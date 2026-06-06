@@ -605,6 +605,59 @@ def session_messages(session_id: str) -> None:
     print_table(rows, title=f"Messages (session: {session_id})")
 
 
+# -------------------------------------------------------------------
+# ingest — codebase ingestion
+# -------------------------------------------------------------------
+
+@cli.group()
+def ingest() -> None:
+    """Ingest a codebase into the knowledge graph."""
+
+
+@ingest.command(name="codebase")
+@click.argument("repo_path", type=click.Path(exists=True, file_okay=False))
+@click.argument("workspace_id")
+@click.option("--max-files", default=0, type=int,
+              help="Max files to process (0 = unlimited)")
+@click.option("--skip-dirs", default="",
+              help="Extra directories to skip (comma-separated)")
+def ingest_codebase(repo_path: str, workspace_id: str,
+                    max_files: int, skip_dirs: str) -> None:
+    """Parse a codebase with tree-sitter and populate the KG."""
+    skip_set = set()
+    if skip_dirs:
+        skip_set = set(d.strip() for d in skip_dirs.split(",") if d.strip())
+
+    try:
+        from spacetime_memory.ingest import CodebaseIngester
+    except ImportError:
+        console.print(
+            "[red]Error:[/red] `spacetime-memory` SDK not installed. "
+            "Run: pip install spacetime-memory"
+        )
+        sys.exit(1)
+
+    with console.status(f"Ingesting {repo_path} ..."):
+        ingester = CodebaseIngester(_sdk_client())
+        stats = ingester.ingest(repo_path, workspace_id,
+                                max_files=max_files, skip_dirs=skip_set)
+
+    console.print(
+        f"[green]Ingestion complete.[/green] "
+        f"{stats['files']} files, {stats['defs']} definitions, "
+        f"{stats['edges']} edges, {stats['errors']} errors"
+    )
+
+
+def _sdk_client():
+    """Build an SDK client from the CLI's env-var config."""
+    from spacetime_memory import Client
+    return Client(
+        host=HOST, port=PORT, database=DB,
+        embedder_url=EMBEDDER_URL,
+    )
+
+
 # ===================================================================
 # Entry point
 # ===================================================================
