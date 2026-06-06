@@ -64,7 +64,7 @@ fn term_match_count(text: &str, terms: &[&str]) -> usize {
 }
 
 /// Parse a JSON array of f64 values into a Vec<f64>.
-fn parse_embedding_json(s: &str) -> Vec<f64> {
+pub(crate) fn parse_embedding_json(s: &str) -> Vec<f64> {
     if s.is_empty() || s == "[]" || s == "null" {
         return vec![];
     }
@@ -73,7 +73,7 @@ fn parse_embedding_json(s: &str) -> Vec<f64> {
 
 /// Compute cosine similarity between two f64 vectors.
 /// Returns 0.0 if either vector is empty or zero-norm.
-fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
+pub(crate) fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;
     }
@@ -153,10 +153,23 @@ pub fn hybrid_search(
                     if stored_emb.is_empty() {
                         continue;
                     }
-                    let score = cosine_similarity(&query_emb, &stored_emb);
-                    if score < 0.1 {
+                    let base_score = cosine_similarity(&query_emb, &stored_emb);
+                    if base_score < 0.1 {
                         continue; // skip near-zero matches
                     }
+
+                    // Weight score by entity trust_score (0.5x–1.0x multiplier)
+                    let trust = if si.entity_type == "memory" {
+                        ctx.db
+                            .memory()
+                            .id()
+                            .find(&si.entity_id)
+                            .map(|m| m.trust_score)
+                            .unwrap_or(0.5)
+                    } else {
+                        0.5
+                    };
+                    let score = base_score * (0.5 + trust * 0.5);
 
                     ctx.db.hybrid_result().insert(HybridResult {
                         id: uuid_v4(),
@@ -193,11 +206,13 @@ pub fn hybrid_search(
                         continue;
                     }
                     let matched = term_match_count(&m.content, &query_terms);
-                    let score = if !query_terms.is_empty() {
+                    let base_score = if !query_terms.is_empty() {
                         matched as f64 / query_terms.len() as f64
                     } else {
                         0.0
                     };
+                    // Weight by trust_score
+                    let score = base_score * (0.5 + m.trust_score * 0.5);
 
                     ctx.db.hybrid_result().insert(HybridResult {
                         id: uuid_v4(),
@@ -343,11 +358,13 @@ pub fn hybrid_search(
                         0.0
                     };
                     // 1 day = 86_400_000_000 micros; scale score linearly from 1.0 down to 0.5
-                    let score = if age < 86_400_000_000.0 {
+                    let base_score = if age < 86_400_000_000.0 {
                         1.0 - (age / 86_400_000_000.0) * 0.5
                     } else {
                         0.5
                     };
+                    // Weight by trust_score
+                    let score = base_score * (0.5 + m.trust_score * 0.5);
 
                     ctx.db.hybrid_result().insert(HybridResult {
                         id: uuid_v4(),

@@ -1,6 +1,8 @@
 use spacetimedb::*;
 
+use crate::hybrid_query::{cosine_similarity, parse_embedding_json};
 use crate::memory::memory;
+use crate::retrieval::search_index;
 use crate::workspace::workspace;
 use crate::{now_micros, uuid_v4};
 
@@ -140,6 +142,124 @@ pub fn decay_weak_memories(
     Ok(())
 }
 
+// ── Auto-Dedup ─────────────────────────────────────────────────────
+
+/// Levenshtein edit distance between two strings (character-level).
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let m = a_chars.len();
+    let n = b_chars.len();
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
+
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr: Vec<usize> = vec![0; n + 1];
+
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            curr[j] = std::cmp::min(
+                std::cmp::min(prev[j] + 1, curr[j - 1] + 1),
+                prev[j - 1] + cost,
+            );
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    prev[n]
+}
+
+/// Find and merge near-duplicate memories within a workspace.
+///
+/// Two memories are considered duplicates when both conditions hold:
+///   1. Embedding cosine similarity >= 0.85
+///   2. Character-level Levenshtein distance <= 30% of longer string
+///
+/// When a pair matches, the older memory is kept and reinforced; the
+/// newer one is marked inactive and consolidated_to the older one.
+#[reducer]
+pub fn dedup_memories(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let now = now_micros();
+
+    // Collect active memories with their embeddings
+    #[allow(clippy::type_complexity)]
+    let memories: Vec<(String, String, i64, Vec<f64>)> = ctx
+        .db
+        .memory()
+        .iter()
+        .filter(|m| m.workspace_id == workspace_id && m.is_active)
+        .map(|m| {
+            let emb = ctx
+                .db
+                .search_index()
+                .iter()
+                .find(|si| si.entity_type == "memory" && si.entity_id == m.id)
+                .map(|si| parse_embedding_json(&si.embedding_json))
+                .unwrap_or_default();
+            (m.id.clone(), m.content.clone(), m.created_at, emb)
+        })
+        .collect();
+
+    if memories.len() < 2 {
+        return Ok(());
+    }
+
+    for i in 0..memories.len() - 1 {
+        for j in i + 1..memories.len() {
+            let (id_a, content_a, created_a, emb_a) = &memories[i];
+            let (id_b, content_b, created_b, emb_b) = &memories[j];
+
+            // Both must have embeddings
+            if emb_a.is_empty() || emb_b.is_empty() {
+                continue;
+            }
+
+            let cos_sim = cosine_similarity(emb_a, emb_b);
+            if cos_sim < 0.85 {
+                continue;
+            }
+
+            let max_len = std::cmp::max(content_a.len(), content_b.len());
+            if max_len == 0 {
+                continue;
+            }
+            let dist = edit_distance(content_a, content_b);
+            let norm_dist = dist as f64 / max_len as f64;
+            if norm_dist > 0.30 {
+                continue;
+            }
+
+            // Keep the older, deactivate the newer
+            let (keep_id, remove_id) = if created_a < created_b {
+                (id_a.clone(), id_b.clone())
+            } else {
+                (id_b.clone(), id_a.clone())
+            };
+
+            if let Some(mut mem) = ctx.db.memory().id().find(&remove_id) {
+                mem.is_active = false;
+                mem.consolidated_to = keep_id.clone();
+                mem.updated_at = now;
+                ctx.db.memory().id().update(mem);
+            }
+
+            if let Some(mut mem) = ctx.db.memory().id().find(&keep_id) {
+                mem.access_count = mem.access_count.saturating_add(1);
+                mem.updated_at = now;
+                ctx.db.memory().id().update(mem);
+            }
+        }
+    }
+
+    Ok(())
+}
+
 // ── Scheduled Maintenance ──────────────────────────────────────────
 
 /// Scheduler table for periodic maintenance tasks.
@@ -207,6 +327,21 @@ pub fn run_maintenance(ctx: &ReducerContext, _arg: MaintenanceSchedule) -> Resul
             target_memory_id: String::new(),
             created_at: now,
         });
+    }
+
+    // 3. Dedup near-duplicate memories per workspace
+    for ws in ctx.db.workspace().iter() {
+        if let Err(e) = dedup_memories(ctx, ws.id.clone()) {
+            // Log but don't halt maintenance on dedup error
+            ctx.db.consolidation_log().insert(ConsolidationLog {
+                id: uuid_v4(),
+                workspace_id: ws.id.clone(),
+                consolidation_type: String::from("dedup_error"),
+                source_memory_ids: e,
+                target_memory_id: String::new(),
+                created_at: now,
+            });
+        }
     }
 
     Ok(())

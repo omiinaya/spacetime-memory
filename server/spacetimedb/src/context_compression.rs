@@ -70,6 +70,15 @@ pub fn reinforce_memory(ctx: &ReducerContext, memory_id: String) -> Result<(), S
     mem.strength = (mem.strength + 0.05).min(1.0);
     mem.updated_at = now_micros();
 
+    // Tier escalation based on strength thresholds
+    if mem.strength >= 0.8 && mem.tier != "L0" {
+        mem.tier = "L0".to_string();
+    } else if mem.strength >= 0.5 && mem.tier == "L2" {
+        mem.tier = "L1".to_string();
+    } else if mem.strength < 0.2 && mem.tier != "L2" {
+        mem.tier = "L2".to_string();
+    }
+
     ctx.db.memory().id().update(mem);
     Ok(())
 }

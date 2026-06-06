@@ -215,3 +215,148 @@ pub fn assign_to_community(
     ctx.db.kg_node().id().update(node);
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Community detection (label propagation)
+// ---------------------------------------------------------------------------
+
+/// Detect communities via label propagation.
+///
+/// Each node adopts the most common `community_id` among its neighbors.
+/// Iterates until convergence (or up to 10 rounds).  Unassigned nodes
+/// (community_id = 0) are left alone — they must be seeded first via
+/// `seed_communities` or manual assignment.
+#[reducer]
+pub fn detect_communities(
+    ctx: &ReducerContext,
+    workspace_id: String,
+) -> Result<(), String> {
+    const MAX_ITER: u32 = 10;
+
+    // Pre-collect edges for the workspace (avoids repeated full-scan filtering)
+    let edge_pairs: Vec<(String, String)> = ctx
+        .db
+        .kg_edge()
+        .iter()
+        .filter(|e| e.workspace_id == workspace_id)
+        .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
+        .collect();
+
+    for _iter in 0..MAX_ITER {
+        let mut changed = false;
+
+        let node_ids: Vec<String> = ctx
+            .db
+            .kg_node()
+            .iter()
+            .filter(|n| n.workspace_id == workspace_id && n.community_id > 0)
+            .map(|n| n.id.clone())
+            .collect();
+
+        for nid in &node_ids {
+            let node = match ctx.db.kg_node().id().find(nid) {
+                Some(n) => n,
+                None => continue,
+            };
+            let current_cid = node.community_id;
+
+            // Collect neighbour community IDs
+            let neighbour_cids: Vec<u64> = edge_pairs
+                .iter()
+                .filter(|(s, t)| s == nid || t == nid)
+                .filter_map(|(s, t)| {
+                    let neighbor_id = if s == nid { t } else { s };
+                    ctx.db
+                        .kg_node()
+                        .id()
+                        .find(neighbor_id)
+                        .map(|n| n.community_id)
+                })
+                .filter(|cid| *cid > 0)
+                .collect();
+
+            if neighbour_cids.is_empty() {
+                continue;
+            }
+
+            // Find most frequent community ID among neighbours
+            let mut freq = std::collections::HashMap::new();
+            for cid in &neighbour_cids {
+                *freq.entry(*cid).or_insert(0u32) += 1;
+            }
+            let best = freq
+                .into_iter()
+                .max_by_key(|&(_, count)| count)
+                .map(|(cid, _)| cid)
+                .unwrap_or(0);
+
+            if best > 0 && best != current_cid {
+                let mut updated = node;
+                updated.community_id = best;
+                ctx.db.kg_node().id().update(updated);
+                changed = true;
+            }
+        }
+
+        if !changed {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+/// Seed isolated nodes that are connected via edges into new communities.
+/// Nodes with community_id == 0 that have edges get a fresh auto-incrementing
+/// community ID (from kg_community.next_id).  Nodes with no edges stay as 0.
+#[reducer]
+pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let now = now_micros();
+    let node_ids: Vec<(String, bool)> = ctx
+        .db
+        .kg_node()
+        .iter()
+        .filter(|n| n.workspace_id == workspace_id && n.community_id == 0)
+        .map(|n| {
+            let has_edge = ctx.db.kg_edge().iter().any(|e| {
+                e.workspace_id == workspace_id
+                    && (e.source_node_id == n.id || e.target_node_id == n.id)
+            });
+            (n.id.clone(), has_edge)
+        })
+        .collect();
+
+    for (nid, has_edge) in &node_ids {
+        if !has_edge {
+            continue;
+        }
+        // Create a fresh community for each isolated-group seed
+        ctx.db.kg_community().insert(KgCommunity {
+            id: 0, // auto-increment
+            workspace_id: workspace_id.clone(),
+            name: format!("Community {}", uuid_v4().get(..8).unwrap_or("new")),
+            summary: String::new(),
+            created_at: now,
+        });
+
+        // The auto-increment ID is assigned server-side; we need to read it back.
+        // Simplest approach: scan for highest community_id and assign that.
+        let new_id = ctx
+            .db
+            .kg_community()
+            .iter()
+            .filter(|c| c.workspace_id == workspace_id)
+            .map(|c| c.id)
+            .max()
+            .unwrap_or(1);
+
+        let mut node = match ctx.db.kg_node().id().find(nid) {
+            Some(n) => n,
+            None => continue,
+        };
+        node.community_id = new_id;
+        ctx.db.kg_node().id().update(node);
+    }
+
+    Ok(())
+}
