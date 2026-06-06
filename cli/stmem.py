@@ -348,6 +348,13 @@ def memory_search(workspace_id: str, query: str, memory_type: str | None,
                 f"  AND hr.query_hash = '{_esc(qhash)}' "
                 f"ORDER BY hr.score DESC LIMIT {limit}"
             )
+        # Auto-reinforce every memory returned
+        for row in rows:
+            if row.get("entity_type") == "memory" and row.get("entity_id"):
+                try:
+                    _call("reinforce_memory", [row["entity_id"]])
+                except Exception:
+                    pass
         print_table(rows, title=f"Semantic search results (workspace: {workspace_id})")
     else:
         clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
@@ -362,6 +369,12 @@ def memory_search(workspace_id: str, query: str, memory_type: str | None,
             rows = _sql(
                 f"SELECT * FROM memory WHERE {where} ORDER BY created_at DESC LIMIT {limit}"
             )
+        # Auto-reinforce every memory returned
+        for row in rows:
+            try:
+                _call("reinforce_memory", [row["id"]])
+            except Exception:
+                pass
         print_table(rows, title=f"Keyword search results (workspace: {workspace_id})")
 
 

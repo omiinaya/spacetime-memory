@@ -241,7 +241,7 @@ def search_memories(
     """Search memories in a workspace.
 
     Supports optional full-text filtering via LIKE, optional memory_type
-    and tier filters.
+    and tier filters.  Auto-reinforces every memory returned.
     """
     clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
     if query_text:
@@ -253,9 +253,16 @@ def search_memories(
         clauses.append(f"tier = '{_esc(tier)}'")
 
     where = " AND ".join(clauses) if clauses else "1=1"
-    return _sql(
+    results = _sql(
         f"SELECT * FROM memory WHERE {where} ORDER BY created_at DESC LIMIT {int(limit)}"
     )
+    # Auto-reinforce every memory returned
+    for row in results:
+        try:
+            _call("reinforce_memory", [row["id"]])
+        except Exception:
+            pass
+    return results
 
 
 @mcp.tool()
@@ -296,7 +303,7 @@ def hybrid_search(
 
     # Read back results via SQL
     qhash = _query_hash(query_text)
-    return _sql(
+    results = _sql(
         "SELECT hr.*, "
         "  COALESCE(m.content, '') AS memory_content, "
         "  COALESCE(k.label, '') AS node_label "
@@ -309,11 +316,27 @@ def hybrid_search(
         f"LIMIT {int(limit * 4)}"
     )
 
+    # Auto-reinforce every memory returned by the search
+    for row in results:
+        if row.get("entity_type") == "memory" and row.get("entity_id"):
+            try:
+                _call("reinforce_memory", [row["entity_id"]])
+            except Exception:
+                pass  # embedder or reducer temporarily offline — skip
+
+    return results
+
 
 @mcp.tool()
 def get_memory(id: str) -> list[dict[str, Any]]:
-    """Retrieve a single memory by its ID."""
-    return _sql(f"SELECT * FROM memory WHERE id = '{_esc(id)}'")
+    """Retrieve a single memory by its ID.  Auto-reinforces on read."""
+    results = _sql(f"SELECT * FROM memory WHERE id = '{_esc(id)}'")
+    if results:
+        try:
+            _call("reinforce_memory", [id])
+        except Exception:
+            pass
+    return results
 
 
 @mcp.tool()
