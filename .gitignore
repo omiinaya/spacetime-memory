@@ -1,35 +1,7 @@
-# Rust
-target/
-**/target/
-
-# Node
-node_modules/
-**/node_modules/
-
-# SpacetimeDB
-~/.local/share/spacetime/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Build output
-dist/
-*.wasm
-
-# Large model files (download via scripts/download-model.sh)
-**/model/*.onnx
-
-# TypeScript build info
-*.tsbuildinfo
-
-# Virtual environments
-**/venv/
-**/__pycache__/
+__pycache__/
 *.pyc
+*.egg-info/
+dist/
+node_modules/
+model/
+*.onnx

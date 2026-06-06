@@ -1,0 +1,19 @@
+{
+  "name": "spacetime-memory",
+  "version": "0.2.0",
+  "description": "TypeScript SDK for spacetime-memory",
+  "main": "dist/client.js",
+  "types": "dist/client.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "typescript": "^5.4"
+  }
+}
