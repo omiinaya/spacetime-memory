@@ -2,75 +2,55 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Database, Search as SearchIcon, Filter, AlertCircle, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { usePollingQuery, fetchMemories, formatMemoryTimestamp } from '@/lib/spacetimedb';
-import type { MemoryRow } from '@/lib/spacetimedb';
+import { Database, Search as SearchIcon, Filter, AlertCircle } from 'lucide-react';
+import { useTable } from '@/lib/useReactiveDb';
+import { formatMemoryTimestamp } from '@/lib/spacetimedb';
 
-function MemoryRowSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex items-center justify-between rounded-lg border border-border p-3">
-          <div className="space-y-1 flex-1">
-            <Skeleton className="h-4 w-3/5" />
-            <Skeleton className="h-3 w-4/5 mt-1" />
-          </div>
-          <div className="flex items-center gap-3 shrink-0 ml-3">
-            <Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="h-4 w-12" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+interface MemoryRow {
+  id: string;
+  workspace_id: string;
+  content: string;
+  summary: string;
+  memory_type: string;
+  tier: string;
+  confidence: number;
+  is_active: boolean;
+  created_at: string | null;
+  updated_at: string | null;
 }
+
+const memoryTypeColors: Record<string, string> = {
+  world_fact: 'bg-blue-500/10 text-blue-600',
+  experience: 'bg-green-500/10 text-green-600',
+  mental_model: 'bg-purple-500/10 text-purple-600',
+  consolidated: 'bg-orange-500/10 text-orange-600',
+};
 
 export default function MemoryBrowser() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: memories, loading, error, refetch } = usePollingQuery(
-    () => fetchMemories(undefined, undefined, undefined, 200),
-    10000,
-  );
+  const { data: memories, loading, error } = useTable<MemoryRow>('memory');
 
   const filtered = memories
-    ? (memories as MemoryRow[])
-        .filter((m) => {
-          if (!searchTerm) return true;
-          const q = searchTerm.toLowerCase();
-          return (
-            m.content.toLowerCase().includes(q) ||
-            m.summary.toLowerCase().includes(q) ||
-            m.memory_type.toLowerCase().includes(q)
-          );
-        })
-        .sort((a, b) => Number(b.updated_at ?? b.created_at ?? 0) - Number(a.updated_at ?? a.created_at ?? 0))
-    : [];
-
-  const memoryTypeColors: Record<string, string> = {
-    world_fact: 'bg-blue-500/10 text-blue-600',
-    experience: 'bg-green-500/10 text-green-600',
-    mental_model: 'bg-purple-500/10 text-purple-600',
-    consolidated: 'bg-orange-500/10 text-orange-600',
-  };
+    .filter((m) => {
+      if (!searchTerm) return true;
+      const q = searchTerm.toLowerCase();
+      return (
+        m.content.toLowerCase().includes(q) ||
+        m.summary.toLowerCase().includes(q) ||
+        m.memory_type.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => Number(b.updated_at ?? b.created_at ?? 0) - Number(a.updated_at ?? a.created_at ?? 0));
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Memory Browser</h1>
-          <p className="text-muted-foreground">
-            {loading ? 'Loading...' : `${filtered.length} memory(ies)`}
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={refetch}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Memory Browser</h1>
+        <p className="text-muted-foreground">
+          {loading ? 'Loading...' : `${filtered.length} memory(ies)`}
+        </p>
       </div>
 
-      {/* Search bar */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1">
           <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -87,7 +67,6 @@ export default function MemoryBrowser() {
         </Badge>
       </div>
 
-      {/* Memory list */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Stored Memories</CardTitle>
@@ -99,7 +78,20 @@ export default function MemoryBrowser() {
               <p className="text-sm">{error}</p>
             </div>
           ) : loading ? (
-            <MemoryRowSkeleton />
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div className="space-y-1 flex-1">
+                    <div className="h-4 w-3/5 rounded bg-muted animate-pulse" />
+                    <div className="h-3 w-4/5 mt-1 rounded bg-muted animate-pulse" />
+                  </div>
+                  <div className="flex gap-3 shrink-0 ml-3">
+                    <div className="h-5 w-16 rounded-full bg-muted animate-pulse" />
+                    <div className="h-4 w-12 rounded bg-muted animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Database className="h-10 w-10 mb-3 opacity-30" />

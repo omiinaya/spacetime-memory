@@ -1,45 +1,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, AlertCircle, RefreshCw } from 'lucide-react';
-import { usePollingQuery, fetchDocuments, formatMemoryTimestamp } from '@/lib/spacetimedb';
-import type { DocumentRow } from '@/lib/spacetimedb';
+import { FileText, AlertCircle } from 'lucide-react';
+import { useTable } from '@/lib/useReactiveDb';
+import { formatMemoryTimestamp } from '@/lib/spacetimedb';
 
-function DocSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="flex items-center justify-between rounded-lg border border-border p-3">
-          <div className="space-y-1 flex-1">
-            <Skeleton className="h-5 w-56" />
-            <Skeleton className="h-3 w-32 mt-1" />
-          </div>
-          <Skeleton className="h-5 w-16 rounded-full shrink-0 ml-3" />
-        </div>
-      ))}
-    </div>
-  );
+interface DocumentRow {
+  id: string;
+  workspace_id: string;
+  title: string;
+  content_type: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export default function Documents() {
-  const { data: docs, loading, error, refetch } = usePollingQuery(() => fetchDocuments(), 10000);
+  const { data: docs, loading, error } = useTable<DocumentRow>('document');
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
-          <p className="text-muted-foreground">
-            {loading ? 'Loading...' : `${docs?.length ?? 0} document(s)`}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={refetch}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+        <p className="text-muted-foreground">
+          {loading ? 'Loading...' : `${docs.length} document(s)`}
+        </p>
       </div>
 
       <Card>
@@ -53,8 +36,18 @@ export default function Documents() {
               <p className="text-sm">{error}</p>
             </div>
           ) : loading ? (
-            <DocSkeleton />
-          ) : !docs || docs.length === 0 ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <div className="space-y-1 flex-1">
+                    <div className="h-5 w-56 rounded bg-muted animate-pulse" />
+                    <div className="h-3 w-32 mt-1 rounded bg-muted animate-pulse" />
+                  </div>
+                  <div className="h-5 w-16 rounded-full bg-muted animate-pulse shrink-0 ml-3" />
+                </div>
+              ))}
+            </div>
+          ) : docs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <FileText className="h-10 w-10 mb-3 opacity-30" />
               <p className="font-medium">No documents yet</p>
@@ -62,7 +55,7 @@ export default function Documents() {
             </div>
           ) : (
             <div className="space-y-3">
-              {(docs as DocumentRow[]).map((doc) => (
+              {docs.map((doc) => (
                 <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                   <div className="flex items-start gap-3 min-w-0 flex-1 mr-3">
                     <FileText className="mt-0.5 h-4 w-4 text-muted-foreground shrink-0" />

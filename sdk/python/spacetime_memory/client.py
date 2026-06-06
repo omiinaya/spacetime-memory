@@ -463,6 +463,63 @@ class Client:
             preferences_json, tags_json,
         ])
 
+    # -----------------------------------------------------------------------
+    # Knowledge Graph — additional queries
+    # -----------------------------------------------------------------------
+
+    def get_node(self, node_id: str) -> list[dict[str, Any]]:
+        """Get a KG node by ID."""
+        return self._sql(
+            f"SELECT * FROM kg_node WHERE id = '{_esc(node_id)}'"
+        )
+
+    def get_community(self, community_id: int) -> dict[str, Any]:
+        """Get community details and its nodes."""
+        community = self._sql(
+            f"SELECT * FROM kg_community WHERE id = {int(community_id)}"
+        )
+        nodes = self._sql(
+            f"SELECT * FROM kg_node WHERE community_id = {int(community_id)}"
+        )
+        return {
+            "community": community[0] if community else None,
+            "nodes": nodes,
+        }
+
+    # -----------------------------------------------------------------------
+    # Peer queries
+    # -----------------------------------------------------------------------
+
+    def list_peers(self, workspace_id: str | None = None) -> list[dict[str, Any]]:
+        """List peers, optionally filtered by workspace."""
+        if workspace_id:
+            return self._sql(
+                f"SELECT * FROM peer WHERE workspace_id = '{_esc(workspace_id)}'"
+            )
+        return self._sql("SELECT * FROM peer")
+
+    # -----------------------------------------------------------------------
+    # Context pack queries
+    # -----------------------------------------------------------------------
+
+    def list_context_packs(self, workspace_id: str) -> list[dict[str, Any]]:
+        """List context packs for a workspace."""
+        return self._sql(
+            f"SELECT * FROM context_pack WHERE workspace_id = '{_esc(workspace_id)}'"
+        )
+
+    def list_context_entries(self, pack_id: str) -> list[dict[str, Any]]:
+        """List entries in a context pack."""
+        return self._sql(
+            f"SELECT * FROM context_entry WHERE pack_id = '{_esc(pack_id)}'"
+        )
+
+    def list_context_deltas(self, previous_pack_id: str) -> list[dict[str, Any]]:
+        """List delta entries for a pack."""
+        return self._sql(
+            f"SELECT * FROM context_delta WHERE previous_pack_id = '{_esc(previous_pack_id)}'"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers

@@ -1,25 +1,27 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Users, AlertCircle, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { usePollingQuery, fetchPeers } from '@/lib/spacetimedb';
-import type { PeerRow } from '@/lib/spacetimedb';
+import { Users, AlertCircle } from 'lucide-react';
+import { useTable } from '@/lib/useReactiveDb';
 
-function PeerSkeleton() {
+interface PeerRow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  peer_type: string;
+  metadata_json: string;
+  created_at: string | null;
+}
+
+function Skeleton() {
   return (
     <div className="space-y-3">
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex items-center justify-between rounded-lg border border-border p-3">
           <div className="space-y-1">
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-3 w-24" />
+            <div className="h-5 w-40 rounded bg-muted animate-pulse" />
+            <div className="h-3 w-24 rounded bg-muted animate-pulse" />
           </div>
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-4 w-12" />
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-5 w-16 rounded-full" />
-          </div>
+          <div className="h-5 w-16 rounded-full bg-muted animate-pulse" />
         </div>
       ))}
     </div>
@@ -27,21 +29,15 @@ function PeerSkeleton() {
 }
 
 export default function Peers() {
-  const { data: peers, loading, error, refetch } = usePollingQuery(() => fetchPeers(), 10000);
+  const { data: peers, loading, error } = useTable<PeerRow>('peer');
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Peers</h1>
-          <p className="text-muted-foreground">
-            {loading ? 'Loading...' : `${peers?.length ?? 0} peer(s) registered`}
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={refetch}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Peers</h1>
+        <p className="text-muted-foreground">
+          {loading ? 'Loading...' : `${peers.length} peer(s) registered`}
+        </p>
       </div>
 
       <Card>
@@ -55,8 +51,8 @@ export default function Peers() {
               <p className="text-sm">{error}</p>
             </div>
           ) : loading ? (
-            <PeerSkeleton />
-          ) : !peers || peers.length === 0 ? (
+            <Skeleton />
+          ) : peers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Users className="h-10 w-10 mb-3 opacity-30" />
               <p className="font-medium">No peers yet</p>
@@ -64,7 +60,7 @@ export default function Peers() {
             </div>
           ) : (
             <div className="space-y-3">
-              {(peers as PeerRow[]).map((peer) => (
+              {peers.map((peer) => (
                 <div key={peer.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                   <div className="space-y-1 min-w-0">
                     <p className="font-medium truncate max-w-[300px]">{peer.name || peer.id}</p>

@@ -157,11 +157,7 @@ def peer_create(workspace_id: str, name: str, peer_type: str, metadata: str) -> 
 def peer_list(workspace_id: str) -> None:
     """List peers in a workspace."""
     with console.status(f"Fetching peers for workspace '{workspace_id}'..."):
-        rows = _sdk_client()._sql(
-            "SELECT * FROM peer WHERE workspace_id = '{}'".format(
-                workspace_id.replace("'", "''")
-            )
-        )
+        rows = _sdk_client().list_peers(workspace_id)
     print_table(rows, title=f"Peers (workspace: {workspace_id})")
 
 
@@ -433,11 +429,7 @@ def session_create(workspace_id: str, name: str, metadata: str) -> None:
 def session_messages(session_id: str) -> None:
     """Get messages for a session."""
     with console.status(f"Fetching messages for session '{session_id}'..."):
-        rows = _sdk_client()._sql(
-            "SELECT * FROM message WHERE session_id = '{}'".format(
-                session_id.replace("'", "''")
-            )
-        )
+        rows = _sdk_client().get_session_messages(session_id)
     print_table(rows, title=f"Messages (session: {session_id})")
 
 
@@ -544,12 +536,7 @@ def context_pack(workspace_id: str, query: str, token_budget: int,
         client._call("generate_context_pack", [
             workspace_id, query, token_budget, peer_id, "",
         ])
-        # Read back from context_pack table
-        rows = client._sql(
-            "SELECT * FROM context_pack WHERE workspace_id = '{}'".format(
-                workspace_id.replace("'", "''")
-            )
-        )
+        rows = client.list_context_packs(workspace_id)
 
     if not rows:
         console.print("[yellow]No context pack generated.[/yellow]")
@@ -559,11 +546,7 @@ def context_pack(workspace_id: str, query: str, token_budget: int,
     print_json(pack)
 
     print_table(
-        client._sql(
-            "SELECT * FROM context_entry WHERE pack_id = '{}'".format(
-                pack.get("id", "").replace("'", "''")
-            )
-        ),
+        client.list_context_entries(pack.get("id", "")),
         title="Context entries",
     )
 
@@ -575,11 +558,7 @@ def context_delta(previous_pack_id: str) -> None:
     client = _sdk_client()
     with console.status("Computing delta..."):
         client._call("get_delta", [previous_pack_id])
-        rows = client._sql(
-            "SELECT * FROM context_delta WHERE previous_pack_id = '{}'".format(
-                previous_pack_id.replace("'", "''")
-            )
-        )
+        rows = client.list_context_deltas(previous_pack_id)
     print_table(rows, title=f"Delta from {previous_pack_id[:16]}...")
 
 

@@ -222,9 +222,7 @@ def query_graph(workspace_id: str, query: str = "") -> list[dict[str, Any]]:
 @mcp.tool()
 def get_node(id: str) -> list[dict[str, Any]]:
     """Retrieve a knowledge graph node by its ID."""
-    return get_client()._sql(
-        "SELECT * FROM kg_node WHERE id = '{}'".format(id.replace("'", "''"))
-    )
+    return get_client().get_node(id)
 
 
 @mcp.tool()
@@ -236,16 +234,7 @@ def get_neighbors(node_id: str) -> list[dict[str, Any]]:
 @mcp.tool()
 def get_community(community_id: int) -> dict[str, Any]:
     """Get community details and list all nodes in that community."""
-    community = get_client()._sql(
-        "SELECT * FROM kg_community WHERE id = {}".format(int(community_id))
-    )
-    nodes = get_client()._sql(
-        "SELECT * FROM kg_node WHERE community_id = {}".format(int(community_id))
-    )
-    return {
-        "community": community[0] if community else None,
-        "nodes": nodes,
-    }
+    return get_client().get_community(community_id)
 
 
 # ---------------------------------------------------------------------------
