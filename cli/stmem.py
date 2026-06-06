@@ -2,12 +2,12 @@
 """stmem — Spacetime-Memory CLI.
 
 A command-line interface for managing memory from the terminal,
-connecting to a SpacetimeDB instance via its HTTP SQL API.
+using the spacetime-memory Python SDK.
 
 Configuration via environment variables:
-    STMEM_HOST          (default: localhost)
-    STMEM_PORT          (default: 3001)
-    STMEM_DB            (default: spacetime-memory)
+    STMEM_HOST / SPACETIMEDB_HOST (default: localhost)
+    STMEM_PORT / SPACETIMEDB_PORT (default: 3001)
+    STMEM_DB / SPACETIMEDB_DB (default: spacetime-memory)
 """
 
 from __future__ import annotations
@@ -23,6 +23,8 @@ from rich.console import Console
 from rich.table import Table
 from rich import box
 
+from spacetime_memory import Client
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -31,77 +33,16 @@ HOST = os.environ.get("STMEM_HOST", os.environ.get("SPACETIMEDB_HOST", "localhos
 PORT = os.environ.get("STMEM_PORT", os.environ.get("SPACETIMEDB_PORT", "3001"))
 DB = os.environ.get("STMEM_DB", os.environ.get("SPACETIMEDB_DB", "spacetime-memory"))
 EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://localhost:9090")
-BASE_URL = f"http://{HOST}:{PORT}"
-SQL_URL = f"{BASE_URL}/v1/database/{DB}/sql"
-REDUCER_BASE = f"{BASE_URL}/v1/database/{DB}/call"
 
 console = Console()
 
-# ---------------------------------------------------------------------------
-# HTTP helpers
-# ---------------------------------------------------------------------------
 
-_client: httpx.Client | None = None
-
-
-def get_client() -> httpx.Client:
-    global _client
-    if _client is None:
-        _client = httpx.Client(timeout=30.0)
-    return _client
-
-
-def _esc(val: str) -> str:
-    """Basic SQL string escaping for single-quoted string literals."""
-    return val.replace("'", "''")
-
-
-def _sql(query: str) -> list[dict[str, Any]]:
-    """Execute a SQL SELECT / read query and return parsed dicts."""
-    resp = get_client().post(SQL_URL, content=query, headers={"Content-Type": "text/plain"})
-    if resp.status_code >= 400:
-        body = resp.text[:2000]
-        raise click.ClickException(f"SQL error (HTTP {resp.status_code}): {body}")
-
-    data: list[dict] = resp.json()
-    if not data:
-        return []
-
-    results: list[dict[str, Any]] = []
-    for table in data:
-        schema = table.get("schema", {})
-        elements = schema.get("elements", [])
-        col_names: list[str] = []
-        for el in elements:
-            name_container = el.get("name", {})
-            if isinstance(name_container, dict) and "some" in name_container:
-                col_names.append(name_container["some"])
-            else:
-                col_names.append("?col?")
-
-        rows = table.get("rows", [])
-        for row in rows:
-            row_dict = {}
-            for i, val in enumerate(row):
-                key = col_names[i] if i < len(col_names) else f"col{i}"
-                row_dict[key] = val
-            results.append(row_dict)
-
-    return results
-
-
-def _call(reducer: str, args: list[Any] | None = None) -> dict[str, Any]:
-    """Call a SpacetimeDB reducer with the given positional arguments."""
-    payload = json.dumps(args or [])
-    resp = get_client().post(
-        f"{REDUCER_BASE}/{reducer}",
-        content=payload,
-        headers={"Content-Type": "application/json"},
+def _sdk_client() -> Client:
+    """Build an SDK Client from the CLI's env-var config."""
+    return Client(
+        host=HOST, port=PORT, database=DB,
+        embedder_url=EMBEDDER_URL,
     )
-    if resp.status_code >= 400:
-        body = resp.text[:2000]
-        raise click.ClickException(f"Reducer error (HTTP {resp.status_code}): {body}")
-    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
@@ -141,35 +82,6 @@ def parse_json_flag(ctx: click.Context, param: click.Parameter, value: str | Non
 
 
 # ---------------------------------------------------------------------------
-# Embedder helper
-# ---------------------------------------------------------------------------
-
-
-def _embed(text: str) -> list[float]:
-    """Generate an embedding vector via the Rust ONNX embedder sidecar."""
-    try:
-        resp = get_client().post(
-            f"{EMBEDDER_URL}/embed",
-            content=json.dumps({"text": text}),
-            headers={"Content-Type": "application/json"},
-            timeout=10.0,
-        )
-        if resp.status_code >= 400:
-            return []
-        return resp.json().get("embedding", [])
-    except Exception:
-        return []
-
-
-def _query_hash(query: str) -> str:
-    """Compute the same query hash as the Rust hybrid_query reducer."""
-    h = 0
-    for b in query.encode("utf-8"):
-        h = ((h * 6364136223846793005) + b) & 0xFFFFFFFFFFFFFFFF
-    return f"{h:016x}"
-
-
-# ---------------------------------------------------------------------------
 # stmem CLI group
 # ---------------------------------------------------------------------------
 
@@ -199,8 +111,9 @@ def workspace() -> None:
 @click.argument("description", default="")
 def workspace_create(name: str, description: str) -> None:
     """Create a new workspace."""
+    client = _sdk_client()
     with console.status(f"Creating workspace '{name}'..."):
-        result = _call("create_workspace", [name, description])
+        result = client.create_workspace(name, description)
     console.print(f"[green]Workspace '{name}' created successfully.[/green]")
     if result:
         print_json(result)
@@ -210,8 +123,8 @@ def workspace_create(name: str, description: str) -> None:
 def workspace_list() -> None:
     """List all workspaces."""
     with console.status("Fetching workspaces..."):
-        rows = _sql("SELECT * FROM workspace")
-    rows.sort(key=lambda r: r.get('created_at', 0), reverse=True)
+        rows = _sdk_client().list_workspaces()
+    rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
     print_table(rows, title="Workspaces")
 
 
@@ -233,7 +146,7 @@ def peer() -> None:
 def peer_create(workspace_id: str, name: str, peer_type: str, metadata: str) -> None:
     """Create a peer (user/agent/entity) in a workspace."""
     with console.status(f"Creating peer '{name}'..."):
-        result = _call("create_peer", [workspace_id, name, peer_type, metadata])
+        result = _sdk_client()._call("create_peer", [workspace_id, name, peer_type, metadata])
     console.print(f"[green]Peer '{name}' created successfully.[/green]")
     if result:
         print_json(result)
@@ -244,9 +157,10 @@ def peer_create(workspace_id: str, name: str, peer_type: str, metadata: str) -> 
 def peer_list(workspace_id: str) -> None:
     """List peers in a workspace."""
     with console.status(f"Fetching peers for workspace '{workspace_id}'..."):
-        rows = _sql(
-            f"SELECT * FROM peer WHERE workspace_id = '{_esc(workspace_id)}' "
-             # — unsupported in SpacetimeDB SQL, sorting client-side
+        rows = _sdk_client()._sql(
+            "SELECT * FROM peer WHERE workspace_id = '{}'".format(
+                workspace_id.replace("'", "''")
+            )
         )
     print_table(rows, title=f"Peers (workspace: {workspace_id})")
 
@@ -286,31 +200,21 @@ def memory_store(
     tier: str,
 ) -> None:
     """Store a new memory and index it for semantic search."""
+    client = _sdk_client()
     with console.status("Storing memory..."):
-        result = _call("store_memory", [
-            workspace_id, peer_id, observer_id,
-            memory_type, content, summary, entities_json,
-            confidence, source_session_id, source_message_id,
-        ])
-        # Generate embedding and index
-        emb = _embed(content)
-        if emb:
-            mems = _sql(
-                f"SELECT id FROM memory WHERE workspace_id = '{_esc(workspace_id)}' "
-                f"AND peer_id = '{_esc(peer_id)}' "
-            )
-            if mems:
-                _call("index_entity", [
-                    workspace_id, "memory", mems[0]["id"],
-                    content, json.dumps(emb),
-                ])
-        if tier:
-            mems = _sql(
-                f"SELECT id FROM memory WHERE workspace_id = '{_esc(workspace_id)}' "
-                f"AND peer_id = '{_esc(peer_id)}' "
-            )
-            if mems:
-                _call("update_memory_tier", [mems[0]["id"], tier])
+        result = client.store(
+            workspace_id=workspace_id,
+            content=content,
+            summary=summary,
+            memory_type=memory_type,
+            peer_id=peer_id,
+            observer_id=observer_id,
+            entities_json=entities_json,
+            confidence=confidence,
+            source_session_id=source_session_id,
+            source_message_id=source_message_id,
+            tier=tier,
+        )
     console.print("[green]Memory stored successfully.[/green]")
     if result:
         print_json(result)
@@ -323,60 +227,21 @@ def memory_store(
 @click.option("--tier", help="Filter by tier (L0/L1/L2)")
 @click.option("--limit", default=50, type=int, help="Max results")
 @click.option("--semantic/--no-semantic", default=True,
-              help="Use semantic (embedding) search; falls back to keyword if embedder unavailable")
+              help="Use semantic (embedding) search")
 def memory_search(workspace_id: str, query: str, memory_type: str | None,
                   tier: str | None, limit: int, semantic: bool) -> None:
     """Search memories in a workspace."""
-    if semantic:
-        # Use hybrid search with real embeddings
-        query_embedding = _embed(query)
-        query_emb_json = json.dumps(query_embedding) if query_embedding else "[]"
-        strategies = ["semantic", "keyword"]
-        if memory_type or tier:
-            strategies.append("temporal")
-        with console.status("Searching semantically..."):
-            _call("hybrid_search", [
-                workspace_id, query, query_emb_json,
-                memory_type or "", tier or "", limit,
-                json.dumps(strategies),
-            ])
-            qhash = _query_hash(query)
-            rows = _sql(
-                f"SELECT hr.*, m.content AS memory_content "
-                f"FROM hybrid_result hr "
-                f"LEFT JOIN memory m ON hr.entity_type = 'memory' AND hr.entity_id = m.id "
-                f"WHERE hr.workspace_id = '{_esc(workspace_id)}' "
-                f"  AND hr.query_hash = '{_esc(qhash)}' "
-                f"{limit}"
-            )
-        # Auto-reinforce every memory returned
-        for row in rows:
-            if row.get("entity_type") == "memory" and row.get("entity_id"):
-                try:
-                    _call("reinforce_memory", [row["entity_id"]])
-                except Exception:
-                    pass
-        print_table(rows, title=f"Semantic search results (workspace: {workspace_id})")
-    else:
-        clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
-        escaped = _esc(query)
-        clauses.append(f"(content LIKE '%{escaped}%' OR summary LIKE '%{escaped}%')")
-        if memory_type:
-            clauses.append(f"memory_type = '{_esc(memory_type)}'")
-        if tier:
-            clauses.append(f"tier = '{_esc(tier)}'")
-        where = " AND ".join(clauses)
-        with console.status("Searching by keyword..."):
-            rows = _sql(
-                f"SELECT * FROM memory WHERE {where} {limit}"
-            )
-        # Auto-reinforce every memory returned
-        for row in rows:
-            try:
-                _call("reinforce_memory", [row["id"]])
-            except Exception:
-                pass
-        print_table(rows, title=f"Keyword search results (workspace: {workspace_id})")
+    client = _sdk_client()
+    with console.status("Searching..."):
+        rows = client.search(
+            workspace_id=workspace_id,
+            query=query,
+            memory_type=memory_type or "",
+            tier=tier or "",
+            limit=limit,
+            semantic=semantic,
+        )
+    print_table(rows, title=f"Search results (workspace: {workspace_id})")
 
 
 @memory.command(name="reinforce")
@@ -384,7 +249,7 @@ def memory_search(workspace_id: str, query: str, memory_type: str | None,
 def memory_reinforce(memory_id: str) -> None:
     """Reinforce a memory (increment access count and bump strength)."""
     with console.status(f"Reinforcing memory '{memory_id}'..."):
-        result = _call("reinforce_memory", [memory_id])
+        result = _sdk_client().reinforce(memory_id)
     console.print(f"[green]Memory '{memory_id}' reinforced.[/green]")
     if result:
         print_json(result)
@@ -397,7 +262,7 @@ def memory_reinforce(memory_id: str) -> None:
 def memory_rate(memory_id: str, rating: str, peer_id: str) -> None:
     """Rate a memory as 'helpful' or 'unhelpful'."""
     with console.status(f"Rating memory '{memory_id}' as '{rating}'..."):
-        result = _call("rate_memory", [memory_id, rating, peer_id])
+        result = _sdk_client()._call("rate_memory", [memory_id, rating, peer_id])
     console.print(f"[green]Memory '{memory_id}' rated as '{rating}'.[/green]")
     if result:
         print_json(result)
@@ -408,13 +273,10 @@ def memory_rate(memory_id: str, rating: str, peer_id: str) -> None:
 @click.option("--type", "memory_type", help="Filter by memory type (world_fact/experience/mental_model)")
 def memory_list(workspace_id: str, memory_type: str | None) -> None:
     """List memories in a workspace."""
-    clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
-    if memory_type:
-        clauses.append(f"memory_type = '{_esc(memory_type)}'")
-    where = " AND ".join(clauses)
     with console.status(f"Fetching memories for workspace '{workspace_id}'..."):
-        rows = _sql(
-            f"SELECT * FROM memory WHERE {where} "
+        rows = _sdk_client().list_memories(
+            workspace_id=workspace_id,
+            memory_type=memory_type or "",
         )
     print_table(rows, title=f"Memories (workspace: {workspace_id})")
 
@@ -434,9 +296,7 @@ def profile() -> None:
 def profile_get(peer_id: str) -> None:
     """Retrieve the profile for a peer."""
     with console.status(f"Fetching profile for peer '{peer_id}'..."):
-        rows = _sql(
-            f"SELECT * FROM profile WHERE peer_id = '{_esc(peer_id)}'"
-        )
+        rows = _sdk_client().get_profile(peer_id)
     print_table(rows, title=f"Profile (peer: {peer_id})")
 
 
@@ -454,9 +314,9 @@ def profile_upsert(peer_id: str, static_facts: str, dynamic_context: str,
                    preferences: str, tags: str) -> None:
     """Create or update a peer profile."""
     with console.status(f"Upserting profile for peer '{peer_id}'..."):
-        result = _call("upsert_profile", [
+        result = _sdk_client().upsert_profile(
             peer_id, static_facts, dynamic_context, preferences, tags,
-        ])
+        )
     console.print(f"[green]Profile for peer '{peer_id}' updated.[/green]")
     if result:
         print_json(result)
@@ -489,20 +349,7 @@ def kg_node_create(workspace_id: str, label: str, node_type: str,
                    summary: str, metadata: str) -> None:
     """Create a knowledge graph node and index it for semantic search."""
     with console.status(f"Creating KG node '{label}'..."):
-        result = _call("create_node", [workspace_id, label, node_type, summary, metadata])
-        # Generate embedding and index
-        content = f"{label}: {summary}" if summary else label
-        emb = _embed(content)
-        if emb:
-            nodes = _sql(
-                f"SELECT id FROM kg_node WHERE workspace_id = '{_esc(workspace_id)}' "
-                f"AND label = '{_esc(label)}' "
-            )
-            if nodes:
-                _call("index_entity", [
-                    workspace_id, "node", nodes[0]["id"],
-                    content, json.dumps(emb),
-                ])
+        result = _sdk_client().create_node(workspace_id, label, node_type, summary, metadata)
     console.print(f"[green]KG node '{label}' created.[/green]")
     if result:
         print_json(result)
@@ -529,7 +376,7 @@ def kg_edge_create(workspace_id: str, source_node_id: str,
                    weight: float, confidence: str, metadata: str) -> None:
     """Create a knowledge graph edge."""
     with console.status(f"Creating edge '{relation}'..."):
-        result = _call("create_edge", [
+        result = _sdk_client()._call("create_edge", [
             workspace_id, source_node_id, target_node_id,
             relation, weight, confidence, metadata,
         ])
@@ -543,12 +390,8 @@ def kg_edge_create(workspace_id: str, source_node_id: str,
 @click.argument("query")
 def kg_query(workspace_id: str, query: str) -> None:
     """Search knowledge graph nodes by label."""
-    escaped = _esc(query)
     with console.status(f"Searching KG nodes for '{query}'..."):
-        rows = _sql(
-            f"SELECT * FROM kg_node WHERE workspace_id = '{_esc(workspace_id)}' "
-            f"AND label LIKE '%{escaped}%' "
-        )
+        rows = _sdk_client().query_graph(workspace_id, query)
     print_table(rows, title=f"KG nodes matching '{query}'")
 
 
@@ -557,16 +400,7 @@ def kg_query(workspace_id: str, query: str) -> None:
 def kg_neighbors(node_id: str) -> None:
     """Get neighbors of a node in the knowledge graph."""
     with console.status(f"Fetching neighbors for node '{node_id}'..."):
-        rows = _sql(
-            f"SELECT e.*, "
-            f"  src.label AS source_label, tgt.label AS target_label "
-            f"FROM kg_edge e "
-            f"LEFT JOIN kg_node src ON e.source_node_id = src.id "
-            f"LEFT JOIN kg_node tgt ON e.target_node_id = tgt.id "
-            f"WHERE e.source_node_id = '{_esc(node_id)}' "
-            f"   OR e.target_node_id = '{_esc(node_id)}' "
-            f""
-        )
+        rows = _sdk_client().get_neighbors(node_id)
     print_table(rows, title=f"Neighbors of node '{node_id}'")
 
 
@@ -588,7 +422,7 @@ def session() -> None:
 def session_create(workspace_id: str, name: str, metadata: str) -> None:
     """Create a new session."""
     with console.status(f"Creating session '{name}'..."):
-        result = _call("create_session", [workspace_id, name, metadata])
+        result = _sdk_client()._call("create_session", [workspace_id, name, metadata])
     console.print(f"[green]Session '{name}' created.[/green]")
     if result:
         print_json(result)
@@ -599,16 +433,18 @@ def session_create(workspace_id: str, name: str, metadata: str) -> None:
 def session_messages(session_id: str) -> None:
     """Get messages for a session."""
     with console.status(f"Fetching messages for session '{session_id}'..."):
-        rows = _sql(
-            f"SELECT * FROM message WHERE session_id = '{_esc(session_id)}' "
-            f""
+        rows = _sdk_client()._sql(
+            "SELECT * FROM message WHERE session_id = '{}'".format(
+                session_id.replace("'", "''")
+            )
         )
     print_table(rows, title=f"Messages (session: {session_id})")
 
 
-# -------------------------------------------------------------------
+# ===================================================================
 # ingest — codebase ingestion
-# -------------------------------------------------------------------
+# ===================================================================
+
 
 @cli.group()
 def ingest() -> None:
@@ -650,18 +486,10 @@ def ingest_codebase(repo_path: str, workspace_id: str,
     )
 
 
-def _sdk_client():
-    """Build an SDK client from the CLI's env-var config."""
-    from spacetime_memory import Client
-    return Client(
-        host=HOST, port=PORT, database=DB,
-        embedder_url=EMBEDDER_URL,
-    )
-
-
-# -------------------------------------------------------------------
+# ===================================================================
 # connector — external data sources
-# -------------------------------------------------------------------
+# ===================================================================
+
 
 @cli.group()
 def connector() -> None:
@@ -693,9 +521,10 @@ def connector_run(rss: str | None, workspace_id: str,
         sys.exit(1)
 
 
-# -------------------------------------------------------------------
+# ===================================================================
 # context — context pack / delta agent
-# -------------------------------------------------------------------
+# ===================================================================
+
 
 @cli.group()
 def context() -> None:
@@ -710,18 +539,18 @@ def context() -> None:
 def context_pack(workspace_id: str, query: str, token_budget: int,
                  peer_id: str) -> None:
     """Generate a context pack for a query and print results."""
-    # 1. Call the reducer
+    client = _sdk_client()
     with console.status("Generating context pack..."):
-        _call("generate_context_pack", [
+        client._call("generate_context_pack", [
             workspace_id, query, token_budget, peer_id, "",
         ])
+        # Read back from context_pack table
+        rows = client._sql(
+            "SELECT * FROM context_pack WHERE workspace_id = '{}'".format(
+                workspace_id.replace("'", "''")
+            )
+        )
 
-    # 2. Read back the context_pack table
-    rows = _sql(
-        "SELECT * FROM context_pack WHERE "
-        f"workspace_id = '{_esc(workspace_id)}' "
-        ""
-    )
     if not rows:
         console.print("[yellow]No context pack generated.[/yellow]")
         return
@@ -729,11 +558,12 @@ def context_pack(workspace_id: str, query: str, token_budget: int,
     pack = rows[0]
     print_json(pack)
 
-    # 3. Show the delta (empty previous_pack_id = full pack)
     print_table(
-        _sql("SELECT * FROM context_entry WHERE "
-             f"pack_id = '{_esc(pack.get('id', ''))}' "
-             ""),
+        client._sql(
+            "SELECT * FROM context_entry WHERE pack_id = '{}'".format(
+                pack.get("id", "").replace("'", "''")
+            )
+        ),
         title="Context entries",
     )
 
@@ -742,14 +572,14 @@ def context_pack(workspace_id: str, query: str, token_budget: int,
 @click.argument("previous_pack_id")
 def context_delta(previous_pack_id: str) -> None:
     """Compute and show the delta from a previous pack."""
+    client = _sdk_client()
     with console.status("Computing delta..."):
-        _call("get_delta", [previous_pack_id])
-
-    rows = _sql(
-        f"SELECT * FROM context_delta "
-        f"WHERE previous_pack_id = '{_esc(previous_pack_id)}' "
-        ""
-    )
+        client._call("get_delta", [previous_pack_id])
+        rows = client._sql(
+            "SELECT * FROM context_delta WHERE previous_pack_id = '{}'".format(
+                previous_pack_id.replace("'", "''")
+            )
+        )
     print_table(rows, title=f"Delta from {previous_pack_id[:16]}...")
 
 
@@ -766,7 +596,7 @@ def main() -> None:
     except httpx.ConnectError as e:
         console.print(
             f"[red]Connection error:[/red] Could not connect to SpacetimeDB at "
-            f"{BASE_URL}. Is it running?\n  {e}"
+            f"http://{HOST}:{PORT}. Is it running?\n  {e}"
         )
         sys.exit(1)
 

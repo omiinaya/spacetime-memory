@@ -1,7 +1,8 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { Route, Switch } from 'wouter';
 import Layout from '@/components/Layout';
 import { Loader2 } from 'lucide-react';
+import { initReactiveDb } from '@/lib/useReactiveDb';
 
 // Lazy load pages
 const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
@@ -25,6 +26,11 @@ function LoadingFallback() {
 }
 
 export default function App() {
+  // Connect + subscribe all tables once on mount
+  useEffect(() => {
+    initReactiveDb();
+  }, []);
+
   return (
     <Layout>
       <Suspense fallback={<LoadingFallback />}>

@@ -1,8 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Database, Users, Activity, Building2, AlertCircle } from 'lucide-react';
-import { usePollingQuery, fetchDashboardStats, fetchRecentActivity } from '@/lib/spacetimedb';
-import type { RecentActivity } from '@/lib/spacetimedb';
+import { useReactiveDb } from '@/lib/useReactiveDb';
 
 function StatCard({ title, value, icon: Icon, loading, color }: {
   title: string;
@@ -53,24 +52,25 @@ function ActivitySkeleton() {
 }
 
 export default function Dashboard() {
-  const { data: stats, loading: statsLoading, error: statsError } = usePollingQuery(fetchDashboardStats, 10000);
-  const { data: activity, loading: activityLoading } = usePollingQuery(() => fetchRecentActivity(8), 10000);
+  const { ready, error, stats, activity } = useReactiveDb();
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          {statsLoading ? 'Loading stats...' : `${stats?.totalWorkspaces ?? 0} workspace(s)`}
+          {ready
+            ? `${stats?.totalWorkspaces ?? 0} workspace(s)`
+            : 'Connecting...'}
         </p>
       </div>
 
-      {/* Stat cards */}
-      {statsError ? (
+      {/* Stat cards — reactive, no polling */}
+      {error ? (
         <Card>
           <CardContent className="flex items-center gap-3 py-6">
             <AlertCircle className="h-5 w-5 text-destructive" />
-            <p className="text-sm text-destructive">Failed to load stats: {statsError}</p>
+            <p className="text-sm text-destructive">Connection error: {error}</p>
           </CardContent>
         </Card>
       ) : (
@@ -79,40 +79,40 @@ export default function Dashboard() {
             title="Total Memories"
             value={stats ? (stats.totalMemories ?? 0).toLocaleString() : '—'}
             icon={Database}
-            loading={statsLoading}
+            loading={!ready}
             color="text-blue-500"
           />
           <StatCard
             title="Active Peers"
             value={stats ? (stats.activePeers ?? 0).toLocaleString() : '—'}
             icon={Users}
-            loading={statsLoading}
+            loading={!ready}
             color="text-green-500"
           />
           <StatCard
             title="Sessions Today"
             value={stats ? (stats.sessionsToday ?? 0).toLocaleString() : '—'}
             icon={Activity}
-            loading={statsLoading}
+            loading={!ready}
             color="text-purple-500"
           />
           <StatCard
             title="Workspaces"
             value={stats ? (stats.totalWorkspaces ?? 0).toLocaleString() : '—'}
             icon={Building2}
-            loading={statsLoading}
+            loading={!ready}
             color="text-orange-500"
           />
         </div>
       )}
 
-      {/* Recent Activity */}
+      {/* Recent Activity — reactive */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Recent Activity</CardTitle>
         </CardHeader>
         <CardContent>
-          {activityLoading ? (
+          {!ready ? (
             <ActivitySkeleton />
           ) : !activity || activity.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
@@ -122,7 +122,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="space-y-4">
-              {(activity as RecentActivity[]).map((item, i) => (
+              {activity.map((item, i) => (
                 <div key={i} className="flex items-center justify-between border-b border-border pb-3 last:border-0 last:pb-0">
                   <div className="flex items-start gap-3 min-w-0">
                     <ActivityIcon type={item.type} />
