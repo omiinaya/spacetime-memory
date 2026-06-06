@@ -658,6 +658,100 @@ def _sdk_client():
     )
 
 
+# -------------------------------------------------------------------
+# connector — external data sources
+# -------------------------------------------------------------------
+
+@cli.group()
+def connector() -> None:
+    """Manage external data connectors."""
+
+
+@connector.command(name="run")
+@click.option("--rss", help="RSS/Atom feed URL")
+@click.option("--workspace-id", required=True, help="Target workspace")
+@click.option("--interval", default=300, type=int, help="Poll interval (seconds)")
+@click.option("--ticks", default=1, type=int, help="Number of poll cycles (0 = forever)")
+def connector_run(rss: str | None, workspace_id: str,
+                  interval: int, ticks: int) -> None:
+    """Run a connector. Currently supports --rss feeds."""
+    client = _sdk_client()
+
+    if rss:
+        try:
+            from spacetime_memory.connectors import RssFeedConnector
+        except ImportError:
+            console.print("[red]Error:[/red] Missing dep. Run: pip install feedparser")
+            sys.exit(1)
+        conn = RssFeedConnector(rss, workspace_id)
+        stop = None if ticks == 0 else ticks
+        conn.run(client, interval_secs=interval, stop_after=stop)
+        console.print("[green]Connector finished.[/green]")
+    else:
+        console.print("[yellow]No connector specified. Use --rss <url>[/yellow]")
+        sys.exit(1)
+
+
+# -------------------------------------------------------------------
+# context — context pack / delta agent
+# -------------------------------------------------------------------
+
+@cli.group()
+def context() -> None:
+    """Query the context pack and delta system."""
+
+
+@context.command(name="pack")
+@click.argument("workspace_id")
+@click.argument("query")
+@click.option("--token-budget", default=4096, type=int, help="Max tokens")
+@click.option("--peer-id", default="cli", help="Peer requesting the pack")
+def context_pack(workspace_id: str, query: str, token_budget: int,
+                 peer_id: str) -> None:
+    """Generate a context pack for a query and print results."""
+    # 1. Call the reducer
+    with console.status("Generating context pack..."):
+        _call("generate_context_pack", [
+            workspace_id, query, token_budget, peer_id, "",
+        ])
+
+    # 2. Read back the context_pack table
+    rows = _sql(
+        "SELECT * FROM context_pack WHERE "
+        f"workspace_id = '{_esc(workspace_id)}' "
+        "ORDER BY created_at DESC LIMIT 1"
+    )
+    if not rows:
+        console.print("[yellow]No context pack generated.[/yellow]")
+        return
+
+    pack = rows[0]
+    print_json(pack)
+
+    # 3. Show the delta (empty previous_pack_id = full pack)
+    print_table(
+        _sql("SELECT * FROM context_entry WHERE "
+             f"pack_id = '{_esc(pack.get('id', ''))}' "
+             "ORDER BY rank ASC"),
+        title="Context entries",
+    )
+
+
+@context.command(name="delta")
+@click.argument("previous_pack_id")
+def context_delta(previous_pack_id: str) -> None:
+    """Compute and show the delta from a previous pack."""
+    with console.status("Computing delta..."):
+        _call("get_delta", [previous_pack_id])
+
+    rows = _sql(
+        f"SELECT * FROM context_delta "
+        f"WHERE previous_pack_id = '{_esc(previous_pack_id)}' "
+        "ORDER BY rank ASC"
+    )
+    print_table(rows, title=f"Delta from {previous_pack_id[:16]}...")
+
+
 # ===================================================================
 # Entry point
 # ===================================================================
