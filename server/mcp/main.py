@@ -9,6 +9,7 @@ Configuration via environment variables:
   SPACETIMEDB_HOST   (default: localhost)
   SPACETIMEDB_PORT   (default: 3001)
   SPACETIMEDB_DB     (default: spacetime-memory)
+  EMBEDDER_URL       (default: http://localhost:9090)
 """
 
 from __future__ import annotations
@@ -32,6 +33,8 @@ BASE_URL = f"http://{HOST}:{PORT}"
 
 SQL_URL = f"{BASE_URL}/v1/database/{DB}/sql"
 REDUCER_URL = f"{BASE_URL}/v1/database/{DB}/call"
+
+EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://localhost:9090")
 
 # ---------------------------------------------------------------------------
 # MCP server
@@ -103,8 +106,49 @@ def _call(reducer: str, args: list[Any]) -> dict[str, Any]:
     if resp.status_code >= 400:
         body = resp.text[:2000]
         raise RuntimeError(f"Reducer error (HTTP {resp.status_code}): {body}")
-    # On success SpacetimeDB returns 200 with empty body for reducers
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Embedder client (Rust ONNX sidecar)
+# ---------------------------------------------------------------------------
+
+
+def _embed(text: str) -> list[float]:
+    """Generate an embedding vector via the Rust ONNX embedder sidecar."""
+    try:
+        resp = get_client().post(
+            f"{EMBEDDER_URL}/embed",
+            content=json.dumps({"text": text}),
+            headers={"Content-Type": "application/json"},
+            timeout=10.0,
+        )
+        if resp.status_code >= 400:
+            return []
+        data = resp.json()
+        return data.get("embedding", [])
+    except Exception:
+        # Embedder unavailable — return empty (semantic search disabled)
+        return []
+
+
+def _embed_batch(texts: list[str]) -> list[list[float]]:
+    """Generate embeddings for multiple texts in one call."""
+    if not texts:
+        return []
+    try:
+        resp = get_client().post(
+            f"{EMBEDDER_URL}/embed",
+            content=json.dumps({"text": "", "texts": texts}),
+            headers={"Content-Type": "application/json"},
+            timeout=30.0,
+        )
+        if resp.status_code >= 400:
+            return []
+        data = resp.json()
+        return data.get("embeddings", [])
+    except Exception:
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -148,19 +192,38 @@ def store_memory(
     Supported memory_type values: world_fact, experience, mental_model.
     Tier (optional): L0=critical, L1=normal, L2=archival.  If provided,
     updates the tier after storing.
+    Automatically generates an embedding index for semantic search.
     """
     result = _call("store_memory", [
         workspace_id, peer_id, observer_id,
         memory_type, content, summary, entities_json,
         confidence, source_session_id, source_message_id,
     ])
+
+    # Generate embedding and index
+    emb = _embed(content)
+    if emb:
+        # Find the memory id that was just created
+        mems = _sql(
+            "SELECT id FROM memory WHERE "
+            f"workspace_id = '{_esc(workspace_id)}' AND "
+            f"peer_id = '{_esc(peer_id)}' "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        if mems:
+            mem_id = mems[0]["id"]
+            _call("index_entity", [
+                workspace_id, "memory", mem_id,
+                content, json.dumps(emb),
+            ])
+
     # If tier is specified, update it after creation
     if tier and tier in ("L0", "L1", "L2"):
-        # The store_memory reducer returns ok but doesn't give back the id.
-        # Find the most recent memory for this workspace+peer to get the id.
         mems = _sql(
-            f"SELECT id FROM memory WHERE workspace_id = '{_esc(workspace_id)}' "
-            f"AND peer_id = '{_esc(peer_id)}' ORDER BY created_at DESC LIMIT 1"
+            "SELECT id FROM memory WHERE "
+            f"workspace_id = '{_esc(workspace_id)}' AND "
+            f"peer_id = '{_esc(peer_id)}' "
+            "ORDER BY created_at DESC LIMIT 1"
         )
         if mems:
             _call("update_memory_tier", [mems[0]["id"], tier])
@@ -192,6 +255,58 @@ def search_memories(
     where = " AND ".join(clauses) if clauses else "1=1"
     return _sql(
         f"SELECT * FROM memory WHERE {where} ORDER BY created_at DESC LIMIT {int(limit)}"
+    )
+
+
+@mcp.tool()
+def hybrid_search(
+    workspace_id: str,
+    query_text: str,
+    memory_type: str = "",
+    tier: str = "",
+    limit: int = 20,
+    strategies: str = "semantic,keyword,graph,temporal",
+) -> list[dict[str, Any]]:
+    """Multi-strategy search across memories, KG nodes, and temporal data.
+
+    Uses real vector embeddings (from the ONNX embedder) for the 'semantic'
+    strategy. Query text is embedded at search time.
+
+    Args:
+        workspace_id: Scope the search.
+        query_text: Natural-language query.
+        memory_type: Optional filter (world_fact/experience/mental_model).
+        tier: Optional filter (L0/L1/L2).
+        limit: Max results per strategy.
+        strategies: Comma-separated strategy names or empty for all.
+
+    Returns rows from the hybrid_result table (read after reducer call).
+    """
+    # Embed the query text for semantic search
+    query_embedding = _embed(query_text)
+    query_emb_json = json.dumps(query_embedding) if query_embedding else "[]"
+
+    strategy_list = [s.strip() for s in strategies.split(",") if s.strip()]
+    strategies_json = json.dumps(strategy_list) if strategy_list else ""
+
+    _call("hybrid_search", [
+        workspace_id, query_text, query_emb_json,
+        memory_type, tier, limit, strategies_json,
+    ])
+
+    # Read back results via SQL
+    qhash = _query_hash(query_text)
+    return _sql(
+        "SELECT hr.*, "
+        "  COALESCE(m.content, '') AS memory_content, "
+        "  COALESCE(k.label, '') AS node_label "
+        "FROM hybrid_result hr "
+        "LEFT JOIN memory m ON hr.entity_type = 'memory' AND hr.entity_id = m.id "
+        "LEFT JOIN kg_node k ON hr.entity_type = 'node' AND hr.entity_id = k.id "
+        f"WHERE hr.workspace_id = '{_esc(workspace_id)}' "
+        f"  AND hr.query_hash = '{_esc(qhash)}' "
+        "ORDER BY hr.score DESC "
+        f"LIMIT {int(limit * 4)}"
     )
 
 
@@ -250,6 +365,41 @@ def upsert_profile(
 # ---------------------------------------------------------------------------
 # Knowledge Graph tools
 # ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def create_node(
+    workspace_id: str,
+    label: str,
+    node_type: str,
+    summary: str = "",
+    metadata_json: str = "{}",
+) -> dict[str, Any]:
+    """Create a knowledge graph node and index it for semantic search.
+
+    Valid node_type values: code, concept, entity, document, topic.
+    """
+    result = _call("create_node", [workspace_id, label, node_type, summary, metadata_json])
+
+    # Generate embedding and index
+    content = f"{label}: {summary}" if summary else label
+    emb = _embed(content)
+    if emb:
+        # Find the node id that was just created
+        nodes = _sql(
+            "SELECT id FROM kg_node WHERE "
+            f"workspace_id = '{_esc(workspace_id)}' AND "
+            f"label = '{_esc(label)}' "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        if nodes:
+            node_id = nodes[0]["id"]
+            _call("index_entity", [
+                workspace_id, "node", node_id,
+                content, json.dumps(emb),
+            ])
+
+    return result
 
 
 @mcp.tool()
@@ -338,9 +488,18 @@ def _esc(val: str) -> str:
     return val.replace("'", "''")
 
 
+def _query_hash(query: str) -> str:
+    """Compute the same query hash as the Rust hybrid_query reducer."""
+    h = 0
+    for b in query.encode("utf-8"):
+        h = ((h * 6364136223846793005) + b) & 0xFFFFFFFFFFFFFFFF
+    return f"{h:016x}"
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     """Run the MCP server using stdio transport."""

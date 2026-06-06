@@ -30,6 +30,7 @@ from rich import box
 HOST = os.environ.get("STMEM_HOST", os.environ.get("SPACETIMEDB_HOST", "localhost"))
 PORT = os.environ.get("STMEM_PORT", os.environ.get("SPACETIMEDB_PORT", "3001"))
 DB = os.environ.get("STMEM_DB", os.environ.get("SPACETIMEDB_DB", "spacetime-memory"))
+EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://localhost:9090")
 BASE_URL = f"http://{HOST}:{PORT}"
 SQL_URL = f"{BASE_URL}/v1/database/{DB}/sql"
 REDUCER_BASE = f"{BASE_URL}/v1/database/{DB}/call"
@@ -137,6 +138,35 @@ def parse_json_flag(ctx: click.Context, param: click.Parameter, value: str | Non
     except json.JSONDecodeError as e:
         raise click.BadParameter(f"Invalid JSON: {e}")
     return value
+
+
+# ---------------------------------------------------------------------------
+# Embedder helper
+# ---------------------------------------------------------------------------
+
+
+def _embed(text: str) -> list[float]:
+    """Generate an embedding vector via the Rust ONNX embedder sidecar."""
+    try:
+        resp = get_client().post(
+            f"{EMBEDDER_URL}/embed",
+            content=json.dumps({"text": text}),
+            headers={"Content-Type": "application/json"},
+            timeout=10.0,
+        )
+        if resp.status_code >= 400:
+            return []
+        return resp.json().get("embedding", [])
+    except Exception:
+        return []
+
+
+def _query_hash(query: str) -> str:
+    """Compute the same query hash as the Rust hybrid_query reducer."""
+    h = 0
+    for b in query.encode("utf-8"):
+        h = ((h * 6364136223846793005) + b) & 0xFFFFFFFFFFFFFFFF
+    return f"{h:016x}"
 
 
 # ---------------------------------------------------------------------------
@@ -254,13 +284,25 @@ def memory_store(
     source_session_id: str, source_message_id: str,
     tier: str,
 ) -> None:
-    """Store a new memory."""
+    """Store a new memory and index it for semantic search."""
     with console.status("Storing memory..."):
         result = _call("store_memory", [
             workspace_id, peer_id, observer_id,
             memory_type, content, summary, entities_json,
             confidence, source_session_id, source_message_id,
         ])
+        # Generate embedding and index
+        emb = _embed(content)
+        if emb:
+            mems = _sql(
+                f"SELECT id FROM memory WHERE workspace_id = '{_esc(workspace_id)}' "
+                f"AND peer_id = '{_esc(peer_id)}' ORDER BY created_at DESC LIMIT 1"
+            )
+            if mems:
+                _call("index_entity", [
+                    workspace_id, "memory", mems[0]["id"],
+                    content, json.dumps(emb),
+                ])
         if tier:
             mems = _sql(
                 f"SELECT id FROM memory WHERE workspace_id = '{_esc(workspace_id)}' "
@@ -279,22 +321,48 @@ def memory_store(
 @click.option("--memory-type", help="Filter by memory type")
 @click.option("--tier", help="Filter by tier (L0/L1/L2)")
 @click.option("--limit", default=50, type=int, help="Max results")
+@click.option("--semantic/--no-semantic", default=True,
+              help="Use semantic (embedding) search; falls back to keyword if embedder unavailable")
 def memory_search(workspace_id: str, query: str, memory_type: str | None,
-                  tier: str | None, limit: int) -> None:
+                  tier: str | None, limit: int, semantic: bool) -> None:
     """Search memories in a workspace."""
-    clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
-    escaped = _esc(query)
-    clauses.append(f"(content LIKE '%{escaped}%' OR summary LIKE '%{escaped}%')")
-    if memory_type:
-        clauses.append(f"memory_type = '{_esc(memory_type)}'")
-    if tier:
-        clauses.append(f"tier = '{_esc(tier)}'")
-    where = " AND ".join(clauses)
-    with console.status("Searching memories..."):
-        rows = _sql(
-            f"SELECT * FROM memory WHERE {where} ORDER BY created_at DESC LIMIT {limit}"
-        )
-    print_table(rows, title=f"Memory search results (workspace: {workspace_id})")
+    if semantic:
+        # Use hybrid search with real embeddings
+        query_embedding = _embed(query)
+        query_emb_json = json.dumps(query_embedding) if query_embedding else "[]"
+        strategies = ["semantic", "keyword"]
+        if memory_type or tier:
+            strategies.append("temporal")
+        with console.status("Searching semantically..."):
+            _call("hybrid_search", [
+                workspace_id, query, query_emb_json,
+                memory_type or "", tier or "", limit,
+                json.dumps(strategies),
+            ])
+            qhash = _query_hash(query)
+            rows = _sql(
+                f"SELECT hr.*, m.content AS memory_content "
+                f"FROM hybrid_result hr "
+                f"LEFT JOIN memory m ON hr.entity_type = 'memory' AND hr.entity_id = m.id "
+                f"WHERE hr.workspace_id = '{_esc(workspace_id)}' "
+                f"  AND hr.query_hash = '{_esc(qhash)}' "
+                f"ORDER BY hr.score DESC LIMIT {limit}"
+            )
+        print_table(rows, title=f"Semantic search results (workspace: {workspace_id})")
+    else:
+        clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
+        escaped = _esc(query)
+        clauses.append(f"(content LIKE '%{escaped}%' OR summary LIKE '%{escaped}%')")
+        if memory_type:
+            clauses.append(f"memory_type = '{_esc(memory_type)}'")
+        if tier:
+            clauses.append(f"tier = '{_esc(tier)}'")
+        where = " AND ".join(clauses)
+        with console.status("Searching by keyword..."):
+            rows = _sql(
+                f"SELECT * FROM memory WHERE {where} ORDER BY created_at DESC LIMIT {limit}"
+            )
+        print_table(rows, title=f"Keyword search results (workspace: {workspace_id})")
 
 
 @memory.command(name="reinforce")
@@ -405,9 +473,22 @@ def kg_node() -> None:
               callback=parse_json_flag)
 def kg_node_create(workspace_id: str, label: str, node_type: str,
                    summary: str, metadata: str) -> None:
-    """Create a knowledge graph node."""
+    """Create a knowledge graph node and index it for semantic search."""
     with console.status(f"Creating KG node '{label}'..."):
         result = _call("create_node", [workspace_id, label, node_type, summary, metadata])
+        # Generate embedding and index
+        content = f"{label}: {summary}" if summary else label
+        emb = _embed(content)
+        if emb:
+            nodes = _sql(
+                f"SELECT id FROM kg_node WHERE workspace_id = '{_esc(workspace_id)}' "
+                f"AND label = '{_esc(label)}' ORDER BY created_at DESC LIMIT 1"
+            )
+            if nodes:
+                _call("index_entity", [
+                    workspace_id, "node", nodes[0]["id"],
+                    content, json.dumps(emb),
+                ])
     console.print(f"[green]KG node '{label}' created.[/green]")
     if result:
         print_json(result)

@@ -63,6 +63,29 @@ fn term_match_count(text: &str, terms: &[&str]) -> usize {
     terms.iter().filter(|t| lower.contains(*t)).count()
 }
 
+/// Parse a JSON array of f64 values into a Vec<f64>.
+fn parse_embedding_json(s: &str) -> Vec<f64> {
+    if s.is_empty() || s == "[]" || s == "null" {
+        return vec![];
+    }
+    serde_json::from_str(s).unwrap_or_default()
+}
+
+/// Compute cosine similarity between two f64 vectors.
+/// Returns 0.0 if either vector is empty or zero-norm.
+fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let norm_a: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
+    let norm_b: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if norm_a == 0.0 || norm_b == 0.0 {
+        return 0.0;
+    }
+    (dot / (norm_a * norm_b)).clamp(0.0, 1.0)
+}
+
 // ---------------------------------------------------------------------------
 // Reducer: hybrid_search
 // ---------------------------------------------------------------------------
@@ -71,6 +94,8 @@ fn term_match_count(text: &str, terms: &[&str]) -> usize {
 ///
 /// `strategies_json` is a JSON array of strategy names, e.g.
 /// `["semantic","keyword","graph","temporal"]`. Empty string defaults to all four.
+/// `query_embedding_json` is a JSON array of f64 embeddings (from the embedder sidecar).
+/// Pass "[]" if not using semantic search — the "semantic" strategy will be skipped.
 ///
 /// Strategies are run sequentially (SpacetimeDB reducers cannot do true parallelism),
 /// and each produces rows in the `HybridResult` table keyed by a hash of the query.
@@ -79,6 +104,7 @@ pub fn hybrid_search(
     ctx: &ReducerContext,
     workspace_id: String,
     query: String,
+    query_embedding_json: String,
     memory_type: String,
     tier: String,
     limit: u32,
@@ -109,6 +135,12 @@ pub fn hybrid_search(
     for strategy in &strategies {
         match strategy.as_str() {
             "semantic" => {
+                // Parse query embedding; skip if empty (no embedding available)
+                let query_emb = parse_embedding_json(&query_embedding_json);
+                if query_emb.is_empty() {
+                    // No query embedding provided — skip semantic strategy
+                    continue;
+                }
                 let mut count: u32 = 0;
                 for si in ctx.db.search_index().iter() {
                     if count >= limit {
@@ -117,16 +149,14 @@ pub fn hybrid_search(
                     if si.workspace_id != workspace_id {
                         continue;
                     }
-                    let content_lower = si.content.to_lowercase();
-                    if !query_terms.iter().all(|t| content_lower.contains(t)) {
+                    let stored_emb = parse_embedding_json(&si.embedding_json);
+                    if stored_emb.is_empty() {
                         continue;
                     }
-                    let matched = term_match_count(&si.content, &query_terms);
-                    let score = if !query_terms.is_empty() {
-                        matched as f64 / query_terms.len() as f64
-                    } else {
-                        0.0
-                    };
+                    let score = cosine_similarity(&query_emb, &stored_emb);
+                    if score < 0.1 {
+                        continue; // skip near-zero matches
+                    }
 
                     ctx.db.hybrid_result().insert(HybridResult {
                         id: uuid_v4(),
