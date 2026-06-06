@@ -61,6 +61,8 @@ pub fn consolidate_memories(
         valid_from: 0,
         parent_directory_id: String::new(),
         consolidated_to: String::new(),
+        trust_score: 0.5,
+        feedback_count: 0,
     };
     ctx.db.memory().insert(mem);
 

@@ -3,6 +3,7 @@ pub mod peer;
 pub mod session;
 pub mod message;
 pub mod memory;
+pub mod memory_feedback;
 pub mod knowledge_graph;
 pub mod document;
 pub mod profile;

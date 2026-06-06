@@ -48,6 +48,12 @@ pub struct Memory {
     // ---- RetainDB: Consolidation ----
     /// If this memory was consolidated into another, the target memory id
     pub consolidated_to: String,
+
+    // ---- Holographic: Trust Scoring & Feedback ----
+    /// Trust score 0.0–1.0; adjusted by user feedback
+    pub trust_score: f64,
+    /// How many user feedback ratings received
+    pub feedback_count: u32,
 }
 
 #[reducer]
@@ -92,6 +98,8 @@ pub fn store_memory(
         valid_from: 0,
         parent_directory_id: String::new(),
         consolidated_to: String::new(),
+        trust_score: 0.5,
+        feedback_count: 0,
     };
 
     ctx.db.memory().insert(mem);

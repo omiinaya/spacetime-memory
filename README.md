@@ -26,6 +26,8 @@
 | [Obsidian](https://obsidian.md) | Graph view, plugins, daily notes, canvas, backlinks |
 | [OpenViking](https://github.com/volcengine/OpenViking) | Filesystem paradigm context database, tiered context loading (L0/L1/L2), directory recursive retrieval, visualized retrieval trajectories |
 | [RetainDB](https://github.com/RetainDB/RetainDB) | Memory reinforcement (strength/access counts), delta compression, consolidation (dedup/rollup/decay), temporal validity, versioned memories, context router |
+| [Holographic](https://github.com/Def-AI/Holographic) | Trust scoring through user feedback, memory reputation and reliability scoring, feedback-driven reinforcement |
+| [ByteRover](https://github.com/ByteRover) | Knowledge curation pipelines, smart-query builders, intelligent memory recall, cross-referencing |
 
 ## Architecture
 
@@ -90,10 +92,11 @@
 | `ContextDirectory` | Hierarchical directory organization for memories and resources (path-based) | OpenViking |
 | `ConsolidationLog` | Tracks memory consolidation operations (dedup, rollup, decay, version_merge) | RetainDB |
 | `ContextPack` | Cached compressed context packs with query_hash for lookups | RetainDB |
+| `MemoryFeedback` | User feedback ratings for trust scoring (helpful/unhelpful) | Holographic |
 
 ### Reducer API
 
-The module exposes ~50 reducers covering full CRUD for all entity types plus special operations:
+The module exposes ~51 reducers covering full CRUD for all entity types plus special operations:
 
 **Peers & Sessions:**
 - `create_workspace`, `update_workspace`, `delete_workspace`
@@ -103,6 +106,7 @@ The module exposes ~50 reducers covering full CRUD for all entity types plus spe
 
 **Memory Layer:**
 - `store_memory`, `update_memory`, `deactivate_memory`, `expire_memories`
+- `rate_memory`
 - `upsert_profile`, `add_profile_fact`, `add_dynamic_context`
 - `create_insight`, `delete_insight`
 
@@ -245,6 +249,43 @@ Directories enable recursive retrieval: query a directory and all subdirectories
 
 Agents can request compressed context packs with a token budget. The system returns only the most relevant memories, file chunks, and tool output — compressed to fit within the budget. On subsequent requests, only delta (changed) context is returned.
 
+### Trust Scoring & Feedback (Holographic)
+
+Every memory carries a `trust_score` (0.0–1.0, default 0.5) and a `feedback_count`. Users can rate memories as `"helpful"` or `"unhelpful"`:
+
+```
+rate_memory(memory_id, "helpful", peer_id)   → trust_score += 0.05
+rate_memory(memory_id, "unhelpful", peer_id) → trust_score -= 0.05
+```
+
+The score is clamped to `[0.0, 1.0]` and `feedback_count` is incremented with each rating. This enables:
+
+- **Reputation-weighted retrieval** — favour memories with high trust scores
+- **Crowd-sourced quality** — aggregated ratings from multiple peers
+- **Confidence calibration** — low-trust memories can be flagged for review or deprioritized
+- **Feedback auditing** — every rating is recorded in the `MemoryFeedback` table with peer identity and timestamp
+
+The table schema:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `String` (PK) | Unique feedback record ID |
+| `memory_id` | `String` | The memory being rated |
+| `rating` | `String` | `"helpful"` or `"unhelpful"` |
+| `peer_id` | `String` | Who submitted the rating |
+| `created_at` | `i64` | Microsecond timestamp |
+
+### Knowledge Curation & Query (ByteRover)
+
+ByteRover-inspired patterns for intelligent memory curation and retrieval:
+
+- **Smart-query building** — compose filters (type, tier, time range, trust threshold) into targeted queries
+- **Cross-referencing** — automatically link related memories via shared entities, tags, or parent directories
+- **Knowledge curation pipelines** — chain operations (filter → rank → consolidate → pack) for automated memory maintenance
+- **Intelligent recall amplification** — boost retrieval scores for memories with high trust, strength, or access counts
+
+These curation patterns build on top of the existing multi-strategy retrieval system, adding trust-aware and curation-aware ranking layers.
+
 ## Project Structure
 
 ```
@@ -259,6 +300,7 @@ spacetime-memory/
 │           ├── session.rs    # Sessions and participants
 │           ├── message.rs    # Messages
 │           ├── memory.rs     # Core memory (world facts, experiences, mental models)
+│           ├── memory_feedback.rs  # Holographic trust scoring & feedback
 │           ├── profile.rs    # User profiles (static + dynamic)
 │           ├── insight.rs    # Reasoning/reflection over memories
 │           ├── knowledge_graph.rs  # KG nodes, edges, communities
