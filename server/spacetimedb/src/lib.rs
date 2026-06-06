@@ -7,6 +7,7 @@ pub mod memory_feedback;
 pub mod knowledge_graph;
 pub mod document;
 pub mod profile;
+pub mod profile_query;
 pub mod tag;
 pub mod entity_linking;
 pub mod insight;
@@ -15,6 +16,7 @@ pub mod auth;
 pub mod context_directory;
 pub mod consolidation;
 pub mod context_compression;
+pub mod context_delta;
 pub mod hybrid_query;
 
 /// Generate a UUID v4 using timestamp (WASM-safe). Not cryptographically secure.
