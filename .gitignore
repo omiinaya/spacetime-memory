@@ -1,0 +1,27 @@
+# Rust
+target/
+**/target/
+
+# Node
+node_modules/
+**/node_modules/
+
+# SpacetimeDB
+~/.local/share/spacetime/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build output
+dist/
+*.wasm
+
+# TypeScript build info
+*.tsbuildinfo
