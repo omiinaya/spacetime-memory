@@ -21,14 +21,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { fetchNodes, fetchEdges, searchNodes, type KgNode } from '@/lib/spacetimedb';
+import { fetchKgNodes as fetchNodes, fetchKgEdges as fetchEdges } from '@/lib/spacetimedb';
 
 /* ------------------------------------------------------------------ */
 /*  Type definitions                                                   */
 /* ------------------------------------------------------------------ */
 
 interface GraphNode {
-  id: number;
+  id: string;
   label: string;
   node_type: string;
   summary: string;
@@ -36,9 +36,9 @@ interface GraphNode {
 }
 
 interface GraphEdge {
-  id: number;
-  from: number;
-  to: number;
+  id: string;
+  from: string;
+  to: string;
   relation: string;
   weight: number;
 }
@@ -74,7 +74,7 @@ const NODE_TYPE_ICONS: Record<string, typeof Layers> = {
 /* ------------------------------------------------------------------ */
 
 interface VisNodeItem {
-  id: number;
+  id: string;
   label: string;
   color: string;
   size: number;
@@ -87,9 +87,9 @@ interface VisNodeItem {
 }
 
 interface VisEdgeItem {
-  id: number;
-  from: number;
-  to: number;
+  id: string;
+  from: string;
+  to: string;
   label: string;
   color: { color: string; highlight: string };
   font: { color: string; size: number; strokeWidth: number; strokeColor: string };
@@ -114,7 +114,7 @@ export default function KnowledgeGraph() {
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<KgNode[]>([]);
+  const [searchResults, setSearchResults] = useState<GraphNode[]>([]);
 
   /* ---------- build vis-network ---------- */
 
@@ -129,7 +129,7 @@ export default function KnowledgeGraph() {
       }
 
       // Filter nodes by search highlight if needed
-      let filteredIds: Set<number> | null = null;
+      let filteredIds: Set<string> | null = null;
       if (highlightLabel) {
         const matches = graphNodes
           .filter((n) => n.label.toLowerCase().includes(highlightLabel.toLowerCase()))
@@ -236,7 +236,7 @@ export default function KnowledgeGraph() {
 
       network.on('click', (params: any) => {
         if (params.nodes && params.nodes.length > 0) {
-          const nodeId = params.nodes[0] as number;
+          const nodeId = params.nodes[0] as string;
           const node = graphNodes.find((n) => n.id === nodeId);
           if (node) {
             setSelectedNode(node);
@@ -268,7 +268,7 @@ export default function KnowledgeGraph() {
       ]);
 
       const graphNodes: GraphNode[] = fetchedNodes.map((n) => ({
-        id: n.node_id,
+        id: n.id,
         label: n.label,
         node_type: n.node_type,
         summary: n.summary ?? '',
@@ -276,9 +276,9 @@ export default function KnowledgeGraph() {
       }));
 
       const graphEdges: GraphEdge[] = fetchedEdges.map((e) => ({
-        id: e.edge_id,
-        from: e.source_id,
-        to: e.target_id,
+        id: e.id,
+        from: e.source_node_id,
+        to: e.target_node_id,
         relation: e.relation,
         weight: e.weight ?? 1,
       }));
@@ -323,26 +323,11 @@ export default function KnowledgeGraph() {
         return;
       }
 
-      try {
-        const results = await searchNodes(query.trim());
-        setSearchResults(results);
-      } catch {
-        // Fallback: filter locally
-        const local = allNodesRef.current.filter((n) =>
-          n.label.toLowerCase().includes(query.toLowerCase()),
-        );
-        setSearchResults(
-          local.map((n) => ({
-            node_id: n.id,
-            label: n.label,
-            node_type: n.node_type,
-            summary: n.summary,
-            community_id: n.community_id,
-            properties: null,
-            created_at: null,
-          })),
-        );
-      }
+      // Filter locally
+      const local = allNodesRef.current.filter((n) =>
+        n.label.toLowerCase().includes(query.toLowerCase()),
+      );
+      setSearchResults(local);
       buildNetwork(allNodesRef.current, allEdgesRef.current, query.trim());
     },
     [buildNetwork],

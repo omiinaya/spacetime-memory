@@ -23,6 +23,9 @@ Thumbs.db
 dist/
 *.wasm
 
+# Large model files (download via scripts/download-model.sh)
+**/model/*.onnx
+
 # TypeScript build info
 *.tsbuildinfo
 
