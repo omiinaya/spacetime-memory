@@ -11,6 +11,9 @@ pub mod entity_linking;
 pub mod insight;
 pub mod retrieval;
 pub mod auth;
+pub mod context_directory;
+pub mod consolidation;
+pub mod context_compression;
 
 /// Generate a UUID v4 using timestamp (WASM-safe). Not cryptographically secure.
 pub fn uuid_v4() -> String {

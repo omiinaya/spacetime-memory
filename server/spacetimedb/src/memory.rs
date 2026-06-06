@@ -26,6 +26,28 @@ pub struct Memory {
     /// 0 = no expiry
     pub expires_at: i64,
     pub updated_at: i64,
+
+    // ---- OpenViking: Tiered contexts ----
+    /// "L0"=critical, "L1"=normal, "L2"=archival
+    pub tier: String,
+
+    // ---- RetainDB: Reinforcement & Versioning ----
+    /// How many times this memory has been accessed
+    pub access_count: u64,
+    /// Memory strength 0.0–1.0
+    pub strength: f64,
+    /// Version number (incremented on updates)
+    pub version: u32,
+    /// Temporal validity; 0 = always valid
+    pub valid_from: i64,
+
+    // ---- OpenViking: Hierarchy ----
+    /// Points to a ContextDirectory; empty "" if not organised
+    pub parent_directory_id: String,
+
+    // ---- RetainDB: Consolidation ----
+    /// If this memory was consolidated into another, the target memory id
+    pub consolidated_to: String,
 }
 
 #[reducer]
@@ -61,6 +83,15 @@ pub fn store_memory(
         created_at: now,
         expires_at: 0,
         updated_at: now,
+
+        // OpenViking + RetainDB fields
+        tier: String::from("L1"),
+        access_count: 0,
+        strength: 0.5,
+        version: 1,
+        valid_from: 0,
+        parent_directory_id: String::new(),
+        consolidated_to: String::new(),
     };
 
     ctx.db.memory().insert(mem);

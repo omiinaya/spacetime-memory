@@ -24,6 +24,8 @@
 | [Logseq](https://github.com/logseq/logseq) | Graph-based knowledge management, block-level referencing, backlinks |
 | [CLI-Anything](https://github.com/HKUDS/CLI-Anything) | CLI harness patterns for agent-native interfaces |
 | [Obsidian](https://obsidian.md) | Graph view, plugins, daily notes, canvas, backlinks |
+| [OpenViking](https://github.com/volcengine/OpenViking) | Filesystem paradigm context database, tiered context loading (L0/L1/L2), directory recursive retrieval, visualized retrieval trajectories |
+| [RetainDB](https://github.com/RetainDB/RetainDB) | Memory reinforcement (strength/access counts), delta compression, consolidation (dedup/rollup/decay), temporal validity, versioned memories, context router |
 
 ## Architecture
 
@@ -85,10 +87,13 @@
 | `SearchIndex` | Multi-strategy search metadata (semantic, BM25, graph, temporal) | Mem0, Hindsight |
 | `ApiKey` | API keys for programmatic access | Common |
 | `AuthSession` | Identity-based session tokens | Common |
+| `ContextDirectory` | Hierarchical directory organization for memories and resources (path-based) | OpenViking |
+| `ConsolidationLog` | Tracks memory consolidation operations (dedup, rollup, decay, version_merge) | RetainDB |
+| `ContextPack` | Cached compressed context packs with query_hash for lookups | RetainDB |
 
 ### Reducer API
 
-The module exposes ~40 reducers covering full CRUD for all entity types plus special operations:
+The module exposes ~50 reducers covering full CRUD for all entity types plus special operations:
 
 **Peers & Sessions:**
 - `create_workspace`, `update_workspace`, `delete_workspace`
@@ -115,6 +120,11 @@ The module exposes ~40 reducers covering full CRUD for all entity types plus spe
 - `create_entity_link`, `add_alias`, `resolve_entity`
 - `create_api_key`, `deactivate_api_key`
 - `create_auth_session`, `revoke_auth_session`, `cleanup_expired_sessions`
+
+**Context & Consolidation (OpenViking / RetainDB):**
+- `create_directory`, `delete_directory`
+- `consolidate_memories`, `decay_weak_memories`
+- `store_context_pack`, `reinforce_memory`, `update_memory_tier`
 
 ## Quick Start
 
@@ -200,6 +210,41 @@ Nodes have types (`code`, `concept`, `entity`, `document`, `topic`) and are orga
 
 Canonical entity names with alias tracking. Entities are linked across memories for retrieval boosting.
 
+### Tiered Context Loading (OpenViking)
+
+```
+L0 ─ Critical context    — loaded on every request (identity, active task)
+L1 ─ Normal context      — loaded on demand, default tier
+L2 ─ Archival context    — deep memory, loaded only for specific queries
+```
+
+Each memory has a `tier` field. Retrieval strategies can filter by tier or escalate from L2 → L1 on access.
+
+### Hierarchical Directory Organization (OpenViking)
+
+Memories can be organized into a filesystem-like directory hierarchy:
+
+```
+/user/preferences/           → user-level static preferences
+/user/sessions/              → per-session memories
+/agent/{id}/knowledge/       → agent's learned knowledge
+/project/{id}/decisions/     → project-specific decisions
+```
+
+Directories enable recursive retrieval: query a directory and all subdirectories are searched.
+
+### Memory Consolidation & Reinforcement (RetainDB)
+
+- **Reinforcement**: Each memory tracks `access_count` and `strength` (0.0–1.0). Frequently accessed memories grow stronger, making them more likely to surface in search results.
+- **Consolidation**: Redundant or overlapping memories can be merged into a single consolidated memory. Source memories are deactivated but preserved for audit.
+- **Decay**: Weak memories (strength below threshold) that haven't been recently reinforced are automatically deactivated.
+- **Versioning**: Memories have a `version` field. Corrections create a new version while the superseded version remains for rollback.
+- **Temporal Validity**: `valid_from` and `expires_at` fields define a memory's active time window, preventing stale facts from being retrieved.
+
+### Delta Context Packs (RetainDB)
+
+Agents can request compressed context packs with a token budget. The system returns only the most relevant memories, file chunks, and tool output — compressed to fit within the budget. On subsequent requests, only delta (changed) context is returned.
+
 ## Project Structure
 
 ```
@@ -221,6 +266,9 @@ spacetime-memory/
 │           ├── entity_linking.rs   # Entity resolution with aliases
 │           ├── tag.rs        # Tags and memory-tag associations
 │           ├── retrieval.rs  # Search index for multi-strategy retrieval
+│           ├── context_directory.rs  # OpenViking hierarchical directories
+│           ├── consolidation.rs  # RetainDB dedup/rollup/decay
+│           ├── context_compression.rs  # RetainDB context packs + reinforcement
 │           └── auth.rs       # API keys and auth sessions
 ├── client/                   # React frontend
 │   ├── src/
