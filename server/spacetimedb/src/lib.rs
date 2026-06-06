@@ -19,15 +19,19 @@ pub mod context_compression;
 pub mod context_delta;
 pub mod hybrid_query;
 
-/// Generate a UUID v4 using timestamp (WASM-safe). Not cryptographically secure.
-pub fn uuid_v4() -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let micros = now.as_micros();
-    // Format as a pseudo-UUID: 8-4-4-4-12 hex chars
-    let ts_part = format!("{:016x}", micros);
-    let rand_part = format!("{:016x}", (micros.wrapping_mul(6364136223846793005) ^ micros) & 0xFFFFFFFFFFFFFFFF);
+/// Generate a UUID v4 using the SpacetimeDB reducer timestamp and RNG.
+/// Safe for WASM — does not use `std::time::SystemTime`.
+/// Each call advances the RNG, so consecutive calls in the same reducer
+/// produce different UUIDs.
+pub fn uuid_v4(ctx: &spacetimedb::ReducerContext) -> String {
+    use spacetimedb::rand::RngCore;
+    let ts = ctx.timestamp.to_micros_since_unix_epoch();
+    let r1 = ctx.rng().next_u64();
+    let r2 = ctx.rng().next_u64();
+    let high = (ts as u64 ^ r1) as u64;
+    let low = r2;
+    let ts_part = format!("{:016x}", high);
+    let rand_part = format!("{:016x}", low);
     format!(
         "{}-{}-{}-{}-{}",
         &ts_part[..8],
@@ -38,21 +42,16 @@ pub fn uuid_v4() -> String {
     )
 }
 
-pub fn now_micros() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_micros() as i64
+/// Get current timestamp in microseconds from the reducer context.
+/// Safe for WASM — uses `ctx.timestamp` instead of `std::time::SystemTime`.
+pub fn now_micros(ctx: &spacetimedb::ReducerContext) -> i64 {
+    (ctx.timestamp.to_micros_since_unix_epoch() / 1000) as i64
 }
 
-pub fn default_expires_at(lifetime_days: i64) -> i64 {
+pub fn default_expires_at(ctx: &spacetimedb::ReducerContext, lifetime_days: i64) -> i64 {
     if lifetime_days <= 0 {
         0
     } else {
-        now_micros() + lifetime_days * 86_400_000_000
+        now_micros(ctx) + lifetime_days * 86_400_000_000
     }
-}
-
-pub fn ctx_timestamp_micros(ctx: &spacetimedb::ReducerContext) -> i64 {
-    ctx.timestamp.to_micros_since_unix_epoch() / 1000
 }

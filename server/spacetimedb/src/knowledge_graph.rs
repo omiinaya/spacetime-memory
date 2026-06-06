@@ -66,8 +66,8 @@ pub fn create_node(
     summary: String,
     metadata_json: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     // Validate node_type
     match node_type.as_str() {
@@ -127,8 +127,8 @@ pub fn create_edge(
     confidence: String,
     metadata_json: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     // Validate confidence
     match confidence.as_str() {
@@ -184,7 +184,7 @@ pub fn create_community(
     name: String,
     summary: String,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
 
     let community = KgCommunity {
         id: 0, // auto-increment
@@ -311,7 +311,7 @@ pub fn detect_communities(
 /// community ID (from kg_community.next_id).  Nodes with no edges stay as 0.
 #[reducer]
 pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
     let node_ids: Vec<(String, bool)> = ctx
         .db
         .kg_node()
@@ -334,7 +334,7 @@ pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<()
         ctx.db.kg_community().insert(KgCommunity {
             id: 0, // auto-increment
             workspace_id: workspace_id.clone(),
-            name: format!("Community {}", uuid_v4().get(..8).unwrap_or("new")),
+            name: format!("Community {}", uuid_v4(ctx).get(..8).unwrap_or("new")),
             summary: String::new(),
             created_at: now,
         });

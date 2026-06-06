@@ -34,8 +34,8 @@ pub fn create_session(
     name: String,
     metadata_json: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     ctx.db.session().insert(Session {
         id: id.clone(),
@@ -85,7 +85,7 @@ pub fn join_session(
         session_id,
         peer_id,
         role,
-        joined_at: now_micros(),
+        joined_at: now_micros(ctx),
     });
     Ok(())
 }
@@ -136,7 +136,7 @@ pub fn update_session_summary(
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
     session.summary = summary;
-    session.updated_at = now_micros();
+    session.updated_at = now_micros(ctx);
 
     ctx.db.session().id().update(session);
     Ok(())

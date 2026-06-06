@@ -43,11 +43,11 @@ pub fn rate_memory(
 
     // Record the feedback
     let feedback = MemoryFeedback {
-        id: uuid_v4(),
+        id: uuid_v4(ctx),
         memory_id: memory_id.clone(),
         rating: rating.clone(),
         peer_id,
-        created_at: now_micros(),
+        created_at: now_micros(ctx),
     };
     ctx.db.memory_feedback().insert(feedback);
 
@@ -56,7 +56,7 @@ pub fn rate_memory(
     let new_score = (mem.trust_score + delta).clamp(0.0, 1.0);
     mem.trust_score = new_score;
     mem.feedback_count += 1;
-    mem.updated_at = now_micros();
+    mem.updated_at = now_micros(ctx);
 
     ctx.db.memory().id().update(mem);
     Ok(())

@@ -38,8 +38,8 @@ pub fn index_entity(
     content: String,
     embedding_json: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     // Validate entity_type
     match entity_type.as_str() {

@@ -5,3 +5,7 @@ dist/
 node_modules/
 model/
 *.onnx
+target/
+venv/
+*.tsbuildinfo
+.spacetime/

@@ -128,7 +128,7 @@ class Client:
 
     def list_workspaces(self) -> list[dict[str, Any]]:
         """List all workspaces."""
-        return self._sql("SELECT * FROM workspace ORDER BY created_at DESC")
+        return self._sql("SELECT * FROM workspace")
 
     # -----------------------------------------------------------------------
     # Memory
@@ -189,11 +189,10 @@ class Client:
                 "SELECT id FROM memory WHERE "
                 f"workspace_id = '{_esc(workspace_id)}' AND "
                 f"peer_id = '{_esc(peer_id)}' "
-                "ORDER BY created_at DESC LIMIT 1"
             )
             if mems:
                 self._call("index_entity", [
-                    workspace_id, "memory", mems[0]["id"],
+                    workspace_id, "memory", mems[-1]["id"],
                     content, json.dumps(emb),
                 ])
 
@@ -202,10 +201,9 @@ class Client:
                 "SELECT id FROM memory WHERE "
                 f"workspace_id = '{_esc(workspace_id)}' AND "
                 f"peer_id = '{_esc(peer_id)}' "
-                "ORDER BY created_at DESC LIMIT 1"
             )
             if mems:
-                self._call("update_memory_tier", [mems[0]["id"], tier])
+                self._call("update_memory_tier", [mems[-1]["id"], tier])
 
         return result
 
@@ -228,17 +226,36 @@ class Client:
                 memory_type, tier, limit, strategies,
             ])
             qhash = _query_hash(query)
-            return self._sql(
-                "SELECT hr.*, COALESCE(m.content, '') AS memory_content, "
-                "  COALESCE(k.label, '') AS node_label "
-                "FROM hybrid_result hr "
-                "LEFT JOIN memory m ON hr.entity_type = 'memory' AND hr.entity_id = m.id "
-                "LEFT JOIN kg_node k ON hr.entity_type = 'node' AND hr.entity_id = k.id "
-                f"WHERE hr.workspace_id = '{_esc(workspace_id)}' "
-                f"  AND hr.query_hash = '{_esc(qhash)}' "
-                f"ORDER BY hr.score DESC LIMIT {limit}"
+            rows = self._sql(
+                "SELECT * FROM hybrid_result "
+                f"WHERE workspace_id = '{_esc(workspace_id)}' "
+                f"  AND query_hash = '{_esc(qhash)}' "
             )
+            rows.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+            # Look up content from source tables in Python
+            mem_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "memory"]
+            node_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "node"]
+            mem_map = {}
+            node_map = {}
+            for mid in mem_ids:
+                mems = self._sql(f"SELECT id, content FROM memory WHERE id = '{_esc(mid)}'")
+                if mems:
+                    mem_map[mid] = mems[0].get("content", "")
+            for nid in node_ids:
+                nodes = self._sql(f"SELECT id, label FROM kg_node WHERE id = '{_esc(nid)}'")
+                if nodes:
+                    node_map[nid] = nodes[0].get("label", "")
+            for r in rows:
+                eid = r.get("entity_id", "")
+                if r.get("entity_type") == "memory":
+                    r["memory_content"] = mem_map.get(eid, "")
+                elif r.get("entity_type") == "node":
+                    r["memory_content"] = node_map.get(eid, "")
+                else:
+                    r["memory_content"] = ""
+            return rows[:limit]
 
+        # Non-semantic (keyword) fallback
         clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
         if query:
             escaped = _esc(query)
@@ -250,10 +267,11 @@ class Client:
         if tier:
             clauses.append(f"tier = '{_esc(tier)}'")
         where = " AND ".join(clauses)
-        return self._sql(
-            f"SELECT * FROM memory WHERE {where} "
-            f"ORDER BY created_at DESC LIMIT {limit}"
+        rows = self._sql(
+            f"SELECT * FROM memory WHERE {where}"
         )
+        rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        return rows[:limit]
 
     def get_memory(self, memory_id: str) -> list[dict[str, Any]]:
         """Get a single memory by ID.  Auto-reinforces on read."""
@@ -292,10 +310,11 @@ class Client:
         if memory_type:
             clauses.append(f"memory_type = '{_esc(memory_type)}'")
         where = " AND ".join(clauses)
-        return self._sql(
-            f"SELECT * FROM memory WHERE {where} "
-            f"ORDER BY created_at DESC LIMIT {limit}"
+        rows = self._sql(
+            f"SELECT * FROM memory WHERE {where}"
         )
+        rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        return rows[:limit]
 
     # -----------------------------------------------------------------------
     # Knowledge Graph
@@ -320,11 +339,10 @@ class Client:
                 "SELECT id FROM kg_node WHERE "
                 f"workspace_id = '{_esc(workspace_id)}' AND "
                 f"label = '{_esc(label)}' "
-                "ORDER BY created_at DESC LIMIT 1"
             )
             if nodes:
                 self._call("index_entity", [
-                    workspace_id, "node", nodes[0]["id"],
+                    workspace_id, "node", nodes[-1]["id"],
                     content, json.dumps(emb),
                 ])
         return result
@@ -351,27 +369,31 @@ class Client:
         """Search KG nodes by label within a workspace."""
         if query:
             escaped = _esc(query)
-            return self._sql(
+            rows = self._sql(
                 "SELECT * FROM kg_node WHERE "
                 f"workspace_id = '{_esc(workspace_id)}' AND "
-                f"label LIKE '%{escaped}%' ORDER BY created_at DESC"
+                f"label LIKE '%{escaped}%'"
             )
-        return self._sql(
-            "SELECT * FROM kg_node WHERE "
-            f"workspace_id = '{_esc(workspace_id)}' ORDER BY created_at DESC"
-        )
+        else:
+            rows = self._sql(
+                "SELECT * FROM kg_node WHERE "
+                f"workspace_id = '{_esc(workspace_id)}'"
+            )
+        rows.sort(key=lambda r: r.get("label", ""))
+        return rows
 
     def get_neighbors(self, node_id: str) -> list[dict[str, Any]]:
         """Get edges connected to a node."""
-        return self._sql(
+        rows = self._sql(
             "SELECT e.*, src.label AS source_label, tgt.label AS target_label "
             "FROM kg_edge e "
             "LEFT JOIN kg_node src ON e.source_node_id = src.id "
             "LEFT JOIN kg_node tgt ON e.target_node_id = tgt.id "
             f"WHERE e.source_node_id = '{_esc(node_id)}' "
             f"   OR e.target_node_id = '{_esc(node_id)}' "
-            "ORDER BY e.weight DESC"
         )
+        rows.sort(key=lambda r: r.get("weight", 0.0), reverse=True)
+        return rows
 
     def detect_communities(self, workspace_id: str) -> dict[str, Any]:
         """Run label-propagation community detection."""
@@ -387,7 +409,7 @@ class Client:
 
     def run_maintenance(self) -> dict[str, Any]:
         """Trigger periodic maintenance (expire, decay, dedup)."""
-        return self._call("run_maintenance", [])
+        return self._call("manual_maintenance", [])
 
     def dedup(self, workspace_id: str) -> dict[str, Any]:
         """Run dedup within a workspace."""
@@ -399,21 +421,23 @@ class Client:
 
     def get_peer_sessions(self, peer_id: str) -> list[dict[str, Any]]:
         """List sessions a peer has participated in."""
-        return self._sql(
+        rows = self._sql(
             "SELECT s.*, sp.role, sp.joined_at "
             "FROM session s "
             "INNER JOIN session_participant sp ON s.id = sp.session_id "
-            f"WHERE sp.peer_id = '{_esc(peer_id)}' "
-            "ORDER BY sp.joined_at DESC"
+            f"WHERE sp.peer_id = '{_esc(peer_id)}'"
         )
+        rows.sort(key=lambda r: r.get("joined_at", 0), reverse=True)
+        return rows
 
     def get_session_messages(self, session_id: str) -> list[dict[str, Any]]:
         """Retrieve messages for a session."""
-        return self._sql(
+        rows = self._sql(
             "SELECT * FROM message WHERE "
-            f"session_id = '{_esc(session_id)}' "
-            "ORDER BY created_at ASC"
+            f"session_id = '{_esc(session_id)}'"
         )
+        rows.sort(key=lambda r: r.get("created_at", 0))
+        return rows
 
     # -----------------------------------------------------------------------
     # Profile

@@ -29,8 +29,8 @@ pub fn create_directory(
     parent_id: String,
     description: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     let dir = ContextDirectory {
         id: id.clone(),

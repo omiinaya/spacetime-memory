@@ -153,7 +153,7 @@ fn upsert_context_pack(
         ctx.db.context_pack().id().delete(&p.id);
     }
 
-    let id = uuid_v4();
+    let id = uuid_v4(ctx);
     let pack = ContextPack {
         id: id.clone(),
         workspace_id,
@@ -187,7 +187,7 @@ pub fn generate_context_pack(
     peer_id: String,
     previous_pack_id: String,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
     let query_hash = compute_query_hash(&query_text);
 
     if previous_pack_id.is_empty() {
@@ -259,7 +259,7 @@ pub fn generate_context_pack(
             serde_json::to_string(&new_entries).unwrap_or_else(|_| String::from("[]"));
 
         // 3. Insert the DeltaPack
-        let delta_id = uuid_v4();
+        let delta_id = uuid_v4(ctx);
         let delta = DeltaPack {
             id: delta_id,
             workspace_id: workspace_id.clone(),

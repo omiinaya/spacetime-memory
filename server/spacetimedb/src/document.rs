@@ -51,8 +51,8 @@ pub fn create_document(
     source_url: String,
     metadata_json: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     // Validate content_type
     match content_type.as_str() {
@@ -95,8 +95,8 @@ pub fn add_chunk(
     chunk_index: u32,
     embedding_json: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     // Verify that the parent document exists
     let mut doc = ctx

@@ -29,8 +29,8 @@ pub fn create_insight(
     source_memory_ids_json: String,
     confidence: f64,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     let ins = Insight {
         id: id.clone(),

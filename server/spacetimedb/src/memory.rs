@@ -70,8 +70,8 @@ pub fn store_memory(
     source_session_id: String,
     source_message_id: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     let mem = Memory {
         id: id.clone(),
@@ -124,7 +124,7 @@ pub fn update_memory(
     mem.content = content;
     mem.summary = summary;
     mem.confidence = confidence;
-    mem.updated_at = now_micros();
+    mem.updated_at = now_micros(ctx);
 
     ctx.db.memory().id().update(mem);
     Ok(())
@@ -140,7 +140,7 @@ pub fn deactivate_memory(ctx: &ReducerContext, id: String) -> Result<(), String>
         .ok_or_else(|| format!("Memory '{}' not found", id))?;
 
     mem.is_active = false;
-    mem.updated_at = now_micros();
+    mem.updated_at = now_micros(ctx);
 
     ctx.db.memory().id().update(mem);
     Ok(())
@@ -148,7 +148,7 @@ pub fn deactivate_memory(ctx: &ReducerContext, id: String) -> Result<(), String>
 
 #[reducer]
 pub fn expire_memories(ctx: &ReducerContext) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
 
     let expired: Vec<_> = ctx
         .db

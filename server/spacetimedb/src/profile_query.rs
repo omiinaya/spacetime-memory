@@ -73,14 +73,14 @@ pub fn get_profile_context(ctx: &ReducerContext, peer_id: String) -> Result<(), 
         .ok_or_else(|| format!("Profile for peer '{}' not found", peer_id))?;
 
     let result = ProfileContextResult {
-        id: uuid_v4(),
+        id: uuid_v4(ctx),
         peer_id: profile.peer_id.clone(),
         static_facts_json: profile.static_facts_json.clone(),
         dynamic_context_json: profile.dynamic_context_json.clone(),
         preferences_json: profile.preferences_json.clone(),
         tags_json: profile.tags_json.clone(),
         query_text: String::new(),
-        created_at: now_micros(),
+        created_at: now_micros(ctx),
     };
 
     ctx.db.profile_context_result().insert(result);
@@ -95,7 +95,7 @@ pub fn search_profiles(
     _workspace_id: String,
     query_text: String,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
     let query_lower = query_text.to_lowercase();
 
     let matches: Vec<_> = ctx
@@ -110,7 +110,7 @@ pub fn search_profiles(
 
     for p in &matches {
         let result = ProfileContextResult {
-            id: uuid_v4(),
+            id: uuid_v4(ctx),
             peer_id: p.peer_id.clone(),
             static_facts_json: p.static_facts_json.clone(),
             dynamic_context_json: p.dynamic_context_json.clone(),
@@ -129,7 +129,7 @@ pub fn search_profiles(
 /// and store the result in `PeerSummaryResult`.
 #[reducer]
 pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<(), String> {
-    let _now = now_micros();
+    let _now = now_micros(ctx);
 
     // Count active memories for this peer
     let memory_count = ctx
@@ -186,7 +186,7 @@ pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<
     let latest_activity = latest_memory.max(latest_insight).max(latest_session);
 
     let summary = PeerSummaryResult {
-        id: uuid_v4(),
+        id: uuid_v4(ctx),
         peer_id,
         memory_count,
         insight_count,
@@ -211,7 +211,7 @@ pub fn search_directory_contents(
     workspace_id: String,
     directory_path: String,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
 
     // 1. Find the root directory by path
     let root_dir = ctx
@@ -281,7 +281,7 @@ pub fn search_directory_contents(
     };
 
     let result = DirectoryContentResult {
-        id: uuid_v4(),
+        id: uuid_v4(ctx),
         workspace_id,
         directory_path,
         directory_id: root_id,

@@ -37,8 +37,8 @@ pub fn create_peer(
         }
     }
 
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     ctx.db.peer().insert(Peer {
         id: id.clone(),
@@ -81,7 +81,7 @@ pub fn update_peer(
             metadata_json
         },
         created_at: existing.created_at,
-        updated_at: now_micros(),
+        updated_at: now_micros(ctx),
     });
     Ok(())
 }

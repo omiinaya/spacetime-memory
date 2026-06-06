@@ -16,8 +16,8 @@ pub struct Workspace {
 
 #[reducer]
 pub fn create_workspace(ctx: &ReducerContext, name: String, description: String) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     ctx.db.workspace().insert(Workspace {
         id: id.clone(),
@@ -43,7 +43,7 @@ pub fn update_workspace(ctx: &ReducerContext, id: String, name: String, descript
         name,
         description,
         created_at: existing.created_at,
-        updated_at: now_micros(),
+        updated_at: now_micros(ctx),
     });
     Ok(())
 }

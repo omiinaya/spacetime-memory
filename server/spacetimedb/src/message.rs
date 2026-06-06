@@ -37,8 +37,8 @@ pub fn send_message(
         }
     }
 
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     ctx.db.message().insert(Message {
         id: id.clone(),

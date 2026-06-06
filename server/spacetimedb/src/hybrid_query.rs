@@ -110,7 +110,7 @@ pub fn hybrid_search(
     limit: u32,
     strategies_json: String,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
     let qhash = query_hash(&query);
     let query_lower = query.to_lowercase();
     let query_terms: Vec<&str> = query_lower.split_whitespace().collect();
@@ -172,7 +172,7 @@ pub fn hybrid_search(
                     let score = base_score * (0.5 + trust * 0.5);
 
                     ctx.db.hybrid_result().insert(HybridResult {
-                        id: uuid_v4(),
+                        id: uuid_v4(ctx),
                         workspace_id: workspace_id.clone(),
                         query_hash: qhash.clone(),
                         entity_type: si.entity_type.clone(),
@@ -215,7 +215,7 @@ pub fn hybrid_search(
                     let score = base_score * (0.5 + m.trust_score * 0.5);
 
                     ctx.db.hybrid_result().insert(HybridResult {
-                        id: uuid_v4(),
+                        id: uuid_v4(ctx),
                         workspace_id: workspace_id.clone(),
                         query_hash: qhash.clone(),
                         entity_type: "memory".to_string(),
@@ -291,7 +291,7 @@ pub fn hybrid_search(
                         let score = edge.weight * 0.5;
 
                         ctx.db.hybrid_result().insert(HybridResult {
-                            id: uuid_v4(),
+                            id: uuid_v4(ctx),
                             workspace_id: workspace_id.clone(),
                             query_hash: qhash.clone(),
                             entity_type: "node".to_string(),
@@ -308,7 +308,7 @@ pub fn hybrid_search(
                     if count < limit {
                         if let Some(node) = ctx.db.kg_node().id().find(node_id) {
                             ctx.db.hybrid_result().insert(HybridResult {
-                                id: uuid_v4(),
+                                id: uuid_v4(ctx),
                                 workspace_id: workspace_id.clone(),
                                 query_hash: qhash.clone(),
                                 entity_type: "node".to_string(),
@@ -367,7 +367,7 @@ pub fn hybrid_search(
                     let score = base_score * (0.5 + m.trust_score * 0.5);
 
                     ctx.db.hybrid_result().insert(HybridResult {
-                        id: uuid_v4(),
+                        id: uuid_v4(ctx),
                         workspace_id: workspace_id.clone(),
                         query_hash: qhash.clone(),
                         entity_type: "memory".to_string(),
@@ -437,7 +437,7 @@ pub fn compute_god_nodes(
     workspace_id: String,
     top_n: u32,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
     let top_n = if top_n == 0 { 10 } else { top_n };
 
     // Count degree for every node that has at least one edge in this workspace
@@ -476,7 +476,7 @@ pub fn compute_god_nodes(
     // Insert new GodNode entries
     for (node_id, edge_count) in &sorted {
         ctx.db.god_node().insert(GodNode {
-            id: uuid_v4(),
+            id: uuid_v4(ctx),
             workspace_id: workspace_id.clone(),
             node_id: node_id.clone(),
             edge_count: *edge_count,

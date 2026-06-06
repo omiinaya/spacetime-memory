@@ -29,7 +29,7 @@ pub fn upsert_profile(
     preferences_json: String,
     tags_json: String,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
 
     // Attempt to find existing profile for this peer
     let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
@@ -43,7 +43,7 @@ pub fn upsert_profile(
         ctx.db.profile().id().update(p);
     } else {
         // Create new profile
-        let id = uuid_v4();
+        let id = uuid_v4(ctx);
         let p = Profile {
             id: id.clone(),
             peer_id,
@@ -61,7 +61,7 @@ pub fn upsert_profile(
 
 #[reducer]
 pub fn add_profile_fact(ctx: &ReducerContext, peer_id: String, fact: String) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
 
     let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
 
@@ -83,7 +83,7 @@ pub fn add_profile_fact(ctx: &ReducerContext, peer_id: String, fact: String) -> 
         ctx.db.profile().id().update(p);
     } else {
         // Create a new profile with just this fact
-        let id = uuid_v4();
+        let id = uuid_v4(ctx);
         let facts = format!("[\"{}\"]", fact.replace('"', "\\\""));
         let p = Profile {
             id: id.clone(),
@@ -106,7 +106,7 @@ pub fn add_dynamic_context(
     peer_id: String,
     context: String,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
 
     let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
 
@@ -126,7 +126,7 @@ pub fn add_dynamic_context(
         ctx.db.profile().id().update(p);
     } else {
         // Create a new profile with just this context entry
-        let id = uuid_v4();
+        let id = uuid_v4(ctx);
         let context_entry = format!("[\"{}\"]", context.replace('"', "\\\""));
         let p = Profile {
             id: id.clone(),

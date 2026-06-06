@@ -29,8 +29,8 @@ pub fn create_entity_link(
     entity_type: String,
     description: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     let el = EntityLink {
         id: id.clone(),

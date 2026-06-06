@@ -43,13 +43,13 @@ pub fn create_api_key(
     }
 
     ctx.db.api_key().insert(ApiKey {
-        id: uuid_v4(),
+        id: uuid_v4(ctx),
         workspace_id,
         key_hash,
         name,
         permissions,
         is_active: true,
-        created_at: now_micros(),
+        created_at: now_micros(ctx),
         last_used_at: 0,
     });
     Ok(())
@@ -74,17 +74,17 @@ pub fn create_auth_session(
     ttl_minutes: i64,
 ) -> Result<(), String> {
     let expires_at = if ttl_minutes > 0 {
-        now_micros() + ttl_minutes * 60_000_000
+        now_micros(ctx) + ttl_minutes * 60_000_000
     } else {
-        now_micros() + 7 * 86_400_000_000 // default 7 days
+        now_micros(ctx) + 7 * 86_400_000_000 // default 7 days
     };
 
     ctx.db.auth_session().insert(AuthSession {
-        id: uuid_v4(),
+        id: uuid_v4(ctx),
         peer_id,
         token_hash,
         expires_at,
-        created_at: now_micros(),
+        created_at: now_micros(ctx),
     });
     Ok(())
 }
@@ -99,7 +99,7 @@ pub fn revoke_auth_session(ctx: &ReducerContext, id: String) -> Result<(), Strin
 /// Clean up expired auth sessions
 #[reducer]
 pub fn cleanup_expired_sessions(ctx: &ReducerContext) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
     let expired: Vec<AuthSession> = ctx.db.auth_session()
         .iter()
         .filter(|s| s.expires_at > 0 && s.expires_at < now)

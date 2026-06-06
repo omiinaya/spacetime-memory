@@ -30,8 +30,8 @@ pub fn store_context_pack(
     pack_json: String,
     token_count: u32,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     // Remove any existing pack with the same workspace_id + query_hash
     let existing: Vec<_> = ctx
@@ -68,7 +68,7 @@ pub fn reinforce_memory(ctx: &ReducerContext, memory_id: String) -> Result<(), S
 
     mem.access_count = mem.access_count.saturating_add(1);
     mem.strength = (mem.strength + 0.05).min(1.0);
-    mem.updated_at = now_micros();
+    mem.updated_at = now_micros(ctx);
 
     // Tier escalation based on strength thresholds
     if mem.strength >= 0.8 && mem.tier != "L0" {
@@ -99,7 +99,7 @@ pub fn update_memory_tier(ctx: &ReducerContext, memory_id: String, tier: String)
         .ok_or_else(|| format!("Memory '{}' not found", memory_id))?;
 
     mem.tier = tier;
-    mem.updated_at = now_micros();
+    mem.updated_at = now_micros(ctx);
 
     ctx.db.memory().id().update(mem);
     Ok(())

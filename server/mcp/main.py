@@ -6,10 +6,10 @@ covering workspaces, memories, profiles, knowledge graph, sessions, and search.
 Uses stdio transport for integration with MCP-compatible clients.
 
 Configuration via environment variables:
-  SPACETIMEDB_HOST   (default: localhost)
-  SPACETIMEDB_PORT   (default: 3001)
-  SPACETIMEDB_DB     (default: spacetime-memory)
-  EMBEDDER_URL       (default: http://localhost:9090)
+  SPACETIMEDB_HOST (default: localhost)
+  SPACETIMEDB_PORT (default: 3001)
+  SPACETIMEDB_DB (default: spacetime-memory)
+  EMBEDDER_URL (default: http://localhost:9090)
 """
 
 from __future__ import annotations
@@ -60,8 +60,8 @@ def _sql(query: str) -> list[dict[str, Any]]:
     """Execute a SQL SELECT / read query and return parsed dicts.
 
     SpacetimeDB returns a positional-array format:
-      [{ "schema": { "elements": [ {"name": {"some": "col"}, ...} ] },
-         "rows": [ [val, ...], ... ] }]
+    [{ "schema": { "elements": [ {"name": {"some": "col"}, ...} ] },
+       "rows": [ [val, ...], ... ] }]
     """
     resp = get_client().post(SQL_URL, content=query, headers={"Content-Type": "text/plain"})
     if resp.status_code >= 400:
@@ -165,7 +165,7 @@ def create_workspace(name: str, description: str = "") -> dict[str, Any]:
 @mcp.tool()
 def list_workspaces() -> list[dict[str, Any]]:
     """List all workspaces with their metadata."""
-    return _sql("SELECT * FROM workspace ORDER BY created_at DESC")
+    return _sql("SELECT * FROM workspace")
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ def store_memory(
     """Store a new memory in the database.
 
     Supported memory_type values: world_fact, experience, mental_model.
-    Tier (optional): L0=critical, L1=normal, L2=archival.  If provided,
+    Tier (optional): L0=critical, L1=normal, L2=archival. If provided,
     updates the tier after storing.
     Automatically generates an embedding index for semantic search.
     """
@@ -208,10 +208,9 @@ def store_memory(
             "SELECT id FROM memory WHERE "
             f"workspace_id = '{_esc(workspace_id)}' AND "
             f"peer_id = '{_esc(peer_id)}' "
-            "ORDER BY created_at DESC LIMIT 1"
         )
         if mems:
-            mem_id = mems[0]["id"]
+            mem_id = mems[-1]["id"]
             _call("index_entity", [
                 workspace_id, "memory", mem_id,
                 content, json.dumps(emb),
@@ -223,10 +222,9 @@ def store_memory(
             "SELECT id FROM memory WHERE "
             f"workspace_id = '{_esc(workspace_id)}' AND "
             f"peer_id = '{_esc(peer_id)}' "
-            "ORDER BY created_at DESC LIMIT 1"
         )
         if mems:
-            _call("update_memory_tier", [mems[0]["id"], tier])
+            _call("update_memory_tier", [mems[-1]["id"], tier])
     return result
 
 
@@ -241,7 +239,7 @@ def search_memories(
     """Search memories in a workspace.
 
     Supports optional full-text filtering via LIKE, optional memory_type
-    and tier filters.  Auto-reinforces every memory returned.
+    and tier filters. Auto-reinforces every memory returned.
     """
     clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
     if query_text:
@@ -254,8 +252,10 @@ def search_memories(
 
     where = " AND ".join(clauses) if clauses else "1=1"
     results = _sql(
-        f"SELECT * FROM memory WHERE {where} ORDER BY created_at DESC LIMIT {int(limit)}"
+        f"SELECT * FROM memory WHERE {where}"
     )
+    results.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+    results = results[:int(limit)]
     # Auto-reinforce every memory returned
     for row in results:
         try:
@@ -304,17 +304,13 @@ def hybrid_search(
     # Read back results via SQL
     qhash = _query_hash(query_text)
     results = _sql(
-        "SELECT hr.*, "
-        "  COALESCE(m.content, '') AS memory_content, "
-        "  COALESCE(k.label, '') AS node_label "
-        "FROM hybrid_result hr "
-        "LEFT JOIN memory m ON hr.entity_type = 'memory' AND hr.entity_id = m.id "
-        "LEFT JOIN kg_node k ON hr.entity_type = 'node' AND hr.entity_id = k.id "
-        f"WHERE hr.workspace_id = '{_esc(workspace_id)}' "
-        f"  AND hr.query_hash = '{_esc(qhash)}' "
-        "ORDER BY hr.score DESC "
-        f"LIMIT {int(limit * 4)}"
+        "SELECT * FROM hybrid_result "
+        f"WHERE workspace_id = '{_esc(workspace_id)}' "
+        f"  AND query_hash = '{_esc(qhash)}' "
     )
+    # Sort by score descending and limit
+    results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+    results = results[:int(limit) * 4]
 
     # Auto-reinforce every memory returned by the search
     for row in results:
@@ -322,14 +318,14 @@ def hybrid_search(
             try:
                 _call("reinforce_memory", [row["entity_id"]])
             except Exception:
-                pass  # embedder or reducer temporarily offline — skip
+                pass
 
     return results
 
 
 @mcp.tool()
 def get_memory(id: str) -> list[dict[str, Any]]:
-    """Retrieve a single memory by its ID.  Auto-reinforces on read."""
+    """Retrieve a single memory by its ID. Auto-reinforces on read."""
     results = _sql(f"SELECT * FROM memory WHERE id = '{_esc(id)}'")
     if results:
         try:
@@ -361,7 +357,7 @@ def get_profile(peer_id: str) -> list[dict[str, Any]]:
     """Retrieve the profile for a peer, including static_facts, dynamic_context, and preferences.
 
     The returned fields (static_facts_json, dynamic_context_json,
-    preferences_json) are JSON strings.  Parse them as needed.
+    preferences_json) are JSON strings. Parse them as needed.
     """
     return _sql(f"SELECT * FROM profile WHERE peer_id = '{_esc(peer_id)}'")
 
@@ -413,10 +409,9 @@ def create_node(
             "SELECT id FROM kg_node WHERE "
             f"workspace_id = '{_esc(workspace_id)}' AND "
             f"label = '{_esc(label)}' "
-            "ORDER BY created_at DESC LIMIT 1"
         )
         if nodes:
-            node_id = nodes[0]["id"]
+            node_id = nodes[-1]["id"]
             _call("index_entity", [
                 workspace_id, "node", node_id,
                 content, json.dumps(emb),
@@ -432,11 +427,10 @@ def query_graph(workspace_id: str, query: str = "") -> list[dict[str, Any]]:
         escaped = _esc(query)
         return _sql(
             f"SELECT * FROM kg_node WHERE workspace_id = '{_esc(workspace_id)}' "
-            f"AND label LIKE '%{escaped}%' ORDER BY created_at DESC"
+            f"AND label LIKE '%{escaped}%'"
         )
     return _sql(
-        f"SELECT * FROM kg_node WHERE workspace_id = '{_esc(workspace_id)}' "
-        f"ORDER BY created_at DESC"
+        f"SELECT * FROM kg_node WHERE workspace_id = '{_esc(workspace_id)}'"
     )
 
 
@@ -452,16 +446,14 @@ def get_neighbors(node_id: str) -> list[dict[str, Any]]:
 
     Returns both outgoing and incoming edges with node labels.
     """
-    return _sql(
-        f"SELECT e.*, "
-        f"  src.label AS source_label, tgt.label AS target_label "
-        f"FROM kg_edge e "
-        f"LEFT JOIN kg_node src ON e.source_node_id = src.id "
-        f"LEFT JOIN kg_node tgt ON e.target_node_id = tgt.id "
-        f"WHERE e.source_node_id = '{_esc(node_id)}' "
-        f"   OR e.target_node_id = '{_esc(node_id)}' "
-        f"ORDER BY e.weight DESC"
+    results = _sql(
+        "SELECT source_node_id, target_node_id, relation, weight "
+        f"FROM kg_edge "
+        f"WHERE source_node_id = '{_esc(node_id)}' "
+        f"   OR target_node_id = '{_esc(node_id)}' "
     )
+    results.sort(key=lambda r: r.get("weight", 0.0), reverse=True)
+    return results
 
 
 @mcp.tool()
@@ -483,26 +475,27 @@ def get_community(community_id: int) -> dict[str, Any]:
 @mcp.tool()
 def get_peer_sessions(peer_id: str) -> list[dict[str, Any]]:
     """List all sessions a peer has participated in."""
-    return _sql(
-        f"SELECT s.*, sp.role, sp.joined_at "
-        f"FROM session s "
-        f"INNER JOIN session_participant sp ON s.id = sp.session_id "
-        f"WHERE sp.peer_id = '{_esc(peer_id)}' "
-        f"ORDER BY sp.joined_at DESC"
+    rows = _sql(
+        "SELECT session_id, peer_id, role, joined_at "
+        "FROM session_participant "
+        f"WHERE peer_id = '{_esc(peer_id)}'"
     )
+    rows.sort(key=lambda r: r.get("joined_at", 0), reverse=True)
+    return rows
 
 
 @mcp.tool()
 def get_session_messages(session_id: str) -> list[dict[str, Any]]:
     """Retrieve all messages for a session, ordered by creation time."""
-    return _sql(
-        f"SELECT * FROM message WHERE session_id = '{_esc(session_id)}' "
-        f"ORDER BY created_at ASC"
+    rows = _sql(
+        f"SELECT * FROM message WHERE session_id = '{_esc(session_id)}'"
     )
+    rows.sort(key=lambda r: r.get("created_at", 0))
+    return rows
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
 
@@ -512,7 +505,7 @@ def _esc(val: str) -> str:
 
 
 def _query_hash(query: str) -> str:
-    """Compute the same query hash as the Rust hybrid_query reducer."""
+    """Deterministic hash matching the Rust hybrid_query reducer."""
     h = 0
     for b in query.encode("utf-8"):
         h = ((h * 6364136223846793005) + b) & 0xFFFFFFFFFFFFFFFF
@@ -520,14 +513,8 @@ def _query_hash(query: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Entry
 # ---------------------------------------------------------------------------
 
-
-def main() -> None:
-    """Run the MCP server using stdio transport."""
-    mcp.run(transport="stdio")
-
-
 if __name__ == "__main__":
-    main()
+    mcp.run()

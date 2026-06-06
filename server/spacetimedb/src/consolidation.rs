@@ -1,10 +1,10 @@
 use spacetimedb::*;
 
+use crate::{uuid_v4, now_micros};
 use crate::hybrid_query::{cosine_similarity, parse_embedding_json};
 use crate::memory::memory;
 use crate::retrieval::search_index;
 use crate::workspace::workspace;
-use crate::{now_micros, uuid_v4};
 
 /// Tracks consolidation operations (dedup, rollup, decay, version_merge).
 #[table(accessor = consolidation_log, public)]
@@ -32,8 +32,8 @@ pub fn consolidate_memories(
     target_content: String,
     target_summary: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     // Parse source IDs from JSON array
     let source_ids: Vec<String> = serde_json::from_str(&source_ids_json)
@@ -81,7 +81,7 @@ pub fn consolidate_memories(
 
     // Log the consolidation
     let log = ConsolidationLog {
-        id: uuid_v4(),
+        id: uuid_v4(ctx),
         workspace_id,
         consolidation_type: String::from("rollup"),
         source_memory_ids: source_ids_json,
@@ -101,7 +101,7 @@ pub fn decay_weak_memories(
     workspace_id: String,
     strength_threshold: f64,
 ) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
     let stale_cutoff = now - 7 * 86_400_000_000; // 7 days ago in micros
 
     let weak: Vec<_> = ctx
@@ -129,7 +129,7 @@ pub fn decay_weak_memories(
         let ids_json = serde_json::to_string(&source_ids)
             .unwrap_or_else(|_| "[]".to_string());
         let log = ConsolidationLog {
-            id: uuid_v4(),
+            id: uuid_v4(ctx),
             workspace_id,
             consolidation_type: String::from("decay"),
             source_memory_ids: ids_json,
@@ -185,7 +185,7 @@ fn edit_distance(a: &str, b: &str) -> usize {
 /// newer one is marked inactive and consolidated_to the older one.
 #[reducer]
 pub fn dedup_memories(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
-    let now = now_micros();
+    let now = now_micros(ctx);
 
     // Collect active memories with their embeddings
     #[allow(clippy::type_complexity)]
@@ -276,7 +276,17 @@ pub struct MaintenanceSchedule {
 /// Runs via SpacetimeDB scheduler (every 5 minutes, configured in `init`).
 #[reducer]
 pub fn run_maintenance(ctx: &ReducerContext, _arg: MaintenanceSchedule) -> Result<(), String> {
-    let now = now_micros();
+    _run_maintenance(ctx)
+}
+
+/// Manual maintenance trigger — callable from HTTP API (no scheduled arg needed).
+#[reducer]
+pub fn manual_maintenance(ctx: &ReducerContext) -> Result<(), String> {
+    _run_maintenance(ctx)
+}
+
+fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
+    let now = now_micros(ctx);
 
     // 1. Expire memories that have passed their expires_at
     let expired: Vec<_> = ctx
@@ -320,7 +330,7 @@ pub fn run_maintenance(ctx: &ReducerContext, _arg: MaintenanceSchedule) -> Resul
         let ids_json =
             serde_json::to_string(&source_ids).unwrap_or_else(|_| "[]".to_string());
         ctx.db.consolidation_log().insert(ConsolidationLog {
-            id: uuid_v4(),
+            id: uuid_v4(ctx),
             workspace_id: ws.id.clone(),
             consolidation_type: String::from("decay"),
             source_memory_ids: ids_json,
@@ -334,7 +344,7 @@ pub fn run_maintenance(ctx: &ReducerContext, _arg: MaintenanceSchedule) -> Resul
         if let Err(e) = dedup_memories(ctx, ws.id.clone()) {
             // Log but don't halt maintenance on dedup error
             ctx.db.consolidation_log().insert(ConsolidationLog {
-                id: uuid_v4(),
+                id: uuid_v4(ctx),
                 workspace_id: ws.id.clone(),
                 consolidation_type: String::from("dedup_error"),
                 source_memory_ids: e,

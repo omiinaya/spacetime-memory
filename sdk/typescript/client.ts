@@ -175,9 +175,7 @@ export class Client {
   }
 
   async listWorkspaces(): Promise<any[]> {
-    return this._sql(
-      "SELECT * FROM workspace ORDER BY created_at DESC"
-    );
+    return this._sql("SELECT * FROM workspace");
   }
 
   // -----------------------------------------------------------------------
@@ -211,13 +209,13 @@ export class Client {
     const emb = await this._embed(content);
     if (emb.length > 0) {
       const mems = await this._sql(
-        `SELECT id FROM memory WHERE workspace_id = '${esc(workspaceId)}' ORDER BY created_at DESC LIMIT 1`
+        `SELECT id FROM memory WHERE workspace_id = '${esc(workspaceId)}'`
       );
       if (mems.length > 0) {
         await this._call("index_entity", [
           workspaceId,
           "memory",
-          mems[0].id,
+          mems[mems.length - 1].id,
           content,
           JSON.stringify(emb),
         ]);
@@ -226,10 +224,10 @@ export class Client {
 
     if (opts?.tier && ["L0", "L1", "L2"].includes(opts.tier)) {
       const mems = await this._sql(
-        `SELECT id FROM memory WHERE workspace_id = '${esc(workspaceId)}' ORDER BY created_at DESC LIMIT 1`
+        `SELECT id FROM memory WHERE workspace_id = '${esc(workspaceId)}'`
       );
       if (mems.length > 0) {
-        await this._call("update_memory_tier", [mems[0].id, opts.tier]);
+        await this._call("update_memory_tier", [mems[mems.length - 1].id, opts.tier]);
       }
     }
   }
@@ -266,16 +264,31 @@ export class Client {
         strategies,
       ]);
       const qhash = queryHash(query);
-      return this._sql(
-        `SELECT hr.*, COALESCE(m.content, '') AS memory_content, ` +
-          `COALESCE(k.label, '') AS node_label ` +
-          `FROM hybrid_result hr ` +
-          `LEFT JOIN memory m ON hr.entity_type = 'memory' AND hr.entity_id = m.id ` +
-          `LEFT JOIN kg_node k ON hr.entity_type = 'node' AND hr.entity_id = k.id ` +
-          `WHERE hr.workspace_id = '${esc(workspaceId)}' ` +
-          `  AND hr.query_hash = '${esc(qhash)}' ` +
-          `ORDER BY hr.score DESC LIMIT ${limit}`
+      let rows = await this._sql(
+        `SELECT * FROM hybrid_result WHERE workspace_id = '${esc(workspaceId)}' AND query_hash = '${esc(qhash)}'`
       );
+      rows.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+      // Look up entity content in Python-style
+      const memIds: string[] = rows.filter((r: any) => r.entity_type === "memory").map((r: any) => r.entity_id);
+      const nodeIds: string[] = rows.filter((r: any) => r.entity_type === "node").map((r: any) => r.entity_id);
+      const memMap: Record<string, string> = {};
+      const nodeMap: Record<string, string> = {};
+      for (const mid of memIds) {
+        const mems = await this._sql(`SELECT id, content FROM memory WHERE id = '${esc(mid)}'`);
+        if (mems.length > 0) memMap[mid] = mems[0].content ?? "";
+      }
+      for (const nid of nodeIds) {
+        const nodes = await this._sql(`SELECT id, label FROM kg_node WHERE id = '${esc(nid)}'`);
+        if (nodes.length > 0) nodeMap[nid] = nodes[0].label ?? "";
+      }
+      for (const r of rows) {
+        const eid = r.entity_id ?? "";
+        if (r.entity_type === "memory") r.memory_content = memMap[eid] ?? "";
+        else if (r.entity_type === "node") r.memory_content = nodeMap[eid] ?? "";
+        else r.memory_content = "";
+      }
+      return rows.slice(0, limit);
     }
 
     let clauses = [`workspace_id = '${esc(workspaceId)}'`];
@@ -291,9 +304,11 @@ export class Client {
       clauses.push(`tier = '${esc(opts.tier)}'`);
     }
     const where = clauses.join(" AND ");
-    return this._sql(
-      `SELECT * FROM memory WHERE ${where} ORDER BY created_at DESC LIMIT ${limit}`
+    let rows = await this._sql(
+      `SELECT * FROM memory WHERE ${where}`
     );
+    rows.sort((a: any, b: any) => (b.created_at ?? 0) - (a.created_at ?? 0));
+    return rows.slice(0, limit);
   }
 
   async getMemory(memoryId: string): Promise<MemoryRecord[]> {
@@ -329,9 +344,11 @@ export class Client {
       clauses.push(`memory_type = '${esc(opts.memoryType)}'`);
     }
     const where = clauses.join(" AND ");
-    return this._sql(
-      `SELECT * FROM memory WHERE ${where} ORDER BY created_at DESC LIMIT ${limit}`
-    ) as Promise<MemoryRecord[]>;
+    let rows = await this._sql(
+      `SELECT * FROM memory WHERE ${where}`
+    );
+    rows.sort((a: any, b: any) => (b.created_at ?? 0) - (a.created_at ?? 0));
+    return rows.slice(0, limit) as MemoryRecord[];
   }
 
   // -----------------------------------------------------------------------
@@ -356,13 +373,13 @@ export class Client {
     const emb = await this._embed(content);
     if (emb.length > 0) {
       const nodes = await this._sql(
-        `SELECT id FROM kg_node WHERE workspace_id = '${esc(workspaceId)}' AND label = '${esc(label)}' ORDER BY created_at DESC LIMIT 1`
+        `SELECT id FROM kg_node WHERE workspace_id = '${esc(workspaceId)}' AND label = '${esc(label)}'`
       );
       if (nodes.length > 0) {
         await this._call("index_entity", [
           workspaceId,
           "node",
-          nodes[0].id,
+          nodes[nodes.length - 1].id,
           content,
           JSON.stringify(emb),
         ]);
@@ -394,23 +411,19 @@ export class Client {
   ): Promise<any[]> {
     if (query) {
       return this._sql(
-        `SELECT * FROM kg_node WHERE workspace_id = '${esc(workspaceId)}' AND label LIKE '%${esc(query)}%' ORDER BY created_at DESC`
+        `SELECT * FROM kg_node WHERE workspace_id = '${esc(workspaceId)}' AND label LIKE '%${esc(query)}%'`
       );
     }
     return this._sql(
-      `SELECT * FROM kg_node WHERE workspace_id = '${esc(workspaceId)}' ORDER BY created_at DESC`
+      `SELECT * FROM kg_node WHERE workspace_id = '${esc(workspaceId)}'`
     );
   }
 
   async getNeighbors(nodeId: string): Promise<any[]> {
     return this._sql(
-      `SELECT e.*, src.label AS source_label, tgt.label AS target_label ` +
-        `FROM kg_edge e ` +
-        `LEFT JOIN kg_node src ON e.source_node_id = src.id ` +
-        `LEFT JOIN kg_node tgt ON e.target_node_id = tgt.id ` +
-        `WHERE e.source_node_id = '${esc(nodeId)}' ` +
-        `   OR e.target_node_id = '${esc(nodeId)}' ` +
-        `ORDER BY e.weight DESC`
+      `SELECT source_node_id, target_node_id, relation, weight FROM kg_edge ` +
+        `WHERE source_node_id = '${esc(nodeId)}' ` +
+        `   OR target_node_id = '${esc(nodeId)}'`
     );
   }
 

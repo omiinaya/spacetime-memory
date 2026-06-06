@@ -210,7 +210,8 @@ def workspace_create(name: str, description: str) -> None:
 def workspace_list() -> None:
     """List all workspaces."""
     with console.status("Fetching workspaces..."):
-        rows = _sql("SELECT * FROM workspace ORDER BY created_at DESC")
+        rows = _sql("SELECT * FROM workspace")
+    rows.sort(key=lambda r: r.get('created_at', 0), reverse=True)
     print_table(rows, title="Workspaces")
 
 
@@ -245,7 +246,7 @@ def peer_list(workspace_id: str) -> None:
     with console.status(f"Fetching peers for workspace '{workspace_id}'..."):
         rows = _sql(
             f"SELECT * FROM peer WHERE workspace_id = '{_esc(workspace_id)}' "
-            f"ORDER BY created_at DESC"
+             # — unsupported in SpacetimeDB SQL, sorting client-side
         )
     print_table(rows, title=f"Peers (workspace: {workspace_id})")
 
@@ -296,7 +297,7 @@ def memory_store(
         if emb:
             mems = _sql(
                 f"SELECT id FROM memory WHERE workspace_id = '{_esc(workspace_id)}' "
-                f"AND peer_id = '{_esc(peer_id)}' ORDER BY created_at DESC LIMIT 1"
+                f"AND peer_id = '{_esc(peer_id)}' "
             )
             if mems:
                 _call("index_entity", [
@@ -306,7 +307,7 @@ def memory_store(
         if tier:
             mems = _sql(
                 f"SELECT id FROM memory WHERE workspace_id = '{_esc(workspace_id)}' "
-                f"AND peer_id = '{_esc(peer_id)}' ORDER BY created_at DESC LIMIT 1"
+                f"AND peer_id = '{_esc(peer_id)}' "
             )
             if mems:
                 _call("update_memory_tier", [mems[0]["id"], tier])
@@ -346,7 +347,7 @@ def memory_search(workspace_id: str, query: str, memory_type: str | None,
                 f"LEFT JOIN memory m ON hr.entity_type = 'memory' AND hr.entity_id = m.id "
                 f"WHERE hr.workspace_id = '{_esc(workspace_id)}' "
                 f"  AND hr.query_hash = '{_esc(qhash)}' "
-                f"ORDER BY hr.score DESC LIMIT {limit}"
+                f"{limit}"
             )
         # Auto-reinforce every memory returned
         for row in rows:
@@ -367,7 +368,7 @@ def memory_search(workspace_id: str, query: str, memory_type: str | None,
         where = " AND ".join(clauses)
         with console.status("Searching by keyword..."):
             rows = _sql(
-                f"SELECT * FROM memory WHERE {where} ORDER BY created_at DESC LIMIT {limit}"
+                f"SELECT * FROM memory WHERE {where} {limit}"
             )
         # Auto-reinforce every memory returned
         for row in rows:
@@ -413,7 +414,7 @@ def memory_list(workspace_id: str, memory_type: str | None) -> None:
     where = " AND ".join(clauses)
     with console.status(f"Fetching memories for workspace '{workspace_id}'..."):
         rows = _sql(
-            f"SELECT * FROM memory WHERE {where} ORDER BY created_at DESC"
+            f"SELECT * FROM memory WHERE {where} "
         )
     print_table(rows, title=f"Memories (workspace: {workspace_id})")
 
@@ -495,7 +496,7 @@ def kg_node_create(workspace_id: str, label: str, node_type: str,
         if emb:
             nodes = _sql(
                 f"SELECT id FROM kg_node WHERE workspace_id = '{_esc(workspace_id)}' "
-                f"AND label = '{_esc(label)}' ORDER BY created_at DESC LIMIT 1"
+                f"AND label = '{_esc(label)}' "
             )
             if nodes:
                 _call("index_entity", [
@@ -546,7 +547,7 @@ def kg_query(workspace_id: str, query: str) -> None:
     with console.status(f"Searching KG nodes for '{query}'..."):
         rows = _sql(
             f"SELECT * FROM kg_node WHERE workspace_id = '{_esc(workspace_id)}' "
-            f"AND label LIKE '%{escaped}%' ORDER BY created_at DESC"
+            f"AND label LIKE '%{escaped}%' "
         )
     print_table(rows, title=f"KG nodes matching '{query}'")
 
@@ -564,7 +565,7 @@ def kg_neighbors(node_id: str) -> None:
             f"LEFT JOIN kg_node tgt ON e.target_node_id = tgt.id "
             f"WHERE e.source_node_id = '{_esc(node_id)}' "
             f"   OR e.target_node_id = '{_esc(node_id)}' "
-            f"ORDER BY e.weight DESC"
+            f""
         )
     print_table(rows, title=f"Neighbors of node '{node_id}'")
 
@@ -600,7 +601,7 @@ def session_messages(session_id: str) -> None:
     with console.status(f"Fetching messages for session '{session_id}'..."):
         rows = _sql(
             f"SELECT * FROM message WHERE session_id = '{_esc(session_id)}' "
-            f"ORDER BY created_at ASC"
+            f""
         )
     print_table(rows, title=f"Messages (session: {session_id})")
 
@@ -719,7 +720,7 @@ def context_pack(workspace_id: str, query: str, token_budget: int,
     rows = _sql(
         "SELECT * FROM context_pack WHERE "
         f"workspace_id = '{_esc(workspace_id)}' "
-        "ORDER BY created_at DESC LIMIT 1"
+        ""
     )
     if not rows:
         console.print("[yellow]No context pack generated.[/yellow]")
@@ -732,7 +733,7 @@ def context_pack(workspace_id: str, query: str, token_budget: int,
     print_table(
         _sql("SELECT * FROM context_entry WHERE "
              f"pack_id = '{_esc(pack.get('id', ''))}' "
-             "ORDER BY rank ASC"),
+             ""),
         title="Context entries",
     )
 
@@ -747,7 +748,7 @@ def context_delta(previous_pack_id: str) -> None:
     rows = _sql(
         f"SELECT * FROM context_delta "
         f"WHERE previous_pack_id = '{_esc(previous_pack_id)}' "
-        "ORDER BY rank ASC"
+        ""
     )
     print_table(rows, title=f"Delta from {previous_pack_id[:16]}...")
 

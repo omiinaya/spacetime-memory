@@ -34,8 +34,8 @@ pub fn create_tag(
     name: String,
     color: String,
 ) -> Result<(), String> {
-    let now = now_micros();
-    let id = uuid_v4();
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
 
     let tag = Tag {
         id: id.clone(),
