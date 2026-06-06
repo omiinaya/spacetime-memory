@@ -25,3 +25,8 @@ dist/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Virtual environments
+**/venv/
+**/__pycache__/
+*.pyc
