@@ -1,7 +1,8 @@
 """Python client for spacetime-memory.
 
 Provides a high-level Client class that wraps the SpacetimeDB HTTP SQL API,
-the reducer-call endpoint, and the Rust ONNX embedder sidecar.
+the reducer-call endpoint, and embedder support (Rust ONNX sidecar + OpenAI
+API fallback).
 """
 
 from __future__ import annotations
@@ -14,8 +15,30 @@ from typing import Any
 import httpx
 
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Error message mapping (human-readable)
+# ---------------------------------------------------------------------------
+
+_SQL_ERROR_MAP: dict[str, str] = {
+    "table.*does not exist": "Table not found. Check that the module is published.",
+    "column.*does not exist": "Column not found. Check the field name.",
+    "duplicate key value": "Duplicate record. A record with this ID already exists.",
+    "violates foreign key": "Referenced record not found. Check that the related record exists.",
+    "syntax error": "SQL syntax error. Check your query syntax.",
+    "permission denied": "Permission denied. You may not have access to this resource.",
+}
+
+_REDUCER_ERROR_MAP: dict[str, str] = {
+    "not found": "Record not found. Check the ID.",
+    "unauthorized": "Authentication required. Please login first.",
+    "already exists": "Record already exists with this identifier.",
+    "validation error": "Invalid input. Check the format of your data.",
+    "rate limit": "Too many requests. Please wait before trying again.",
+}
 
 # ---------------------------------------------------------------------------
 # Client
@@ -28,6 +51,15 @@ class Client:
     Minimal config — point at a running SpacetimeDB instance + embedder.
     All methods return parsed dicts: {"status": "ok"} for writes, or
     list[dict] / dict for reads.
+
+    Embedder type can be one of:
+
+    - ``"local"`` — use the Rust ONNX sidecar (default behaviour)
+    - ``"openai"`` — use OpenAI's embeddings API
+    - ``"auto"`` — try the sidecar first, fall back to OpenAI if unavailable
+
+    When using ``"openai"`` or ``"auto"`` fallback, set ``OPENAI_API_KEY``
+    environment variable.
 
     Example::
 
@@ -43,7 +75,9 @@ class Client:
         port: int | str | None = None,
         database: str | None = None,
         embedder_url: str | None = None,
+        embedder_type: str | None = None,
         timeout: float = 30.0,
+        verbose: bool = False,
     ):
         self.host = host or os.environ.get("SPACETIMEDB_HOST", "localhost")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
@@ -54,6 +88,11 @@ class Client:
             embedder_url
             or os.environ.get("EMBEDDER_URL", "http://localhost:9090")
         )
+        self.embedder_type = (
+            embedder_type
+            or os.environ.get("EMBEDDER_TYPE", "auto")
+        )
+        self.verbose = verbose
 
         base = f"http://{self.host}:{self.port}"
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
@@ -72,10 +111,28 @@ class Client:
             headers={"Content-Type": "text/plain"},
         )
         if resp.status_code >= 400:
-            raise RuntimeError(
-                f"SQL error (HTTP {resp.status_code}): {resp.text[:500]}"
-            )
+            error_text = resp.text[:500]
+            if self.verbose:
+                raise RuntimeError(
+                    f"SQL error (HTTP {resp.status_code}): {error_text}"
+                )
+            friendly = self._map_sql_error(error_text)
+            raise RuntimeError(friendly)
         return _parse_sql_response(resp.text)
+
+    def _map_sql_error(self, error_text: str) -> str:
+        """Map raw SQL error text to a human-friendly message."""
+        for pattern, message in _SQL_ERROR_MAP.items():
+            if re.search(pattern, error_text, re.IGNORECASE):
+                return f"{message} (raw: {error_text[:200]})"
+        return f"Database error: {error_text[:300]}"
+
+    def _map_reducer_error(self, error_text: str) -> str:
+        """Map raw reducer error text to a human-friendly message."""
+        for pattern, message in _REDUCER_ERROR_MAP.items():
+            if re.search(pattern, error_text, re.IGNORECASE):
+                return f"{message} (raw: {error_text[:200]})"
+        return f"Reducer error: {error_text[:300]}"
 
     def _call(self, reducer: str, args: list[Any]) -> dict[str, Any]:
         """Call a SpacetimeDB reducer with positional JSON args."""
@@ -85,12 +142,36 @@ class Client:
             headers={"Content-Type": "application/json"},
         )
         if resp.status_code >= 400:
-            raise RuntimeError(
-                f"Reducer error (HTTP {resp.status_code}): {resp.text[:500]}"
-            )
+            error_text = resp.text[:500]
+            if self.verbose:
+                raise RuntimeError(
+                    f"Reducer error (HTTP {resp.status_code}): {error_text}"
+                )
+            friendly = self._map_reducer_error(error_text)
+            raise RuntimeError(friendly)
         return {"status": "ok"}
 
     def _embed(self, text: str) -> list[float]:
+        """Get an embedding vector.
+
+        Behaviour depends on ``embedder_type``:
+        - ``"local"``: use the Rust ONNX sidecar (current behaviour)
+        - ``"openai"``: call OpenAI embeddings API
+        - ``"auto"``: try sidecar first, fall back to OpenAI
+        """
+        if self.embedder_type == "openai":
+            return self._embed_openai(text)
+        if self.embedder_type == "local":
+            return self._embed_local(text)
+
+        # "auto" — try local, fall back to OpenAI
+        result = self._embed_local(text)
+        if result:
+            return result
+        logger.info("Local embedder unavailable, falling back to OpenAI")
+        return self._embed_openai(text)
+
+    def _embed_local(self, text: str) -> list[float]:
         """Get an embedding vector via the Rust ONNX sidecar."""
         try:
             resp = self._http.post(
@@ -116,8 +197,53 @@ class Client:
             logger.exception("Unexpected error in _embed for text (len=%d)", len(text))
             return []
 
+    def _embed_openai(self, text: str) -> list[float]:
+        """Embed via OpenAI API."""
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
+            return []
+        try:
+            resp = self._http.post(
+                "https://api.openai.com/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"input": text, "model": "text-embedding-ada-002"},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["data"][0]["embedding"]
+        except httpx.TimeoutException:
+            logger.warning("OpenAI embedder timed out for text (len=%d)", len(text))
+            return []
+        except Exception:
+            logger.exception("OpenAI embedder failed for text (len=%d)", len(text))
+            return []
+
     def _embed_batch(self, texts: list[str]) -> list[list[float]]:
-        """Get embeddings for multiple texts."""
+        """Get embeddings for multiple texts.
+
+        Behaviour follows ``embedder_type`` — see :meth:`_embed`.
+        """
+        if not texts:
+            return []
+        if self.embedder_type == "openai":
+            return self._embed_batch_openai(texts)
+        if self.embedder_type == "local":
+            return self._embed_batch_local(texts)
+
+        # "auto" — try local, fall back to OpenAI
+        result = self._embed_batch_local(texts)
+        if result:
+            return result
+        logger.info("Local embedder unavailable for batch, falling back to OpenAI")
+        return self._embed_batch_openai(texts)
+
+    def _embed_batch_local(self, texts: list[str]) -> list[list[float]]:
+        """Get embeddings for multiple texts via the Rust ONNX sidecar."""
         if not texts:
             return []
         try:
@@ -142,6 +268,36 @@ class Client:
             return []
         except Exception:
             logger.exception("Unexpected error in _embed_batch (count=%d)", len(texts))
+            return []
+
+    def _embed_batch_openai(self, texts: list[str]) -> list[list[float]]:
+        """Get embeddings for multiple texts via OpenAI API."""
+        if not texts:
+            return []
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
+            return []
+        try:
+            resp = self._http.post(
+                "https://api.openai.com/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"input": texts, "model": "text-embedding-ada-002"},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            # OpenAI returns data in order matching input
+            results = [item["embedding"] for item in data["data"]]
+            return results
+        except httpx.TimeoutException:
+            logger.warning("OpenAI embedder timed out for batch (count=%d)", len(texts))
+            return []
+        except Exception:
+            logger.exception("OpenAI embedder failed for batch (count=%d)", len(texts))
             return []
 
     def check_embedder_health(self) -> dict[str, Any]:

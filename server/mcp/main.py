@@ -8,10 +8,16 @@ Configuration via environment variables:
   SPACETIMEDB_PORT (default: 3001)
   SPACETIMEDB_DB (default: spacetime-memory)
   EMBEDDER_URL (default: http://localhost:9090)
+  MCP_API_KEY (optional) — if set, tools require this key for HTTP/SSE transport.
+    Stdio transport (local agent) does not use token auth; rely on filesystem
+    permissions instead.  For HTTP/SSE access, it is recommended to pair this
+    with a reverse proxy (nginx / Caddy) that enforces the API key at the
+    transport layer.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 from typing import Any
@@ -28,6 +34,129 @@ HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get("SPACETIMEDB_DB", "spacetime-memory")
 EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://localhost:9090")
+MCP_API_KEY = os.environ.get("MCP_API_KEY", "")
+
+# ---------------------------------------------------------------------------
+# Auth helpers
+# ---------------------------------------------------------------------------
+
+if MCP_API_KEY:
+    print(
+        "  [mcp] MCP API key authentication is enabled. "
+        "Tools will require a valid key for HTTP/SSE transport."
+    )
+
+
+def require_api_key(func):
+    """Decorator that enforces MCP_API_KEY on non-stdio transports.
+
+    For HTTP/SSE transport, the FastMCP tool receives request context via
+    the ``ctx`` argument.  If ``MCP_API_KEY`` is set, we extract the
+    ``Authorization`` header from the request metadata and compare it
+    against the configured key.
+
+    For stdio transport (local agent), there are no HTTP headers, so auth
+    does not apply — rely on filesystem permissions instead.
+
+    .. note::
+
+        FastMCP passes context as the first positional arg when the tool
+        signature includes ``ctx``.  This decorator introspects the
+        available context to determine the transport type.
+    """
+
+    @functools.wraps(func)
+    async def async_wrapper(*args, **kwargs):
+        # If no key is configured, allow all
+        if not MCP_API_KEY:
+            return await func(*args, **kwargs)
+
+        # Try to extract the Authorization header from the request context.
+        # FastMCP passes the request context in a variety of ways depending
+        # on transport.  We do a best-effort check.
+        request_meta = None
+
+        # Check if first arg is the FastMCP context object
+        for arg in args:
+            if hasattr(arg, "request"):
+                request_meta = getattr(arg, "request", None)
+                break
+        if not request_meta:
+            # Check kwargs for common context names
+            for key in ("ctx", "context", "request"):
+                val = kwargs.get(key)
+                if val is not None and hasattr(val, "request"):
+                    request_meta = getattr(val, "request", None)
+                    break
+
+        if request_meta is not None:
+            # We have request metadata — check the Authorization header
+            headers = getattr(request_meta, "headers", {}) or getattr(
+                request_meta, "scope", {}
+            )
+            # FastMCP / Starlette-style: headers is a dict-like object
+            auth_header = ""
+            if isinstance(headers, dict):
+                auth_header = headers.get("authorization", "") or headers.get(
+                    "Authorization", ""
+                )
+            elif hasattr(headers, "get"):
+                auth_header = headers.get("authorization", "") or headers.get(
+                    "Authorization", ""
+                )
+
+            expected = f"Bearer {MCP_API_KEY}"
+            if auth_header != expected:
+                raise PermissionError("Unauthorized: invalid or missing API key")
+
+        # If no request context (stdio), auth doesn't apply
+        return await func(*args, **kwargs)
+
+    @functools.wraps(func)
+    def sync_wrapper(*args, **kwargs):
+        # If no key is configured, allow all
+        if not MCP_API_KEY:
+            return func(*args, **kwargs)
+
+        # Try to extract the Authorization header from the request context.
+        request_meta = None
+        for arg in args:
+            if hasattr(arg, "request"):
+                request_meta = getattr(arg, "request", None)
+                break
+        if not request_meta:
+            for key in ("ctx", "context", "request"):
+                val = kwargs.get(key)
+                if val is not None and hasattr(val, "request"):
+                    request_meta = getattr(val, "request", None)
+                    break
+
+        if request_meta is not None:
+            headers = getattr(request_meta, "headers", {}) or getattr(
+                request_meta, "scope", {}
+            )
+            auth_header = ""
+            if isinstance(headers, dict):
+                auth_header = headers.get("authorization", "") or headers.get(
+                    "Authorization", ""
+                )
+            elif hasattr(headers, "get"):
+                auth_header = headers.get("authorization", "") or headers.get(
+                    "Authorization", ""
+                )
+
+            expected = f"Bearer {MCP_API_KEY}"
+            if auth_header != expected:
+                raise PermissionError("Unauthorized: invalid or missing API key")
+
+        return func(*args, **kwargs)
+
+    # Return the appropriate wrapper depending on whether the function is async
+    import asyncio
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    return sync_wrapper
+
 
 # ---------------------------------------------------------------------------
 # MCP server + SDK Client
@@ -67,12 +196,14 @@ def _embed_batch(texts: list[str]) -> list[list[float]]:
 
 
 @mcp.tool()
+@require_api_key
 def create_workspace(name: str, description: str = "") -> dict[str, Any]:
     """Create a new workspace."""
     return get_client().create_workspace(name, description)
 
 
 @mcp.tool()
+@require_api_key
 def list_workspaces() -> list[dict[str, Any]]:
     """List all workspaces."""
     return get_client().list_workspaces()
@@ -84,6 +215,7 @@ def list_workspaces() -> list[dict[str, Any]]:
 
 
 @mcp.tool()
+@require_api_key
 def store_memory(
     workspace_id: str,
     peer_id: str,
@@ -114,6 +246,7 @@ def store_memory(
 
 
 @mcp.tool()
+@require_api_key
 def search_memories(
     workspace_id: str,
     query_text: str = "",
@@ -133,6 +266,7 @@ def search_memories(
 
 
 @mcp.tool()
+@require_api_key
 def hybrid_search(
     workspace_id: str,
     query_text: str,
@@ -153,20 +287,23 @@ def hybrid_search(
 
 
 @mcp.tool()
+@require_api_key
 def get_memory(id: str) -> list[dict[str, Any]]:
     """Retrieve a single memory by its ID. Auto-reinforces on read."""
     return get_client().get_memory(id)
 
 
 @mcp.tool()
+@require_api_key
 def reinforce_memory(memory_id: str) -> dict[str, Any]:
     """Reinforce a memory: increment access_count and bump strength."""
     return get_client().reinforce(memory_id)
 
 
 @mcp.tool()
+@require_api_key
 def rate_memory(memory_id: str, rating: str, peer_id: str) -> dict[str, Any]:
-    """Rate a memory on a 1–5 scale to adjust its trust score.
+    """Rate a memory on a 1-5 scale to adjust its trust score.
 
     Accepts:
       - "helpful" (score 5) or "unhelpful" (score 1) for binary ratings.
@@ -178,13 +315,15 @@ def rate_memory(memory_id: str, rating: str, peer_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+@require_api_key
 def escalate_memories(workspace_id: str, l2_to_l1: int = 5, l1_to_l0: int = 20) -> str:
-    """Batch-escalate memory tiers: L2→L1 at l2_to_l1 accesses, L1→L0 at l1_to_l0."""
+    """Batch-escalate memory tiers: L2->L1 at l2_to_l1 accesses, L1->L0 at l1_to_l0."""
     get_client().escalate_memories(workspace_id, l2_to_l1, l1_to_l0)
     return f"Tier escalation triggered for workspace {workspace_id[:16]}..."
 
 
 @mcp.tool()
+@require_api_key
 def dedup_memories(workspace_id: str) -> str:
     """Deduplicate near-duplicate memories in a workspace (cosine >= 0.85 + edit dist <= 30%)."""
     get_client()._call("dedup_memories", [workspace_id])
@@ -197,12 +336,14 @@ def dedup_memories(workspace_id: str) -> str:
 
 
 @mcp.tool()
+@require_api_key
 def get_profile(peer_id: str) -> list[dict[str, Any]]:
     """Retrieve a peer's profile."""
     return get_client().get_profile(peer_id)
 
 
 @mcp.tool()
+@require_api_key
 def upsert_profile(
     peer_id: str,
     static_facts_json: str = "[]",
@@ -223,6 +364,7 @@ def upsert_profile(
 
 
 @mcp.tool()
+@require_api_key
 def create_node(
     workspace_id: str,
     label: str,
@@ -235,24 +377,28 @@ def create_node(
 
 
 @mcp.tool()
+@require_api_key
 def query_graph(workspace_id: str, query: str = "") -> list[dict[str, Any]]:
     """Search knowledge graph nodes by label within a workspace."""
     return get_client().query_graph(workspace_id, query)
 
 
 @mcp.tool()
+@require_api_key
 def get_node(id: str) -> list[dict[str, Any]]:
     """Retrieve a knowledge graph node by its ID."""
     return get_client().get_node(id)
 
 
 @mcp.tool()
+@require_api_key
 def get_neighbors(node_id: str) -> list[dict[str, Any]]:
     """Get all edges (neighbors) connected to a node."""
     return get_client().get_neighbors(node_id)
 
 
 @mcp.tool()
+@require_api_key
 def get_community(community_id: int) -> dict[str, Any]:
     """Get community details and list all nodes in that community."""
     return get_client().get_community(community_id)
@@ -264,12 +410,14 @@ def get_community(community_id: int) -> dict[str, Any]:
 
 
 @mcp.tool()
+@require_api_key
 def get_peer_sessions(peer_id: str) -> list[dict[str, Any]]:
     """List all sessions a peer has participated in."""
     return get_client().get_peer_sessions(peer_id)
 
 
 @mcp.tool()
+@require_api_key
 def get_session_messages(session_id: str) -> list[dict[str, Any]]:
     """Retrieve all messages for a session."""
     return get_client().get_session_messages(session_id)
@@ -281,6 +429,7 @@ def get_session_messages(session_id: str) -> list[dict[str, Any]]:
 
 
 @mcp.tool()
+@require_api_key
 def graph_bfs(workspace_id: str, start_node_id: str, max_depth: int = 3) -> str:
     """BFS traverse the knowledge graph from a node. Results in graph_traversal_result table."""
     get_client().graph_bfs(workspace_id, start_node_id, max_depth)
@@ -288,6 +437,7 @@ def graph_bfs(workspace_id: str, start_node_id: str, max_depth: int = 3) -> str:
 
 
 @mcp.tool()
+@require_api_key
 def shortest_path(workspace_id: str, source_id: str, target_id: str, max_hops: int = 6) -> str:
     """Find shortest path between two KG nodes. Results in shortest_path_result table."""
     get_client().shortest_path(workspace_id, source_id, target_id, max_hops)
@@ -300,6 +450,7 @@ def shortest_path(workspace_id: str, source_id: str, target_id: str, max_hops: i
 
 
 @mcp.tool()
+@require_api_key
 def create_tour(workspace_id: str, title: str, description: str = "") -> str:
     """Create a new guided tour through KG nodes."""
     get_client().create_tour(workspace_id, title, description)
@@ -307,6 +458,7 @@ def create_tour(workspace_id: str, title: str, description: str = "") -> str:
 
 
 @mcp.tool()
+@require_api_key
 def add_tour_stop(tour_id: str, node_id: str, heading: str, description: str = "") -> str:
     """Add a stop to an existing tour."""
     get_client().add_tour_stop(tour_id, node_id, heading, description)
@@ -319,6 +471,7 @@ def add_tour_stop(tour_id: str, node_id: str, heading: str, description: str = "
 
 
 @mcp.tool()
+@require_api_key
 def synthesize_mental_models(workspace_id: str, memory_ids_json: str) -> str:
     """Request synthesis of a mental model from a set of source memories.
 
@@ -331,6 +484,7 @@ def synthesize_mental_models(workspace_id: str, memory_ids_json: str) -> str:
 
 
 @mcp.tool()
+@require_api_key
 def get_mental_model(id: str) -> str:
     """Get a single mental model by its ID."""
     client = get_client()
@@ -339,6 +493,7 @@ def get_mental_model(id: str) -> str:
 
 
 @mcp.tool()
+@require_api_key
 def list_mental_models(workspace_id: str, status: str = "") -> str:
     """List mental models for a workspace, optionally filtered by status.
 
@@ -360,6 +515,7 @@ def list_mental_models(workspace_id: str, status: str = "") -> str:
 
 
 @mcp.tool()
+@require_api_key
 def add_fact(
     workspace_id: str,
     peer_id: str,
@@ -376,6 +532,7 @@ def add_fact(
 
 
 @mcp.tool()
+@require_api_key
 def list_facts(
     workspace_id: str,
     peer_id: str = "",
@@ -404,6 +561,7 @@ def list_facts(
 
 
 @mcp.tool()
+@require_api_key
 def create_directory(workspace_id: str, name: str, path: str, parent_id: str = "", description: str = "") -> str:
     """Create a directory in the context directory tree."""
     get_client().create_directory(workspace_id, name, path, parent_id, description)
@@ -411,6 +569,7 @@ def create_directory(workspace_id: str, name: str, path: str, parent_id: str = "
 
 
 @mcp.tool()
+@require_api_key
 def traverse_directory(workspace_id: str, root_directory_id: str) -> str:
     """Recursively traverse directory tree showing all children."""
     rows = get_client().traverse_directory(workspace_id, root_directory_id)
@@ -418,6 +577,7 @@ def traverse_directory(workspace_id: str, root_directory_id: str) -> str:
 
 
 @mcp.tool()
+@require_api_key
 def list_directory(directory_id: str) -> str:
     """List children of a directory."""
     rows = get_client().list_directory(directory_id)

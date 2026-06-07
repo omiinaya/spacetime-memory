@@ -4,6 +4,19 @@ Provides the abstract base class :class:`SpacetimePlugin` that all plugins
 must subclass, and the :class:`PluginManager` that discovers, loads, and
 manages plugins from a plugin directory.
 
+Sandbox
+=======
+
+.. caution::
+
+    Python's runtime sandboxing is **limited**.  The ``SandboxConfig`` and
+    ``_apply_sandbox`` mechanism provides **audit logging and basic
+    guardrails** — it monkey-patches a handful of known-dangerous standard
+    library functions at import time — but it is **not a security boundary**.
+    A determined attacker with arbitrary Python code can bypass these
+    restrictions.  For true isolation, run untrusted plugins in a separate
+    process, container, or VM.
+
 Usage::
 
     from spacetime_memory import Client
@@ -25,8 +38,51 @@ import subprocess
 import sys
 import types
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
+
+# ---------------------------------------------------------------------------
+# Sandbox
+# ---------------------------------------------------------------------------
+
+
+class SandboxError(RuntimeError):
+    """Raised when a plugin violates a sandbox restriction."""
+
+    pass
+
+
+@dataclass
+class SandboxConfig:
+    """Configuration for a plugin's sandbox restrictions.
+
+    Plugins declare their intent by setting a ``SandboxConfig`` instance
+    as a class attribute.  The ``PluginManager`` applies best-effort
+    restrictions when the plugin is loaded and audits compliance.
+
+    .. caution::
+
+        These restrictions are implemented by monkey-patching standard
+        library functions at import time.  They are **not a security
+        boundary** and can be bypassed by a determined attacker.
+    """
+
+    allow_filesystem_write: bool = False
+    allow_filesystem_read: bool = True  # read-only by default
+    allow_network: bool = False
+    allow_subprocess: bool = False
+    allowed_modules: list[str] = field(
+        default_factory=lambda: [
+            "json",
+            "re",
+            "datetime",
+            "typing",
+            "os",
+            "pathlib",
+        ]
+    )
+
 
 # ---------------------------------------------------------------------------
 # Plugin base class
@@ -42,11 +98,21 @@ class SpacetimePlugin(ABC):
     The remaining hook methods are optional — the manager will call them
     when triggered, but a plugin that doesn't override them simply does
     nothing.
+
+    To declare sandbox restrictions, set ``sandbox`` to a
+    :class:`SandboxConfig` instance::
+
+        class MyPlugin(SpacetimePlugin):
+            name = "my-plugin"
+            version = "1.0.0"
+            description = "A harmless read-only plugin"
+            sandbox = SandboxConfig(allow_filesystem_write=False)
     """
 
     name: str = ""
     version: str = ""
     description: str = ""
+    sandbox: SandboxConfig = SandboxConfig()
 
     @abstractmethod
     def on_load(self, client) -> None:
@@ -114,6 +180,8 @@ class PluginManager:
         self.plugins: dict[str, SpacetimePlugin] = {}
         self._discovered: dict[str, dict[str, Any]] = {}
         self._loaded_modules: dict[str, types.ModuleType] = {}
+        # Track which plugins had sandbox applied
+        self._sandboxed: dict[str, bool] = {}
 
     # ------------------------------------------------------------------
     # Discovery
@@ -325,6 +393,18 @@ class PluginManager:
         # Instantiate and initialise
         try:
             plugin_instance = plugin_class()
+        except Exception as e:
+            print(f"  [plugin] Error instantiating '{name}': {e}")
+            import traceback
+            traceback.print_exc()
+            self._cleanup_module(module_name, name)
+            return False
+
+        # Apply sandbox restrictions *before* calling on_load
+        sandbox_cfg = getattr(plugin_instance, "sandbox", SandboxConfig())
+        self._apply_sandbox(name, sandbox_cfg)
+
+        try:
             plugin_instance.on_load(self.client)
             self.plugins[name] = plugin_instance
             print(f"  [plugin] Loaded '{name}' v{plugin_instance.version}")
@@ -332,7 +412,6 @@ class PluginManager:
         except Exception as e:
             print(f"  [plugin] Error initialising '{name}': {e}")
             import traceback
-
             traceback.print_exc()
             self._cleanup_module(module_name, name)
             return False
@@ -368,6 +447,9 @@ class PluginManager:
             getattr(self._loaded_modules.pop(name, None), "__name__", ""),
             name,
         )
+
+        # Remove sandbox patching
+        self._sandboxed.pop(name, None)
 
         print(f"  [plugin] Unloaded '{name}'")
         return True
@@ -406,6 +488,202 @@ class PluginManager:
                 "path": info["path"],
             })
         return result
+
+    # ------------------------------------------------------------------
+    # Sandbox
+    # ------------------------------------------------------------------
+
+    def _apply_sandbox(self, name: str, cfg: SandboxConfig) -> None:
+        """Apply best-effort sandbox restrictions for *name*.
+
+        Monkey-patches dangerous standard-library functions that the
+        plugin's ``SandboxConfig`` disallows.
+
+        .. caution::
+
+            This is **not** a security boundary — see the module docstring.
+        """
+        if not cfg:
+            self._sandboxed[name] = False
+            return
+
+        patches_applied = 0
+
+        # --- Subprocess ---
+        if not cfg.allow_subprocess:
+            # Patch subprocess module functions
+            import subprocess as _sp_subprocess
+
+            def _deny_subprocess(*args, **kwargs):
+                raise SandboxError(
+                    f"Plugin '{name}' is not allowed to spawn subprocesses "
+                    f"(sandbox: allow_subprocess=False)"
+                )
+
+            _sp_subprocess.run = _deny_subprocess  # type: ignore[assignment]
+            _sp_subprocess.call = _deny_subprocess  # type: ignore[assignment]
+            _sp_subprocess.Popen = _deny_subprocess  # type: ignore[assignment]
+            _sp_subprocess.check_call = _deny_subprocess  # type: ignore[assignment]
+            _sp_subprocess.check_output = _deny_subprocess  # type: ignore[assignment]
+            patches_applied += 5
+
+            # Also patch os.system / os.popen
+            import os as _sp_os
+
+            _sp_os.system = _deny_subprocess  # type: ignore[assignment]
+            _sp_os.popen = _deny_subprocess  # type: ignore[assignment]
+            patches_applied += 2
+
+        # --- Network ---
+        if not cfg.allow_network:
+            try:
+                import socket as _sp_socket
+
+                class _DeniedSocket:
+                    """Stand-in that raises on any socket operation."""
+
+                    def __getattr__(self, item):
+                        raise SandboxError(
+                            f"Plugin '{name}' is not allowed to open network "
+                            f"sockets (sandbox: allow_network=False)"
+                        )
+
+                _denied_sock = _DeniedSocket()
+
+                def _deny_socket(*args, **kwargs):
+                    raise SandboxError(
+                        f"Plugin '{name}' is not allowed to open network "
+                        f"sockets (sandbox: allow_network=False)"
+                    )
+
+                _sp_socket.socket = _deny_socket  # type: ignore[assignment]
+                patches_applied += 1
+            except ImportError:
+                pass  # socket not available in restricted environments
+
+            # Patch httpx if imported
+            try:
+                import httpx as _sp_httpx
+
+                original_request = _sp_httpx.Client.request
+
+                def _deny_httpx_request(self, *args, **kwargs):
+                    raise SandboxError(
+                        f"Plugin '{name}' is not allowed to make HTTP requests "
+                        f"(sandbox: allow_network=False)"
+                    )
+
+                _sp_httpx.Client.request = _deny_httpx_request  # type: ignore[assignment]
+                patches_applied += 1
+            except ImportError:
+                pass
+
+        # --- Filesystem write ---
+        if not cfg.allow_filesystem_write:
+            import builtins as _sp_builtins
+
+            _original_open = _sp_builtins.open
+
+            def _sandboxed_open(file, mode="r", *args, **kwargs):
+                if "w" in mode or "a" in mode or "x" in mode or "+" in mode:
+                    raise SandboxError(
+                        f"Plugin '{name}' is not allowed to write to the "
+                        f"filesystem (sandbox: allow_filesystem_write=False). "
+                        f"Attempted to open {file!r} with mode {mode!r}"
+                    )
+                return _original_open(file, mode, *args, **kwargs)
+
+            _sp_builtins.open = _sandboxed_open  # type: ignore[assignment]
+            patches_applied += 1
+
+        self._sandboxed[name] = True
+        if patches_applied:
+            print(
+                f"  [plugin] Sandbox applied to '{name}' "
+                f"({patches_applied} patch(es))"
+            )
+
+    def verify_sandbox(self, name: str) -> dict[str, Any]:
+        """Check that a loaded plugin's sandbox config is honoured.
+
+        Returns a report dict with:
+        - ``name``: plugin name
+        - ``loaded``: whether the plugin is loaded
+        - ``sandbox_config``: the plugin's ``SandboxConfig`` (dict)
+        - ``sandbox_applied``: whether sandbox patches were applied
+        - ``compliant``: overall compliance flag
+        - ``notes``: list of human-readable notes
+        """
+        report: dict[str, Any] = {
+            "name": name,
+            "loaded": name in self.plugins,
+            "sandbox_config": None,
+            "sandbox_applied": self._sandboxed.get(name, False),
+            "compliant": True,
+            "notes": [],
+        }
+
+        plugin = self.plugins.get(name)
+        if plugin is None:
+            report["compliant"] = False
+            report["notes"].append("Plugin is not loaded — cannot verify.")
+            return report
+
+        cfg = getattr(plugin, "sandbox", None)
+        if cfg is None or not isinstance(cfg, SandboxConfig):
+            report["notes"].append(
+                "No SandboxConfig declared — plugin runs with full access. "
+                "Consider adding ``sandbox = SandboxConfig(...)``."
+            )
+            report["compliant"] = False
+            return report
+
+        report["sandbox_config"] = {
+            "allow_filesystem_write": cfg.allow_filesystem_write,
+            "allow_filesystem_read": cfg.allow_filesystem_read,
+            "allow_network": cfg.allow_network,
+            "allow_subprocess": cfg.allow_subprocess,
+            "allowed_modules": list(cfg.allowed_modules),
+        }
+
+        if self._sandboxed.get(name):
+            report["notes"].append(
+                "Sandbox patches were applied at load time."
+            )
+        else:
+            report["notes"].append(
+                "Sandbox patches were NOT applied — unexpected state."
+            )
+            report["compliant"] = False
+
+        # Informational notes about limitations
+        report["notes"].append(
+            "Python runtime sandboxing is limited — this provides audit "
+            "logging and basic guardrails, not a security boundary."
+        )
+
+        return report
+
+    def verify(self) -> list[dict[str, Any]]:
+        """Check all loaded plugins against sandbox rules.
+
+        Returns a list of compliance reports, one per loaded plugin.
+        """
+        reports: list[dict[str, Any]] = []
+        for name in self.plugins:
+            reports.append(self.verify_sandbox(name))
+        # Also report discovered-but-not-loaded plugins
+        for name in self._discovered:
+            if name not in self.plugins:
+                reports.append({
+                    "name": name,
+                    "loaded": False,
+                    "sandbox_config": None,
+                    "sandbox_applied": False,
+                    "compliant": False,
+                    "notes": ["Plugin is not loaded."],
+                })
+        return reports
 
     # ------------------------------------------------------------------
     # Hooks

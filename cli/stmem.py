@@ -42,6 +42,11 @@ console = Console()
 
 # Global output format; set by root CLI group --output flag
 _current_output_format: str = "table"
+_quiet_mode: bool = False
+_no_header_mode: bool = False
+_compact_json_mode: bool = False
+_no_color_mode: bool = False
+_verbose_mode: bool = False
 
 # Aliases file path
 ALIASES_FILE = os.path.join(os.path.expanduser("~"), ".stmem_aliases.json")
@@ -69,7 +74,14 @@ def _sdk_client() -> Client:
     return Client(
         host=HOST, port=PORT, database=DB,
         embedder_url=EMBEDDER_URL,
+        verbose=_verbose_mode,
     )
+
+
+def _quiet_print(msg: str) -> None:
+    """Print a message unless quiet mode is on."""
+    if not _quiet_mode:
+        console.print(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -91,18 +103,26 @@ def print_table(rows: list[dict[str, Any]], title: str = "",
         output = _current_output_format
 
     if not rows:
-        console.print("[yellow]No results found.[/yellow]")
+        if not _quiet_mode:
+            console.print("[yellow]No results found.[/yellow]")
+        return
+
+    if _quiet_mode:
         return
 
     if output == "json":
-        console.print_json(json.dumps(rows, default=str))
+        if _compact_json_mode:
+            console.print(json.dumps(rows, default=str))
+        else:
+            console.print_json(json.dumps(rows, default=str))
         return
 
     if output == "csv":
         cols = list(rows[0].keys())
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(cols)
+        if not _no_header_mode:
+            writer.writerow(cols)
         for row in rows:
             writer.writerow([str(row.get(c, "")) for c in cols])
         console.print(buf.getvalue().strip())
@@ -149,17 +169,36 @@ def _esc(val: str) -> str:
 @click.version_option(version="0.1.0", prog_name="stmem")
 @click.option("--output", "-o", type=click.Choice(["table", "json", "csv"]),
               default="table", help="Output format: table, json, or csv")
+@click.option("--quiet", "-q", is_flag=True, help="Suppress non-error output")
+@click.option("--no-header", is_flag=True, help="Skip header row in CSV output")
+@click.option("--compact-json", is_flag=True, help="Compact JSON output (no indentation)")
+@click.option("--no-color", is_flag=True, help="Disable colored output")
+@click.option("--verbose", "-v", is_flag=True, help="Show raw error messages instead of friendly ones")
 @click.pass_context
-def cli(ctx: click.Context, output: str) -> None:
+def cli(ctx: click.Context, output: str, quiet: bool, no_header: bool,
+        compact_json: bool, no_color: bool, verbose: bool) -> None:
     """stmem — Spacetime-Memory CLI.
 
     Manage workspaces, peers, memories, profiles, knowledge graphs, and sessions
     on a SpacetimeDB instance.
     """
-    global _current_output_format
+    global console, _current_output_format, _quiet_mode, _no_header_mode, _compact_json_mode, _no_color_mode, _verbose_mode
     _current_output_format = output
+    _quiet_mode = quiet
+    _no_header_mode = no_header
+    _compact_json_mode = compact_json
+    _no_color_mode = no_color
+    _verbose_mode = verbose
     ctx.ensure_object(dict)
     ctx.obj["output"] = output
+    ctx.obj["quiet"] = quiet
+    ctx.obj["no_header"] = no_header
+    ctx.obj["compact_json"] = compact_json
+    ctx.obj["no_color"] = no_color
+    ctx.obj["verbose"] = verbose
+    if no_color:
+        os.environ["NO_COLOR"] = "1"
+        console = Console(no_color=True)
 
 
 # ===================================================================
@@ -203,7 +242,7 @@ def alias_set(name: str, command: str) -> None:
     aliases = _load_aliases()
     aliases[name] = command
     _save_aliases(aliases)
-    console.print(f"[green]Alias '{name}' set to:[/green] {command}")
+    _quiet_print(f"[green]Alias '{name}' set to:[/green] {command}")
 
 
 @alias.command(name="list")
@@ -231,7 +270,7 @@ def alias_remove(name: str) -> None:
         return
     del aliases[name]
     _save_aliases(aliases)
-    console.print(f"[green]Alias '{name}' removed.[/green]")
+    _quiet_print(f"[green]Alias '{name}' removed.[/green]")
 
 
 # ===================================================================
@@ -252,7 +291,7 @@ def workspace_create(name: str, description: str) -> None:
     client = _sdk_client()
     with console.status(f"Creating workspace '{name}'..."):
         result = client.create_workspace(name, description)
-    console.print(f"[green]Workspace '{name}' created successfully.[/green]")
+    _quiet_print(f"[green]Workspace '{name}' created successfully.[/green]")
     if result:
         print_json(result)
 
@@ -285,7 +324,7 @@ def peer_create(workspace_id: str, name: str, peer_type: str, metadata: str) -> 
     """Create a peer (user/agent/entity) in a workspace."""
     with console.status(f"Creating peer '{name}'..."):
         result = _sdk_client()._call("create_peer", [workspace_id, name, peer_type, metadata])
-    console.print(f"[green]Peer '{name}' created successfully.[/green]")
+    _quiet_print(f"[green]Peer '{name}' created successfully.[/green]")
     if result:
         print_json(result)
 
@@ -349,7 +388,7 @@ def memory_store(
             source_message_id=source_message_id,
             tier=tier,
         )
-    console.print("[green]Memory stored successfully.[/green]")
+    _quiet_print("[green]Memory stored successfully.[/green]")
     if result:
         print_json(result)
 
@@ -418,7 +457,7 @@ def memory_reinforce(memory_id: str) -> None:
     """Reinforce a memory (increment access count and bump strength)."""
     with console.status(f"Reinforcing memory '{memory_id}'..."):
         result = _sdk_client().reinforce(memory_id)
-    console.print(f"[green]Memory '{memory_id}' reinforced.[/green]")
+    _quiet_print(f"[green]Memory '{memory_id}' reinforced.[/green]")
     if result:
         print_json(result)
 
@@ -431,7 +470,7 @@ def memory_escalate(workspace_id: str, l2_to_l1: int, l1_to_l0: int) -> None:
     """Batch-escalate memory tiers based on access_count thresholds."""
     with console.status(f"Escalating memories in workspace '{workspace_id[:16]}...'..."):
         result = _sdk_client().escalate_memories(workspace_id, l2_to_l1, l1_to_l0)
-    console.print(f"[green]Tier escalation triggered for workspace {workspace_id[:16]}...[/green]")
+    _quiet_print(f"[green]Tier escalation triggered for workspace {workspace_id[:16]}...[/green]")
     if result:
         print_json(result)
 
@@ -444,7 +483,7 @@ def memory_rate(memory_id: str, rating: str, peer_id: str) -> None:
     """Rate a memory as 'helpful' or 'unhelpful'."""
     with console.status(f"Rating memory '{memory_id}' as '{rating}'..."):
         result = _sdk_client()._call("rate_memory", [memory_id, rating, peer_id])
-    console.print(f"[green]Memory '{memory_id}' rated as '{rating}'.[/green]")
+    _quiet_print(f"[green]Memory '{memory_id}' rated as '{rating}'.[/green]")
     if result:
         print_json(result)
 
@@ -557,7 +596,7 @@ def memory_update(memory_id: str, content: str, summary: str,
             )
         if "tier" in updates:
             client._call("update_memory_tier", [memory_id, updates["tier"]])
-    console.print(f"[green]Memory '{memory_id[:16]}...' updated.[/green]")
+    _quiet_print(f"[green]Memory '{memory_id[:16]}...' updated.[/green]")
 
 
 @memory.command(name="batch-update")
@@ -593,7 +632,7 @@ def memory_batch_update(workspace_id: str, memory_ids: str, content: str,
         return
     with console.status(f"Batch updating {len(ids)} memories..."):
         result = client.batch_update_memories(workspace_id, ids, updates)
-    console.print(f"[green]Batch update completed for {len(ids)} memories.[/green]")
+    _quiet_print(f"[green]Batch update completed for {len(ids)} memories.[/green]")
     if result:
         print_json(result)
 
@@ -668,7 +707,7 @@ def directory_create(workspace_id: str, name: str, path: str,
     """Create a directory in the context directory tree."""
     with console.status(f"Creating directory '{name}'..."):
         result = _sdk_client().create_directory(workspace_id, name, path, parent_id, description)
-    console.print(f"[green]Directory '{name}' created.[/green]")
+    _quiet_print(f"[green]Directory '{name}' created.[/green]")
     if result:
         print_json(result)
 
@@ -681,7 +720,7 @@ def directory_link(directory_id: str, memory_id: str, workspace_id: str) -> None
     """Link a memory to a directory."""
     with console.status(f"Linking memory '{memory_id[:16]}...' to directory..."):
         result = _sdk_client().link_memory_to_directory(directory_id, memory_id, workspace_id)
-    console.print(f"[green]Memory linked to directory.[/green]")
+    _quiet_print(f"[green]Memory linked to directory.[/green]")
     if result:
         print_json(result)
 
@@ -693,7 +732,7 @@ def directory_unlink(directory_id: str, memory_id: str) -> None:
     """Unlink a memory from a directory."""
     with console.status(f"Unlinking memory '{memory_id[:16]}...' from directory..."):
         result = _sdk_client().unlink_memory_from_directory(directory_id, memory_id)
-    console.print(f"[green]Memory unlinked from directory.[/green]")
+    _quiet_print(f"[green]Memory unlinked from directory.[/green]")
     if result:
         print_json(result)
 
@@ -734,7 +773,7 @@ def profile_upsert(peer_id: str, static_facts: str, dynamic_context: str,
         result = _sdk_client().upsert_profile(
             peer_id, static_facts, dynamic_context, preferences, tags,
         )
-    console.print(f"[green]Profile for peer '{peer_id}' updated.[/green]")
+    _quiet_print(f"[green]Profile for peer '{peer_id}' updated.[/green]")
     if result:
         print_json(result)
 
@@ -764,7 +803,7 @@ def fact_add(workspace_id: str, peer_id: str, content: str,
     """Add a new fact about a peer."""
     with console.status("Adding fact..."):
         _sdk_client()._call("add_fact", [workspace_id, peer_id, fact_type, category, content, confidence, source, tier])
-    console.print("[green]Fact added successfully.[/green]")
+    _quiet_print("[green]Fact added successfully.[/green]")
 
 
 @fact.command(name="list")
@@ -859,7 +898,7 @@ def fact_update(fact_id: str, content: str, confidence: float | None,
     client = _sdk_client()
     with console.status(f"Updating fact '{fact_id[:16]}...'..."):
         client._call("update_fact", [fact_id, content, confidence if confidence else 0.0, category, tier_val])
-    console.print(f"[green]Fact '{fact_id[:16]}...' updated.[/green]")
+    _quiet_print(f"[green]Fact '{fact_id[:16]}...' updated.[/green]")
 
 
 @fact.command(name="delete")
@@ -868,7 +907,7 @@ def fact_delete(fact_id: str) -> None:
     """Deactivate a fact (soft delete)."""
     with console.status(f"Deleting fact '{fact_id[:16]}...'..."):
         _sdk_client()._call("delete_fact", [fact_id])
-    console.print(f"[green]Fact '{fact_id[:16]}...' deactivated.[/green]")
+    _quiet_print(f"[green]Fact '{fact_id[:16]}...' deactivated.[/green]")
 
 
 # ===================================================================
@@ -899,7 +938,7 @@ def kg_node_create(workspace_id: str, label: str, node_type: str,
     """Create a knowledge graph node and index it for semantic search."""
     with console.status(f"Creating KG node '{label}'..."):
         result = _sdk_client().create_node(workspace_id, label, node_type, summary, metadata)
-    console.print(f"[green]KG node '{label}' created.[/green]")
+    _quiet_print(f"[green]KG node '{label}' created.[/green]")
     if result:
         print_json(result)
 
@@ -929,7 +968,7 @@ def kg_edge_create(workspace_id: str, source_node_id: str,
             workspace_id, source_node_id, target_node_id,
             relation, weight, confidence, metadata,
         ])
-    console.print(f"[green]Edge '{relation}' created.[/green]")
+    _quiet_print(f"[green]Edge '{relation}' created.[/green]")
     if result:
         print_json(result)
 
@@ -972,7 +1011,7 @@ def session_create(workspace_id: str, name: str, metadata: str) -> None:
     """Create a new session."""
     with console.status(f"Creating session '{name}'..."):
         result = _sdk_client()._call("create_session", [workspace_id, name, metadata])
-    console.print(f"[green]Session '{name}' created.[/green]")
+    _quiet_print(f"[green]Session '{name}' created.[/green]")
     if result:
         print_json(result)
 
@@ -1024,7 +1063,7 @@ def ingest_codebase(repo_path: str, workspace_id: str,
         stats = ingester.ingest(repo_path, workspace_id,
                                 max_files=max_files, skip_dirs=skip_set)
 
-    console.print(
+    _quiet_print(
         f"[green]Ingestion complete.[/green] "
         f"{stats['files']} files, {stats['defs']} definitions, "
         f"{stats['edges']} edges, {stats['errors']} errors"
@@ -1060,7 +1099,7 @@ def connector_run(rss: str | None, workspace_id: str,
         conn = RssFeedConnector(rss, workspace_id)
         stop = None if ticks == 0 else ticks
         conn.run(client, interval_secs=interval, stop_after=stop)
-        console.print("[green]Connector finished.[/green]")
+        _quiet_print("[green]Connector finished.[/green]")
     else:
         console.print("[yellow]No connector specified. Use --rss <url>[/yellow]")
         sys.exit(1)
@@ -1183,7 +1222,7 @@ def plugin_load(name: str) -> None:
         mgr.discover()
         ok = mgr.load(name)
     if ok:
-        console.print(f"[green]Plugin '{name}' loaded successfully.[/green]")
+        _quiet_print(f"[green]Plugin '{name}' loaded successfully.[/green]")
     else:
         console.print(f"[red]Failed to load plugin '{name}'.[/red]")
         sys.exit(1)
@@ -1197,7 +1236,7 @@ def plugin_unload(name: str) -> None:
     with console.status(f"Unloading plugin '{name}'..."):
         ok = mgr.unload(name)
     if ok:
-        console.print(f"[green]Plugin '{name}' unloaded.[/green]")
+        _quiet_print(f"[green]Plugin '{name}' unloaded.[/green]")
     else:
         console.print(f"[yellow]Plugin '{name}' was not loaded.[/yellow]")
         sys.exit(1)
@@ -1210,7 +1249,7 @@ def plugin_reload() -> None:
     with console.status("Reloading all plugins..."):
         mgr.unload_all()
         loaded = mgr.load_all()
-    console.print(
+    _quiet_print(
         f"[green]Reloaded {len(loaded)} plugin(s): {', '.join(loaded)}[/green]"
     )
 
@@ -1274,7 +1313,7 @@ def replication_add(name: str, remote_url: str, remote_db: str,
         result = client._call("add_replication_peer", [
             ws_id, name, remote_url, remote_db, auth_token,
         ])
-    console.print(f"[green]Replication peer '{name}' added successfully.[/green]")
+    _quiet_print(f"[green]Replication peer '{name}' added successfully.[/green]")
     if result:
         print_json(result)
 
@@ -1286,7 +1325,7 @@ def replication_remove(peer_id: str) -> None:
     client = _sdk_client()
     with console.status(f"Removing replication peer '{peer_id}'..."):
         result = client._call("remove_replication_peer", [peer_id])
-    console.print(f"[green]Replication peer removed.[/green]")
+    _quiet_print(f"[green]Replication peer removed.[/green]")
     if result:
         print_json(result)
 
@@ -1370,7 +1409,7 @@ def replication_sync(workspace_id: str, mode: str) -> None:
     with console.status("Running sync cycle..."):
         daemon = ReplicationDaemon(interval=60, once=True, mode=mode)
         total = daemon.sync_once()
-    console.print(f"[green]Sync complete — {total} entries replicated (mode={mode}).[/green]")
+    _quiet_print(f"[green]Sync complete — {total} entries replicated (mode={mode}).[/green]")
 
 
 @replication.command(name="daemon")
@@ -1389,7 +1428,7 @@ def replication_daemon(interval: int, mode: str, daemonize: bool) -> None:
         pid = os.fork()
         if pid > 0:
             parent_exit_msg = f"[green]Replication daemon started (PID: {pid})[/green]"
-            console.print(parent_exit_msg)
+            _quiet_print(parent_exit_msg)
             sys.exit(0)
         os.setsid()
 
@@ -1440,7 +1479,7 @@ def mental_create(workspace_id: str, memory_ids: str) -> None:
     ids_json = json.dumps(ids_list)
     with console.status("Creating mental model..."):
         result = client._call("synthesize_mental_models", [workspace_id, ids_json])
-    console.print("[green]Mental model created (status=pending). Run `stmem mental synthesize` to generate content.[/green]")
+    _quiet_print("[green]Mental model created (status=pending). Run `stmem mental synthesize` to generate content.[/green]")
     if result:
         print_json(result)
 
@@ -1517,6 +1556,9 @@ def main() -> None:
             f"[red]Connection error:[/red] Could not connect to SpacetimeDB at "
             f"http://{HOST}:{PORT}. Is it running?\n  {e}"
         )
+        sys.exit(1)
+    except RuntimeError as e:
+        console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
 
