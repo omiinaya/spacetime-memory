@@ -340,6 +340,29 @@ class Client:
         """Reinforce a memory (bump access_count + strength)."""
         return self._call("reinforce_memory", [memory_id])
 
+    def rate_memory(
+        self, memory_id: str, rating: str, peer_id: str
+    ) -> dict[str, Any]:
+        """Rate a memory to adjust its trust score.
+
+        Args:
+            memory_id: The memory to rate.
+            rating: "helpful" (score 5), "unhelpful" (score 1),
+                    or an integer string "1"–"5" for graded feedback.
+            peer_id: The peer submitting the rating.
+        """
+        return self._call("rate_memory", [memory_id, rating, peer_id])
+
+    def escalate_memories(self, workspace_id: str, l2_to_l1: int = 5, l1_to_l0: int = 20) -> dict[str, Any]:
+        """Batch-escalate memory tiers based on access_count thresholds.
+
+        Args:
+            workspace_id: The workspace to escalate memories in.
+            l2_to_l1: Access count threshold for L2→L1 escalation (default: 5).
+            l1_to_l0: Access count threshold for L1→L0 escalation (default: 20).
+        """
+        return self._call("escalate_memories", [workspace_id, l2_to_l1, l1_to_l0])
+
     def list_memories(
         self, workspace_id: str, memory_type: str = "", limit: int = 50
     ) -> list[dict[str, Any]]:

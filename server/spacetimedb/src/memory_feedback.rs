@@ -11,8 +11,10 @@ pub struct MemoryFeedback {
     pub id: String,
     /// The memory this feedback applies to
     pub memory_id: String,
-    /// "helpful" or "unhelpful"
+    /// Original rating string: "helpful", "unhelpful", or "1"-"5"
     pub rating: String,
+    /// Numeric score (1.0–5.0) parsed from the rating
+    pub score: f64,
     /// The peer who submitted the feedback
     pub peer_id: String,
     pub created_at: i64,
@@ -35,7 +37,15 @@ pub struct WorkspaceConfig {
     pub last_decay_at: i64,
 }
 
-/// Rate a memory: records feedback and adjusts its trust_score.
+/// Rate a memory: records feedback and recalculates its trust_score.
+///
+/// Accepts a 1–5 scale:
+/// - `"helpful"` → score 5
+/// - `"unhelpful"` → score 1
+/// - `"1"`, `"2"`, `"3"`, `"4"`, `"5"` → score as-is
+///
+/// Trust score is recomputed as the average of all feedback scores
+/// mapped to [0.0, 1.0] (score / 5.0).
 #[reducer]
 pub fn rate_memory(
     ctx: &ReducerContext,
@@ -43,13 +53,28 @@ pub fn rate_memory(
     rating: String,
     peer_id: String,
 ) -> Result<(), String> {
-    // Validate rating
-    if rating != "helpful" && rating != "unhelpful" {
-        return Err(format!(
-            "Invalid rating '{}'. Must be 'helpful' or 'unhelpful'",
-            rating
-        ));
-    }
+    // Parse rating into numeric score 1.0–5.0
+    let score: f64 = match rating.as_str() {
+        "helpful" => 5.0,
+        "unhelpful" => 1.0,
+        other => {
+            let n: i32 = other
+                .parse()
+                .map_err(|_| {
+                    format!(
+                        "Invalid rating '{}'. Must be 'helpful', 'unhelpful', or an integer 1–5",
+                        rating
+                    )
+                })?;
+            if !(1..=5).contains(&n) {
+                return Err(format!(
+                    "Invalid rating '{}'. Must be between 1 and 5",
+                    rating
+                ));
+            }
+            n as f64
+        }
+    };
 
     // Find the memory
     let mut mem = ctx
@@ -64,15 +89,26 @@ pub fn rate_memory(
         id: uuid_v4(ctx),
         memory_id: memory_id.clone(),
         rating: rating.clone(),
+        score,
         peer_id,
         created_at: now_micros(ctx),
     };
     ctx.db.memory_feedback().insert(feedback);
 
-    // Update trust_score (+0.05 helpful, -0.05 unhelpful, clamped 0.0–1.0)
-    let delta = if rating == "helpful" { 0.05 } else { -0.05 };
-    let new_score = (mem.trust_score + delta).clamp(0.0, 1.0);
-    mem.trust_score = new_score;
+    // Recalculate trust_score as average of all feedback scores / 5.0
+    let all_scores: Vec<f64> = ctx
+        .db
+        .memory_feedback()
+        .iter()
+        .filter(|f| f.memory_id == memory_id)
+        .map(|f| f.score)
+        .collect();
+    let avg_score = if all_scores.is_empty() {
+        0.5
+    } else {
+        all_scores.iter().sum::<f64>() / all_scores.len() as f64
+    };
+    mem.trust_score = (avg_score / 5.0).clamp(0.0, 1.0);
     mem.feedback_count += 1;
     mem.updated_at = now_micros(ctx);
 
@@ -93,7 +129,7 @@ const MICROS_PER_DAY: i64 = 86_400_000_000;
 ///
 /// Memories older than `max_days` are set to the floor trust score (0.1).
 /// The result is clamped to [0.1, 1.0].
-fn apply_decay_inner(
+pub fn apply_decay_inner(
     ctx: &ReducerContext,
     workspace_id: &str,
     decay_rate: f64,

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Replication daemon for spacetime-memory.
 
-Syncs mutations between SpacetimeDB instances.
+Syncs mutations between SpacetimeDB instances in both directions
+(push AND pull) with conflict resolution.
 
 Usage:
-    python scripts/replication_daemon.py [--interval 60] [--once]
+    python scripts/replication_daemon.py [--interval 60] [--once] [--mode both]
 """
 
 from __future__ import annotations
@@ -128,19 +129,24 @@ DELETE_REDUCERS: dict[str, tuple[str, callable]] = {
 
 
 class ReplicationDaemon:
-    """Syncs mutations between SpacetimeDB instances.
+    """Syncs mutations between SpacetimeDB instances in both directions.
 
     Reads replication peers from the local database, pushes unsynced log
-    entries to each remote peer, and marks entries as synced on success.
+    entries to each remote peer, and pulls remote unsynced entries to
+    the local instance. Supports conflict resolution via timestamp comparison.
 
     Args:
         interval: Seconds between sync cycles (default: 60).
         once: If True, run a single sync cycle and exit.
+        mode: One of "push", "pull", or "both" (default: "both").
     """
 
-    def __init__(self, interval: int = 60, once: bool = False) -> None:
+    def __init__(
+        self, interval: int = 60, once: bool = False, mode: str = "both"
+    ) -> None:
         self.interval = interval
         self.once = once
+        self.mode = mode
         self._local_client = self._build_local_client()
 
     # ------------------------------------------------------------------
@@ -202,14 +208,19 @@ class ReplicationDaemon:
             return []
 
     def _get_unsynced_entries(
-        self, workspace_id: str, limit: int = 100
+        self, workspace_id: str, client: Client | None = None, limit: int = 100
     ) -> list[dict[str, Any]]:
-        """Fetch unsynced log entries for a workspace."""
+        """Fetch unsynced log entries for a workspace.
+
+        Args:
+            workspace_id: The workspace to query.
+            client: The client to query (defaults to local client).
+            limit: Max number of entries to fetch.
+        """
+        c = client or self._local_client
         try:
-            self._local_client._call(
-                "get_unsynced_entries", [workspace_id, limit]
-            )
-            rows = self._local_client._sql(
+            c._call("get_unsynced_entries", [workspace_id, limit])
+            rows = c._sql(
                 "SELECT * FROM replication_result "
                 "WHERE query_type = 'unsynced' "
                 "AND workspace_id = '{}' "
@@ -222,17 +233,30 @@ class ReplicationDaemon:
             _log(f"Error fetching unsynced entries for {workspace_id}: {exc}")
             return []
 
-    def _mark_synced(self, log_ids: list[str]) -> None:
-        """Mark log entries as synced locally."""
+    def _mark_synced(self, log_ids: list[str], client: Client | None = None) -> None:
+        """Mark log entries as synced.
+
+        Args:
+            log_ids: List of log entry IDs to mark as synced.
+            client: The client to use (defaults to local).
+        """
         if not log_ids:
             return
+        c = client or self._local_client
         try:
-            self._local_client._call("mark_log_synced", [json.dumps(log_ids)])
+            c._call("mark_log_synced", [json.dumps(log_ids)])
         except Exception as exc:
             _log(f"Error marking log entries as synced: {exc}")
 
+    def _mark_peer_synced(self, peer_id: str, last_sync_at: int) -> None:
+        """Update a peer's last_sync_at timestamp locally."""
+        try:
+            self._local_client._call("mark_peer_synced", [peer_id, last_sync_at])
+        except Exception as exc:
+            _log(f"Error marking peer synced: {exc}")
+
     # ------------------------------------------------------------------
-    # Apply a single log entry to a remote instance
+    # Apply a single log entry to a remote instance (push direction)
     # ------------------------------------------------------------------
 
     def _apply_entry(
@@ -291,15 +315,13 @@ class ReplicationDaemon:
             return False
 
     # ------------------------------------------------------------------
-    # Sync a workspace to a single peer
+    # Push: send local unsynced entries to a remote peer
     # ------------------------------------------------------------------
 
-    def _sync_to_peer(
-        self, peer: dict[str, Any]
-    ) -> int:
-        """Push unsynced entries for a workspace to a single peer.
+    def push_to_peer(self, peer: dict[str, Any]) -> int:
+        """Push local unsynced entries to a single remote peer.
 
-        Returns the number of entries successfully synced.
+        Returns the number of entries successfully pushed.
         """
         workspace_id = peer.get("workspace_id", "")
         remote_url = peer.get("remote_url", "")
@@ -307,7 +329,7 @@ class ReplicationDaemon:
         auth_token = peer.get("auth_token", "")
 
         _log(
-            f"Syncing workspace '{workspace_id}' "
+            f"PUSH: workspace '{workspace_id}' "
             f"to peer '{peer.get('name', '')}' at {remote_url}"
         )
 
@@ -343,17 +365,128 @@ class ReplicationDaemon:
 
         count = len(synced_ids)
         _log(
-            f"Synced {count} entries to '{peer.get('name', '')}' "
+            f"PUSH: synced {count} entries to '{peer.get('name', '')}' "
             f"({failures} failures)"
         )
         return count
+
+    # ------------------------------------------------------------------
+    # Pull: fetch remote unsynced entries and apply them locally
+    # ------------------------------------------------------------------
+
+    def pull_from_peer(self, peer: dict[str, Any]) -> int:
+        """Pull unsynced entries from a remote peer and apply locally.
+
+        Connects to the remote instance, reads its unsynced replication
+        entries, then calls replicate_incoming on the LOCAL instance to
+        apply them with conflict resolution.
+
+        Returns the number of entries successfully pulled.
+        """
+        workspace_id = peer.get("workspace_id", "")
+        remote_url = peer.get("remote_url", "")
+        remote_db = peer.get("remote_db", "")
+        peer_id = peer.get("id", "")
+        auth_token = peer.get("auth_token", "")
+
+        _log(
+            f"PULL: workspace '{workspace_id}' "
+            f"from peer '{peer.get('name', '')}' at {remote_url}"
+        )
+
+        # Build remote client
+        try:
+            remote = self._build_remote_client(remote_url, remote_db, auth_token)
+        except Exception as exc:
+            _log(f"Failed to build remote client: {exc}")
+            return 0
+
+        # Read remote unsynced entries
+        try:
+            remote_entries = self._get_unsynced_entries(
+                workspace_id, client=remote, limit=200
+            )
+        except Exception as exc:
+            _log(f"Failed to fetch remote unsynced entries: {exc}")
+            return 0
+
+        if not remote_entries:
+            _log(f"PULL: no unsynced entries on remote for '{peer.get('name', '')}'")
+            return 0
+
+        _log(
+            f"PULL: found {len(remote_entries)} unsynced entries on remote"
+        )
+
+        # Serialize entries as JSON and call replicate_incoming on LOCAL instance
+        entries_json = json.dumps(remote_entries)
+        try:
+            self._local_client._call(
+                "replicate_incoming",
+                [workspace_id, peer_id, entries_json],
+            )
+        except Exception as exc:
+            _log(f"PULL: replicate_incoming failed: {exc}")
+            return 0
+
+        # Mark entries as synced on the remote side (they've been pulled)
+        log_ids = [e.get("id", "") for e in remote_entries if e.get("id")]
+        if log_ids:
+            try:
+                remote._call("mark_log_synced", [json.dumps(log_ids)])
+            except Exception as exc:
+                _log(f"PULL: failed to mark remote entries synced: {exc}")
+
+        # Update the peer's last_sync_at locally
+        ts = int(time.time() * 1_000_000)
+        self._mark_peer_synced(peer_id, ts)
+
+        _log(
+            f"PULL: pulled {len(remote_entries)} entries from "
+            f"'{peer.get('name', '')}'"
+        )
+        return len(remote_entries)
+
+    # ------------------------------------------------------------------
+    # Bi-directional sync for a single peer
+    # ------------------------------------------------------------------
+
+    def sync_bidirectional(self, peer: dict[str, Any]) -> dict[str, int]:
+        """Run push then pull for a single peer.
+
+        Returns a dict with 'pushed' and 'pulled' counts.
+        """
+        result: dict[str, int] = {"pushed": 0, "pulled": 0}
+
+        if self.mode in ("push", "both"):
+            result["pushed"] = self.push_to_peer(peer)
+
+        if self.mode in ("pull", "both"):
+            result["pulled"] = self.pull_from_peer(peer)
+
+        return result
+
+    # ------------------------------------------------------------------
+    # Legacy: sync a workspace to a single peer (push-only, backwards compat)
+    # ------------------------------------------------------------------
+
+    def _sync_to_peer(
+        self, peer: dict[str, Any]
+    ) -> int:
+        """Push unsynced entries for a workspace to a single peer.
+
+        Legacy method — uses push_to_peer internally now.
+
+        Returns the number of entries successfully synced.
+        """
+        return self.push_to_peer(peer)
 
     # ------------------------------------------------------------------
     # Main loop
     # ------------------------------------------------------------------
 
     def sync_once(self) -> int:
-        """Run a single sync cycle. Returns total entries synced."""
+        """Run a single sync cycle. Returns total entries synced (push+pull)."""
         total = 0
         peers = self._get_active_peers()
 
@@ -361,10 +494,11 @@ class ReplicationDaemon:
             _log("No active replication peers found")
             return 0
 
-        _log(f"Found {len(peers)} active peer(s)")
+        _log(f"Found {len(peers)} active peer(s), mode={self.mode}")
 
         for peer in peers:
-            total += self._sync_to_peer(peer)
+            result = self.sync_bidirectional(peer)
+            total += result.get("pushed", 0) + result.get("pulled", 0)
 
         _log(f"Sync cycle complete — {total} entries replicated")
         return total
@@ -377,6 +511,7 @@ class ReplicationDaemon:
 
         _log(
             f"Replication daemon started (interval={self.interval}s, "
+            f"mode={self.mode}, "
             f"pid={os.getpid()})"
         )
 
@@ -423,9 +558,18 @@ def main() -> None:
         action="store_true",
         help="Run a single sync cycle and exit",
     )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="both",
+        choices=["push", "pull", "both"],
+        help="Sync direction: push, pull, or both (default: both)",
+    )
     args = parser.parse_args()
 
-    daemon = ReplicationDaemon(interval=args.interval, once=args.once)
+    daemon = ReplicationDaemon(
+        interval=args.interval, once=args.once, mode=args.mode
+    )
     daemon.run()
 
 

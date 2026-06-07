@@ -423,6 +423,19 @@ def memory_reinforce(memory_id: str) -> None:
         print_json(result)
 
 
+@memory.command(name="escalate")
+@click.argument("workspace_id")
+@click.option("--l2-to-l1", default=5, type=int, help="Access count threshold for L2→L1 escalation (default: 5)")
+@click.option("--l1-to-l0", default=20, type=int, help="Access count threshold for L1→L0 escalation (default: 20)")
+def memory_escalate(workspace_id: str, l2_to_l1: int, l1_to_l0: int) -> None:
+    """Batch-escalate memory tiers based on access_count thresholds."""
+    with console.status(f"Escalating memories in workspace '{workspace_id[:16]}...'..."):
+        result = _sdk_client().escalate_memories(workspace_id, l2_to_l1, l1_to_l0)
+    console.print(f"[green]Tier escalation triggered for workspace {workspace_id[:16]}...[/green]")
+    if result:
+        print_json(result)
+
+
 @memory.command(name="rate")
 @click.argument("memory_id")
 @click.argument("rating", type=click.Choice(["helpful", "unhelpful"]))
@@ -1343,8 +1356,10 @@ def replication_status(ctx: click.Context, workspace_id: str, watch: bool) -> No
 
 @replication.command(name="sync")
 @click.option("--workspace-id", default="", help="Workspace ID (uses default if empty)")
-def replication_sync(workspace_id: str) -> None:
-    """Trigger a one-time sync cycle."""
+@click.option("--mode", default="both", type=click.Choice(["push", "pull", "both"]),
+              help="Sync direction: push, pull, or both (default: both)")
+def replication_sync(workspace_id: str, mode: str) -> None:
+    """Trigger a one-time sync cycle (push+pull by default)."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
     try:
         from replication_daemon import ReplicationDaemon
@@ -1353,19 +1368,22 @@ def replication_sync(workspace_id: str) -> None:
         sys.exit(1)
 
     with console.status("Running sync cycle..."):
-        daemon = ReplicationDaemon(interval=60, once=True)
+        daemon = ReplicationDaemon(interval=60, once=True, mode=mode)
         total = daemon.sync_once()
-    console.print(f"[green]Sync complete — {total} entries replicated.[/green]")
+    console.print(f"[green]Sync complete — {total} entries replicated (mode={mode}).[/green]")
 
 
 @replication.command(name="daemon")
 @click.option("--interval", default=60, type=int, help="Sync interval in seconds")
+@click.option("--mode", default="both", type=click.Choice(["push", "pull", "both"]),
+              help="Sync direction: push, pull, or both (default: both)")
 @click.option("--daemonize/--no-daemonize", default=False,
               help="Fork to background (Unix only)")
-def replication_daemon(interval: int, daemonize: bool) -> None:
+def replication_daemon(interval: int, mode: str, daemonize: bool) -> None:
     """Start the replication daemon.
 
-    Runs continuously, syncing mutations to remote peers at the given interval.
+    Runs continuously, syncing mutations to/from remote peers at the given interval.
+    Supports push-only, pull-only, or bi-directional sync.
     """
     if daemonize:
         pid = os.fork()
@@ -1382,7 +1400,7 @@ def replication_daemon(interval: int, daemonize: bool) -> None:
         console.print("[red]Error: replication_daemon.py not found in scripts/[/red]")
         sys.exit(1)
 
-    daemon = ReplicationDaemon(interval=interval, once=False)
+    daemon = ReplicationDaemon(interval=interval, once=False, mode=mode)
     daemon.run()
 
 

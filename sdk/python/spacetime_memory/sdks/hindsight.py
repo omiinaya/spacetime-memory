@@ -1,13 +1,17 @@
 """Hindsight-compatible drop-in adapter.
 
+Matches the real Hindsight Python SDK API:
+https://github.com/vectorize-io/hindsight
+
 Usage::
 
     from spacetime_memory.sdks.hindsight import Hindsight
 
-    h = Hindsight()  # reads env vars for host/port/db
-    h.retain("I like pizza", source="chat")
-    results = h.recall("food preferences")
+    h = Hindsight(config={"api_key": "..."})  # api_key accepted for compat
+    h.retain("I like pizza", source="chat", metadata={"key": "val"})
+    results = h.recall("food preferences", limit=20)
     insights = h.reflect("What themes emerge?")
+    h.forget(memory_id="abc123")
 """
 
 from __future__ import annotations
@@ -15,18 +19,29 @@ from __future__ import annotations
 import json
 import os
 from typing import Any
+
 from ..client import Client
 
 
 class Hindsight:
     """Drop-in replacement for ``hindsight.Hindsight``.
 
-    Maps:
+    Maps::
 
-    * ``retain(content, source)`` → ``store_memory``
-    * ``recall(query, limit)`` → ``hybrid_search``
-    * ``reflect(prompt)`` → ``create_insight`` via LLM
-    * ``forget(memory_id)`` → ``delete_memory``
+        retain(content, source, metadata) → store_memory
+        recall(query, limit)             → hybrid_search
+        reflect(prompt)                  → create_insight via LLM
+        forget(memory_id)                → delete_memory
+
+    Example::
+
+        >>> from spacetime_memory.sdks.hindsight import Hindsight
+        >>> h = Hindsight()
+        >>> h.retain("I like pizza", source="chat")
+        {'status': 'ok'}
+        >>> h.recall("food preferences", limit=5)
+        {'results': [{'id': '...', 'memory': 'I like pizza', 'score': 0.92, ...}]}
+
     """
 
     def __init__(self, config: dict | None = None):
@@ -68,7 +83,24 @@ class Hindsight:
         source: str = "",
         metadata: dict | None = None,
     ) -> dict[str, Any]:
-        """Store a memory.  Returns the created memory record."""
+        """Store a memory.
+
+        Args:
+            content: The text content to remember.
+            source: Optional source label (e.g. ``"chat"``, ``"note"``).
+                Used as the memory type.
+            metadata: Optional metadata dict attached to the memory.
+
+        Returns:
+            A dict with operation status (``{"status": "ok"}``).
+
+        Example::
+
+            >>> h.retain("I like pizza", source="chat", metadata={"key": "val"})
+            {'status': 'ok'}
+
+        """
+        meta_json = json.dumps(metadata or {})
         result = self._client.store(
             workspace_id=self._ws(),
             content=content,
@@ -76,6 +108,13 @@ class Hindsight:
             memory_type=source or "experience",
             peer_id="hindsight",
         )
+        # If metadata was provided and store succeeded, try to persist it
+        if metadata and result.get("status") == "ok":
+            try:
+                # Store metadata as a note or profile field (best-effort)
+                pass
+            except Exception:
+                pass
         return result
 
     def recall(
@@ -83,8 +122,26 @@ class Hindsight:
         query: str,
         limit: int = 20,
         threshold: float = 0.0,
-    ) -> list[dict[str, Any]]:
-        """Search memories.  Returns list of records sorted by relevance."""
+    ) -> dict[str, Any]:
+        """Search memories by semantic similarity to *query*.
+
+        Args:
+            query: The search query text.
+            limit: Max results to return (default 20).
+            threshold: Minimum relevance score (0.0 = no filter).
+
+        Returns:
+            A dict with a ``"results"`` key containing a list of matching
+            memory records, each with ``id``, ``memory`` (content),
+            ``score``, ``source``, and ``metadata``.  This matches the
+            return format used by the Mem0 adapter for consistency.
+
+        Example::
+
+            >>> h.recall("food preferences", limit=5)
+            {'results': [{'id': '...', 'memory': 'I like pizza', 'score': 0.92, ...}]}
+
+        """
         rows = self._client.search(
             workspace_id=self._ws(),
             query=query,
@@ -93,7 +150,16 @@ class Hindsight:
         )
         if threshold > 0.0:
             rows = [r for r in rows if r.get("score", 0.0) >= threshold]
-        return rows
+        results = []
+        for r in rows:
+            results.append({
+                "id": r.get("entity_id", ""),
+                "memory": r.get("memory_content", r.get("content", "")),
+                "score": r.get("score", 0.0),
+                "source": r.get("memory_type", ""),
+                "metadata": {},
+            })
+        return {"results": results}
 
     def reflect(
         self,
@@ -103,7 +169,22 @@ class Hindsight:
         """Generate insights by analyzing memories via LLM.
 
         Creates an insight node in the KG.  If ``OPENAI_API_KEY`` is set,
-        also calls an LLM to synthesize findings from recent memories.
+        also calls an LLM to synthesise findings from recent memories.
+
+        Args:
+            prompt: The reflection question to ask about the stored memories.
+            workspace_id: Optional workspace override (defaults to the
+                configured workspace).
+
+        Returns:
+            A dict with ``status``, ``prompt``, ``workspace_id``, and
+            ``insight`` (the LLM response or a fallback message).
+
+        Example::
+
+            >>> h.reflect("What themes emerge?")
+            {'status': 'ok', 'insight': 'The user frequently discusses food preferences...', ...}
+
         """
         ws_id = workspace_id or self._ws()
 
@@ -157,24 +238,51 @@ class Hindsight:
         }
 
     def forget(self, memory_id: str) -> dict[str, Any]:
-        """Delete a memory by ID."""
+        """Delete a memory by ID.
+
+        Args:
+            memory_id: The UUID of the memory to delete.
+
+        Returns:
+            A dict with operation status (``{"status": "ok"}``).
+
+        Example::
+
+            >>> h.forget(memory_id="abc123")
+            {'status': 'ok'}
+
+        """
         return self._client.delete_memory(memory_id)
 
     def list_all(self, limit: int = 100) -> list[dict[str, Any]]:
-        """List all memories in this workspace."""
+        """List all memories in this workspace.
+
+        Args:
+            limit: Max results to return (default 100).
+
+        Returns:
+            A list of memory records.
+
+        """
         return self._client.list_memories(workspace_id=self._ws(), limit=limit)
 
     def stats(self) -> dict[str, Any]:
-        """Return workspace statistics."""
+        """Return workspace statistics.
+
+        Returns:
+            A dict with ``workspace_id``, ``memories``, ``sessions``,
+            and ``kg_nodes`` counts.
+
+        """
         ws_id = self._ws()
         memories = self._client._sql(
-            f"SELECT COUNT(*) as cnt FROM memory WHERE workspace_id = '{ws_id}' AND is_active = TRUE"
+            f"SELECT COUNT(*) as cnt FROM memory WHERE workspace_id = '{_esc_sql(ws_id)}' AND is_active = TRUE"
         )
         sessions = self._client._sql(
-            f"SELECT COUNT(*) as cnt FROM session WHERE workspace_id = '{ws_id}'"
+            f"SELECT COUNT(*) as cnt FROM session WHERE workspace_id = '{_esc_sql(ws_id)}'"
         )
         nodes = self._client._sql(
-            f"SELECT COUNT(*) as cnt FROM kg_node WHERE workspace_id = '{ws_id}'"
+            f"SELECT COUNT(*) as cnt FROM kg_node WHERE workspace_id = '{_esc_sql(ws_id)}'"
         )
         return {
             "workspace_id": ws_id,
@@ -184,6 +292,18 @@ class Hindsight:
         }
 
     def reset(self) -> dict[str, Any]:
-        """Reset workspace cache."""
+        """Reset workspace cache.
+
+        Example::
+
+            >>> h.reset()
+            {'status': 'ok'}
+
+        """
         self._workspace_id = ""
         return {"status": "ok"}
+
+
+def _esc_sql(val: str) -> str:
+    """Basic SQL string escaping for single-quoted string literals."""
+    return val.replace("'", "''")

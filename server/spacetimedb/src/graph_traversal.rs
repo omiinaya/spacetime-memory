@@ -3,7 +3,6 @@ use spacetimedb::*;
 use crate::knowledge_graph::{kg_edge, kg_node};
 use crate::{now_micros, uuid_v4};
 
-use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Stores the result of a BFS/DFS traversal.
 #[table(accessor = graph_traversal_result, public)]

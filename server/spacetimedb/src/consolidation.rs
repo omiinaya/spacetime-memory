@@ -5,6 +5,7 @@ use crate::context_directory::{context_directory, directory_memory_link};
 use crate::hybrid_query::{cosine_similarity, parse_embedding_json};
 use crate::knowledge_graph::{kg_community, kg_edge, kg_node};
 use crate::memory::memory;
+use crate::memory_feedback;
 use crate::note::{note, note_block};
 use crate::profile::profile;
 use crate::retrieval::search_index;
@@ -421,6 +422,23 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
         }
     }
 
+    // 4. Apply reputation decay for all workspaces (default params)
+    const DEFAULT_DECAY_RATE: f64 = 0.005;
+    const DEFAULT_MAX_DAYS: i64 = 90;
+    for ws in ctx.db.workspace().iter() {
+        if let Err(e) = memory_feedback::apply_decay_inner(ctx, &ws.id, DEFAULT_DECAY_RATE, DEFAULT_MAX_DAYS) {
+            // Log but don't halt maintenance on decay error
+            ctx.db.consolidation_log().insert(ConsolidationLog {
+                id: uuid_v4(ctx),
+                workspace_id: ws.id.clone(),
+                consolidation_type: String::from("decay_error"),
+                source_memory_ids: e,
+                target_memory_id: String::new(),
+                created_at: now,
+            });
+        }
+    }
+
     Ok(())
 }
 
@@ -472,7 +490,7 @@ pub struct BackupEntry {
 pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
     let now = now_micros(ctx);
 
-    let mut insert_entry = |table_name: &str, record_id: String, data_json: String| {
+    let insert_entry = |table_name: &str, record_id: String, data_json: String| {
         ctx.db.backup_entry().insert(BackupEntry {
             id: uuid_v4(ctx),
             workspace_id: workspace_id.clone(),

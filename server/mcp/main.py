@@ -166,14 +166,21 @@ def reinforce_memory(memory_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 def rate_memory(memory_id: str, rating: str, peer_id: str) -> dict[str, Any]:
-    """Rate a memory as 'helpful' or 'unhelpful' to adjust its trust score."""
+    """Rate a memory on a 1–5 scale to adjust its trust score.
+
+    Accepts:
+      - "helpful" (score 5) or "unhelpful" (score 1) for binary ratings.
+      - "1", "2", "3", "4", or "5" for graded numeric feedback.
+
+    Trust score is recomputed as the average of all feedback scores / 5.
+    """
     return get_client()._call("rate_memory", [memory_id, rating, peer_id])
 
 
 @mcp.tool()
 def escalate_memories(workspace_id: str, l2_to_l1: int = 5, l1_to_l0: int = 20) -> str:
     """Batch-escalate memory tiers: L2→L1 at l2_to_l1 accesses, L1→L0 at l1_to_l0."""
-    get_client()._call("escalate_memories", [workspace_id, l2_to_l1, l1_to_l0])
+    get_client().escalate_memories(workspace_id, l2_to_l1, l1_to_l0)
     return f"Tier escalation triggered for workspace {workspace_id[:16]}..."
 
 
