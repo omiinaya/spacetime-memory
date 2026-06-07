@@ -44,7 +44,7 @@ class Client:
         self.host = host or os.environ.get("SPACETIMEDB_HOST", "localhost")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
         self.database = database or os.environ.get(
-            "SPACETIMEDB_DB", "spacetime-memory"
+            "SPACETIMEDB_DB", "c200f381695ed98be9b3fa689dd298cddff6212d35c46ae2a01999f921b88c82"
         )
         self.embedder_url = (
             embedder_url
@@ -518,6 +518,93 @@ class Client:
         """List delta entries for a pack."""
         return self._sql(
             f"SELECT * FROM context_delta WHERE previous_pack_id = '{_esc(previous_pack_id)}'"
+        )
+
+    # -----------------------------------------------------------------------
+    # Notes (markdown documents with wikilink backlinking)
+    # -----------------------------------------------------------------------
+
+    def create_note(
+        self,
+        workspace_id: str = "default",
+        title: str = "",
+        content: str = "",
+        note_date: str = "",
+        embed: bool = True,
+    ) -> dict[str, Any]:
+        """Create a note. If *embed* is True, auto-embeds via the sidecar."""
+        embedding_json = "[]"
+        if embed and content.strip():
+            emb = self._embed(content[:1024])
+            if emb:
+                embedding_json = json.dumps(emb)
+        return self._call("create_note", [
+            workspace_id, title, content, note_date, embedding_json,
+        ])
+
+    def update_note(
+        self,
+        note_id: str,
+        title: str = "",
+        content: str = "",
+        embed: bool = True,
+    ) -> dict[str, Any]:
+        """Update a note. Re-embeds if content changes and *embed* is True."""
+        embedding_json = "[]"
+        if embed and content.strip():
+            emb = self._embed(content[:1024])
+            if emb:
+                embedding_json = json.dumps(emb)
+        return self._call("update_note", [note_id, title, content, embedding_json])
+
+    def delete_note(self, note_id: str) -> dict[str, Any]:
+        """Delete a note and its backlinks."""
+        return self._call("delete_note", [note_id])
+
+    def list_notes(
+        self, workspace_id: str = "default", include_inactive: bool = False
+    ) -> list[dict[str, Any]]:
+        """List notes in a workspace."""
+        clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
+        if not include_inactive:
+            clauses.append("is_active = true")
+        where = " AND ".join(clauses)
+        rows = self._sql(f"SELECT * FROM note WHERE {where}")
+        rows.sort(key=lambda r: r.get("updated_at", 0), reverse=True)
+        return rows
+
+    def get_note(self, note_id: str) -> list[dict[str, Any]]:
+        """Get a note by ID."""
+        return self._sql(f"SELECT * FROM note WHERE id = '{_esc(note_id)}'")
+
+    def get_note_by_date(self, note_date: str) -> list[dict[str, Any]]:
+        """Get a note by its date string (YYYY-MM-DD)."""
+        return self._sql(
+            f"SELECT * FROM note WHERE note_date = '{_esc(note_date)}' AND is_active = true"
+        )
+
+    def get_note_by_title(self, title: str) -> list[dict[str, Any]]:
+        """Find a note by exact title."""
+        return self._sql(
+            f"SELECT * FROM note WHERE title = '{_esc(title)}' AND is_active = true"
+        )
+
+    def get_backlinks(self, note_id: str) -> list[dict[str, Any]]:
+        """Get all notes that link *to* the given note."""
+        return self._sql(
+            "SELECT nb.*, n.title AS source_title "
+            "FROM note_backlink nb "
+            "LEFT JOIN note n ON nb.source_note_id = n.id "
+            f"WHERE nb.target_note_id = '{_esc(note_id)}'"
+        )
+
+    def get_outgoing_links(self, note_id: str) -> list[dict[str, Any]]:
+        """Get all notes that the given note links *to*."""
+        return self._sql(
+            "SELECT nb.*, n.title AS target_title "
+            "FROM note_backlink nb "
+            "LEFT JOIN note n ON nb.target_note_id = n.id "
+            f"WHERE nb.source_note_id = '{_esc(note_id)}'"
         )
 
 

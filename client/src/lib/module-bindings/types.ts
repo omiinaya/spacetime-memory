@@ -252,6 +252,29 @@ export const Message = __t.object("Message", {
 });
 export type Message = __Infer<typeof Message>;
 
+export const Note = __t.object("Note", {
+  id: __t.string(),
+  workspaceId: __t.string(),
+  title: __t.string(),
+  content: __t.string(),
+  noteDate: __t.string(),
+  embeddingJson: __t.string(),
+  backlinkCount: __t.u32(),
+  createdAt: __t.i64(),
+  updatedAt: __t.i64(),
+  isActive: __t.bool(),
+});
+export type Note = __Infer<typeof Note>;
+
+export const NoteBacklink = __t.object("NoteBacklink", {
+  id: __t.string(),
+  sourceNoteId: __t.string(),
+  targetNoteId: __t.string(),
+  displayText: __t.string(),
+  createdAt: __t.i64(),
+});
+export type NoteBacklink = __Infer<typeof NoteBacklink>;
+
 export const Peer = __t.object("Peer", {
   id: __t.string(),
   workspaceId: __t.string(),

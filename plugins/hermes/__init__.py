@@ -37,7 +37,7 @@ def _load_config() -> dict:
     return {
         "host": os.environ.get("SPACETIMEDB_HOST", "localhost"),
         "port": os.environ.get("SPACETIMEDB_PORT", "3001"),
-        "database": os.environ.get("SPACETIMEDB_DB", "spacetime-memory"),
+        "database": os.environ.get("SPACETIMEDB_DB", "c200f381695ed98be9b3fa689dd298cddff6212d35c46ae2a01999f921b88c82"),
         "embedder_url": os.environ.get("EMBEDDER_URL", "http://localhost:9090"),
     }
 
@@ -376,7 +376,7 @@ class SpacetimeMemoryProvider(MemoryProvider):
     def system_prompt_block(self) -> str:
         return (
             "# SpacetimeDB Memory\n"
-            f"Active. Connected to {self._host}:{self._port}/{self._database}.\n"
+            f"Active. Connected to {self._host}:{self._port} (DB: c200f381...).\n"
             "Use spacetime_search to find memories/notes/nodes, "
             "spacetime_store to save facts, "
             "spacetime_notes to browse markdown notes, "

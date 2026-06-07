@@ -13,6 +13,9 @@ const MemoryBrowser = React.lazy(() => import('@/pages/MemoryBrowser'));
 const Documents = React.lazy(() => import('@/pages/Documents'));
 const Search = React.lazy(() => import('@/pages/Search'));
 const Settings = React.lazy(() => import('@/pages/Settings'));
+const DailyNotes = React.lazy(() => import('@/pages/DailyNotes'));
+const NotesList = React.lazy(() => import('@/pages/NotesList'));
+const NoteEditor = React.lazy(() => import('@/pages/NoteEditor'));
 
 function LoadingFallback() {
   return (
@@ -43,6 +46,10 @@ export default function App() {
           <Route path="/documents" component={Documents} />
           <Route path="/search" component={Search} />
           <Route path="/settings" component={Settings} />
+          <Route path="/daily" component={DailyNotes} />
+          <Route path="/notes" component={NotesList} />
+          <Route path="/notes/new" component={NoteEditor} />
+          <Route path="/notes/:id" component={NoteEditor} />
           <Route>
             <div className="flex h-[60vh] items-center justify-center">
               <div className="text-center">

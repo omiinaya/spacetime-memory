@@ -51,6 +51,7 @@ import CreateEdgeReducer from "./create_edge_reducer";
 import CreateEntityLinkReducer from "./create_entity_link_reducer";
 import CreateInsightReducer from "./create_insight_reducer";
 import CreateNodeReducer from "./create_node_reducer";
+import CreateNoteReducer from "./create_note_reducer";
 import CreatePeerReducer from "./create_peer_reducer";
 import CreateSessionReducer from "./create_session_reducer";
 import CreateTagReducer from "./create_tag_reducer";
@@ -65,6 +66,7 @@ import DeleteEdgeReducer from "./delete_edge_reducer";
 import DeleteInsightReducer from "./delete_insight_reducer";
 import DeleteMessageReducer from "./delete_message_reducer";
 import DeleteNodeReducer from "./delete_node_reducer";
+import DeleteNoteReducer from "./delete_note_reducer";
 import DeletePeerReducer from "./delete_peer_reducer";
 import DeleteWorkspaceReducer from "./delete_workspace_reducer";
 import DetectCommunitiesReducer from "./detect_communities_reducer";
@@ -94,6 +96,7 @@ import TagMemoryReducer from "./tag_memory_reducer";
 import UntagMemoryReducer from "./untag_memory_reducer";
 import UpdateMemoryReducer from "./update_memory_reducer";
 import UpdateMemoryTierReducer from "./update_memory_tier_reducer";
+import UpdateNoteReducer from "./update_note_reducer";
 import UpdatePeerReducer from "./update_peer_reducer";
 import UpdateSessionSummaryReducer from "./update_session_summary_reducer";
 import UpdateWorkspaceReducer from "./update_workspace_reducer";
@@ -123,6 +126,8 @@ import MemoryRow from "./memory_table";
 import MemoryFeedbackRow from "./memory_feedback_table";
 import MemoryTagRow from "./memory_tag_table";
 import MessageRow from "./message_table";
+import NoteRow from "./note_table";
+import NoteBacklinkRow from "./note_backlink_table";
 import PeerRow from "./peer_table";
 import PeerSummaryResultRow from "./peer_summary_result_table";
 import ProfileRow from "./profile_table";
@@ -364,6 +369,28 @@ const tablesSchema = __schema({
       { name: 'message_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, MessageRow),
+  note: __table({
+    name: 'note',
+    indexes: [
+      { accessor: 'id', name: 'note_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'note_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, NoteRow),
+  note_backlink: __table({
+    name: 'note_backlink',
+    indexes: [
+      { accessor: 'id', name: 'note_backlink_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'note_backlink_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, NoteBacklinkRow),
   peer: __table({
     name: 'peer',
     indexes: [
@@ -480,6 +507,7 @@ const reducersSchema = __reducers(
   __reducerSchema("create_entity_link", CreateEntityLinkReducer),
   __reducerSchema("create_insight", CreateInsightReducer),
   __reducerSchema("create_node", CreateNodeReducer),
+  __reducerSchema("create_note", CreateNoteReducer),
   __reducerSchema("create_peer", CreatePeerReducer),
   __reducerSchema("create_session", CreateSessionReducer),
   __reducerSchema("create_tag", CreateTagReducer),
@@ -494,6 +522,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_insight", DeleteInsightReducer),
   __reducerSchema("delete_message", DeleteMessageReducer),
   __reducerSchema("delete_node", DeleteNodeReducer),
+  __reducerSchema("delete_note", DeleteNoteReducer),
   __reducerSchema("delete_peer", DeletePeerReducer),
   __reducerSchema("delete_workspace", DeleteWorkspaceReducer),
   __reducerSchema("detect_communities", DetectCommunitiesReducer),
@@ -523,6 +552,7 @@ const reducersSchema = __reducers(
   __reducerSchema("untag_memory", UntagMemoryReducer),
   __reducerSchema("update_memory", UpdateMemoryReducer),
   __reducerSchema("update_memory_tier", UpdateMemoryTierReducer),
+  __reducerSchema("update_note", UpdateNoteReducer),
   __reducerSchema("update_peer", UpdatePeerReducer),
   __reducerSchema("update_session_summary", UpdateSessionSummaryReducer),
   __reducerSchema("update_workspace", UpdateWorkspaceReducer),

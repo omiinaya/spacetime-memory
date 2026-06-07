@@ -13,6 +13,8 @@ import {
   Menu,
   X,
   Sparkles,
+  StickyNote,
+  CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -24,6 +26,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/daily', label: 'Daily Notes', icon: CalendarDays },
+  { href: '/notes', label: 'Notes', icon: StickyNote },
   { href: '/peers', label: 'Peers', icon: Users },
   { href: '/sessions', label: 'Sessions', icon: Monitor },
   { href: '/graph', label: 'Knowledge Graph', icon: Network },
