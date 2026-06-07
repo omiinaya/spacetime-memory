@@ -9,7 +9,7 @@ import json
 import pytest
 from unittest.mock import Mock
 from click.testing import CliRunner
-from stmem import cli, _make_client
+from cli.stmem import cli, _make_client
 from tests.conftest import make_sql_response
 
 
@@ -46,7 +46,7 @@ def mock_client():
 @pytest.fixture
 def mocked_cli_runner(monkeypatch, runner, mock_client):
     """A CliRunner where the CLI's ``_make_client`` returns a mocked Client."""
-    monkeypatch.setattr("stmem._make_client", lambda **kw: mock_client)
+    monkeypatch.setattr("cli.stmem._make_client", lambda **kw: mock_client)
     return runner, mock_client
 
 

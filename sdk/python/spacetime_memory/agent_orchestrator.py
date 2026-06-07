@@ -30,9 +30,12 @@ Usage:
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -412,7 +415,9 @@ class AgentOrchestrator:
                         }
                     )
             except Exception:
-                pass
+                logger.warning(
+                    "Failed to get session steps for %s", session_id, exc_info=True
+                )
 
         # Sort by score descending, then by position
         context.sort(key=lambda c: c.get("score", 0.0), reverse=True)
@@ -447,6 +452,10 @@ class AgentOrchestrator:
                 )
                 shared.append(pid)
             except Exception:
+                logger.warning(
+                    "Failed to share session %s with peer %s",
+                    session_id, pid, exc_info=True,
+                )
                 failed.append(pid)
 
         # Track in state if we have it

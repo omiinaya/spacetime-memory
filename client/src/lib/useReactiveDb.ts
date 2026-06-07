@@ -28,13 +28,14 @@ export function initReactiveDb() {
   getConnection();
 
   // Subscribe to all tables the frontend needs
+  // Note: Large tables are limited to prevent performance issues.
+  // Full data access is available via the SDK/API for batch operations.
   subscribe([
+    // Small tables — no limit needed
     'SELECT * FROM workspace',
     'SELECT * FROM peer',
     'SELECT * FROM session',
     'SELECT * FROM session_participant',
-    'SELECT * FROM message',
-    'SELECT * FROM memory',
     'SELECT * FROM memory_feedback',
     'SELECT * FROM context_directory',
     'SELECT * FROM directory_memory_link',
@@ -53,8 +54,15 @@ export function initReactiveDb() {
     'SELECT * FROM account',
     'SELECT * FROM tour',
     'SELECT * FROM tour_stop',
-    'SELECT * FROM consolidation_log',
     'SELECT * FROM merge_suggestion',
+    'SELECT * FROM space_permission',
+
+    // Large tables — limited to prevent performance issues
+    'SELECT * FROM memory WHERE is_active = true ORDER BY created_at DESC LIMIT 500',
+    'SELECT * FROM message LIMIT 1000',
+    'SELECT * FROM consolidation_log LIMIT 200',
+    'SELECT * FROM replication_log LIMIT 200',
+    'SELECT * FROM hybrid_result LIMIT 200',
   ]);
 
   // Bump version when initial data lands

@@ -59,3 +59,19 @@ def mock_http_client():
     )
     client._http = mock_http
     yield client
+
+
+@pytest.fixture
+def mock_client():
+    """A MagicMock with the interface expected by AgentOrchestrator.
+
+    All methods return sensible defaults so tests don't need to set up
+    boilerplate for every call.
+    """
+    client = MagicMock()
+    client._call.return_value = {"status": "ok"}
+    client._sql.return_value = []
+    client.search.return_value = []
+    client.store.return_value = {"status": "ok"}
+    client.query_graph.return_value = []
+    return client

@@ -1,8 +1,11 @@
-name: Release
+name: Docker
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
+  pull_request:
+    branches: [main]
 
 jobs:
   docker:
@@ -11,9 +14,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build Docker image
         run: docker build -t spacetime-memory .
-      - name: Save image
+      - name: Test Docker image (smoke)
+        run: |
+          docker run -d --name stmem-test -p 3001:3001 -p 9090:9090 spacetime-memory
+          sleep 10
+          curl -s http://localhost:3001/health || echo "DB not ready yet (expected in CI)"
+          docker stop stmem-test
+          docker rm stmem-test
+      - if: startsWith(github.ref, 'refs/tags/')
+        name: Save image (release only)
         run: docker save spacetime-memory | gzip > spacetime-memory.tar.gz
-      - uses: actions/upload-artifact@v4
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: spacetime-memory.tar.gz

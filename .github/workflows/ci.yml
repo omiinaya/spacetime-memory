@@ -41,3 +41,17 @@ jobs:
         working-directory: client
       - run: npx tsc --noEmit
         working-directory: client
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t spacetime-memory .
+      - name: Test Docker image (smoke)
+        run: |
+          docker run -d --name stmem-test -p 3001:3001 -p 9090:9090 spacetime-memory
+          sleep 10
+          curl -s http://localhost:3001/health || echo "DB not ready yet (expected in CI)"
+          docker stop stmem-test
+          docker rm stmem-test

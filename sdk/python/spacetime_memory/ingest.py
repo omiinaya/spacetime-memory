@@ -17,6 +17,7 @@ Usage::
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from pathlib import Path
@@ -24,6 +25,8 @@ from typing import Any
 
 from tree_sitter_language_pack import get_language
 from tree_sitter import Parser as TSParser, Query, QueryCursor
+
+logger = logging.getLogger(__name__)
 
 # ── Language config ─────────────────────────────────────────────────
 
@@ -316,7 +319,7 @@ class CodebaseIngester:
                 summary=f"{lang_name} file: {rel_str}",
             )
         except Exception:
-            pass
+            logger.warning("Failed to create file node for %s", file_label, exc_info=True)
         file_id = self._resolve_node(workspace_id, file_label)
         file_nodes[fpath] = file_id or ""
 
@@ -372,7 +375,9 @@ class CodebaseIngester:
                             summary=f"{type_label} {name} in {rel_str}",
                         )
                     except Exception:
-                        pass
+                        logger.warning(
+                            "Failed to create def node for %s", def_label, exc_info=True
+                        )
 
                     def_id = self._resolve_node(workspace_id, def_label)
                     if file_node_id and def_id:
@@ -383,7 +388,10 @@ class CodebaseIngester:
                             )
                             self._stats["edges"] += 1
                         except Exception:
-                            pass
+                            logger.warning(
+                                "Failed to create contains edge: %s -> %s",
+                                file_node_id, def_id, exc_info=True,
+                            )
 
                     defs.append({
                         "id": def_id or def_label,
@@ -424,7 +432,10 @@ class CodebaseIngester:
                                     )
                                     self._stats["edges"] += 1
                                 except Exception:
-                                    pass
+                                    logger.warning(
+                                        "Failed to create call edge: %s -> %s",
+                                        src_id, tgt_id, exc_info=True,
+                                    )
                             break
 
     def _resolve_node(self, workspace_id: str, label: str) -> str:
@@ -434,5 +445,5 @@ class CodebaseIngester:
                 if r.get("label") == label:
                     return r.get("id", "")
         except Exception:
-            pass
+            logger.warning("Failed to resolve node for label %s", label, exc_info=True)
         return ""

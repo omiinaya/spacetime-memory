@@ -62,7 +62,8 @@ RUN pip install --no-cache-dir -e cli
 COPY --from=embedder-builder /build/target/release/embedder /usr/local/bin/embedder
 
 # ---- ONNX embedding model ----
-COPY server/embedder/model/ /app/model/
+COPY scripts/download-model.sh ./scripts/download-model.sh
+RUN apt-get update && apt-get install -y python3-pip && pip install huggingface-hub && bash scripts/download-model.sh
 
 # ---- SpacetimeDB WASM module ----
 COPY --from=module-builder /build/target/wasm32-unknown-unknown/release/spacetime_memory.wasm /app/module/spacetime_memory.wasm

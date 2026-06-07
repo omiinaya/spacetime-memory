@@ -898,6 +898,148 @@ def get_agent_context(
 
 
 # ---------------------------------------------------------------------------
+# Health & Monitoring tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def health_check() -> dict:
+    """Check the health of all system components.
+
+    Returns status of SpacetimeDB connection, embedder, and basic stats.
+    """
+    client = get_client()
+    result: dict = {
+        "status": "ok",
+        "spacetimedb": "unknown",
+        "embedder": "unknown",
+        "memory_count": 0,
+        "workspace_count": 0,
+    }
+    # Check SpacetimeDB
+    try:
+        ws = client.list_workspaces()
+        result["spacetimedb"] = "ok"
+        result["workspace_count"] = len(ws)
+    except Exception as e:
+        result["spacetimedb"] = f"error: {e}"
+        result["status"] = "degraded"
+    # Check embedder
+    try:
+        emb = client.check_embedder_health()
+        result["embedder"] = emb.get("status", "unknown")
+    except Exception as e:
+        result["embedder"] = f"error: {e}"
+        result["status"] = "degraded"
+    # Get memory count
+    try:
+        mems = client._sql("SELECT COUNT(*) as cnt FROM memory WHERE is_active = TRUE")
+        if mems:
+            result["memory_count"] = mems[0].get("cnt", 0)
+    except Exception:
+        pass
+    return result
+
+
+@mcp.tool()
+def get_metrics() -> dict:
+    """Get operational metrics for monitoring.
+
+    Returns counters and gauges for: memory operations, search operations,
+    connector events, errors, and system health.
+    """
+    client = get_client()
+    metrics: dict = {
+        "memories": {
+            "total": 0,
+            "active": 0,
+            "by_tier": {"L0": 0, "L1": 0, "L2": 0},
+        },
+        "workspaces": 0,
+        "peers": 0,
+        "kg_nodes": 0,
+        "kg_edges": 0,
+        "sessions": 0,
+        "notes": 0,
+        "facts": 0,
+    }
+    try:
+        # Memory counts
+        rows = client._sql("SELECT COUNT(*) as c FROM memory")
+        if rows:
+            metrics["memories"]["total"] = rows[0].get("c", 0)
+
+        rows = client._sql(
+            "SELECT COUNT(*) as c FROM memory WHERE is_active = TRUE"
+        )
+        if rows:
+            metrics["memories"]["active"] = rows[0].get("c", 0)
+
+        for tier in ["L0", "L1", "L2"]:
+            rows = client._sql(
+                f"SELECT COUNT(*) as c FROM memory "
+                f"WHERE tier = '{tier}' AND is_active = TRUE"
+            )
+            if rows:
+                metrics["memories"]["by_tier"][tier] = rows[0].get("c", 0)
+
+        # Workspaces
+        metrics["workspaces"] = len(client.list_workspaces())
+
+        # Distinct peers from memory table
+        rows = client._sql(
+            "SELECT COUNT(DISTINCT peer_id) as c FROM memory"
+        )
+        if rows:
+            metrics["peers"] = rows[0].get("c", 0)
+
+        # KG nodes (if table exists)
+        try:
+            rows = client._sql("SELECT COUNT(*) as c FROM kg_node")
+            if rows:
+                metrics["kg_nodes"] = rows[0].get("c", 0)
+        except Exception:
+            metrics["kg_nodes"] = -1  # table not available
+
+        # KG edges (if table exists)
+        try:
+            rows = client._sql("SELECT COUNT(*) as c FROM kg_edge")
+            if rows:
+                metrics["kg_edges"] = rows[0].get("c", 0)
+        except Exception:
+            metrics["kg_edges"] = -1
+
+        # Sessions (if table exists)
+        try:
+            rows = client._sql("SELECT COUNT(*) as c FROM session")
+            if rows:
+                metrics["sessions"] = rows[0].get("c", 0)
+        except Exception:
+            metrics["sessions"] = -1
+
+        # Notes (if table exists)
+        try:
+            rows = client._sql("SELECT COUNT(*) as c FROM note")
+            if rows:
+                metrics["notes"] = rows[0].get("c", 0)
+        except Exception:
+            metrics["notes"] = -1
+
+        # Facts (if table exists)
+        try:
+            rows = client._sql("SELECT COUNT(*) as c FROM fact")
+            if rows:
+                metrics["facts"] = rows[0].get("c", 0)
+        except Exception:
+            metrics["facts"] = -1
+
+    except Exception as e:
+        metrics["error"] = str(e)
+
+    return metrics
+
+
+# ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
 

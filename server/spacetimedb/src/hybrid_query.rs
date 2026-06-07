@@ -391,10 +391,10 @@ pub fn hybrid_search(
 }
 
 // ---------------------------------------------------------------------------
-// Reducer: get_search_results (placeholder)
+// Reducer: get_search_results
 // ---------------------------------------------------------------------------
 
-/// Placeholder reducer that signals the client should read the `HybridResult`
+/// Reducer that signals the client should read the `HybridResult`
 /// table directly. SpacetimeDB v2.4 reducers cannot return row data to the
 /// caller, so after calling `hybrid_search` the client queries `HybridResult`
 /// filtered by `workspace_id` and `query_hash`.
