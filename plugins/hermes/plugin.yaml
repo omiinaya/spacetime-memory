@@ -1,0 +1,4 @@
+name: spacetime
+version: 1.0.0
+description: "SpacetimeDB — distributed memory with hybrid search, knowledge graphs, notes, wikilinks, and persistent user profiles. Backed by SpacetimeDB v2.4.1 + Rust ONNX embedder sidecar."
+pip_dependencies: []
