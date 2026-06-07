@@ -24,6 +24,8 @@ import {
   Share2,
   BrainCircuit,
   FolderTree,
+  ShieldCheck,
+  Wand2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
@@ -45,7 +47,8 @@ const navItems: NavItem[] = [
   { href: '/memories', label: 'Memory Browser', icon: Database },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/search', label: 'Search', icon: Search },
-  { href: '/query', label: 'Smart Query', icon: Sparkles },
+  { href: '/query', label: 'Smart Query', icon: Wand2 },
+  { href: '/trust-dashboard', label: 'Trust Dashboard', icon: ShieldCheck },
   { href: '/tours', label: 'Tours', icon: Route },
   { href: '/code-explorer', label: 'Code Explorer', icon: Code2 },
   { href: '/trajectories', label: 'Trajectories', icon: GitFork },

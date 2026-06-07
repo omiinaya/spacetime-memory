@@ -27,6 +27,7 @@ const GraphViz = React.lazy(() => import('@/pages/GraphViz'));
 const BlockGraph = React.lazy(() => import('@/pages/BlockGraph'));
 const SessionReasoning = React.lazy(() => import('@/pages/SessionReasoning'));
 const DirectoryBrowser = React.lazy(() => import('@/pages/DirectoryBrowser'));
+const TrustDashboard = React.lazy(() => import('@/pages/TrustDashboard'));
 
 function LoadingFallback() {
   return (
@@ -76,6 +77,7 @@ function AuthenticatedApp() {
           <Route path="/notes/:id" component={NoteEditor} />
           <Route path="/graph/notes" component={NoteGraph} />
           <Route path="/query" component={SmartQuery} />
+          <Route path="/trust-dashboard" component={TrustDashboard} />
           <Route path="/tours" component={Tours} />
           <Route path="/code-explorer" component={CodeExplorer} />
           <Route path="/trajectories" component={TrajectoryViz} />

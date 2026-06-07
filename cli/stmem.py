@@ -12,10 +12,13 @@ Configuration via environment variables:
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 import subprocess
 import sys
+import time
 from typing import Any
 
 import click
@@ -37,6 +40,29 @@ EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://localhost:9090")
 
 console = Console()
 
+# Global output format; set by root CLI group --output flag
+_current_output_format: str = "table"
+
+# Aliases file path
+ALIASES_FILE = os.path.join(os.path.expanduser("~"), ".stmem_aliases.json")
+
+
+def _load_aliases() -> dict[str, str]:
+    """Load aliases from ~/.stmem_aliases.json."""
+    if os.path.exists(ALIASES_FILE):
+        try:
+            with open(ALIASES_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def _save_aliases(aliases: dict[str, str]) -> None:
+    """Save aliases to ~/.stmem_aliases.json."""
+    with open(ALIASES_FILE, "w") as f:
+        json.dump(aliases, f, indent=2)
+
 
 def _sdk_client() -> Client:
     """Build an SDK Client from the CLI's env-var config."""
@@ -51,11 +77,38 @@ def _sdk_client() -> Client:
 # ---------------------------------------------------------------------------
 
 
-def print_table(rows: list[dict[str, Any]], title: str = "") -> None:
-    """Print query results as a Rich table."""
+def print_table(rows: list[dict[str, Any]], title: str = "",
+                output: str | None = None) -> None:
+    """Print query results as table, json, or csv.
+
+    Args:
+        rows: List of dicts to display.
+        title: Optional table title (only used in table mode).
+        output: One of "table", "json", "csv".  Defaults to the
+                module-global ``_current_output_format``.
+    """
+    if output is None:
+        output = _current_output_format
+
     if not rows:
         console.print("[yellow]No results found.[/yellow]")
         return
+
+    if output == "json":
+        console.print_json(json.dumps(rows, default=str))
+        return
+
+    if output == "csv":
+        cols = list(rows[0].keys())
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(cols)
+        for row in rows:
+            writer.writerow([str(row.get(c, "")) for c in cols])
+        console.print(buf.getvalue().strip())
+        return
+
+    # Default: Rich table
     table = Table(title=title, box=box.ROUNDED, header_style="bold cyan")
     cols = list(rows[0].keys())
     for c in cols:
@@ -68,7 +121,7 @@ def print_table(rows: list[dict[str, Any]], title: str = "") -> None:
 
 def print_json(data: Any) -> None:
     """Print data as formatted JSON."""
-    console.print_json(json.dumps(data) if not isinstance(data, str) else data)
+    console.print_json(json.dumps(data, default=str) if not isinstance(data, str) else data)
 
 
 def parse_json_flag(ctx: click.Context, param: click.Parameter, value: str | None) -> str | None:
@@ -94,12 +147,91 @@ def _esc(val: str) -> str:
 
 @click.group()
 @click.version_option(version="0.1.0", prog_name="stmem")
-def cli() -> None:
+@click.option("--output", "-o", type=click.Choice(["table", "json", "csv"]),
+              default="table", help="Output format: table, json, or csv")
+@click.pass_context
+def cli(ctx: click.Context, output: str) -> None:
     """stmem — Spacetime-Memory CLI.
 
     Manage workspaces, peers, memories, profiles, knowledge graphs, and sessions
     on a SpacetimeDB instance.
     """
+    global _current_output_format
+    _current_output_format = output
+    ctx.ensure_object(dict)
+    ctx.obj["output"] = output
+
+
+# ===================================================================
+# completion — shell completion scripts
+# ===================================================================
+
+
+@cli.command(name="completion")
+@click.argument("shell", type=click.Choice(["bash", "zsh", "fish"]))
+def completion(shell: str) -> None:
+    """Generate shell completion script.
+
+    Usage: eval "$(stmem completion bash)"
+    """
+    if shell == "bash":
+        click.echo('eval "$(_STMEM_COMPLETE=bash_source stmem)"')
+    elif shell == "zsh":
+        click.echo('eval "$(_STMEM_COMPLETE=zsh_source stmem)"')
+    elif shell == "fish":
+        click.echo('eval "$(_STMEM_COMPLETE=fish_source stmem)"')
+
+
+# ===================================================================
+# alias — CLI aliases
+# ===================================================================
+
+
+@cli.group()
+def alias() -> None:
+    """Manage CLI aliases."""
+
+
+@alias.command(name="set")
+@click.argument("name")
+@click.argument("command")
+def alias_set(name: str, command: str) -> None:
+    """Set an alias.
+
+    Example: stmem alias set ll 'memory list --tier L0'
+    """
+    aliases = _load_aliases()
+    aliases[name] = command
+    _save_aliases(aliases)
+    console.print(f"[green]Alias '{name}' set to:[/green] {command}")
+
+
+@alias.command(name="list")
+def alias_list() -> None:
+    """List all aliases."""
+    aliases = _load_aliases()
+    if not aliases:
+        console.print("[yellow]No aliases defined.[/yellow]")
+        return
+    table = Table(title="Aliases", box=box.ROUNDED, header_style="bold cyan")
+    table.add_column("Name")
+    table.add_column("Command")
+    for name, cmd in sorted(aliases.items()):
+        table.add_row(name, cmd)
+    console.print(table)
+
+
+@alias.command(name="remove")
+@click.argument("name")
+def alias_remove(name: str) -> None:
+    """Remove an alias."""
+    aliases = _load_aliases()
+    if name not in aliases:
+        console.print(f"[yellow]Alias '{name}' not found.[/yellow]")
+        return
+    del aliases[name]
+    _save_aliases(aliases)
+    console.print(f"[green]Alias '{name}' removed.[/green]")
 
 
 # ===================================================================
@@ -230,20 +362,41 @@ def memory_store(
 @click.option("--limit", default=50, type=int, help="Max results")
 @click.option("--semantic/--no-semantic", default=True,
               help="Use semantic (embedding) search")
-def memory_search(workspace_id: str, query: str, memory_type: str | None,
-                  tier: str | None, limit: int, semantic: bool) -> None:
+@click.option("--watch", "-w", is_flag=True, help="Watch for changes (poll every 5s)")
+@click.pass_context
+def memory_search(ctx: click.Context, workspace_id: str, query: str,
+                  memory_type: str | None, tier: str | None, limit: int,
+                  semantic: bool, watch: bool) -> None:
     """Search memories in a workspace."""
     client = _sdk_client()
-    with console.status("Searching..."):
-        rows = client.search(
-            workspace_id=workspace_id,
-            query=query,
-            memory_type=memory_type or "",
-            tier=tier or "",
-            limit=limit,
-            semantic=semantic,
-        )
-    print_table(rows, title=f"Search results (workspace: {workspace_id})")
+
+    def _run_search() -> list[dict[str, Any]]:
+        with console.status("Searching..."):
+            return client.search(
+                workspace_id=workspace_id,
+                query=query,
+                memory_type=memory_type or "",
+                tier=tier or "",
+                limit=limit,
+                semantic=semantic,
+            )
+
+    def _display(rows: list[dict[str, Any]]) -> None:
+        print_table(rows, title=f"Search results (workspace: {workspace_id})",
+                    output=ctx.obj.get("output", "table"))
+
+    if watch:
+        try:
+            while True:
+                console.clear()
+                rows = _run_search()
+                _display(rows)
+                time.sleep(5)
+        except KeyboardInterrupt:
+            pass
+    else:
+        rows = _run_search()
+        _display(rows)
 
 
 @memory.command(name="get")
@@ -289,50 +442,72 @@ def memory_rate(memory_id: str, rating: str, peer_id: str) -> None:
 @click.option("--tier", default="", type=click.Choice(["", "L0", "L1", "L2"]), help="Filter by tier")
 @click.option("--directory", default="", help="Directory ID — list memories linked to this directory")
 @click.option("--recursive", is_flag=True, help="When used with --directory, recursively traverse subdirectories")
-def memory_list(workspace_id: str, memory_type: str | None, tier: str,
-                directory: str, recursive: bool) -> None:
+@click.option("--watch", "-w", is_flag=True, help="Watch for changes (poll every 5s)")
+@click.pass_context
+def memory_list(ctx: click.Context, workspace_id: str, memory_type: str | None, tier: str,
+                directory: str, recursive: bool, watch: bool) -> None:
     """List memories in a workspace."""
     client = _sdk_client()
-    if directory:
-        with console.status(f"Listing directory '{directory[:16]}...'..."):
-            if recursive:
-                rows = client.traverse_directory(workspace_id, directory)
-            else:
-                rows = client.list_directory(directory)
-        # Show linked memories if any rows have memory_id
-        linked_memories = []
-        for r in rows:
-            mid = r.get("memory_id", "")
-            if mid:
-                mems = client.get_memory(mid)
-                if mems:
-                    linked_memories.append(mems[0])
-        if linked_memories:
-            print_table(linked_memories, title=f"Memories in directory (workspace: {workspace_id})")
-        else:
-            print_table(rows, title=f"Directory contents (workspace: {workspace_id})")
-        return
 
-    with console.status(f"Fetching memories for workspace '{workspace_id}'..."):
-        if tier:
-            # Use raw SQL when tier is specified since list_memories doesn't filter by tier
-            clauses = [
-                f"workspace_id = '{workspace_id}'",
-                "is_active = true",
-            ]
-            if memory_type:
-                clauses.append(f"memory_type = '{memory_type}'")
+    def _run_list() -> list[dict[str, Any]]:
+        if directory:
+            with console.status(f"Listing directory '{directory[:16]}...'..."):
+                if recursive:
+                    rows = client.traverse_directory(workspace_id, directory)
+                else:
+                    rows = client.list_directory(directory)
+            # Show linked memories if any rows have memory_id
+            linked_memories = []
+            for r in rows:
+                mid = r.get("memory_id", "")
+                if mid:
+                    mems = client.get_memory(mid)
+                    if mems:
+                        linked_memories.append(mems[0])
+            if linked_memories:
+                return linked_memories
+            return rows
+
+        with console.status(f"Fetching memories for workspace '{workspace_id}'..."):
             if tier:
-                clauses.append(f"tier = '{tier}'")
-            where = " AND ".join(clauses)
-            rows = client._sql(f"SELECT * FROM memory WHERE {where}")
-            rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+                clauses = [
+                    f"workspace_id = '{workspace_id}'",
+                    "is_active = true",
+                ]
+                if memory_type:
+                    clauses.append(f"memory_type = '{memory_type}'")
+                if tier:
+                    clauses.append(f"tier = '{tier}'")
+                where = " AND ".join(clauses)
+                rows = client._sql(f"SELECT * FROM memory WHERE {where}")
+                rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+                return rows
+            else:
+                return client.list_memories(
+                    workspace_id=workspace_id,
+                    memory_type=memory_type or "",
+                )
+
+    def _display(rows: list[dict[str, Any]]) -> None:
+        if directory and not any(r.get("memory_id", "") for r in rows):
+            print_table(rows, title=f"Directory contents (workspace: {workspace_id})",
+                        output=ctx.obj.get("output", "table"))
         else:
-            rows = client.list_memories(
-                workspace_id=workspace_id,
-                memory_type=memory_type or "",
-            )
-    print_table(rows, title=f"Memories (workspace: {workspace_id})")
+            print_table(rows, title=f"Memories (workspace: {workspace_id})",
+                        output=ctx.obj.get("output", "table"))
+
+    if watch:
+        try:
+            while True:
+                console.clear()
+                rows = _run_list()
+                _display(rows)
+                time.sleep(5)
+        except KeyboardInterrupt:
+            pass
+    else:
+        rows = _run_list()
+        _display(rows)
 
 
 @memory.command(name="update")
@@ -360,7 +535,6 @@ def memory_update(memory_id: str, content: str, summary: str,
         return
 
     with console.status(f"Updating memory '{memory_id[:16]}...'..."):
-        # Update content/summary/confidence via the existing reducer
         if "content" in updates or "summary" in updates or "confidence" in updates:
             client.update_memory(
                 memory_id,
@@ -421,6 +595,7 @@ def memory_history(memory_id: str) -> None:
     print_table(rows, title=f"Memory History ({memory_id[:16]}...)")
 
 
+
 # ===================================================================
 # directory commands
 # ===================================================================
@@ -433,11 +608,30 @@ def directory() -> None:
 
 @directory.command(name="list")
 @click.argument("directory_id")
-def directory_list(directory_id: str) -> None:
+@click.option("--watch", "-w", is_flag=True, help="Watch for changes (poll every 5s)")
+@click.pass_context
+def directory_list(ctx: click.Context, directory_id: str, watch: bool) -> None:
     """List children of a directory."""
-    with console.status(f"Listing directory '{directory_id[:16]}...'..."):
-        rows = _sdk_client().list_directory(directory_id)
-    print_table(rows, title=f"Directory: {directory_id[:16]}...")
+    def _run() -> list[dict[str, Any]]:
+        with console.status(f"Listing directory '{directory_id[:16]}...'..."):
+            return _sdk_client().list_directory(directory_id)
+
+    def _display(rows: list[dict[str, Any]]) -> None:
+        print_table(rows, title=f"Directory: {directory_id[:16]}...",
+                    output=ctx.obj.get("output", "table"))
+
+    if watch:
+        try:
+            while True:
+                console.clear()
+                rows = _run()
+                _display(rows)
+                time.sleep(5)
+        except KeyboardInterrupt:
+            pass
+    else:
+        rows = _run()
+        _display(rows)
 
 
 @directory.command(name="tree")
@@ -566,22 +760,44 @@ def fact_add(workspace_id: str, peer_id: str, content: str,
 @click.option("--type", "fact_type", default="")
 @click.option("--tier", default="")
 @click.option("--category", default="")
-def fact_list(workspace_id: str, peer: str, fact_type: str, tier: str, category: str) -> None:
+@click.option("--watch", "-w", is_flag=True, help="Watch for changes (poll every 5s)")
+@click.pass_context
+def fact_list(ctx: click.Context, workspace_id: str, peer: str, fact_type: str,
+              tier: str, category: str, watch: bool) -> None:
     """List facts for a workspace with optional filters."""
     client = _sdk_client()
-    query_hash = f"{workspace_id}:{peer}:{fact_type}:{tier}:{category}"
-    with console.status("Listing facts..."):
-        client._call("list_facts", [workspace_id, peer, fact_type, tier, category])
-        rows = client._sql(
-            f"SELECT * FROM fact_result WHERE query_hash = '{_esc(query_hash)}' ORDER BY created_at DESC"
-        )
-    facts = []
-    if rows:
+
+    def _run() -> list[dict[str, Any]]:
+        query_hash = f"{workspace_id}:{peer}:{fact_type}:{tier}:{category}"
+        with console.status("Listing facts..."):
+            client._call("list_facts", [workspace_id, peer, fact_type, tier, category])
+            rows = client._sql(
+                f"SELECT * FROM fact_result WHERE query_hash = '{_esc(query_hash)}' ORDER BY created_at DESC"
+            )
+        facts: list[dict[str, Any]] = []
+        if rows:
+            try:
+                facts = json.loads(rows[0].get("json_data", "[]"))
+            except (json.JSONDecodeError, IndexError):
+                pass
+        return facts
+
+    def _display(rows: list[dict[str, Any]]) -> None:
+        print_table(rows, title=f"Facts (workspace: {workspace_id})",
+                    output=ctx.obj.get("output", "table"))
+
+    if watch:
         try:
-            facts = json.loads(rows[0].get("json_data", "[]"))
-        except (json.JSONDecodeError, IndexError):
+            while True:
+                console.clear()
+                rows = _run()
+                _display(rows)
+                time.sleep(5)
+        except KeyboardInterrupt:
             pass
-    print_table(facts, title=f"Facts (workspace: {workspace_id})")
+    else:
+        rows = _run()
+        _display(rows)
 
 
 @fact.command(name="search")
@@ -777,7 +993,7 @@ def ingest() -> None:
 def ingest_codebase(repo_path: str, workspace_id: str,
                     max_files: int, skip_dirs: str) -> None:
     """Parse a codebase with tree-sitter and populate the KG."""
-    skip_set = set()
+    skip_set: set[str] = set()
     if skip_dirs:
         skip_set = set(d.strip() for d in skip_dirs.split(",") if d.strip())
 
@@ -951,7 +1167,6 @@ def plugin_load(name: str) -> None:
     """Load a plugin by name."""
     mgr = _plugin_manager()
     with console.status(f"Loading plugin '{name}'..."):
-        # Discover first so the plugin is in _discovered
         mgr.discover()
         ok = mgr.load(name)
     if ok:
@@ -1035,7 +1250,6 @@ def replication_add(name: str, remote_url: str, remote_db: str,
     client = _sdk_client()
     ws_id = workspace_id
     if not ws_id:
-        # Use the first workspace from list
         workspaces = client.list_workspaces()
         if not workspaces:
             console.print("[red]No workspaces found. Create one first or specify --workspace-id.[/red]")
@@ -1066,40 +1280,71 @@ def replication_remove(peer_id: str) -> None:
 
 @replication.command(name="status")
 @click.option("--workspace-id", default="", help="Workspace ID (uses default if empty)")
-def replication_status(workspace_id: str) -> None:
+@click.option("--watch", "-w", is_flag=True, help="Watch for changes (poll every 5s)")
+@click.pass_context
+def replication_status(ctx: click.Context, workspace_id: str, watch: bool) -> None:
     """Show replication sync status."""
     client = _sdk_client()
-    ws_id = workspace_id
-    if not ws_id:
-        workspaces = client.list_workspaces()
-        if not workspaces:
-            console.print("[red]No workspaces found. Create one first or specify --workspace-id.[/red]")
-            sys.exit(1)
-        ws_id = workspaces[0]["id"]
 
-    with console.status("Fetching replication status..."):
-        client._call("get_replication_status", [ws_id])
-        rows = client._sql(
-            "SELECT * FROM replication_result "
-            "WHERE query_type = 'status' "
-            "AND workspace_id = '{}' "
-            "ORDER BY created_at DESC LIMIT 1".format(ws_id)
-        )
-    if not rows:
-        console.print("[yellow]No replication status available.[/yellow]")
-        return
-    status = json.loads(rows[0].get("json_data", "{}"))
-    if not status:
-        console.print("[yellow]Empty status response.[/yellow]")
-        return
-    print_json(status)
+    def _resolve_ws() -> str:
+        ws_id = workspace_id
+        if not ws_id:
+            workspaces = client.list_workspaces()
+            if not workspaces:
+                console.print("[red]No workspaces found. Create one first or specify --workspace-id.[/red]")
+                sys.exit(1)
+            ws_id = workspaces[0]["id"]
+        return ws_id
+
+    def _run() -> dict[str, Any] | None:
+        ws_id = _resolve_ws()
+        with console.status("Fetching replication status..."):
+            client._call("get_replication_status", [ws_id])
+            rows = client._sql(
+                "SELECT * FROM replication_result "
+                "WHERE query_type = 'status' "
+                "AND workspace_id = '{}' "
+                "ORDER BY created_at DESC LIMIT 1".format(ws_id)
+            )
+        if not rows:
+            console.print("[yellow]No replication status available.[/yellow]")
+            return None
+        status = json.loads(rows[0].get("json_data", "{}"))
+        if not status:
+            console.print("[yellow]Empty status response.[/yellow]")
+            return None
+        return status
+
+    def _display(status: dict[str, Any]) -> None:
+        output = ctx.obj.get("output", "table")
+        if output == "json":
+            print_json(status)
+        elif output == "csv":
+            # Convert single dict to a one-row list for print_table
+            print_table([status], title="Replication Status", output=output)
+        else:
+            print_json(status)
+
+    if watch:
+        try:
+            while True:
+                console.clear()
+                status = _run()
+                if status is not None:
+                    _display(status)
+                time.sleep(5)
+        except KeyboardInterrupt:
+            pass
+    else:
+        status = _run()
+        if status is not None:
+            _display(status)
 
 
 @replication.command(name="sync")
 @click.option("--workspace-id", default="", help="Workspace ID (uses default if empty)")
 def replication_sync(workspace_id: str) -> None:
     """Trigger a one-time sync cycle."""
-    # Import and run the daemon in --once mode
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
     try:
         from replication_daemon import ReplicationDaemon
@@ -1125,10 +1370,9 @@ def replication_daemon(interval: int, daemonize: bool) -> None:
     if daemonize:
         pid = os.fork()
         if pid > 0:
-            # Parent exits, child continues
-            console.print(f"[green]Replication daemon started (PID: {pid})[/green]")
+            parent_exit_msg = f"[green]Replication daemon started (PID: {pid})[/green]"
+            console.print(parent_exit_msg)
             sys.exit(0)
-        # Child continues
         os.setsid()
 
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
@@ -1231,6 +1475,20 @@ def mental_get(id: str) -> None:
 # ===================================================================
 
 def main() -> None:
+    # Check for alias substitution before Click parses arguments
+    args = sys.argv[1:]
+    if args and args[0] not in ("alias", "completion", "--help", "--version"):
+        aliases = _load_aliases()
+        # Match the first non-flag argument against alias names
+        for i, arg in enumerate(args):
+            if not arg.startswith("-") and arg in aliases:
+                # Replace the matched argument with the alias value
+                alias_cmd = aliases[arg]
+                rest = args[i + 1:]
+                # Reconstruct sys.argv with the alias expansion
+                sys.argv = [sys.argv[0]] + alias_cmd.split() + rest
+                break
+
     try:
         cli()
     except click.ClickException as e:

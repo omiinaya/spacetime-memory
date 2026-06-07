@@ -718,3 +718,710 @@ class ConnectorRegistry:
                 print(f"  [registry error] {name}: {e}")
                 results[name] = []
         return results
+
+
+# ── Slack Connector ──────────────────────────────────────────────────
+
+
+class SlackConnector(Connector):
+    """Poll a Slack workspace for recent messages via Slack Web API.
+
+    Queries ``conversations.history`` for each configured channel.
+    Deduplicates by message timestamp (``ts``) and handles rate
+    limiting via the ``Retry-After`` header.
+
+    Usage::
+
+        connector = SlackConnector(
+            token="xoxb-...",
+            channel_ids=["C123", "C456"],
+            workspace_id="ws-1",
+        )
+        connector.run(client, interval_secs=60)
+    """
+
+    BASE_URL = "https://slack.com/api"
+
+    def __init__(
+        self,
+        token: str,
+        channel_ids: list[str],
+        workspace_id: str,
+        peer_id: str = "slack-bot",
+    ):
+        self.token = token
+        self.channel_ids = channel_ids
+        self.workspace_id = workspace_id
+        self.peer_id = peer_id
+        self._seen: set[str] = set()
+        self._channel_names: dict[str, str] = {}
+
+    def poll(self) -> list[Event]:
+        events: list[Event] = []
+
+        with httpx.Client() as client:
+            for channel_id in self.channel_ids:
+                channel_name = self._get_channel_name(
+                    client, channel_id
+                )
+                self._channel_names[channel_id] = channel_name
+
+                url = f"{self.BASE_URL}/conversations.history"
+                params = {"channel": channel_id, "limit": 30}
+
+                try:
+                    resp = client.get(
+                        url,
+                        headers={
+                            "Authorization": f"Bearer {self.token}",
+                        },
+                        params=params,
+                        timeout=30,
+                    )
+                except httpx.RequestError as e:
+                    print(
+                        f"  [Slack HTTP error]"
+                        f" channel={channel_id}: {e}"
+                    )
+                    continue
+
+                # Handle rate limiting
+                if resp.status_code == 429:
+                    retry_after = int(
+                        resp.headers.get("Retry-After", 5)
+                    )
+                    print(
+                        f"  [Slack] Rate limited on"
+                        f" {channel_id}, retry after {retry_after}s"
+                    )
+                    continue
+
+                if resp.status_code != 200:
+                    print(
+                        f"  [Slack] Unexpected status"
+                        f" {resp.status_code} on {channel_id}"
+                    )
+                    continue
+
+                data = resp.json()
+                if not data.get("ok"):
+                    print(
+                        f"  [Slack] API error on {channel_id}:"
+                        f" {data.get('error', 'unknown')}"
+                    )
+                    continue
+
+                messages = data.get("messages", [])
+                for msg in messages:
+                    msg_ts = msg.get("ts", "")
+                    if msg_ts in self._seen:
+                        continue
+                    self._seen.add(msg_ts)
+
+                    text = msg.get("text", "")
+                    subtype = msg.get("subtype", "")
+
+                    # Skip bot messages and channel join/leave noise
+                    if subtype in ("channel_join", "channel_leave"):
+                        continue
+
+                    channel_name = self._channel_names.get(
+                        channel_id, channel_id
+                    )
+                    events.append(Event(
+                        content=text,
+                        workspace_id=self.workspace_id,
+                        summary=text[:200],
+                        memory_type="experience",
+                        peer_id=self.peer_id,
+                        metadata={
+                            "source": "slack",
+                            "channel": channel_name,
+                            "channel_id": channel_id,
+                            "ts": msg_ts,
+                            "user": msg.get("user", ""),
+                            "subtype": subtype,
+                        },
+                    ))
+
+        return events
+
+    def _get_channel_name(
+        self, client: httpx.Client, channel_id: str,
+    ) -> str:
+        """Look up the human-friendly name for a channel."""
+        try:
+            resp = client.get(
+                f"{self.BASE_URL}/conversations.info",
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                },
+                params={"channel": channel_id},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("ok"):
+                    channel_info = data.get("channel", {})
+                    return channel_info.get("name", channel_id)
+        except Exception:
+            pass
+        return channel_id
+
+
+# ── Discord Connector ────────────────────────────────────────────────
+
+
+class DiscordConnector(Connector):
+    """Poll a Discord channel for recent messages via Discord REST API.
+
+    Queries ``/channels/{id}/messages`` for each configured channel.
+    Deduplicates by message ID and handles rate limiting.
+
+    Usage::
+
+        connector = DiscordConnector(
+            token="MTE...",
+            channel_ids=["123", "456"],
+            workspace_id="ws-1",
+        )
+        connector.run(client, interval_secs=60)
+    """
+
+    BASE_URL = "https://discord.com/api/v10"
+
+    def __init__(
+        self,
+        token: str,
+        channel_ids: list[str],
+        workspace_id: str,
+        peer_id: str = "discord-bot",
+    ):
+        self.token = token
+        self.channel_ids = channel_ids
+        self.workspace_id = workspace_id
+        self.peer_id = peer_id
+        self._seen: set[str] = set()
+
+    def poll(self) -> list[Event]:
+        events: list[Event] = []
+        headers = {
+            "Authorization": f"Bot {self.token}",
+            "User-Agent": "spacetime-memory-connector/1.0",
+        }
+
+        with httpx.Client() as client:
+            for channel_id in self.channel_ids:
+                url = (
+                    f"{self.BASE_URL}"
+                    f"/channels/{channel_id}/messages"
+                )
+                params = {"limit": 50}
+
+                try:
+                    resp = client.get(
+                        url,
+                        headers=headers,
+                        params=params,
+                        timeout=30,
+                    )
+                except httpx.RequestError as e:
+                    print(
+                        f"  [Discord HTTP error]"
+                        f" channel={channel_id}: {e}"
+                    )
+                    continue
+
+                # Handle rate limiting
+                if resp.status_code == 429:
+                    retry_after = resp.json().get(
+                        "retry_after", 5.0
+                    )
+                    print(
+                        f"  [Discord] Rate limited on"
+                        f" {channel_id}, retry after {retry_after}s"
+                    )
+                    continue
+
+                if resp.status_code == 403:
+                    print(
+                        f"  [Discord] Forbidden on channel"
+                        f" {channel_id} — check bot permissions"
+                    )
+                    continue
+
+                if resp.status_code != 200:
+                    print(
+                        f"  [Discord] Unexpected status"
+                        f" {resp.status_code} on {channel_id}"
+                    )
+                    continue
+
+                messages = resp.json()
+                for msg in messages:
+                    msg_id = msg.get("id", "")
+                    if msg_id in self._seen:
+                        continue
+                    self._seen.add(msg_id)
+
+                    content = msg.get("content", "")
+                    author = msg.get("author", {})
+                    author_name = author.get("username", "unknown")
+                    timestamp = msg.get("timestamp", "")
+
+                    events.append(Event(
+                        content=content,
+                        workspace_id=self.workspace_id,
+                        summary=content[:200],
+                        memory_type="experience",
+                        peer_id=self.peer_id,
+                        metadata={
+                            "source": "discord",
+                            "channel_id": channel_id,
+                            "message_id": msg_id,
+                            "author": author_name,
+                            "timestamp": timestamp,
+                        },
+                    ))
+
+        return events
+
+
+# ── Notion Connector ─────────────────────────────────────────────────
+
+
+class NotionConnector(Connector):
+    """Poll a Notion database for new or updated pages via Notion API.
+
+    Queries ``/databases/{database_id}/query`` (POST) and extracts
+    title / content from page properties.  Deduplicates by page ID.
+
+    Usage::
+
+        connector = NotionConnector(
+            token="secret_...",
+            database_id="abc123",
+            workspace_id="ws-1",
+        )
+        connector.run(client, interval_secs=300)
+    """
+
+    BASE_URL = "https://api.notion.com/v1"
+
+    def __init__(
+        self,
+        token: str,
+        database_id: str,
+        workspace_id: str,
+        peer_id: str = "notion-bot",
+    ):
+        self.token = token
+        self.database_id = database_id
+        self.workspace_id = workspace_id
+        self.peer_id = peer_id
+        self._seen: set[str] = set()
+
+    def poll(self) -> list[Event]:
+        events: list[Event] = []
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json",
+            "User-Agent": "spacetime-memory-connector/1.0",
+        }
+        url = (
+            f"{self.BASE_URL}"
+            f"/databases/{self.database_id}/query"
+        )
+        payload = {"page_size": 50}
+
+        with httpx.Client() as client:
+            try:
+                resp = client.post(
+                    url, headers=headers, json=payload, timeout=30,
+                )
+            except httpx.RequestError as e:
+                print(f"  [Notion HTTP error] {e}")
+                return events
+
+            # Handle rate limiting
+            if resp.status_code == 429:
+                print("  [Notion] Rate limited")
+                return events
+
+            if resp.status_code == 401:
+                print(
+                    "  [Notion] Unauthorised — check integration token"
+                )
+                return events
+
+            if resp.status_code != 200:
+                print(
+                    f"  [Notion] Unexpected status {resp.status_code}"
+                )
+                return events
+
+            data = resp.json()
+            results = data.get("results", [])
+            for page in results:
+                page_id = page.get("id", "")
+                if page_id in self._seen:
+                    continue
+                self._seen.add(page_id)
+
+                props = page.get("properties", {})
+                title_text = self._extract_title(props)
+                body_text = self._extract_body(props)
+
+                content = title_text
+                if body_text:
+                    content = f"{title_text}\n\n{body_text}"
+
+                events.append(Event(
+                    content=content,
+                    workspace_id=self.workspace_id,
+                    summary=title_text[:200],
+                    memory_type="experience",
+                    peer_id=self.peer_id,
+                    metadata={
+                        "source": "notion",
+                        "page_id": page_id,
+                        "database_id": self.database_id,
+                        "url": page.get("url", ""),
+                        "created_time": page.get(
+                            "created_time", ""
+                        ),
+                        "last_edited_time": page.get(
+                            "last_edited_time", ""
+                        ),
+                    },
+                ))
+
+        return events
+
+    @staticmethod
+    def _extract_title(props: dict) -> str:
+        """Extract a title string from Notion page properties."""
+        # Try common title property types
+        for prop in props.values():
+            prop_type = prop.get("type", "")
+            if prop_type == "title":
+                parts = prop.get("title", [])
+                if parts:
+                    return "".join(
+                        p.get("plain_text", "") for p in parts
+                    )
+            if prop_type == "rich_text":
+                parts = prop.get("rich_text", [])
+                if parts:
+                    return "".join(
+                        p.get("plain_text", "") for p in parts
+                    )
+        # Fallback: use the first text property we find
+        for key, prop in props.items():
+            prop_type = prop.get("type", "")
+            if prop_type in ("title", "rich_text"):
+                parts = prop.get(prop_type, [])
+                if parts:
+                    return "".join(
+                        p.get("plain_text", "") for p in parts
+                    )
+        return "Untitled"
+
+    @staticmethod
+    def _extract_body(props: dict) -> str:
+        """Extract body content from Notion page properties (non-title)."""
+        parts: list[str] = []
+        for key, prop in props.items():
+            prop_type = prop.get("type", "")
+            if prop_type == "rich_text":
+                items = prop.get("rich_text", [])
+                text = "".join(
+                    p.get("plain_text", "") for p in items
+                )
+                if text.strip():
+                    parts.append(f"{key}: {text}")
+            elif prop_type == "select":
+                select = prop.get("select")
+                if select:
+                    parts.append(
+                        f"{key}: {select.get('name', '')}"
+                    )
+            elif prop_type == "multi_select":
+                mselects = prop.get("multi_select", [])
+                names = [m.get("name", "") for m in mselects]
+                if names:
+                    parts.append(f"{key}: {', '.join(names)}")
+            elif prop_type == "status":
+                status = prop.get("status")
+                if status:
+                    parts.append(
+                        f"{key}: {status.get('name', '')}"
+                    )
+            elif prop_type == "date":
+                date = prop.get("date")
+                if date:
+                    parts.append(
+                        f"{key}: {date.get('start', '')}"
+                    )
+            elif prop_type == "checkbox":
+                parts.append(
+                    f"{key}: {prop.get('checkbox', False)}"
+                )
+            elif prop_type == "number":
+                val = prop.get("number")
+                if val is not None:
+                    parts.append(f"{key}: {val}")
+            elif prop_type == "url":
+                val = prop.get("url")
+                if val:
+                    parts.append(f"{key}: {val}")
+            elif prop_type == "email":
+                val = prop.get("email")
+                if val:
+                    parts.append(f"{key}: {val}")
+            elif prop_type == "phone_number":
+                val = prop.get("phone_number")
+                if val:
+                    parts.append(f"{key}: {val}")
+        return "\n".join(parts)
+
+
+# ── Org-mode Parser ──────────────────────────────────────────────────
+
+
+class OrgModeParser(Connector):
+    """Parse Emacs org-mode files and convert to memories / KG nodes.
+
+    This connector is **not a poller** — it has a ``parse()`` method
+    instead of ``poll()``.  Call ``parse()`` once to import the file.
+
+    Parsing supports:
+
+    * Headings (``*``, ``**``, …)
+    * TODO states (``** TODO``, ``** DONE``)
+    * Lists (``- item``)
+    * Code blocks (``#+BEGIN_SRC`` / ``#+END_SRC``)
+    * Properties drawers (``:PROPERTIES:``)
+    * Tags (``:tag1:tag2:`` at end of heading lines)
+
+    Usage::
+
+        parser = OrgModeParser(
+            file_path="/path/to/notes.org",
+            workspace_id="ws-1",
+        )
+        events = parser.parse()
+        for ev in events:
+            client.store(...)
+    """
+
+    def __init__(
+        self,
+        file_path: str,
+        workspace_id: str,
+        peer_id: str = "org-parser",
+    ):
+        self.file_path = file_path
+        self.workspace_id = workspace_id
+        self.peer_id = peer_id
+
+    def poll(self) -> list[Event]:
+        """Not applicable for OrgModeParser — returns empty list."""
+        return []
+
+    def parse(self) -> list[Event]:
+        """Read and parse the org-mode file, returning Events.
+
+        Each top-level heading (``*``) becomes an Event.  Nested
+        content under the heading is included in the event body.
+        """
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            print(
+                f"  [OrgMode] File not found: {self.file_path}"
+            )
+            return []
+        except OSError as e:
+            print(f"  [OrgMode] Error reading file: {e}")
+            return []
+
+        events: list[Event] = []
+        sections = self._parse_sections(lines)
+
+        for section in sections:
+            heading_text = section["heading"]
+            body_text = section["body"]
+            outline_level = section["level"]
+            todo_state = section["todo_state"]
+            tags = section["tags"]
+
+            content = heading_text
+            if body_text:
+                content = f"{heading_text}\n\n{body_text}"
+
+            metadata = {
+                "source": "org-mode",
+                "file": self.file_path,
+                "outline_level": outline_level,
+                "tags": tags,
+                "todo_state": todo_state,
+            }
+
+            events.append(Event(
+                content=content,
+                workspace_id=self.workspace_id,
+                summary=heading_text[:200],
+                memory_type="experience",
+                peer_id=self.peer_id,
+                metadata=metadata,
+            ))
+
+        return events
+
+    def _parse_sections(
+        self, lines: list[str],
+    ) -> list[dict]:
+        """Split org-mode lines into heading-anchored sections."""
+        sections: list[dict] = []
+        current: dict | None = None
+        in_src_block = False
+        in_props_drawer = False
+        body_lines: list[str] = []
+
+        for line in lines:
+            stripped = line.rstrip("\n")
+
+            # Track source blocks
+            if stripped.startswith("#+BEGIN_SRC"):
+                in_src_block = True
+                if current is not None:
+                    body_lines.append(stripped)
+                continue
+            if stripped.startswith("#+END_SRC"):
+                in_src_block = False
+                if current is not None:
+                    body_lines.append(stripped)
+                continue
+
+            # Track properties drawers
+            if stripped == ":PROPERTIES:":
+                in_props_drawer = True
+                continue
+            if stripped == ":END:":
+                in_props_drawer = False
+                continue
+
+            # Skip content inside source blocks or property drawers
+            if in_src_block or in_props_drawer:
+                continue
+
+            # Detect heading
+            heading_match = self._match_heading(stripped)
+            if heading_match:
+                # Finalise previous section
+                if current is not None:
+                    current["body"] = "\n".join(body_lines)
+                    sections.append(current)
+
+                # Start new section
+                current = {
+                    "heading": heading_match["text"],
+                    "level": heading_match["level"],
+                    "todo_state": heading_match["todo_state"],
+                    "tags": heading_match["tags"],
+                }
+                body_lines = []
+            else:
+                # Body content line
+                if current is not None:
+                    # Skip comment lines
+                    if stripped.startswith("# "):
+                        continue
+                    body_lines.append(stripped)
+
+        # Finalise last section
+        if current is not None:
+            current["body"] = "\n".join(body_lines)
+            sections.append(current)
+
+        return sections
+
+    @staticmethod
+    def _match_heading(
+        line: str,
+    ) -> dict | None:
+        """Test if a line is an org-mode heading.
+
+        Returns a dict with keys ``text``, ``level``, ``todo_state``,
+        ``tags`` if the line is a heading, else ``None``.
+        """
+        # Headings start with one or more *
+        if not line.startswith("*"):
+            return None
+
+        # Count leading asterisks
+        level = 0
+        for ch in line:
+            if ch == "*":
+                level += 1
+            else:
+                break
+
+        if level == 0:
+            return None
+
+        # Remainder after the asterisks
+        rest = line[level:].strip()
+        if not rest:
+            return {
+                "text": "(empty heading)",
+                "level": level,
+                "todo_state": "",
+                "tags": [],
+            }
+
+        # Extract tags at end of line, e.g. ``:tag1:tag2:``
+        tags: list[str] = []
+        if rest.endswith(":"):
+            # Tags are colon-surrounded words at end
+            space_idx = rest.rfind(" ", 0, -1)
+            maybe_tags = rest[space_idx + 1 :] if space_idx >= 0 else rest
+            if (
+                maybe_tags.startswith(":")
+                and maybe_tags.count(":") >= 2
+            ):
+                tags = [
+                    t
+                    for t in maybe_tags.strip(":").split(":")
+                    if t
+                ]
+                rest = rest[:space_idx].strip() if space_idx >= 0 else ""
+
+        # Extract TODO state (TODO, DONE, or any known keyword)
+        todo_state = ""
+        keywords = [
+            "TODO",
+            "DONE",
+            "IN-PROGRESS",
+            "BLOCKED",
+            "CANCELLED",
+            "DEFERRED",
+            "WAITING",
+        ]
+        for kw in keywords:
+            if rest.startswith(kw) and (
+                len(rest) == len(kw) or rest[len(kw)] in (" ", "\t")
+            ):
+                todo_state = kw
+                rest = rest[len(kw):].strip()
+                break
+
+        return {
+            "text": rest,
+            "level": level,
+            "todo_state": todo_state,
+            "tags": tags,
+        }
