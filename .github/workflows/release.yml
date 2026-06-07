@@ -1,0 +1,19 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t spacetime-memory .
+      - name: Save image
+        run: docker save spacetime-memory | gzip > spacetime-memory.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: spacetime-memory.tar.gz

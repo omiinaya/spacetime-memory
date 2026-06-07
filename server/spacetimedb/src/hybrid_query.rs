@@ -486,3 +486,145 @@ pub fn compute_god_nodes(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_hash_deterministic() {
+        let h1 = query_hash("hello world");
+        let h2 = query_hash("hello world");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_query_hash_different_queries() {
+        let h1 = query_hash("foo");
+        let h2 = query_hash("bar");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_query_hash_empty() {
+        let h = query_hash("");
+        assert_eq!(h.len(), 16);
+    }
+
+    #[test]
+    fn test_term_match_count_all_match() {
+        let count = term_match_count("the quick brown fox", &["the", "quick", "fox"]);
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_term_match_count_some_match() {
+        let count = term_match_count("hello world", &["hello", "missing", "world"]);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_term_match_count_none() {
+        let count = term_match_count("hello world", &["foo", "bar"]);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_term_match_count_case_insensitive() {
+        let count = term_match_count("HELLO WORLD", &["hello"]);
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_term_match_count_empty_terms() {
+        let count = term_match_count("hello", &[]);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_parse_embedding_json_valid() {
+        let parsed = parse_embedding_json("[1.0, 2.0, 3.0]");
+        assert_eq!(parsed.len(), 3);
+        assert!((parsed[0] - 1.0).abs() < 1e-10);
+        assert!((parsed[2] - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_parse_embedding_json_empty_array() {
+        let parsed = parse_embedding_json("[]");
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn test_parse_embedding_json_empty_string() {
+        let parsed = parse_embedding_json("");
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn test_parse_embedding_json_null() {
+        let parsed = parse_embedding_json("null");
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn test_parse_embedding_json_invalid() {
+        let parsed = parse_embedding_json("not json");
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn test_cosine_similarity_identical() {
+        let v = vec![1.0, 2.0, 3.0, 4.0];
+        let sim = cosine_similarity(&v, &v);
+        assert!((sim - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_cosine_similarity_orthogonal() {
+        let a = vec![1.0, 0.0];
+        let b = vec![0.0, 1.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!(sim.abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_cosine_similarity_partial() {
+        let a = vec![1.0, 0.0];
+        let b = vec![1.0, 1.0];
+        let sim = cosine_similarity(&a, &b);
+        // dot=1.0, |a|=1.0, |b|=sqrt(2) ≈ 1.414, sim ≈ 0.707
+        assert!((sim - 1.0 / 2.0_f64.sqrt()).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_cosine_similarity_mismatched_lengths() {
+        let a = vec![1.0, 2.0];
+        let b = vec![1.0];
+        let sim = cosine_similarity(&a, &b);
+        assert_eq!(sim, 0.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_empty() {
+        let sim = cosine_similarity(&[], &[]);
+        assert_eq!(sim, 0.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_zero_vector() {
+        let a = vec![0.0, 0.0];
+        let b = vec![1.0, 2.0];
+        let sim = cosine_similarity(&a, &b);
+        assert_eq!(sim, 0.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_single_dimension() {
+        let a = vec![5.0];
+        let b = vec![2.5];
+        let sim = cosine_similarity(&a, &b);
+        // Both 1-D, dot = 12.5, |a|=5, |b|=2.5, sim=1.0
+        assert!((sim - 1.0).abs() < 1e-6);
+    }
+}

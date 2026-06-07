@@ -13,6 +13,10 @@ from typing import Any
 
 import httpx
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
@@ -96,9 +100,20 @@ class Client:
                 timeout=10.0,
             )
             if resp.status_code >= 400:
+                logger.warning(
+                    "Embedder returned HTTP %d for text (len=%d): %s",
+                    resp.status_code, len(text), resp.text[:200],
+                )
                 return []
             return resp.json().get("embedding", [])
+        except httpx.TimeoutException:
+            logger.warning("Embedder timed out for text (len=%d)", len(text))
+            return []
+        except httpx.ConnectError:
+            logger.warning("Embedder connection refused for text (len=%d) — is the sidecar running?", len(text))
+            return []
         except Exception:
+            logger.exception("Unexpected error in _embed for text (len=%d)", len(text))
             return []
 
     def _embed_batch(self, texts: list[str]) -> list[list[float]]:
@@ -113,10 +128,31 @@ class Client:
                 timeout=30.0,
             )
             if resp.status_code >= 400:
+                logger.warning(
+                    "Embedder returned HTTP %d for batch (count=%d): %s",
+                    resp.status_code, len(texts), resp.text[:200],
+                )
                 return []
             return resp.json().get("embeddings", [])
-        except Exception:
+        except httpx.TimeoutException:
+            logger.warning("Embedder timed out for batch (count=%d)", len(texts))
             return []
+        except httpx.ConnectError:
+            logger.warning("Embedder connection refused for batch (count=%d) — is the sidecar running?", len(texts))
+            return []
+        except Exception:
+            logger.exception("Unexpected error in _embed_batch (count=%d)", len(texts))
+            return []
+
+    def check_embedder_health(self) -> dict[str, Any]:
+        """Check if the embedder sidecar is running. Returns status info."""
+        try:
+            resp = self._http.get(f"{self.embedder_url}/health", timeout=5.0)
+            if resp.status_code == 200:
+                return resp.json()
+            return {"status": "error", "code": resp.status_code}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     # -----------------------------------------------------------------------
     # Workspace

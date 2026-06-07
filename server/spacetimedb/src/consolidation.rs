@@ -179,6 +179,69 @@ fn edit_distance(a: &str, b: &str) -> usize {
     prev[n]
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_edit_distance_identical() {
+        assert_eq!(edit_distance("hello", "hello"), 0);
+    }
+
+    #[test]
+    fn test_edit_distance_empty_vs_nonempty() {
+        assert_eq!(edit_distance("", "abc"), 3);
+        assert_eq!(edit_distance("abc", ""), 3);
+    }
+
+    #[test]
+    fn test_edit_distance_two_empty() {
+        assert_eq!(edit_distance("", ""), 0);
+    }
+
+    #[test]
+    fn test_edit_distance_insert() {
+        // "cat" -> "cats" requires 1 insertion
+        assert_eq!(edit_distance("cat", "cats"), 1);
+    }
+
+    #[test]
+    fn test_edit_distance_delete() {
+        // "cats" -> "cat" requires 1 deletion
+        assert_eq!(edit_distance("cats", "cat"), 1);
+    }
+
+    #[test]
+    fn test_edit_distance_substitute() {
+        // "cat" -> "cut" requires 1 substitution
+        assert_eq!(edit_distance("cat", "cut"), 1);
+    }
+
+    #[test]
+    fn test_edit_distance_completely_different() {
+        assert_eq!(edit_distance("abc", "xyz"), 3);
+    }
+
+    #[test]
+    fn test_edit_distance_unicode() {
+        // Unicode characters are single chars in Rust
+        assert_eq!(edit_distance("café", "cafe"), 1);
+    }
+
+    #[test]
+    fn test_edit_distance_longer_transposition() {
+        // "kitten" -> "sitting" has edit distance 3
+        // k->s, e->i, +g
+        assert_eq!(edit_distance("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn test_edit_distance_reversed() {
+        // Symmetric property
+        assert_eq!(edit_distance("abc", "def"), edit_distance("def", "abc"));
+    }
+}
+
 /// Find and merge near-duplicate memories within a workspace.
 ///
 /// Two memories are considered duplicates when both conditions hold:

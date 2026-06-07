@@ -624,6 +624,259 @@ fn extract_title_from_markdown(content: &str) -> String {
     String::new()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_into_blocks_empty() {
+        let blocks = split_into_blocks("");
+        assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn test_split_into_blocks_blank_string() {
+        let blocks = split_into_blocks("   \n\n  ");
+        assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn test_split_into_blocks_heading_and_paragraph() {
+        let blocks = split_into_blocks("# Hello\n\nWorld");
+        assert_eq!(blocks.len(), 2);
+        assert!(blocks[0].contains("# Hello"));
+        assert!(blocks[1].contains("World"));
+    }
+
+    #[test]
+    fn test_split_into_blocks_multiple_headings() {
+        let blocks = split_into_blocks("# A\n\n## B\n\n### C");
+        assert_eq!(blocks.len(), 3);
+        assert!(blocks[0].contains("# A"));
+        assert!(blocks[1].contains("## B"));
+        assert!(blocks[2].contains("### C"));
+    }
+
+    #[test]
+    fn test_split_into_blocks_list_items_same_type() {
+        let blocks = split_into_blocks("- item 1\n- item 2\n- item 3");
+        // Same type list items should stay together
+        assert_eq!(blocks.len(), 1);
+        assert!(blocks[0].contains("- item 1"));
+    }
+
+    #[test]
+    fn test_split_into_blocks_hr_separates() {
+        let blocks = split_into_blocks("Before\n\n---\n\nAfter");
+        assert_eq!(blocks.len(), 3);
+        assert!(blocks[0].contains("Before"));
+        assert!(blocks[1].contains("---"));
+        assert!(blocks[2].contains("After"));
+    }
+
+    #[test]
+    fn test_classify_block_heading_h1() {
+        let (typ, level, _, _, _, content) = classify_block("# Title");
+        assert_eq!(typ, "heading");
+        assert_eq!(level, 1);
+        assert_eq!(content, "Title");
+    }
+
+    #[test]
+    fn test_classify_block_heading_h2() {
+        let (typ, level, _, _, _, content) = classify_block("## Subtitle");
+        assert_eq!(typ, "heading");
+        assert_eq!(level, 2);
+        assert_eq!(content, "Subtitle");
+    }
+
+    #[test]
+    fn test_classify_block_heading_h6() {
+        let (typ, level, _, _, _, content) = classify_block("###### Deep");
+        assert_eq!(typ, "heading");
+        assert_eq!(level, 6);
+        assert_eq!(content, "Deep");
+    }
+
+    #[test]
+    fn test_classify_block_todo_done() {
+        let (typ, _, state, _, _, content) = classify_block("- [x] Completed task");
+        assert_eq!(typ, "todo");
+        assert_eq!(state, "done");
+        assert!(content.contains("Completed task"));
+    }
+
+    #[test]
+    fn test_classify_block_todo_unchecked() {
+        let (typ, _, state, _, _, content) = classify_block("- [ ] Pending task");
+        assert_eq!(typ, "todo");
+        assert_eq!(state, "todo");
+        assert!(content.contains("Pending task"));
+    }
+
+    #[test]
+    fn test_classify_block_todo_caps_x() {
+        let (typ, _, state, _, _, _) = classify_block("* [X] Done task");
+        assert_eq!(typ, "todo");
+        assert_eq!(state, "done");
+    }
+
+    #[test]
+    fn test_classify_block_list_item_dash() {
+        let (typ, _, _, _, _, content) = classify_block("- list item");
+        assert_eq!(typ, "list_item");
+        assert_eq!(content, "list item");
+    }
+
+    #[test]
+    fn test_classify_block_list_item_star() {
+        let (typ, _, _, _, _, content) = classify_block("* bullet point");
+        assert_eq!(typ, "list_item");
+        assert_eq!(content, "bullet point");
+    }
+
+    #[test]
+    fn test_classify_block_ordered_list() {
+        let (typ, _, _, _, _, content) = classify_block("1. first item");
+        assert_eq!(typ, "list_item");
+        assert_eq!(content, "first item");
+    }
+
+    #[test]
+    fn test_classify_block_code_block() {
+        let (typ, _, _, _, props, _) = classify_block("```rust");
+        assert_eq!(typ, "code_block");
+        assert!(props.contains("rust"));
+    }
+
+    #[test]
+    fn test_classify_block_quote() {
+        let (typ, _, _, _, _, content) = classify_block("> quoted text");
+        assert_eq!(typ, "quote");
+        assert_eq!(content, "quoted text");
+    }
+
+    #[test]
+    fn test_classify_block_hr_dash() {
+        let (typ, _, _, _, _, _) = classify_block("---");
+        assert_eq!(typ, "hr");
+    }
+
+    #[test]
+    fn test_classify_block_hr_star() {
+        let (typ, _, _, _, _, _) = classify_block("***");
+        assert_eq!(typ, "hr");
+    }
+
+    #[test]
+    fn test_classify_block_paragraph() {
+        let (typ, _, _, _, _, content) = classify_block("Just a regular paragraph.");
+        assert_eq!(typ, "paragraph");
+        assert_eq!(content, "Just a regular paragraph.");
+    }
+
+    #[test]
+    fn test_count_indent_no_indent() {
+        assert_eq!(count_indent("hello"), 0);
+    }
+
+    #[test]
+    fn test_count_indent_spaces() {
+        assert_eq!(count_indent("  indented"), 2);
+    }
+
+    #[test]
+    fn test_count_indent_tabs() {
+        assert_eq!(count_indent("\t\tindented"), 2);
+    }
+
+    #[test]
+    fn test_count_indent_mixed() {
+        assert_eq!(count_indent("  \tindented"), 3);
+    }
+
+    #[test]
+    fn test_find_block_refs_simple() {
+        let refs = find_block_refs("See ((abc123)) for details");
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].0, "abc123");
+        assert!(!refs[0].1); // not an embed
+    }
+
+    #[test]
+    fn test_find_block_refs_multiple() {
+        let refs = find_block_refs("((a)) and ((b)) and ((c))");
+        assert_eq!(refs.len(), 3);
+    }
+
+    #[test]
+    fn test_find_block_refs_embed() {
+        let refs = find_block_refs("{{embed ((note:id:0001))}}");
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].0, "note:id:0001");
+        assert!(refs[0].1); // is an embed
+    }
+
+    #[test]
+    fn test_find_block_refs_none() {
+        let refs = find_block_refs("No references here");
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn test_find_block_refs_empty_inner() {
+        let refs = find_block_refs("Empty (()) parens");
+        assert!(refs.is_empty());
+    }
+
+    #[test]
+    fn test_is_date_format_valid() {
+        assert!(is_date_format("2024-01-15"));
+        assert!(is_date_format("1999-12-31"));
+        assert!(is_date_format("2020-02-29"));
+    }
+
+    #[test]
+    fn test_is_date_format_invalid() {
+        assert!(!is_date_format("not-a-date"));
+        assert!(!is_date_format("01-15-2024")); // wrong order
+        assert!(!is_date_format("2024-1-15"));  // non-padded month
+        assert!(!is_date_format(""));           // empty
+        assert!(!is_date_format("2024-01"));    // too short
+    }
+
+    #[test]
+    fn test_extract_title_from_markdown_h1() {
+        let title = extract_title_from_markdown("# My Note\n\nContent here");
+        assert_eq!(title, "My Note");
+    }
+
+    #[test]
+    fn test_extract_title_from_markdown_tab_prefix() {
+        let title = extract_title_from_markdown("#\tTab Title\n\nContent");
+        assert_eq!(title, "Tab Title");
+    }
+
+    #[test]
+    fn test_extract_title_from_markdown_h2_ignored() {
+        // Only h1 (# ) is extracted
+        let title = extract_title_from_markdown("## Subtitle\n\nContent");
+        assert_eq!(title, "");
+    }
+
+    #[test]
+    fn test_extract_title_fallback() {
+        let title = extract_title_from_markdown("No heading\nJust text");
+        assert_eq!(title, "");
+    }
+
+    #[test]
+    fn test_extract_title_empty_content() {
+        let title = extract_title_from_markdown("");
+        assert_eq!(title, "");
+    }
+}
+
 fn resolve_backlinks(ctx: &ReducerContext, source_id: &str, content: &str, now: i64) {
     // Parse [[wikilink]] or [[wikilink|display]] syntax
     for cap in content.split('[') {

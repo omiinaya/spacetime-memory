@@ -1,0 +1,30 @@
+# ============================================================================
+# Spacetime Memory — Docker Compose
+# ============================================================================
+# Start everything with:  docker compose up --build
+# Then open:              http://localhost:5173
+# ============================================================================
+version: "3.8"
+
+services:
+  spacetime-memory:
+    build: .
+    ports:
+      # SpacetimeDB
+      - "3001:3001"
+      # ONNX Embedder
+      - "9090:9090"
+      # Frontend (static HTTP server)
+      - "5173:5173"
+    volumes:
+      # Persist SpacetimeDB data across restarts
+      - spacetime-data:/app/data
+    environment:
+      - RUST_LOG=info
+      - SPACETIMEDB_HOST=0.0.0.0
+      - SPACETIMEDB_PORT=3001
+      - SPACETIMEDB_DB=spacetime-memory
+      - EMBEDDER_MODEL_PATH=/app/model/all-MiniLM-L6-v2.onnx
+
+volumes:
+  spacetime-data:

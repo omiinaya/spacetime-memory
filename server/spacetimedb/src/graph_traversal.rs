@@ -267,3 +267,10 @@ pub fn get_neighbors(
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Note: All functions in this file are SpacetimeDB reducers that require a
+// `&ReducerContext` parameter and access the database. They cannot be tested
+// with standard `cargo test` — integration tests requiring the SpacetimeDB
+// runtime are needed. No pure helper functions exist in this module.
+// ---------------------------------------------------------------------------
