@@ -44,7 +44,7 @@ class Client:
         self.host = host or os.environ.get("SPACETIMEDB_HOST", "localhost")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
         self.database = database or os.environ.get(
-            "SPACETIMEDB_DB", "c200f381695ed98be9b3fa689dd298cddff6212d35c46ae2a01999f921b88c82"
+            "SPACETIMEDB_DB", "c200e409f602c06527d0aa66dc2d05718a6b62c4c3317b5498951cea41782713"
         )
         self.embedder_url = (
             embedder_url
@@ -122,9 +122,14 @@ class Client:
     # Workspace
     # -----------------------------------------------------------------------
 
-    def create_workspace(self, name: str, description: str = "") -> dict[str, Any]:
-        """Create a new workspace. Returns reducer status."""
-        return self._call("create_workspace", [name, description])
+    def create_workspace(self, name: str, description: str = "", id: str | None = None) -> dict[str, Any]:
+        """Create a new workspace. Returns reducer status.
+        If *id* is omitted, generates a UUID client-side matching the reducer's
+        UUID v4 format so callers can discover it immediately via list_workspaces.
+        """
+        import uuid
+        ws_id = id if id else uuid.uuid4().hex[:32]
+        return self._call("create_workspace", [name, description, ws_id])
 
     def list_workspaces(self) -> list[dict[str, Any]]:
         """List all workspaces."""

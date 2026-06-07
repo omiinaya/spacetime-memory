@@ -37,7 +37,7 @@ def _load_config() -> dict:
     return {
         "host": os.environ.get("SPACETIMEDB_HOST", "localhost"),
         "port": os.environ.get("SPACETIMEDB_PORT", "3001"),
-        "database": os.environ.get("SPACETIMEDB_DB", "c200f381695ed98be9b3fa689dd298cddff6212d35c46ae2a01999f921b88c82"),
+        "database": os.environ.get("SPACETIMEDB_DB", "spacetime-memory"),
         "embedder_url": os.environ.get("EMBEDDER_URL", "http://localhost:9090"),
     }
 

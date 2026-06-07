@@ -15,12 +15,12 @@ pub struct Workspace {
 }
 
 #[reducer]
-pub fn create_workspace(ctx: &ReducerContext, name: String, description: String) -> Result<(), String> {
+pub fn create_workspace(ctx: &ReducerContext, name: String, description: String, id: String) -> Result<(), String> {
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let workspace_id = if id.is_empty() { uuid_v4(ctx) } else { id };
 
     ctx.db.workspace().insert(Workspace {
-        id: id.clone(),
+        id: workspace_id.clone(),
         name,
         description,
         created_at: now,
