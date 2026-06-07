@@ -204,6 +204,35 @@ export async function fetchInsights(pid?: string): Promise<any[]> {
 export async function fetchTags(): Promise<any[]> { return getFromCache('tag'); }
 export async function fetchDashboardStats(): Promise<DashboardStats> { return getDashboardStats(); }
 export async function fetchRecentActivity(l = 10): Promise<RecentActivity[]> { return getRecentActivity(l); }
+export async function fetchNotesWithBacklinks(): Promise<any[]> {
+  // Returns notes with their outgoingLinks parsed from content
+  const notes = getFromCache<any>('note');
+  const backlinks = getFromCache<any>('note_backlink');
+  const blCount = new Map<string, number>();
+  const olMap = new Map<string, string[]>();
+  for (const bl of backlinks) {
+    blCount.set(bl.targetNoteId, (blCount.get(bl.targetNoteId) || 0) + 1);
+  }
+  return notes.map((n: any) => {
+    const parsedLinks = extractWikilinks(n.content || '');
+    olMap.set(n.id, parsedLinks);
+    return {
+      ...n,
+      backlinkCount: blCount.get(n.id) || 0,
+      outgoingLinks: JSON.stringify(parsedLinks),
+    };
+  });
+}
+
+function extractWikilinks(content: string): string[] {
+  const links: string[] = [];
+  const re = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    links.push(m[1].trim());
+  }
+  return [...new Set(links)];
+}
 
 // ---------------------------------------------------------------------------
 // Backward-compatible type aliases and hooks for unmigrated pages
