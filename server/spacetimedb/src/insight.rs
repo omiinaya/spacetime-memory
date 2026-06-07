@@ -58,3 +58,96 @@ pub fn delete_insight(ctx: &ReducerContext, id: String) -> Result<(), String> {
     ctx.db.insight().id().delete(&id);
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// MentalModel — higher-level abstractions synthesized from raw memories
+// ---------------------------------------------------------------------------
+
+/// A mental model is a higher-level abstraction, belief, pattern, heuristic,
+/// or rule synthesized from a set of experiences (raw memories).
+#[table(accessor = mental_model, public)]
+#[derive(Debug, Clone)]
+pub struct MentalModel {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    /// "mental_model", "belief", "pattern", "heuristic", "abstraction"
+    pub model_type: String,
+    /// The synthesized content (filled by Python LLM script)
+    pub content: String,
+    /// JSON array of source memory IDs
+    pub source_memory_ids: String,
+    /// Confidence score 0.0-1.0 (set by Python script after LLM call)
+    pub confidence: f64,
+    /// "pending", "completed", "failed"
+    pub status: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[reducer]
+pub fn synthesize_mental_models(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    memory_ids_json: String,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
+
+    // Validate that memory_ids_json is valid JSON
+    if let Err(e) = serde_json::from_str::<Vec<String>>(&memory_ids_json) {
+        return Err(format!("Invalid memory_ids_json: {}", e));
+    }
+
+    let model = MentalModel {
+        id: id.clone(),
+        workspace_id,
+        model_type: "mental_model".to_string(),
+        content: "Synthesis requested. Run mental_model_synthesis.py to generate LLM output.".to_string(),
+        source_memory_ids: memory_ids_json,
+        confidence: 0.5,
+        status: "pending".to_string(),
+        created_at: now,
+        updated_at: now,
+    };
+
+    ctx.db.mental_model().insert(model);
+    Ok(())
+}
+
+#[reducer]
+pub fn update_mental_model(
+    ctx: &ReducerContext,
+    id: String,
+    content: String,
+    confidence: f64,
+    status: String,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+
+    let mut model = ctx.db
+        .mental_model()
+        .id()
+        .find(&id)
+        .ok_or_else(|| format!("MentalModel '{}' not found", id))?;
+
+    model.content = content;
+    model.confidence = confidence;
+    model.status = status;
+    model.updated_at = now;
+
+    ctx.db.mental_model().id().update(model);
+    Ok(())
+}
+
+#[reducer]
+pub fn delete_mental_model(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    ctx.db
+        .mental_model()
+        .id()
+        .find(&id)
+        .ok_or_else(|| format!("MentalModel '{}' not found", id))?;
+
+    ctx.db.mental_model().id().delete(&id);
+    Ok(())
+}

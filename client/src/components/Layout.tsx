@@ -21,6 +21,7 @@ import {
   Code2,
   GitFork,
   GitMerge,
+  Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
@@ -47,6 +48,8 @@ const navItems: NavItem[] = [
   { href: '/code-explorer', label: 'Code Explorer', icon: Code2 },
   { href: '/trajectories', label: 'Trajectories', icon: GitFork },
   { href: '/merge-candidates', label: 'Merge Candidates', icon: GitMerge },
+  { href: '/graph-viz', label: 'Graph Viz', icon: GitFork },
+  { href: '/block-graph', label: 'Block Graph', icon: Share2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

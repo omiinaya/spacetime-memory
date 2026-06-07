@@ -307,6 +307,47 @@ def add_tour_stop(tour_id: str, node_id: str, heading: str, description: str = "
 
 
 # ---------------------------------------------------------------------------
+# Mental Model tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def synthesize_mental_models(workspace_id: str, memory_ids_json: str) -> str:
+    """Request synthesis of a mental model from a set of source memories.
+
+    Creates a pending MentalModel record. Run mental_model_synthesis.py
+    to generate actual LLM content.
+    """
+    client = get_client()
+    client._call("synthesize_mental_models", [workspace_id, memory_ids_json])
+    return f"Mental model synthesis requested for workspace {workspace_id[:16]}..."
+
+
+@mcp.tool()
+def get_mental_model(id: str) -> str:
+    """Get a single mental model by its ID."""
+    client = get_client()
+    rows = client._sql(f"SELECT * FROM mental_model WHERE id = '{id}'")
+    return json.dumps(rows, default=str)
+
+
+@mcp.tool()
+def list_mental_models(workspace_id: str, status: str = "") -> str:
+    """List mental models for a workspace, optionally filtered by status.
+
+    Args:
+        workspace_id: The workspace ID
+        status: Optional filter: "pending", "completed", "failed", or empty for all
+    """
+    client = get_client()
+    where = f"workspace_id = '{workspace_id}'"
+    if status:
+        where += f" AND status = '{status}'"
+    rows = client._sql(f"SELECT * FROM mental_model WHERE {where} ORDER BY created_at DESC")
+    return json.dumps(rows, default=str)
+
+
+# ---------------------------------------------------------------------------
 # Directory tools
 # ---------------------------------------------------------------------------
 
