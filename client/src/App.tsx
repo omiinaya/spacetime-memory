@@ -17,6 +17,7 @@ const DailyNotes = React.lazy(() => import('@/pages/DailyNotes'));
 const NotesList = React.lazy(() => import('@/pages/NotesList'));
 const NoteEditor = React.lazy(() => import('@/pages/NoteEditor'));
 const NoteGraph = React.lazy(() => import('@/pages/NoteGraph'));
+const SmartQuery = React.lazy(() => import('@/pages/SmartQuery'));
 
 function LoadingFallback() {
   return (
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/notes/new" component={NoteEditor} />
           <Route path="/notes/:id" component={NoteEditor} />
           <Route path="/graph/notes" component={NoteGraph} />
+          <Route path="/query" component={SmartQuery} />
           <Route>
             <div className="flex h-[60vh] items-center justify-center">
               <div className="text-center">

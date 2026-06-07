@@ -35,6 +35,7 @@ const navItems: NavItem[] = [
   { href: '/memories', label: 'Memory Browser', icon: Database },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/search', label: 'Search', icon: Search },
+  { href: '/query', label: 'Smart Query', icon: Sparkles },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
