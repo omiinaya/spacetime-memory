@@ -142,3 +142,238 @@ pub fn add_dynamic_context(
 
     Ok(())
 }
+
+// =========================================================================
+// Fact table — peer facts (Facts project parity)
+// =========================================================================
+
+/// A static or dynamic fact about a peer (Facts project parity).
+#[table(accessor = fact, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Fact {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub peer_id: String,
+    pub fact_type: String, // "static" or "dynamic"
+    pub category: String, // "preference", "behavior", "knowledge", "relationship", "custom"
+    pub content: String,
+    pub confidence: f64,
+    pub source: String, // "manual", "extracted", "inferred", "imported"
+    pub tier: String, // "L0", "L1", "L2"
+    pub is_active: bool,
+    pub created_at: i64,
+    pub expires_at: i64,
+    pub updated_at: i64,
+}
+
+/// Result table for list_facts / search_facts queries.
+#[table(accessor = fact_result, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FactResult {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub query_hash: String,
+    pub json_data: String,
+    pub created_at: i64,
+}
+
+// -------------------------------------------------------------------------
+// Fact reducers
+// -------------------------------------------------------------------------
+
+#[reducer]
+pub fn add_fact(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    peer_id: String,
+    fact_type: String,
+    category: String,
+    content: String,
+    confidence: f64,
+    source: String,
+    tier: String,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
+
+    // Determine expires_at: L0=30d, L1=90d, L2=365d from now (in micros)
+    let expires_offset: i64 = match tier.as_str() {
+        "L0" => 30 * 86400 * 1_000_000,
+        "L1" => 90 * 86400 * 1_000_000,
+        "L2" => 365 * 86400 * 1_000_000,
+        _ => 90 * 86400 * 1_000_000,
+    };
+
+    let fact = Fact {
+        id,
+        workspace_id,
+        peer_id,
+        fact_type,
+        category,
+        content,
+        confidence,
+        source,
+        tier,
+        is_active: true,
+        created_at: now,
+        expires_at: now + expires_offset,
+        updated_at: now,
+    };
+    ctx.db.fact().insert(fact);
+    Ok(())
+}
+
+#[reducer]
+pub fn update_fact(
+    ctx: &ReducerContext,
+    fact_id: String,
+    content: String,
+    confidence: f64,
+    category: String,
+    tier: String,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+    let existing = ctx.db.fact().id().find(&fact_id);
+
+    match existing {
+        Some(mut fact) => {
+            if !content.is_empty() {
+                fact.content = content;
+            }
+            if confidence > 0.0 {
+                fact.confidence = confidence;
+            }
+            if !category.is_empty() {
+                fact.category = category;
+            }
+            if !tier.is_empty() {
+                fact.tier = tier;
+                // Recompute expires_at based on new tier
+                let expires_offset: i64 = match fact.tier.as_str() {
+                    "L0" => 30 * 86400 * 1_000_000,
+                    "L1" => 90 * 86400 * 1_000_000,
+                    "L2" => 365 * 86400 * 1_000_000,
+                    _ => 90 * 86400 * 1_000_000,
+                };
+                fact.expires_at = now + expires_offset;
+            }
+            fact.updated_at = now;
+            ctx.db.fact().id().update(fact);
+            Ok(())
+        }
+        None => Err(format!("Fact '{}' not found", fact_id)),
+    }
+}
+
+#[reducer]
+pub fn delete_fact(ctx: &ReducerContext, fact_id: String) -> Result<(), String> {
+    let now = now_micros(ctx);
+    let existing = ctx.db.fact().id().find(&fact_id);
+
+    match existing {
+        Some(mut fact) => {
+            fact.is_active = false;
+            fact.updated_at = now;
+            ctx.db.fact().id().update(fact);
+            Ok(())
+        }
+        None => Err(format!("Fact '{}' not found", fact_id)),
+    }
+}
+
+#[reducer]
+pub fn list_facts(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    peer_id: String,
+    fact_type: String,
+    tier: String,
+    category: String,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+
+    let facts: Vec<Fact> = ctx
+        .db
+        .fact()
+        .iter()
+        .filter(|f| {
+            if f.workspace_id != workspace_id {
+                return false;
+            }
+            if !f.is_active {
+                return false;
+            }
+            if !peer_id.is_empty() && f.peer_id != peer_id {
+                return false;
+            }
+            if !fact_type.is_empty() && f.fact_type != fact_type {
+                return false;
+            }
+            if !tier.is_empty() && f.tier != tier {
+                return false;
+            }
+            if !category.is_empty() && f.category != category {
+                return false;
+            }
+            true
+        })
+        .collect();
+
+    let json_data = serde_json::to_string(&facts).unwrap_or_else(|_| "[]".to_string());
+    let query_hash = format!("{}:{}:{}:{}:{}", workspace_id, peer_id, fact_type, tier, category);
+    let result_id = uuid_v4(ctx);
+
+    let result = FactResult {
+        id: result_id,
+        workspace_id,
+        query_hash,
+        json_data,
+        created_at: now,
+    };
+    ctx.db.fact_result().insert(result);
+    Ok(())
+}
+
+#[reducer]
+pub fn search_facts(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    query: String,
+    tier: String,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+
+    let query_lower = query.to_lowercase();
+    let facts: Vec<Fact> = ctx
+        .db
+        .fact()
+        .iter()
+        .filter(|f| {
+            if f.workspace_id != workspace_id {
+                return false;
+            }
+            if !f.is_active {
+                return false;
+            }
+            if !tier.is_empty() && f.tier != tier {
+                return false;
+            }
+            f.content.to_lowercase().contains(&query_lower)
+        })
+        .collect();
+
+    let json_data = serde_json::to_string(&facts).unwrap_or_else(|_| "[]".to_string());
+    let result_id = uuid_v4(ctx);
+
+    let result = FactResult {
+        id: result_id,
+        workspace_id,
+        query_hash: format!("search:{}:{}", query, tier),
+        json_data,
+        created_at: now,
+    };
+    ctx.db.fact_result().insert(result);
+    Ok(())
+}

@@ -347,7 +347,51 @@ def list_mental_models(workspace_id: str, status: str = "") -> str:
     return json.dumps(rows, default=str)
 
 
+# -------------------------------------------------------------------------
+# Fact tools
 # ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def add_fact(
+    workspace_id: str,
+    peer_id: str,
+    content: str,
+    fact_type: str = "dynamic",
+    category: str = "custom",
+    confidence: float = 0.8,
+    source: str = "manual",
+    tier: str = "L1",
+) -> str:
+    """Add a fact about a peer. Returns the fact ID."""
+    get_client()._call("add_fact", [workspace_id, peer_id, fact_type, category, content, confidence, source, tier])
+    return f"Fact added for peer {peer_id[:16]}... in workspace {workspace_id[:16]}..."
+
+
+@mcp.tool()
+def list_facts(
+    workspace_id: str,
+    peer_id: str = "",
+    fact_type: str = "",
+    tier: str = "",
+    category: str = "",
+) -> list[dict[str, Any]]:
+    """List facts for a workspace with optional filters (peer_id, fact_type, tier, category)."""
+    client = get_client()
+    client._call("list_facts", [workspace_id, peer_id, fact_type, tier, category])
+    query_hash = f"{workspace_id}:{peer_id}:{fact_type}:{tier}:{category}"
+    rows = client._sql(
+        f"SELECT * FROM fact_result WHERE query_hash = '{query_hash}' ORDER BY created_at DESC"
+    )
+    if rows:
+        try:
+            return json.loads(rows[0].get("json_data", "[]"))
+        except (json.JSONDecodeError, IndexError):
+            pass
+    return []
+
+
+# -------------------------------------------------------------------------
 # Directory tools
 # ---------------------------------------------------------------------------
 

@@ -25,6 +25,8 @@ const TrajectoryViz = React.lazy(() => import('@/pages/TrajectoryViz'));
 const MergeCandidates = React.lazy(() => import('@/pages/MergeCandidates'));
 const GraphViz = React.lazy(() => import('@/pages/GraphViz'));
 const BlockGraph = React.lazy(() => import('@/pages/BlockGraph'));
+const SessionReasoning = React.lazy(() => import('@/pages/SessionReasoning'));
+const DirectoryBrowser = React.lazy(() => import('@/pages/DirectoryBrowser'));
 
 function LoadingFallback() {
   return (
@@ -80,6 +82,8 @@ function AuthenticatedApp() {
           <Route path="/merge-candidates" component={MergeCandidates} />
           <Route path="/graph-viz" component={GraphViz} />
           <Route path="/block-graph" component={BlockGraph} />
+          <Route path="/session-reasoning" component={SessionReasoning} />
+          <Route path="/directory-browser" component={DirectoryBrowser} />
           <Route>
             <div className="flex h-[60vh] items-center justify-center">
               <div className="text-center">

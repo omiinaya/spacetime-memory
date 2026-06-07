@@ -22,6 +22,8 @@ import {
   GitFork,
   GitMerge,
   Share2,
+  BrainCircuit,
+  FolderTree,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
@@ -50,6 +52,8 @@ const navItems: NavItem[] = [
   { href: '/merge-candidates', label: 'Merge Candidates', icon: GitMerge },
   { href: '/graph-viz', label: 'Graph Viz', icon: GitFork },
   { href: '/block-graph', label: 'Block Graph', icon: Share2 },
+  { href: '/session-reasoning', label: 'Session Reasoning', icon: BrainCircuit },
+  { href: '/directory-browser', label: 'Directories', icon: FolderTree },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

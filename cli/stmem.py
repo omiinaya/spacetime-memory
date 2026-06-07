@@ -533,6 +533,116 @@ def profile_upsert(peer_id: str, static_facts: str, dynamic_context: str,
 
 
 # ===================================================================
+# fact commands
+# ===================================================================
+
+
+@cli.group()
+def fact() -> None:
+    """Manage peer facts."""
+
+
+@fact.command(name="add")
+@click.argument("workspace_id")
+@click.argument("peer_id")
+@click.argument("content")
+@click.option("--type", "fact_type", default="dynamic", type=click.Choice(["static", "dynamic"]))
+@click.option("--category", default="custom", type=click.Choice(["preference", "behavior", "knowledge", "relationship", "custom"]))
+@click.option("--confidence", default=0.8, type=float)
+@click.option("--source", default="manual", type=click.Choice(["manual", "extracted", "inferred", "imported"]))
+@click.option("--tier", default="L1", type=click.Choice(["L0", "L1", "L2"]))
+def fact_add(workspace_id: str, peer_id: str, content: str,
+             fact_type: str, category: str, confidence: float,
+             source: str, tier: str) -> None:
+    """Add a new fact about a peer."""
+    with console.status("Adding fact..."):
+        _sdk_client()._call("add_fact", [workspace_id, peer_id, fact_type, category, content, confidence, source, tier])
+    console.print("[green]Fact added successfully.[/green]")
+
+
+@fact.command(name="list")
+@click.argument("workspace_id")
+@click.option("--peer", default="")
+@click.option("--type", "fact_type", default="")
+@click.option("--tier", default="")
+@click.option("--category", default="")
+def fact_list(workspace_id: str, peer: str, fact_type: str, tier: str, category: str) -> None:
+    """List facts for a workspace with optional filters."""
+    client = _sdk_client()
+    query_hash = f"{workspace_id}:{peer}:{fact_type}:{tier}:{category}"
+    with console.status("Listing facts..."):
+        client._call("list_facts", [workspace_id, peer, fact_type, tier, category])
+        rows = client._sql(
+            f"SELECT * FROM fact_result WHERE query_hash = '{_esc(query_hash)}' ORDER BY created_at DESC"
+        )
+    facts = []
+    if rows:
+        try:
+            facts = json.loads(rows[0].get("json_data", "[]"))
+        except (json.JSONDecodeError, IndexError):
+            pass
+    print_table(facts, title=f"Facts (workspace: {workspace_id})")
+
+
+@fact.command(name="search")
+@click.argument("workspace_id")
+@click.argument("query")
+@click.option("--tier", default="")
+def fact_search(workspace_id: str, query: str, tier: str) -> None:
+    """Search facts by content (LIKE / substring match)."""
+    client = _sdk_client()
+    with console.status("Searching facts..."):
+        client._call("search_facts", [workspace_id, query, tier])
+        rows = client._sql(
+            f"SELECT * FROM fact_result WHERE workspace_id = '{_esc(workspace_id)}' ORDER BY created_at DESC LIMIT 50"
+        )
+    facts = []
+    if rows:
+        try:
+            facts = json.loads(rows[0].get("json_data", "[]"))
+        except (json.JSONDecodeError, IndexError):
+            pass
+    print_table(facts, title=f"Fact search: '{query}'")
+
+
+@fact.command(name="get")
+@click.argument("fact_id")
+def fact_get(fact_id: str) -> None:
+    """Get a single fact by ID."""
+    with console.status(f"Fetching fact '{fact_id[:16]}...'..."):
+        rows = _sdk_client()._sql(f"SELECT * FROM fact WHERE id = '{_esc(fact_id)}'")
+    if rows:
+        print_json(rows[0])
+    else:
+        console.print(f"[yellow]Fact '{fact_id[:16]}...' not found.[/yellow]")
+
+
+@fact.command(name="update")
+@click.argument("fact_id")
+@click.option("--content", default="")
+@click.option("--confidence", type=float, default=None)
+@click.option("--tier", type=click.Choice(["L0", "L1", "L2", ""]), default="")
+@click.option("--category", default="")
+def fact_update(fact_id: str, content: str, confidence: float | None,
+                tier: str, category: str) -> None:
+    """Update a fact's content, confidence, category, and/or tier."""
+    tier_val = tier if tier else ""
+    client = _sdk_client()
+    with console.status(f"Updating fact '{fact_id[:16]}...'..."):
+        client._call("update_fact", [fact_id, content, confidence if confidence else 0.0, category, tier_val])
+    console.print(f"[green]Fact '{fact_id[:16]}...' updated.[/green]")
+
+
+@fact.command(name="delete")
+@click.argument("fact_id")
+def fact_delete(fact_id: str) -> None:
+    """Deactivate a fact (soft delete)."""
+    with console.status(f"Deleting fact '{fact_id[:16]}...'..."):
+        _sdk_client()._call("delete_fact", [fact_id])
+    console.print(f"[green]Fact '{fact_id[:16]}...' deactivated.[/green]")
+
+
+# ===================================================================
 # knowledge-graph commands
 # ===================================================================
 

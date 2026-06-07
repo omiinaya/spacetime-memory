@@ -36,6 +36,8 @@ export function initReactiveDb() {
     'SELECT * FROM message',
     'SELECT * FROM memory',
     'SELECT * FROM memory_feedback',
+    'SELECT * FROM context_directory',
+    'SELECT * FROM directory_memory_link',
     'SELECT * FROM profile',
     'SELECT * FROM kg_node',
     'SELECT * FROM kg_edge',
