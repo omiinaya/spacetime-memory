@@ -330,6 +330,75 @@ def dedup_memories(workspace_id: str) -> str:
     return f"Dedup complete for workspace {workspace_id[:16]}..."
 
 
+@mcp.tool()
+@require_api_key
+def suggest_merges(workspace_id: str, threshold: float = 0.8) -> str:
+    """Find candidate merge pairs in a workspace and record them as MergeSuggestion rows.
+
+    Args:
+        workspace_id: The workspace to scan.
+        threshold: Minimum cosine similarity threshold (default: 0.8).
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().suggest_merges(workspace_id, threshold)
+    return (f"Merge suggestion scan complete for workspace {workspace_id[:16]}... "
+            f"Check the merge_suggestion table for results.")
+
+
+@mcp.tool()
+@require_api_key
+def approve_merge(suggestion_id: str) -> str:
+    """Approve a pending merge suggestion — deactivates the source into the target.
+
+    Args:
+        suggestion_id: The ID of the MergeSuggestion row to approve.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().approve_merge(suggestion_id)
+    return f"Merge suggestion {suggestion_id[:16]}... approved."
+
+
+@mcp.tool()
+@require_api_key
+def reject_merge(suggestion_id: str) -> str:
+    """Reject a pending merge suggestion without merging.
+
+    Args:
+        suggestion_id: The ID of the MergeSuggestion row to reject.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().reject_merge(suggestion_id)
+    return f"Merge suggestion {suggestion_id[:16]}... rejected."
+
+
+@mcp.tool()
+@require_api_key
+def set_memory_scope(memory_id: str, user_scope: str) -> str:
+    """Set the user scope on an existing memory for user-level isolation.
+
+    Args:
+        memory_id: The UUID of the memory to scope.
+        user_scope: The user identity hash to scope the memory to.
+            Use an empty string ("") to make the memory shared (visible to all).
+
+    Returns:
+        A confirmation message.
+
+    Example::
+
+        set_memory_scope("abc-123", "alice")   # Scope to alice only
+        set_memory_scope("abc-123", "")         # Make shared
+    """
+    get_client()._call("set_memory_scope", [memory_id, user_scope])
+    return f"Memory {memory_id[:16]}... scoped to '{user_scope or 'shared'}'."
+
+
 # ---------------------------------------------------------------------------
 # Profile tools
 # ---------------------------------------------------------------------------
@@ -402,6 +471,55 @@ def get_neighbors(node_id: str) -> list[dict[str, Any]]:
 def get_community(community_id: int) -> dict[str, Any]:
     """Get community details and list all nodes in that community."""
     return get_client().get_community(community_id)
+
+
+@mcp.tool()
+@require_api_key
+def compute_pagerank(workspace_id: str, damping: float = 0.85, max_iterations: int = 100) -> str:
+    """Compute PageRank centrality for all nodes in a workspace.
+    
+    Args:
+        workspace_id: The workspace to compute PageRank for.
+        damping: PageRank damping factor (default: 0.85).
+        max_iterations: Maximum iterations (default: 100).
+    
+    Returns:
+        Summary string with the number of nodes ranked.
+    """
+    get_client().compute_pagerank(workspace_id, damping, max_iterations)
+    # Read back the results
+    rows = get_client()._sql(
+        "SELECT * FROM pagerank_result WHERE "
+        f"workspace_id = '{workspace_id}' "
+        "ORDER BY rank DESC"
+    )
+    return json.dumps(rows, default=str)
+
+
+@mcp.tool()
+@require_api_key
+def compute_community_hierarchy(workspace_id: str) -> str:
+    """Build hierarchical community dendrogram using agglomerative clustering.
+    
+    Args:
+        workspace_id: The workspace to build hierarchy for.
+    
+    Returns:
+        JSON string with hierarchy edges and clusters.
+    """
+    get_client().compute_community_hierarchy(workspace_id)
+    # Read back the hierarchy
+    edges = get_client()._sql(
+        "SELECT * FROM community_hierarchy WHERE "
+        f"workspace_id = '{workspace_id}' "
+        "ORDER BY depth ASC"
+    )
+    clusters = get_client()._sql(
+        "SELECT * FROM hierarchy_cluster WHERE "
+        f"workspace_id = '{workspace_id}' "
+        "ORDER BY depth ASC"
+    )
+    return json.dumps({"edges": edges, "clusters": clusters}, default=str)
 
 
 # ---------------------------------------------------------------------------

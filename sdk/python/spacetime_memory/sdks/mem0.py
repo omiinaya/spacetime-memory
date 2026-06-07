@@ -139,6 +139,17 @@ class Memory:
             source_session_id=run_id or "",
         )
 
+        # If user_id is provided, scope the stored memory to that user
+        if user_id:
+            stored = self._client.search(ws_id, content, limit=1, semantic=True)
+            if stored:
+                mem_id = stored[0].get("entity_id", "") or stored[0].get("id", "")
+                if mem_id:
+                    try:
+                        self._client._call("set_memory_scope", [mem_id, user_id])
+                    except Exception:
+                        pass  # Non-critical; memory still exists
+
         # Return Mem0-compatible shape — search for the stored memory
         return {
             "results": [
@@ -200,7 +211,8 @@ class Memory:
 
         Args:
             query: The search query text.
-            user_id: Optional user filter.
+            user_id: Optional user filter. When set, only memories scoped
+                to this user (via ``user_scope``) are returned.
             agent_id: Optional agent filter (accepted for compatibility).
             run_id: Optional run/session filter.
             limit: Max results to return (default 100).
@@ -231,8 +243,17 @@ class Memory:
             score = r.get("score", 0.0)
             if threshold > 0.0 and score < threshold:
                 continue
+            # If user_id is specified, verify user_scope isolation
+            mem_id = r.get("entity_id", "")
+            if user_id and mem_id:
+                # Fetch the full record to check user_scope
+                mem_records = self._client.get_memory(mem_id)
+                if mem_records:
+                    mem_user_scope = mem_records[0].get("user_scope", "")
+                    if mem_user_scope != "" and mem_user_scope != user_id:
+                        continue  # Skip: scoped to a different user
             results.append({
-                "id": r.get("entity_id", ""),
+                "id": mem_id,
                 "memory": r.get("memory_content", r.get("content", "")),
                 "score": score,
                 "user_id": user_id or "",
@@ -267,12 +288,18 @@ class Memory:
             {'results': [{'id': '...', 'memory': 'I like pizza', ...}]}
 
         """
-        ws_id = self._ws(user_id)
-        rows = self._client.list_memories(workspace_id=ws_id, limit=limit)
+        if user_id:
+            ws_id = self._ws(user_id)
+            rows = self._client.get_user_memories(
+                user_scope=user_id, workspace_id=ws_id
+            )[:limit]
+        else:
+            ws_id = self._ws(None)
+            rows = self._client.list_memories(workspace_id=ws_id, limit=limit)
         return {
             "results": [
                 {
-                    "id": r["id"],
+                    "id": r["memory_id"] if "memory_id" in r else r["id"],
                     "memory": r.get("content", ""),
                     "user_id": user_id or "",
                     "agent_id": agent_id or "",

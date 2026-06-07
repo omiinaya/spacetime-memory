@@ -54,6 +54,11 @@ pub struct Memory {
     pub trust_score: f64,
     /// How many user feedback ratings received
     pub feedback_count: u32,
+
+    // ---- User-level isolation (Mem0 parity) ----
+    /// "" = shared (visible to all users in workspace),
+    /// or a specific user identity hash for user-scoped isolation
+    pub user_scope: String,
 }
 
 #[reducer]
@@ -100,6 +105,7 @@ pub fn store_memory(
         consolidated_to: String::new(),
         trust_score: 0.5,
         feedback_count: 0,
+        user_scope: String::new(),
     };
 
     ctx.db.memory().insert(mem);
@@ -161,6 +167,81 @@ pub fn expire_memories(ctx: &ReducerContext) -> Result<(), String> {
         mem.is_active = false;
         mem.updated_at = now;
         ctx.db.memory().id().update(mem);
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// User-level memory isolation (Mem0 parity)
+// ---------------------------------------------------------------------------
+
+/// Result table for `get_user_memories` queries.
+/// Clients read from this table after calling the reducer.
+#[table(accessor = user_memory_result, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct UserMemoryResult {
+    #[primary_key]
+    pub id: String,
+    pub user_scope: String,
+    pub workspace_id: String,
+    pub memory_id: String,
+    pub content: String,
+    pub summary: String,
+    pub memory_type: String,
+    pub confidence: f64,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub tier: String,
+}
+
+/// Set the user_scope on an existing memory.
+/// "" means shared (visible to all), a non-empty string means user-scoped.
+#[reducer]
+pub fn set_memory_scope(
+    ctx: &ReducerContext,
+    memory_id: String,
+    user_scope: String,
+) -> Result<(), String> {
+    let mut mem = ctx
+        .db
+        .memory()
+        .id()
+        .find(&memory_id)
+        .ok_or_else(|| format!("Memory '{}' not found", memory_id))?;
+
+    mem.user_scope = user_scope;
+    mem.updated_at = now_micros(ctx);
+
+    ctx.db.memory().id().update(mem);
+    Ok(())
+}
+
+/// Retrieve all memories scoped to a specific user within a workspace.
+/// Results are stored in the `user_memory_result` table, keyed by
+/// `user_scope` + `workspace_id`.
+#[reducer]
+pub fn get_user_memories(
+    ctx: &ReducerContext,
+    user_scope: String,
+    workspace_id: String,
+) -> Result<(), String> {
+    for mem in ctx.db.memory().iter() {
+        if mem.user_scope == user_scope && mem.workspace_id == workspace_id {
+            ctx.db.user_memory_result().insert(UserMemoryResult {
+                id: uuid_v4(ctx),
+                user_scope: user_scope.clone(),
+                workspace_id: workspace_id.clone(),
+                memory_id: mem.id.clone(),
+                content: mem.content.clone(),
+                summary: mem.summary.clone(),
+                memory_type: mem.memory_type.clone(),
+                confidence: mem.confidence,
+                is_active: mem.is_active,
+                created_at: mem.created_at,
+                tier: mem.tier.clone(),
+            });
+        }
     }
 
     Ok(())

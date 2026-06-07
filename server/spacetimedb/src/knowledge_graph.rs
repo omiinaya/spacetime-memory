@@ -360,3 +360,416 @@ pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<()
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// PageRank centrality
+// ---------------------------------------------------------------------------
+
+/// PageRank results for knowledge-graph nodes.
+#[table(accessor = pagerank_result, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PagerankResult {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub node_id: String,
+    pub node_label: String,
+    pub rank: f64,
+    pub iteration: u32,
+    pub computed_at: i64,
+}
+
+/// Compute PageRank centrality for all nodes in a workspace.
+///
+/// Uses the standard PageRank algorithm:
+///   PR(n) = (1-d)/N + d * sum(PR(i) / out_degree(i))  for each incoming edge i->n
+///
+/// Converges when max change < 1e-6 or max_iterations reached.
+#[reducer]
+pub fn compute_pagerank(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    damping: f64,
+    max_iterations: u32,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+    let d = if damping <= 0.0 || damping >= 1.0 {
+        0.85
+    } else {
+        damping
+    };
+    let max_iter = if max_iterations == 0 {
+        100
+    } else {
+        max_iterations
+    };
+    let convergence_threshold = 1e-6;
+
+    // Collect all nodes in this workspace
+    let nodes: Vec<(String, String)> = ctx
+        .db
+        .kg_node()
+        .iter()
+        .filter(|n| n.workspace_id == workspace_id)
+        .map(|n| (n.id.clone(), n.label.clone()))
+        .collect();
+
+    let n_nodes = nodes.len();
+    if n_nodes == 0 {
+        return Ok(());
+    }
+
+    // Build a map from node_id -> index
+    let mut node_index: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    for (i, (nid, _)) in nodes.iter().enumerate() {
+        node_index.insert(nid.clone(), i);
+    }
+
+    // Collect all edges for this workspace
+    let edges: Vec<(String, String)> = ctx
+        .db
+        .kg_edge()
+        .iter()
+        .filter(|e| e.workspace_id == workspace_id)
+        .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
+        .collect();
+
+    // Build adjacency: for each node, list of incoming edge source indices
+    let mut incoming: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+    // and out-degree count for each node
+    let mut out_degree: Vec<f64> = vec![0.0_f64; n_nodes];
+
+    for (src, tgt) in &edges {
+        if let (Some(&si), Some(&ti)) = (node_index.get(src), node_index.get(tgt)) {
+            incoming[ti].push(si);
+            out_degree[si] += 1.0;
+        }
+    }
+
+    // Handle dangling nodes (out_degree == 0): treat them as linking to all nodes
+    let dangling: Vec<usize> = (0..n_nodes)
+        .filter(|i| out_degree[*i] == 0.0)
+        .collect();
+
+    // Initialise ranks uniformly
+    let init_rank = 1.0 / n_nodes as f64;
+    let mut rank: Vec<f64> = vec![init_rank; n_nodes];
+
+    let mut actual_iterations = 0u32;
+    for iter in 0..max_iter {
+        actual_iterations = iter + 1;
+
+        let mut new_rank: Vec<f64> = vec![(1.0 - d) / n_nodes as f64; n_nodes];
+
+        // Compute contribution from dangling nodes (they link to everyone)
+        let dangling_contrib: f64 = if !dangling.is_empty() {
+            let sum: f64 = dangling.iter().map(|&i| rank[i]).sum();
+            sum / n_nodes as f64
+        } else {
+            0.0
+        };
+
+        for i in 0..n_nodes {
+            // Add dangling contribution
+            new_rank[i] += d * dangling_contrib;
+
+            // Add contributions from regular incoming edges
+            let od = out_degree[i];
+            if od > 0.0 {
+                let contrib: f64 = incoming[i]
+                    .iter()
+                    .map(|&src_idx| rank[src_idx] / out_degree[src_idx])
+                    .sum();
+                new_rank[i] += d * contrib;
+            }
+        }
+
+        // Check convergence
+        let max_change: f64 = rank
+            .iter()
+            .zip(new_rank.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f64, f64::max);
+
+        rank = new_rank;
+
+        if max_change < convergence_threshold {
+            break;
+        }
+    }
+
+    // Normalise so sum = 1.0
+    let sum: f64 = rank.iter().sum();
+    if sum > 0.0 {
+        for r in &mut rank {
+            *r /= sum;
+        }
+    }
+
+    // Clear previous PagerankResult entries for this workspace
+    let old: Vec<_> = ctx
+        .db
+        .pagerank_result()
+        .iter()
+        .filter(|p| p.workspace_id == workspace_id)
+        .collect();
+    for p in old {
+        ctx.db.pagerank_result().id().delete(&p.id);
+    }
+
+    // Insert new results
+    for (i, (nid, nlabel)) in nodes.iter().enumerate() {
+        ctx.db.pagerank_result().insert(PagerankResult {
+            id: uuid_v4(ctx),
+            workspace_id: workspace_id.clone(),
+            node_id: nid.clone(),
+            node_label: nlabel.clone(),
+            rank: rank[i],
+            iteration: actual_iterations,
+            computed_at: now,
+        });
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Hierarchical community dendrogram
+// ---------------------------------------------------------------------------
+
+/// A cluster in the community hierarchy dendrogram.
+#[table(accessor = hierarchy_cluster, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HierarchyCluster {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    /// JSON array of community IDs in this cluster
+    pub community_ids: String,
+    pub depth: u32,
+}
+
+/// A parent-child relationship in the community dendrogram.
+#[table(accessor = community_hierarchy, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CommunityHierarchy {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub parent_cluster_id: String,
+    pub child_cluster_id: String,
+    pub similarity: f64,
+    pub depth: u32,
+}
+
+/// Build a hierarchical community dendrogram using agglomerative clustering.
+///
+/// 1. Gets all communities and their node sets (via kg_node.community_id)
+/// 2. Computes Jaccard similarity between community pairs
+/// 3. Repeatedly merges the two most similar clusters
+/// 4. Stops when only one cluster remains or max similarity < 0.1
+#[reducer]
+pub fn compute_community_hierarchy(
+    ctx: &ReducerContext,
+    workspace_id: String,
+) -> Result<(), String> {
+    // Get all communities in this workspace
+    let communities: Vec<(u64, String)> = ctx
+        .db
+        .kg_community()
+        .iter()
+        .filter(|c| c.workspace_id == workspace_id)
+        .map(|c| (c.id, c.name.clone()))
+        .collect();
+
+    if communities.is_empty() {
+        return Ok(());
+    }
+
+    // Get node membership: community_id -> set of node_ids
+    let mut community_node_sets: std::collections::HashMap<
+        u64,
+        std::collections::HashSet<String>,
+    > = std::collections::HashMap::new();
+    for node in ctx.db.kg_node().iter() {
+        if node.workspace_id != workspace_id {
+            continue;
+        }
+        if node.community_id > 0 {
+            community_node_sets
+                .entry(node.community_id)
+                .or_insert_with(std::collections::HashSet::new)
+                .insert(node.id.clone());
+        }
+    }
+
+    // Clear previous hierarchy data for this workspace
+    let old_clusters: Vec<_> = ctx
+        .db
+        .hierarchy_cluster()
+        .iter()
+        .filter(|h| h.workspace_id == workspace_id)
+        .collect();
+    for h in old_clusters {
+        ctx.db.hierarchy_cluster().id().delete(&h.id);
+    }
+    let old_edges: Vec<_> = ctx
+        .db
+        .community_hierarchy()
+        .iter()
+        .filter(|h| h.workspace_id == workspace_id)
+        .collect();
+    for h in old_edges {
+        ctx.db.community_hierarchy().id().delete(&h.id);
+    }
+
+    // Initialise: each community is its own cluster
+    #[derive(Clone)]
+    struct Cluster {
+        id: String,
+        depth: u32,
+        community_set: std::collections::HashSet<u64>,
+    }
+
+    let mut clusters: Vec<Cluster> = communities
+        .iter()
+        .map(|(cid, _)| {
+            let mut set = std::collections::HashSet::new();
+            set.insert(*cid);
+            Cluster {
+                id: uuid_v4(ctx),
+                depth: 0,
+                community_set: set,
+            }
+        })
+        .collect();
+
+    // Insert initial HierarchyCluster rows
+    for cluster in &clusters {
+        let community_ids: Vec<String> = cluster
+            .community_set
+            .iter()
+            .map(|c| c.to_string())
+            .collect();
+        ctx.db.hierarchy_cluster().insert(HierarchyCluster {
+            id: cluster.id.clone(),
+            workspace_id: workspace_id.clone(),
+            community_ids: format!("[{}]", community_ids.join(",")),
+            depth: 0,
+        });
+    }
+
+    // Helper: Jaccard similarity between two clusters
+    let jaccard = |set_a: &std::collections::HashSet<u64>,
+                   set_b: &std::collections::HashSet<u64>|
+     -> f64 {
+        let mut nodes_a = std::collections::HashSet::new();
+        let mut nodes_b = std::collections::HashSet::new();
+        let mut nodes_union = std::collections::HashSet::new();
+
+        for cid in set_a {
+            if let Some(ns) = community_node_sets.get(cid) {
+                for n in ns {
+                    nodes_a.insert(n.clone());
+                    nodes_union.insert(n.clone());
+                }
+            }
+        }
+        for cid in set_b {
+            if let Some(ns) = community_node_sets.get(cid) {
+                for n in ns {
+                    nodes_b.insert(n.clone());
+                    nodes_union.insert(n.clone());
+                }
+            }
+        }
+
+        let intersection_size = nodes_a.intersection(&nodes_b).count();
+        let union_size = nodes_union.len();
+
+        if union_size == 0 {
+            return 0.0;
+        }
+        intersection_size as f64 / union_size as f64
+    };
+
+    let similarity_threshold = 0.1;
+    let mut depth = 0u32;
+
+    // Agglomerative clustering
+    while clusters.len() > 1 {
+        depth += 1;
+
+        // Find the two most similar clusters
+        let mut best_i = 0;
+        let mut best_j = 1;
+        let mut best_sim = -1.0_f64;
+
+        for i in 0..clusters.len() {
+            for j in (i + 1)..clusters.len() {
+                let sim = jaccard(&clusters[i].community_set, &clusters[j].community_set);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_i = i;
+                    best_j = j;
+                }
+            }
+        }
+
+        // If best similarity is below threshold, stop
+        if best_sim < similarity_threshold {
+            break;
+        }
+
+        // Merge the two most similar clusters
+        let parent_set: std::collections::HashSet<u64> = clusters[best_i]
+            .community_set
+            .union(&clusters[best_j].community_set)
+            .copied()
+            .collect();
+
+        let parent_id = uuid_v4(ctx);
+
+        // Insert HierarchyCluster for the new merged cluster
+        let community_ids: Vec<String> = parent_set.iter().map(|c| c.to_string()).collect();
+        ctx.db.hierarchy_cluster().insert(HierarchyCluster {
+            id: parent_id.clone(),
+            workspace_id: workspace_id.clone(),
+            community_ids: format!("[{}]", community_ids.join(",")),
+            depth,
+        });
+
+        // Insert CommunityHierarchy edges for parent -> child relationships
+        let child_clusters = [clusters[best_i].clone(), clusters[best_j].clone()];
+        for child in &child_clusters {
+            ctx.db
+                .community_hierarchy()
+                .insert(CommunityHierarchy {
+                    id: uuid_v4(ctx),
+                    workspace_id: workspace_id.clone(),
+                    parent_cluster_id: parent_id.clone(),
+                    child_cluster_id: child.id.clone(),
+                    similarity: best_sim,
+                    depth,
+                });
+        }
+
+        // Remove the two old clusters and add the new parent
+        if best_j > best_i {
+            clusters.remove(best_j);
+            clusters.remove(best_i);
+        } else {
+            clusters.remove(best_i);
+            clusters.remove(best_j);
+        }
+
+        clusters.push(Cluster {
+            id: parent_id,
+            depth,
+            community_set: parent_set,
+        });
+    }
+
+    Ok(())
+}

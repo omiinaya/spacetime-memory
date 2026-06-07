@@ -444,6 +444,7 @@ fn apply_incoming_insert(
                 consolidated_to: data.get("consolidated_to").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 trust_score: data.get("trust_score").and_then(|v| v.as_f64()).unwrap_or(0.5),
                 feedback_count: data.get("feedback_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                user_scope: data.get("user_scope").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             };
             ctx.db.memory().insert(memory);
             Ok(())

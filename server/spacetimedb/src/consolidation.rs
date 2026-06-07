@@ -71,6 +71,7 @@ pub fn consolidate_memories(
         consolidated_to: String::new(),
         trust_score: 0.5,
         feedback_count: 0,
+        user_scope: String::new(),
     };
     ctx.db.memory().insert(mem);
 
@@ -143,6 +144,213 @@ pub fn decay_weak_memories(
         };
         ctx.db.consolidation_log().insert(log);
     }
+
+    Ok(())
+}
+
+// ── Merge Suggestion System ─────────────────────────────────────────────
+
+/// A suggested merge between two near-duplicate memories, awaiting review.
+#[table(accessor = merge_suggestion, public)]
+#[derive(Debug, Clone)]
+pub struct MergeSuggestion {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    /// The memory that would be deactivated / consolidated away.
+    pub source_id: String,
+    /// The memory that would be kept (the survivor).
+    pub target_id: String,
+    pub cosine_similarity: f64,
+    /// Normalised edit distance (0.0 – 1.0).
+    pub edit_distance: f64,
+    /// First 100 chars of each memory, concatenated.
+    pub content_overlap_preview: String,
+    /// "pending" | "approved" | "rejected"
+    pub status: String,
+    pub created_at: i64,
+}
+
+/// Scan all active memories in a workspace and suggest merge candidates.
+///
+/// For each pair meeting the threshold criteria (cosine >= *threshold* AND
+/// edit distance <= 30 %), a `MergeSuggestion` row is created with status
+/// "pending".  Any previous "pending" suggestions for the same workspace
+/// are cleared first.
+#[reducer]
+pub fn suggest_merges(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    threshold: f64,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+
+    // ── Collect active memories with embeddings ────────────────────────
+    #[allow(clippy::type_complexity)]
+    let memories: Vec<(String, String, i64, Vec<f64>)> = ctx
+        .db
+        .memory()
+        .iter()
+        .filter(|m| m.workspace_id == workspace_id && m.is_active)
+        .map(|m| {
+            let emb = ctx
+                .db
+                .search_index()
+                .iter()
+                .find(|si| si.entity_type == "memory" && si.entity_id == m.id)
+                .map(|si| parse_embedding_json(&si.embedding_json))
+                .unwrap_or_default();
+            (m.id.clone(), m.content.clone(), m.created_at, emb)
+        })
+        .collect();
+
+    if memories.len() < 2 {
+        return Ok(());
+    }
+
+    // ── Clear any existing pending suggestions for this workspace ──────
+    let stale: Vec<String> = ctx
+        .db
+        .merge_suggestion()
+        .iter()
+        .filter(|s| s.workspace_id == workspace_id && s.status == "pending")
+        .map(|s| s.id.clone())
+        .collect();
+    for sid in stale {
+        ctx.db.merge_suggestion().id().delete(sid);
+    }
+
+    // ── Pairwise comparison ────────────────────────────────────────────
+    for i in 0..memories.len() - 1 {
+        for j in i + 1..memories.len() {
+            let (id_a, content_a, created_a, emb_a) = &memories[i];
+            let (id_b, content_b, created_b, emb_b) = &memories[j];
+
+            if emb_a.is_empty() || emb_b.is_empty() {
+                continue;
+            }
+
+            let cos_sim = cosine_similarity(emb_a, emb_b);
+            if cos_sim < threshold {
+                continue;
+            }
+
+            let max_len = std::cmp::max(content_a.len(), content_b.len());
+            if max_len == 0 {
+                continue;
+            }
+            let dist = edit_distance(content_a, content_b);
+            let norm_dist = dist as f64 / max_len as f64;
+            if norm_dist > 0.30 {
+                continue;
+            }
+
+            // Newer memory = source (to be deactivated), older = target (survivor)
+            let (source_id, target_id) = if created_a < created_b {
+                (id_b.clone(), id_a.clone())
+            } else {
+                (id_a.clone(), id_b.clone())
+            };
+
+            let preview = format!(
+                "{} | {}",
+                content_a.chars().take(100).collect::<String>(),
+                content_b.chars().take(100).collect::<String>(),
+            );
+
+            ctx.db.merge_suggestion().insert(MergeSuggestion {
+                id: uuid_v4(ctx),
+                workspace_id: workspace_id.clone(),
+                source_id,
+                target_id,
+                cosine_similarity: cos_sim,
+                edit_distance: norm_dist,
+                content_overlap_preview: preview,
+                status: String::from("pending"),
+                created_at: now,
+            });
+        }
+    }
+
+    Ok(())
+}
+
+/// Approve a merge suggestion: deactivate the source memory into the target.
+#[reducer]
+pub fn approve_merge(ctx: &ReducerContext, suggestion_id: String) -> Result<(), String> {
+    let now = now_micros(ctx);
+
+    let mut suggestion = ctx
+        .db
+        .merge_suggestion()
+        .id()
+        .find(&suggestion_id)
+        .ok_or_else(|| "Merge suggestion not found".to_string())?;
+
+    if suggestion.status != "pending" {
+        return Err(format!(
+            "Suggestion is not pending (current status: {})",
+            suggestion.status
+        ));
+    }
+
+    suggestion.status = String::from("approved");
+    // Extract fields before moving `suggestion` into the update call
+    let source_id = suggestion.source_id.clone();
+    let target_id = suggestion.target_id.clone();
+    let workspace_id = suggestion.workspace_id.clone();
+    ctx.db.merge_suggestion().id().update(suggestion);
+
+    // Deactivate the source memory, pointing it at the target
+    if let Some(mut src) = ctx.db.memory().id().find(&source_id) {
+        src.is_active = false;
+        src.consolidated_to = target_id.clone();
+        src.updated_at = now;
+        ctx.db.memory().id().update(src);
+    }
+
+    // Reinforce the target (bump access count as a "merge reinforcement")
+    if let Some(mut tgt) = ctx.db.memory().id().find(&target_id) {
+        tgt.access_count = tgt.access_count.saturating_add(1);
+        tgt.updated_at = now;
+        ctx.db.memory().id().update(tgt);
+    }
+
+    // Log the consolidation
+    let source_ids_json = serde_json::to_string(&[source_id])
+        .unwrap_or_else(|_| "[]".to_string());
+    let log = ConsolidationLog {
+        id: uuid_v4(ctx),
+        workspace_id,
+        consolidation_type: String::from("approved_merge"),
+        source_memory_ids: source_ids_json,
+        target_memory_id: target_id,
+        created_at: now,
+    };
+    ctx.db.consolidation_log().insert(log);
+
+    Ok(())
+}
+
+/// Reject a merge suggestion without merging.
+#[reducer]
+pub fn reject_merge(ctx: &ReducerContext, suggestion_id: String) -> Result<(), String> {
+    let mut suggestion = ctx
+        .db
+        .merge_suggestion()
+        .id()
+        .find(&suggestion_id)
+        .ok_or_else(|| "Merge suggestion not found".to_string())?;
+
+    if suggestion.status != "pending" {
+        return Err(format!(
+            "Suggestion is not pending (current status: {})",
+            suggestion.status
+        ));
+    }
+
+    suggestion.status = String::from("rejected");
+    ctx.db.merge_suggestion().id().update(suggestion);
 
     Ok(())
 }

@@ -9,7 +9,7 @@ import { callReducer } from '@/lib/spacetimedb';
 import {
   GitMerge, GitBranch, ArrowLeft, Eye, X,
   Filter, Calendar, AlertCircle, Sparkles, Layers, FileText,
-  CheckCircle2, Clock,
+  CheckCircle2, Clock, ThumbsUp, ThumbsDown, Search,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -46,6 +46,18 @@ interface WorkspaceRow {
   updated_at: number;
 }
 
+interface MergeSuggestionRow {
+  id: string;
+  workspace_id: string;
+  source_id: string;
+  target_id: string;
+  cosine_similarity: number;
+  edit_distance: number;
+  content_overlap_preview: string;
+  status: string; // "pending" | "approved" | "rejected"
+  created_at: number;
+}
+
 // ---------------------------------------------------------------------------
 // Merge group derived type
 // ---------------------------------------------------------------------------
@@ -74,6 +86,23 @@ function confidenceColor(c: number): string {
   if (c >= 0.8) return 'text-green-500';
   if (c >= 0.5) return 'text-yellow-500';
   return 'text-red-500';
+}
+
+function statusBadgeVariant(status: string): 'default' | 'secondary' | 'outline' {
+  switch (status) {
+    case 'approved': return 'default';
+    case 'rejected': return 'secondary';
+    default: return 'outline'; // pending
+  }
+}
+
+function statusColor(status: string): string {
+  switch (status) {
+    case 'pending': return 'bg-amber-500/10 text-amber-600 border-amber-500/30';
+    case 'approved': return 'bg-green-500/10 text-green-600 border-green-500/30';
+    case 'rejected': return 'bg-gray-500/10 text-gray-500 border-gray-400/30';
+    default: return '';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -403,12 +432,102 @@ function MergeGroupCard({
 }
 
 // ---------------------------------------------------------------------------
+// Suggestion Card sub-component
+// ---------------------------------------------------------------------------
+
+function SuggestionCard({
+  suggestion,
+  onApprove,
+  onReject,
+  memories,
+}: {
+  suggestion: MergeSuggestionRow;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  memories: MemoryRow[];
+}) {
+  const sourceMem = memories.find((m) => m.id === suggestion.source_id);
+  const targetMem = memories.find((m) => m.id === suggestion.target_id);
+
+  const isPending = suggestion.status === 'pending';
+
+  return (
+    <Card className={`border-l-4 ${
+      suggestion.status === 'approved' ? 'border-l-green-500/60' :
+      suggestion.status === 'rejected' ? 'border-l-gray-400/40' :
+      'border-l-amber-500/60'
+    }`}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge
+                variant={statusBadgeVariant(suggestion.status)}
+                className={`text-[10px] uppercase tracking-wider ${statusColor(suggestion.status)}`}
+              >
+                {suggestion.status}
+              </Badge>
+              <Badge variant="outline" className="text-[10px] font-mono">
+                Sim: {(suggestion.cosine_similarity * 100).toFixed(1)}%
+              </Badge>
+              <Badge variant="outline" className="text-[10px] font-mono">
+                Edit: {(suggestion.edit_distance * 100).toFixed(1)}%
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+              {suggestion.content_overlap_preview || '(no preview)'}
+            </p>
+          </div>
+        </div>
+
+        {/* Source → Target */}
+        <div className="grid grid-cols-2 gap-3 mt-2">
+          <div className="rounded bg-muted/30 p-2 text-xs">
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Source (merged away)</p>
+            <p className="font-medium truncate">{sourceMem?.summary || sourceMem?.content?.slice(0, 60) || '(unknown)'}</p>
+          </div>
+          <div className="rounded bg-green-500/5 p-2 text-xs border border-green-500/20">
+            <p className="text-[10px] text-green-600 uppercase mb-1">Target (survivor)</p>
+            <p className="font-medium truncate">{targetMem?.summary || targetMem?.content?.slice(0, 60) || '(unknown)'}</p>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        {isPending && (
+          <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border">
+            <Button
+              variant="default"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => onApprove(suggestion.id)}
+            >
+              <ThumbsUp className="h-3 w-3 mr-1" />
+              Approve
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => onReject(suggestion.id)}
+            >
+              <ThumbsDown className="h-3 w-3 mr-1" />
+              Reject
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
 export default function MergeCandidates() {
   const { data: memories, loading, error } = useTable<MemoryRow>('memory');
   const { data: workspaces } = useTable<WorkspaceRow>('workspace');
+  const { data: suggestions } = useTable<MergeSuggestionRow>('merge_suggestion');
 
   // State
   const [selectedSurvivorId, setSelectedSurvivorId] = useState<string | null>(null);
@@ -416,6 +535,8 @@ export default function MergeCandidates() {
   const [workspaceFilter, setWorkspaceFilter] = useState<string>('');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
+  const [scanThreshold, setScanThreshold] = useState<string>('0.8');
+  const [scanning, setScanning] = useState(false);
 
   // --- Derived data ---
   const { groups, allMerged } = useMemo(() => {
@@ -444,6 +565,18 @@ export default function MergeCandidates() {
 
     return { groups, allMerged: merged };
   }, [memories]);
+
+  // Filtered merge suggestions
+  const filteredSuggestions = useMemo(() => {
+    if (!suggestions) return [];
+    if (!workspaceFilter) return suggestions;
+    return suggestions.filter((s) => s.workspace_id === workspaceFilter);
+  }, [suggestions, workspaceFilter]);
+
+  // Pending suggestions count
+  const pendingCount = useMemo(() => {
+    return filteredSuggestions.filter((s) => s.status === 'pending').length;
+  }, [filteredSuggestions]);
 
   // --- Filtering ---
   const filteredGroups = useMemo(() => {
@@ -487,6 +620,39 @@ export default function MergeCandidates() {
 
   const handleCompare = useCallback((candidate: MemoryRow) => {
     setCompareCandidate(candidate);
+  }, []);
+
+  const handleFindCandidates = useCallback(async () => {
+    const ws = workspaceFilter;
+    if (!ws) {
+      alert('Please select a workspace first using the filter dropdown.');
+      return;
+    }
+    const threshold = parseFloat(scanThreshold) || 0.8;
+    setScanning(true);
+    try {
+      await callReducer('suggest_merges', [ws, threshold]);
+    } catch (err: any) {
+      console.error('Failed to scan for merge candidates:', err);
+    } finally {
+      setScanning(false);
+    }
+  }, [workspaceFilter, scanThreshold]);
+
+  const handleApproveMerge = useCallback(async (suggestionId: string) => {
+    try {
+      await callReducer('approve_merge', [suggestionId]);
+    } catch (err: any) {
+      console.error('Failed to approve merge:', err);
+    }
+  }, []);
+
+  const handleRejectMerge = useCallback(async (suggestionId: string) => {
+    try {
+      await callReducer('reject_merge', [suggestionId]);
+    } catch (err: any) {
+      console.error('Failed to reject merge:', err);
+    }
   }, []);
 
   // --- Render ---
@@ -719,8 +885,39 @@ export default function MergeCandidates() {
       {/* Stats */}
       <StatsBar groups={groups} allMerged={allMerged} />
 
-      {/* Empty state */}
-      {groups.length === 0 ? (
+      {/* ── Merge Suggestions Section ── */}
+      {filteredSuggestions.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Search className="h-4 w-4 text-amber-500" />
+              Merge suggestions
+              <Badge variant="outline" className="ml-1 text-[10px]">
+                {pendingCount} pending / {filteredSuggestions.length} total
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              Auto-detected near-duplicate pairs awaiting review
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {filteredSuggestions.map((s) => (
+                <SuggestionCard
+                  key={s.id}
+                  suggestion={s}
+                  onApprove={handleApproveMerge}
+                  onReject={handleRejectMerge}
+                  memories={memories || []}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty state (no groups, no suggestions) */}
+      {groups.length === 0 && filteredSuggestions.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
             <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-green-500/50" />
@@ -728,11 +925,34 @@ export default function MergeCandidates() {
             <p className="text-sm mt-1">
               All memories are unique — no near-duplicates detected.
             </p>
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <select
+                className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                value={workspaceFilter}
+                onChange={(e) => setWorkspaceFilter(e.target.value)}
+              >
+                <option value="">Select workspace...</option>
+                {workspaces?.map((ws: WorkspaceRow) => (
+                  <option key={ws.id} value={ws.id}>
+                    {ws.name || ws.id.slice(0, 12)}
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleFindCandidates}
+                disabled={scanning || !workspaceFilter}
+              >
+                <Search className="h-3.5 w-3.5 mr-1.5" />
+                {scanning ? 'Scanning...' : 'Find New Candidates'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
         <>
-          {/* Filters */}
+          {/* Filters + Find Candidates */}
           <Card>
             <CardContent className="p-4">
               <div className="flex flex-wrap items-end gap-3">
@@ -796,12 +1016,66 @@ export default function MergeCandidates() {
                   </Button>
                 )}
 
-                <div className="text-xs text-muted-foreground ml-auto">
-                  Showing {filteredGroups.length} of {groups.length} groups
+                <div className="text-xs text-muted-foreground ml-auto flex items-center gap-3">
+                  <span>
+                    Showing {filteredGroups.length} of {groups.length} groups
+                  </span>
+                  {/* Find New Candidates */}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      className="h-8 w-20 text-xs"
+                      placeholder="0.8"
+                      value={scanThreshold}
+                      onChange={(e) => setScanThreshold(e.target.value)}
+                      title="Cosine similarity threshold"
+                    />
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={handleFindCandidates}
+                      disabled={scanning || !workspaceFilter}
+                    >
+                      <Search className="h-3 w-3 mr-1" />
+                      {scanning ? 'Scanning...' : 'Find New Candidates'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Merge suggestions (if any) */}
+          {filteredSuggestions.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Search className="h-4 w-4 text-amber-500" />
+                  Pending Merge Suggestions
+                  <Badge variant="outline" className="ml-1 text-[10px]">
+                    {pendingCount} pending
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {filteredSuggestions.map((s) => (
+                    <SuggestionCard
+                      key={s.id}
+                      suggestion={s}
+                      onApprove={handleApproveMerge}
+                      onReject={handleRejectMerge}
+                      memories={memories || []}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Merge group cards */}
           {filteredGroups.length === 0 ? (

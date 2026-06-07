@@ -536,6 +536,30 @@ class Client:
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         return rows[:limit]
 
+    def get_user_memories(
+        self, user_scope: str, workspace_id: str
+    ) -> list[dict[str, Any]]:
+        """Get all memories scoped to a specific user within a workspace.
+        
+        Calls the ``get_user_memories`` reducer which populates the
+        ``user_memory_result`` table, then reads from it.
+        
+        Args:
+            user_scope: The user identity hash to filter by.
+            workspace_id: The workspace to search in.
+        
+        Returns:
+            List of memory records scoped to the given user.
+        """
+        self._call("get_user_memories", [user_scope, workspace_id])
+        rows = self._sql(
+            "SELECT * FROM user_memory_result WHERE "
+            f"user_scope = '{_esc(user_scope)}' AND "
+            f"workspace_id = '{_esc(workspace_id)}' "
+            "ORDER BY created_at DESC"
+        )
+        return rows
+
     # -----------------------------------------------------------------------
     # Directory (context directory tree)
     # -----------------------------------------------------------------------
@@ -731,6 +755,46 @@ class Client:
         return self._call("dedup_memories", [workspace_id])
 
     # -----------------------------------------------------------------------
+    # Merge suggestions
+    # -----------------------------------------------------------------------
+
+    def suggest_merges(self, workspace_id: str, threshold: float = 0.8) -> dict[str, Any]:
+        """Scan active memories and record merge suggestions.
+
+        Args:
+            workspace_id: The workspace to scan.
+            threshold: Minimum cosine similarity threshold (default: 0.8).
+
+        Returns:
+            Reducer status.
+        """
+        return self._call("suggest_merges", [workspace_id, threshold])
+
+    def approve_merge(self, suggestion_id: str) -> dict[str, Any]:
+        """Approve a pending merge suggestion.
+
+        Deactivates the source memory into the target (survivor) memory.
+
+        Args:
+            suggestion_id: The ID of the MergeSuggestion row.
+
+        Returns:
+            Reducer status.
+        """
+        return self._call("approve_merge", [suggestion_id])
+
+    def reject_merge(self, suggestion_id: str) -> dict[str, Any]:
+        """Reject a pending merge suggestion without merging.
+
+        Args:
+            suggestion_id: The ID of the MergeSuggestion row.
+
+        Returns:
+            Reducer status.
+        """
+        return self._call("reject_merge", [suggestion_id])
+
+    # -----------------------------------------------------------------------
     # Session
     # -----------------------------------------------------------------------
 
@@ -800,6 +864,30 @@ class Client:
             "community": community[0] if community else None,
             "nodes": nodes,
         }
+
+    def compute_pagerank(self, workspace_id: str, damping: float = 0.85, max_iterations: int = 100) -> dict[str, Any]:
+        """Compute PageRank centrality for all nodes in a workspace.
+
+        Args:
+            workspace_id: The workspace to compute PageRank for.
+            damping: PageRank damping factor (default: 0.85).
+            max_iterations: Maximum iterations (default: 100).
+
+        Returns:
+            Reducer status.
+        """
+        return self._call("compute_pagerank", [workspace_id, damping, max_iterations])
+
+    def compute_community_hierarchy(self, workspace_id: str) -> dict[str, Any]:
+        """Build hierarchical community dendrogram using agglomerative clustering.
+
+        Args:
+            workspace_id: The workspace to build hierarchy for.
+
+        Returns:
+            Reducer status.
+        """
+        return self._call("compute_community_hierarchy", [workspace_id])
 
     # -----------------------------------------------------------------------
     # Peer queries

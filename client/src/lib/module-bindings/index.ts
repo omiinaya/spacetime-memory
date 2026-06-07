@@ -41,6 +41,8 @@ import AddProfileFactReducer from "./add_profile_fact_reducer";
 import AssignToCommunityReducer from "./assign_to_community_reducer";
 import CleanupExpiredSessionsReducer from "./cleanup_expired_sessions_reducer";
 import ComputeGodNodesReducer from "./compute_god_nodes_reducer";
+import ComputePagerankReducer from "./compute_pagerank_reducer";
+import ComputeCommunityHierarchyReducer from "./compute_community_hierarchy_reducer";
 import ConsolidateMemoriesReducer from "./consolidate_memories_reducer";
 import CreateApiKeyReducer from "./create_api_key_reducer";
 import CreateAuthSessionReducer from "./create_auth_session_reducer";
@@ -117,6 +119,9 @@ import DocumentRow from "./document_table";
 import EntityLinkRow from "./entity_link_table";
 import GodNodeRow from "./god_node_table";
 import HybridResultRow from "./hybrid_result_table";
+import PagerankResultRow from "./pagerank_result_table";
+import HierarchyClusterRow from "./hierarchy_cluster_table";
+import CommunityHierarchyRow from "./community_hierarchy_table";
 import InsightRow from "./insight_table";
 import KgCommunityRow from "./kg_community_table";
 import KgEdgeRow from "./kg_edge_table";
@@ -274,6 +279,17 @@ const tablesSchema = __schema({
       { name: 'hybrid_result_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, HybridResultRow),
+  pagerank_result: __table({
+    name: 'pagerank_result',
+    indexes: [
+      { accessor: 'id', name: 'pagerank_result_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'pagerank_result_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, PagerankResultRow),
   insight: __table({
     name: 'insight',
     indexes: [
@@ -318,6 +334,28 @@ const tablesSchema = __schema({
       { name: 'kg_node_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, KgNodeRow),
+  hierarchy_cluster: __table({
+    name: 'hierarchy_cluster',
+    indexes: [
+      { accessor: 'id', name: 'hierarchy_cluster_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'hierarchy_cluster_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, HierarchyClusterRow),
+  community_hierarchy: __table({
+    name: 'community_hierarchy',
+    indexes: [
+      { accessor: 'id', name: 'community_hierarchy_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'community_hierarchy_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CommunityHierarchyRow),
   maintenance_schedule: __table({
     name: 'maintenance_schedule',
     indexes: [
@@ -497,6 +535,8 @@ const reducersSchema = __reducers(
   __reducerSchema("assign_to_community", AssignToCommunityReducer),
   __reducerSchema("cleanup_expired_sessions", CleanupExpiredSessionsReducer),
   __reducerSchema("compute_god_nodes", ComputeGodNodesReducer),
+  __reducerSchema("compute_pagerank", ComputePagerankReducer),
+  __reducerSchema("compute_community_hierarchy", ComputeCommunityHierarchyReducer),
   __reducerSchema("consolidate_memories", ConsolidateMemoriesReducer),
   __reducerSchema("create_api_key", CreateApiKeyReducer),
   __reducerSchema("create_auth_session", CreateAuthSessionReducer),

@@ -16,11 +16,14 @@ import {
   Code,
   GitBranch,
   MessageSquare,
+  BarChart3,
+  GitMerge,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchKgNodes as fetchNodes, fetchKgEdges as fetchEdges } from '@/lib/spacetimedb';
 
 /* ------------------------------------------------------------------ */
@@ -41,6 +44,28 @@ interface GraphEdge {
   to: string;
   relation: string;
   weight: number;
+}
+
+interface PagerankEntry {
+  id: string;
+  node_id: string;
+  node_label: string;
+  rank: number;
+  iteration: number;
+}
+
+interface HierarchyNode {
+  id: string;
+  parent_cluster_id: string;
+  child_cluster_id: string;
+  similarity: number;
+  depth: number;
+}
+
+interface DendrogramNode {
+  id: string;
+  community_ids: string;
+  depth: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -99,6 +124,78 @@ interface VisEdgeItem {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Dendrogram tree renderer                                           */
+/* ------------------------------------------------------------------ */
+
+function DendrogramTree({
+  edges,
+  clusters,
+  communityLabels,
+}: {
+  edges: HierarchyNode[];
+  clusters: DendrogramNode[];
+  communityLabels: Record<number, string>;
+}) {
+  // Build tree from edges: find root(s) — nodes with no parent
+  const childIds = new Set(edges.map((e) => e.child_cluster_id));
+  const parentIds = new Set(edges.map((e) => e.parent_cluster_id));
+  const roots = [...parentIds].filter((id) => !childIds.has(id));
+
+  // Map cluster id -> DendrogramNode
+  const clusterMap = new Map(clusters.map((c) => [c.id, c]));
+
+  // Map cluster id -> children edges
+  const childrenMap = new Map<string, HierarchyNode[]>();
+  for (const e of edges) {
+    if (!childrenMap.has(e.parent_cluster_id)) {
+      childrenMap.set(e.parent_cluster_id, []);
+    }
+    childrenMap.get(e.parent_cluster_id)!.push(e);
+  }
+
+  function renderNode(clusterId: string, depth: number): React.ReactNode {
+    const cluster = clusterMap.get(clusterId);
+    if (!cluster) return null;
+
+    const children = childrenMap.get(clusterId) || [];
+
+    // Parse community IDs
+    let communityIds: number[] = [];
+    try {
+      communityIds = JSON.parse(cluster.community_ids);
+    } catch {
+      communityIds = [];
+    }
+
+    // Get edge info for this parent-child relationship
+    const childEdges = edges.filter((e) => e.parent_cluster_id === clusterId);
+
+    return (
+      <div key={clusterId} className="ml-4 border-l border-border pl-3">
+        <div className="flex items-center gap-2 py-1">
+          <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground" />
+          <span className="text-xs text-muted-foreground">
+            {communityIds.length > 1 ? (
+              <>Cluster ({communityIds.length} communities) — depth {cluster.depth}</>
+            ) : (
+              <>Community {communityIds[0]}: {communityLabels[communityIds[0]] || 'unnamed'}</>
+            )}
+          </span>
+          {childEdges.length > 0 && (
+            <span className="text-[10px] text-muted-foreground/60">
+              (sim: {childEdges[0].similarity.toFixed(3)})
+            </span>
+          )}
+        </div>
+        {children.map((edge) => renderNode(edge.child_cluster_id, depth + 1))}
+      </div>
+    );
+  }
+
+  return <div className="py-2">{roots.map((r) => renderNode(r, 0))}</div>;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -115,6 +212,17 @@ export default function KnowledgeGraph() {
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GraphNode[]>([]);
+  const [activeTab, setActiveTab] = useState('graph');
+
+  // PageRank state
+  const [pagerankLoading, setPagerankLoading] = useState(false);
+  const [pagerankResults, setPagerankResults] = useState<PagerankEntry[]>([]);
+
+  // Community Hierarchy state
+  const [hierarchyLoading, setHierarchyLoading] = useState(false);
+  const [hierarchyEdges, setHierarchyEdges] = useState<HierarchyNode[]>([]);
+  const [hierarchyClusters, setHierarchyClusters] = useState<DendrogramNode[]>([]);
+  const [communityLabels, setCommunityLabels] = useState<Record<number, string>>({});
 
   /* ---------- build vis-network ---------- */
 
@@ -347,6 +455,98 @@ export default function KnowledgeGraph() {
 
   const fitView = () => networkRef.current?.fit({ animation: { duration: 300, easingFunction: 'easeInOutQuad' } });
 
+  /* ---------- PageRank ---------- */
+
+  const handleComputePagerank = useCallback(async () => {
+    setPagerankLoading(true);
+    try {
+      // Use the workspace ID from the first node (all nodes share the same workspace)
+      const wsId = allNodesRef.current[0]?.id ?? '';
+      const resp = await fetch('/api/call/compute_pagerank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([wsId, 0.85, 100]),
+      });
+      if (!resp.ok) {
+        console.error('PageRank reducer call failed');
+      }
+
+      // Read back results via SQL proxy
+      const sqlResp = await fetch(`/api/sql?q=SELECT * FROM pagerank_result ORDER BY rank DESC`);
+      const rows = await sqlResp.json();
+      setPagerankResults(
+        rows.map((r: any) => ({
+          id: r.id,
+          node_id: r.node_id,
+          node_label: r.node_label,
+          rank: r.rank,
+          iteration: r.iteration,
+        })),
+      );
+    } catch (err) {
+      console.error('PageRank error:', err);
+    } finally {
+      setPagerankLoading(false);
+    }
+  }, []);
+
+  /* ---------- Community Hierarchy ---------- */
+
+  const handleComputeHierarchy = useCallback(async () => {
+    setHierarchyLoading(true);
+    try {
+      const wsId = allNodesRef.current[0]?.id ?? '';
+
+      // Load community labels
+      const commResp = await fetch(`/api/sql?q=SELECT * FROM kg_community`);
+      const commRows = await commResp.json();
+      const labels: Record<number, string> = {};
+      for (const c of commRows) {
+        labels[c.id] = c.name;
+      }
+      setCommunityLabels(labels);
+
+      // Call reducer
+      await fetch('/api/call/compute_community_hierarchy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([wsId]),
+      });
+
+      // Read back edges
+      const edgesResp = await fetch(
+        `/api/sql?q=SELECT * FROM community_hierarchy ORDER BY depth ASC`,
+      );
+      const edgeRows = await edgesResp.json();
+      setHierarchyEdges(
+        edgeRows.map((e: any) => ({
+          id: e.id,
+          parent_cluster_id: e.parent_cluster_id,
+          child_cluster_id: e.child_cluster_id,
+          similarity: e.similarity,
+          depth: e.depth,
+        })),
+      );
+
+      // Read back clusters
+      const clustResp = await fetch(
+        `/api/sql?q=SELECT * FROM hierarchy_cluster ORDER BY depth ASC`,
+      );
+      const clustRows = await clustResp.json();
+      setHierarchyClusters(
+        clustRows.map((c: any) => ({
+          id: c.id,
+          community_ids: c.community_ids,
+          depth: c.depth,
+        })),
+      );
+    } catch (err) {
+      console.error('Hierarchy error:', err);
+    } finally {
+      setHierarchyLoading(false);
+    }
+  }, []);
+
   /* ---------- render ---------- */
 
   // --- Loading skeleton ---
@@ -431,147 +631,255 @@ export default function KnowledgeGraph() {
         </div>
       </div>
 
-      {/* Toolbar: search + zoom + legend */}
-      <div className="flex shrink-0 flex-wrap items-center gap-3">
-        {/* Search */}
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search nodes…"
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-9 pr-8"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => handleSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-1 flex-col">
+        <div className="flex shrink-0 items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="graph" className="flex items-center gap-1.5">
+              <NetworkIcon className="h-4 w-4" />
+              Graph
+            </TabsTrigger>
+            <TabsTrigger value="pagerank" className="flex items-center gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              PageRank
+            </TabsTrigger>
+            <TabsTrigger value="hierarchy" className="flex items-center gap-1.5">
+              <GitMerge className="h-4 w-4" />
+              Community Hierarchy
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        {/* Zoom controls */}
-        <div className="flex items-center rounded-md border border-border bg-card">
-          <button
-            onClick={zoomIn}
-            className="rounded-l-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            title="Zoom in"
-            type="button"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </button>
-          <button
-            onClick={zoomOut}
-            className="border-x border-border p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            title="Zoom out"
-            type="button"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </button>
-          <button
-            onClick={fitView}
-            className="rounded-r-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            title="Fit view"
-            type="button"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Legend */}
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
-          <span className="mr-1 text-xs text-muted-foreground">Legend:</span>
-          {Object.entries(NODE_TYPE_COLORS).map(([type, colors]) => (
-            <span key={type} className="flex items-center gap-1 text-xs">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: colors.bg }}
+        {/* ============ Graph Tab ============ */}
+        <TabsContent value="graph" className="mt-3 flex flex-1 flex-col gap-3">
+          {/* Toolbar: search + zoom + legend */}
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            {/* Search */}
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search nodes…"
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="pl-9 pr-8"
               />
-              <span className="text-muted-foreground capitalize">{type}</span>
-            </span>
-          ))}
-        </div>
-      </div>
+              {searchQuery && (
+                <button
+                  onClick={() => handleSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
 
-      {/* Main area: graph + details panel */}
-      <div className="flex flex-1 gap-4 overflow-hidden">
-        {/* Graph canvas */}
-        <div className="relative flex-1 overflow-hidden rounded-lg border border-border bg-card">
-          <div ref={containerRef} className="h-full w-full" />
+            {/* Zoom controls */}
+            <div className="flex items-center rounded-md border border-border bg-card">
+              <button
+                onClick={zoomIn}
+                className="rounded-l-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                title="Zoom in"
+                type="button"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+              <button
+                onClick={zoomOut}
+                className="border-x border-border p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                title="Zoom out"
+                type="button"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <button
+                onClick={fitView}
+                className="rounded-r-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                title="Fit view"
+                type="button"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </button>
+            </div>
 
-          {/* Search results indicator */}
-          {searchResults.length > 0 && (
-            <div className="absolute left-3 top-3 z-10 rounded-md bg-background/90 px-2.5 py-1 text-xs text-muted-foreground backdrop-blur-sm">
-              {searchResults.length} node{searchResults.length !== 1 ? 's' : ''} found
-              — click to inspect
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
+              <span className="mr-1 text-xs text-muted-foreground">Legend:</span>
+              {Object.entries(NODE_TYPE_COLORS).map(([type, colors]) => (
+                <span key={type} className="flex items-center gap-1 text-xs">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: colors.bg }}
+                  />
+                  <span className="text-muted-foreground capitalize">{type}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Main area: graph + details panel */}
+          <div className="flex flex-1 gap-4 overflow-hidden">
+            {/* Graph canvas */}
+            <div className="relative flex-1 overflow-hidden rounded-lg border border-border bg-card">
+              <div ref={containerRef} className="h-full w-full" />
+
+              {/* Search results indicator */}
+              {searchResults.length > 0 && (
+                <div className="absolute left-3 top-3 z-10 rounded-md bg-background/90 px-2.5 py-1 text-xs text-muted-foreground backdrop-blur-sm">
+                  {searchResults.length} node{searchResults.length !== 1 ? 's' : ''} found
+                  — click to inspect
+                </div>
+              )}
+            </div>
+
+            {/* Details panel */}
+            {selectedNode && (
+              <Card className="w-80 shrink-0 overflow-y-auto">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    {(() => {
+                      const Icon = NODE_TYPE_ICONS[selectedNode.node_type] ?? Layers;
+                      return <Icon className="h-4 w-4 text-muted-foreground" />;
+                    })()}
+                    Node Details
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setSelectedNode(null)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Label */}
+                  <div>
+                    <p className="text-xs text-muted-foreground">Label</p>
+                    <p className="text-sm font-medium">{selectedNode.label}</p>
+                  </div>
+
+                  {/* Type */}
+                  <div>
+                    <p className="text-xs text-muted-foreground">Type</p>
+                    <Badge
+                      variant="outline"
+                      className="mt-0.5 capitalize"
+                    >
+                      {selectedNode.node_type}
+                    </Badge>
+                  </div>
+
+                  {/* Community ID */}
+                  {selectedNode.community_id != null && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Community</p>
+                      <div className="mt-0.5 flex items-center gap-1">
+                        <Hash className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm">{selectedNode.community_id}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Summary */}
+                  {selectedNode.summary && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Summary</p>
+                      <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                        {selectedNode.summary}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ============ PageRank Tab ============ */}
+        <TabsContent value="pagerank" className="mt-3 flex flex-1 flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <Button onClick={handleComputePagerank} disabled={pagerankLoading}>
+              {pagerankLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <BarChart3 className="mr-2 h-4 w-4" />
+              )}
+              Compute PageRank
+            </Button>
+            {pagerankResults.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {pagerankResults.length} nodes ranked
+              </span>
+            )}
+          </div>
+
+          {pagerankResults.length > 0 && (
+            <div className="flex-1 overflow-y-auto rounded-lg border border-border bg-card">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-muted/50">
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-2 text-left font-medium text-muted-foreground">Rank</th>
+                    <th className="px-4 py-2 text-left font-medium text-muted-foreground">Node</th>
+                    <th className="px-4 py-2 text-right font-medium text-muted-foreground">PageRank Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagerankResults.map((entry, i) => (
+                    <tr key={entry.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-2 text-muted-foreground">#{i + 1}</td>
+                      <td className="px-4 py-2 font-medium">{entry.node_label}</td>
+                      <td className="px-4 py-2 text-right font-mono">
+                        {(entry.rank * 100).toFixed(3)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-        </div>
 
-        {/* Details panel */}
-        {selectedNode && (
-          <Card className="w-80 shrink-0 overflow-y-auto">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                {(() => {
-                  const Icon = NODE_TYPE_ICONS[selectedNode.node_type] ?? Layers;
-                  return <Icon className="h-4 w-4 text-muted-foreground" />;
-                })()}
-                Node Details
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setSelectedNode(null)}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Label */}
-              <div>
-                <p className="text-xs text-muted-foreground">Label</p>
-                <p className="text-sm font-medium">{selectedNode.label}</p>
-              </div>
+          {!pagerankLoading && pagerankResults.length === 0 && (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+              Click "Compute PageRank" to rank nodes by centrality.
+            </div>
+          )}
+        </TabsContent>
 
-              {/* Type */}
-              <div>
-                <p className="text-xs text-muted-foreground">Type</p>
-                <Badge
-                  variant="outline"
-                  className="mt-0.5 capitalize"
-                >
-                  {selectedNode.node_type}
-                </Badge>
-              </div>
-
-              {/* Community ID */}
-              {selectedNode.community_id != null && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Community</p>
-                  <div className="mt-0.5 flex items-center gap-1">
-                    <Hash className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-sm">{selectedNode.community_id}</span>
-                  </div>
-                </div>
+        {/* ============ Community Hierarchy Tab ============ */}
+        <TabsContent value="hierarchy" className="mt-3 flex flex-1 flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <Button onClick={handleComputeHierarchy} disabled={hierarchyLoading}>
+              {hierarchyLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <GitMerge className="mr-2 h-4 w-4" />
               )}
+              Build Community Hierarchy
+            </Button>
+            {hierarchyEdges.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {hierarchyEdges.length} merges · {hierarchyClusters.length} clusters
+              </span>
+            )}
+          </div>
 
-              {/* Summary */}
-              {selectedNode.summary && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Summary</p>
-                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                    {selectedNode.summary}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          {hierarchyEdges.length > 0 && hierarchyClusters.length > 0 && (
+            <div className="flex-1 overflow-y-auto rounded-lg border border-border bg-card p-4">
+              <DendrogramTree
+                edges={hierarchyEdges}
+                clusters={hierarchyClusters}
+                communityLabels={communityLabels}
+              />
+            </div>
+          )}
+
+          {!hierarchyLoading && hierarchyEdges.length === 0 && (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+              Click "Build Community Hierarchy" to see the dendrogram.
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
