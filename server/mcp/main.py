@@ -255,6 +255,44 @@ def get_session_messages(session_id: str) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# KG Graph Traversal tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def graph_bfs(workspace_id: str, start_node_id: str, max_depth: int = 3) -> str:
+    """BFS traverse the knowledge graph from a node. Results in graph_traversal_result table."""
+    get_client().graph_bfs(workspace_id, start_node_id, max_depth)
+    return f"BFS from {start_node_id} up to depth {max_depth} completed. Read via SQL on graph_traversal_result."
+
+
+@mcp.tool()
+def shortest_path(workspace_id: str, source_id: str, target_id: str, max_hops: int = 6) -> str:
+    """Find shortest path between two KG nodes. Results in shortest_path_result table."""
+    get_client().shortest_path(workspace_id, source_id, target_id, max_hops)
+    return f"Shortest path computed. Read via SQL on shortest_path_result."
+
+
+# ---------------------------------------------------------------------------
+# Tour tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def create_tour(workspace_id: str, title: str, description: str = "") -> str:
+    """Create a new guided tour through KG nodes."""
+    get_client().create_tour(workspace_id, title, description)
+    return f"Tour '{title}' created."
+
+
+@mcp.tool()
+def add_tour_stop(tour_id: str, node_id: str, heading: str, description: str = "") -> str:
+    """Add a stop to an existing tour."""
+    get_client().add_tour_stop(tour_id, node_id, heading, description)
+    return f"Stop '{heading}' added to tour."
+
+
+# ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
 

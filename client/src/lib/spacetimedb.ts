@@ -204,6 +204,15 @@ export async function fetchInsights(pid?: string): Promise<any[]> {
 export async function fetchTags(): Promise<any[]> { return getFromCache('tag'); }
 export async function fetchDashboardStats(): Promise<DashboardStats> { return getDashboardStats(); }
 export async function fetchRecentActivity(l = 10): Promise<RecentActivity[]> { return getRecentActivity(l); }
+export async function fetchTours(): Promise<any[]> { return getFromCache('tour'); }
+export async function fetchTourStops(tourId: string): Promise<any[]> {
+  try {
+    const rows = await executeSql(
+      `SELECT * FROM tour_stop WHERE tour_id = '${tourId}'`
+    );
+    return parseSqlResponse(rows);
+  } catch { return []; }
+}
 export async function fetchNotesWithBacklinks(): Promise<any[]> {
   // Returns notes with their outgoingLinks parsed from content
   const notes = getFromCache<any>('note');

@@ -612,6 +612,41 @@ class Client:
             f"WHERE nb.source_note_id = '{_esc(note_id)}'"
         )
 
+    # -------------------------------------------------------------------
+    # KG Graph Traversal
+    # -------------------------------------------------------------------
+
+    def graph_bfs(self, workspace_id: str, start_node_id: str, max_depth: int = 3) -> None:
+        """BFS traversal from a start node up to max_depth.
+        Results are in graph_traversal_result table, keyed by query_id."""
+        self._call("graph_bfs", [workspace_id, start_node_id, max_depth])
+
+    def shortest_path(self, workspace_id: str, source_id: str, target_id: str, max_hops: int = 6) -> None:
+        """Shortest path between two nodes.
+        Results in shortest_path_result table, ordered by step_order."""
+        self._call("shortest_path", [workspace_id, source_id, target_id, max_hops])
+
+    def get_neighbors(self, workspace_id: str, node_id: str) -> None:
+        """Get immediate neighbours of a node.
+        Results in graph_traversal_result table with depth=1."""
+        self._call("get_neighbors", [workspace_id, node_id])
+
+    # -------------------------------------------------------------------
+    # Tours
+    # -------------------------------------------------------------------
+
+    def create_tour(self, workspace_id: str, title: str, description: str = "") -> None:
+        """Create a new guided tour."""
+        self._call("create_tour", [workspace_id, title, description])
+
+    def add_tour_stop(self, tour_id: str, node_id: str, heading: str, description: str = "") -> None:
+        """Add a stop to a tour."""
+        self._call("add_tour_stop", [tour_id, node_id, heading, description])
+
+    def delete_tour(self, tour_id: str) -> None:
+        """Delete a tour and all its stops."""
+        self._call("delete_tour", [tour_id])
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers

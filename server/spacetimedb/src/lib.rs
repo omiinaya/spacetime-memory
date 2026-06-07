@@ -20,6 +20,7 @@ pub mod context_delta;
 pub mod hybrid_query;
 pub mod note;
 pub mod graph_traversal;
+pub mod tour;
 
 /// Generate a UUID v4 using the SpacetimeDB reducer timestamp and RNG.
 /// Safe for WASM — does not use `std::time::SystemTime`.
