@@ -1,0 +1,7 @@
+{
+  "name": "example_logger",
+  "version": "1.0.0",
+  "description": "Logs all memory operations (store, retrieve) and connector events to the console",
+  "entry_point": "main.py",
+  "dependencies": []
+}

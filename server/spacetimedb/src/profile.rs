@@ -4,7 +4,7 @@ use crate::{now_micros, uuid_v4};
 
 /// A profile accumulates static facts and dynamic context about a peer.
 #[table(accessor = profile, public)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Profile {
     #[primary_key]
     pub id: String,

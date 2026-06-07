@@ -22,6 +22,7 @@ const SmartQuery = React.lazy(() => import('@/pages/SmartQuery'));
 const Tours = React.lazy(() => import('@/pages/Tours'));
 const CodeExplorer = React.lazy(() => import('@/pages/CodeExplorer'));
 const TrajectoryViz = React.lazy(() => import('@/pages/TrajectoryViz'));
+const MergeCandidates = React.lazy(() => import('@/pages/MergeCandidates'));
 
 function LoadingFallback() {
   return (
@@ -74,6 +75,7 @@ function AuthenticatedApp() {
           <Route path="/tours" component={Tours} />
           <Route path="/code-explorer" component={CodeExplorer} />
           <Route path="/trajectories" component={TrajectoryViz} />
+          <Route path="/merge-candidates" component={MergeCandidates} />
           <Route>
             <div className="flex h-[60vh] items-center justify-center">
               <div className="text-center">

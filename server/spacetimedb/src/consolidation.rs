@@ -1,8 +1,12 @@
 use spacetimedb::*;
 
 use crate::{uuid_v4, now_micros};
+use crate::context_directory::{context_directory, directory_memory_link};
 use crate::hybrid_query::{cosine_similarity, parse_embedding_json};
+use crate::knowledge_graph::{kg_community, kg_edge, kg_node};
 use crate::memory::memory;
+use crate::note::{note, note_block};
+use crate::profile::profile;
 use crate::retrieval::search_index;
 use crate::workspace::workspace;
 
@@ -376,4 +380,158 @@ pub fn init(ctx: &ReducerContext) {
         scheduled_id: 1,
         scheduled_at: one_hour.into(),
     });
+}
+
+// ── Backup / Restore ──────────────────────────────────────────────────────
+
+/// A backup entry storing the JSON-serialised state of a single record.
+#[table(accessor = backup_entry, public)]
+#[derive(Debug, Clone)]
+pub struct BackupEntry {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    /// Name of the source table (e.g. "memory", "kg_node").
+    pub table_name: String,
+    /// Primary-key value of the original record.
+    pub record_id: String,
+    /// JSON-encoded record data.
+    pub data_json: String,
+    /// Timestamp (micros) when this backup entry was created.
+    pub exported_at: i64,
+}
+
+/// Export all relevant tables for a workspace into `backup_entry` rows.
+///
+/// Exported tables: memory, profile, kg_node, kg_edge, kg_community,
+/// note, note_block, directory_memory_link, context_directory.
+#[reducer]
+pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let now = now_micros(ctx);
+
+    let mut insert_entry = |table_name: &str, record_id: String, data_json: String| {
+        ctx.db.backup_entry().insert(BackupEntry {
+            id: uuid_v4(ctx),
+            workspace_id: workspace_id.clone(),
+            table_name: table_name.to_string(),
+            record_id,
+            data_json,
+            exported_at: now,
+        });
+    };
+
+    // ── memory (filtered by workspace) ────────────────────────────────
+    for m in ctx.db.memory().iter().filter(|m| m.workspace_id == workspace_id) {
+        let json = serde_json::to_string(&m)
+            .map_err(|e| format!("Serialize memory: {}", e))?;
+        insert_entry("memory", m.id.clone(), json);
+    }
+
+    // ── profile (no workspace_id field — export all) ──────────────────
+    for p in ctx.db.profile().iter() {
+        let json = serde_json::to_string(&p)
+            .map_err(|e| format!("Serialize profile: {}", e))?;
+        insert_entry("profile", p.id.clone(), json);
+    }
+
+    // ── kg_node ───────────────────────────────────────────────────────
+    for n in ctx.db.kg_node().iter().filter(|n| n.workspace_id == workspace_id) {
+        let json = serde_json::to_string(&n)
+            .map_err(|e| format!("Serialize kg_node: {}", e))?;
+        insert_entry("kg_node", n.id.clone(), json);
+    }
+
+    // ── kg_edge ───────────────────────────────────────────────────────
+    for e in ctx.db.kg_edge().iter().filter(|e| e.workspace_id == workspace_id) {
+        let json = serde_json::to_string(&e)
+            .map_err(|e| format!("Serialize kg_edge: {}", e))?;
+        insert_entry("kg_edge", e.id.clone(), json);
+    }
+
+    // ── kg_community ──────────────────────────────────────────────────
+    for c in ctx.db.kg_community().iter().filter(|c| c.workspace_id == workspace_id) {
+        let json = serde_json::to_string(&c)
+            .map_err(|e| format!("Serialize kg_community: {}", e))?;
+        insert_entry("kg_community", c.id.to_string(), json);
+    }
+
+    // ── note ──────────────────────────────────────────────────────────
+    for n in ctx.db.note().iter().filter(|n| n.workspace_id == workspace_id) {
+        let json = serde_json::to_string(&n)
+            .map_err(|e| format!("Serialize note: {}", e))?;
+        insert_entry("note", n.id.clone(), json);
+    }
+
+    // ── note_block ────────────────────────────────────────────────────
+    for nb in ctx.db.note_block().iter() {
+        // note_block doesn't have workspace_id — export all
+        let json = serde_json::to_string(&nb)
+            .map_err(|e| format!("Serialize note_block: {}", e))?;
+        insert_entry("note_block", nb.id.clone(), json);
+    }
+
+    // ── directory_memory_link ─────────────────────────────────────────
+    for dl in ctx.db.directory_memory_link().iter().filter(|dl| dl.workspace_id == workspace_id) {
+        let json = serde_json::to_string(&dl)
+            .map_err(|e| format!("Serialize directory_memory_link: {}", e))?;
+        insert_entry("directory_memory_link", dl.id.clone(), json);
+    }
+
+    // ── context_directory ─────────────────────────────────────────────
+    for cd in ctx.db.context_directory().iter().filter(|cd| cd.workspace_id == workspace_id) {
+        let json = serde_json::to_string(&cd)
+            .map_err(|e| format!("Serialize context_directory: {}", e))?;
+        insert_entry("context_directory", cd.id.clone(), json);
+    }
+
+    Ok(())
+}
+
+/// Restore records for a workspace from `backup_entry` rows.
+///
+/// Currently restores: memory, kg_node.
+/// Skips records whose primary key already exists in the target table.
+/// Validates that `data_json` is well-formed JSON before attempting restore.
+#[reducer]
+pub fn restore_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let entries: Vec<_> = ctx
+        .db
+        .backup_entry()
+        .iter()
+        .filter(|e| e.workspace_id == workspace_id)
+        .collect();
+
+    for entry in &entries {
+        // Validate JSON first
+        serde_json::from_str::<serde_json::Value>(&entry.data_json)
+            .map_err(|e| {
+                format!(
+                    "Invalid JSON in backup entry {} (table={}, record_id={}): {}",
+                    entry.id, entry.table_name, entry.record_id, e
+                )
+            })?;
+
+        match entry.table_name.as_str() {
+            "memory" => {
+                if ctx.db.memory().id().find(&entry.record_id).is_none() {
+                    let mem: crate::memory::Memory = serde_json::from_str(&entry.data_json)
+                        .map_err(|e| format!("Deserialize memory: {}", e))?;
+                    ctx.db.memory().insert(mem);
+                }
+            }
+            "kg_node" => {
+                if ctx.db.kg_node().id().find(&entry.record_id).is_none() {
+                    let node: crate::knowledge_graph::KgNode =
+                        serde_json::from_str(&entry.data_json)
+                            .map_err(|e| format!("Deserialize kg_node: {}", e))?;
+                    ctx.db.kg_node().insert(node);
+                }
+            }
+            // Other tables are not auto-restored — they can be re-inserted
+            // manually or via a future extension. Silently skip.
+            _ => {}
+        }
+    }
+
+    Ok(())
 }

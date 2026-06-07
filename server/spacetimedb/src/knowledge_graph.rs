@@ -4,7 +4,7 @@ use crate::{now_micros, uuid_v4};
 
 /// A node in the knowledge graph, representing a concept, entity, or document.
 #[table(accessor = kg_node, public)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KgNode {
     #[primary_key]
     pub id: String,
@@ -24,7 +24,7 @@ pub struct KgNode {
 
 /// A directed, typed edge between two knowledge graph nodes.
 #[table(accessor = kg_edge, public)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KgEdge {
     #[primary_key]
     pub id: String,
@@ -43,7 +43,7 @@ pub struct KgEdge {
 /// A community (cluster) grouping related nodes in the knowledge graph.
 /// Uses u64 auto-increment primary key.
 #[table(accessor = kg_community, public)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KgCommunity {
     #[primary_key]
     pub id: u64,

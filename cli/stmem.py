@@ -771,6 +771,262 @@ def context_delta(previous_pack_id: str) -> None:
 
 
 # ===================================================================
+# plugin commands
+# ===================================================================
+
+
+@cli.group()
+def plugin() -> None:
+    """Manage plugins (discover, load, unload, list)."""
+
+
+def _plugin_manager() -> Any:
+    """Build a PluginManager from the CLI's env-var config."""
+    from spacetime_memory.plugin_manager import PluginManager
+
+    client = _sdk_client()
+    # Default plugin dir: <project>/plugins/
+    default_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "plugins",
+    )
+    plugin_dir = os.environ.get("STMEM_PLUGIN_DIR", default_dir)
+    return PluginManager(client, plugin_dir=plugin_dir)
+
+
+@plugin.command(name="list")
+def plugin_list() -> None:
+    """List all discovered and loaded plugins."""
+    mgr = _plugin_manager()
+    with console.status("Discovering plugins..."):
+        plugins = mgr.list()
+    if not plugins:
+        console.print("[yellow]No plugins discovered.[/yellow]")
+        console.print(
+            f"  Plugin directory: [cyan]{mgr.plugin_dir}[/cyan]"
+        )
+        return
+
+    table = Table(
+        title=f"Plugins (dir: {mgr.plugin_dir})",
+        box=box.ROUNDED,
+        header_style="bold cyan",
+    )
+    table.add_column("Name")
+    table.add_column("Version")
+    table.add_column("Description")
+    table.add_column("Loaded")
+    table.add_column("Type")
+    for p in plugins:
+        loaded = "[green]✔[/green]" if p["loaded"] else "[dim]—[/dim]"
+        table.add_row(
+            p["name"],
+            p["version"],
+            p["description"][:80] if p["description"] else "",
+            loaded,
+            p["type"],
+        )
+    console.print(table)
+
+
+@plugin.command(name="load")
+@click.argument("name")
+def plugin_load(name: str) -> None:
+    """Load a plugin by name."""
+    mgr = _plugin_manager()
+    with console.status(f"Loading plugin '{name}'..."):
+        # Discover first so the plugin is in _discovered
+        mgr.discover()
+        ok = mgr.load(name)
+    if ok:
+        console.print(f"[green]Plugin '{name}' loaded successfully.[/green]")
+    else:
+        console.print(f"[red]Failed to load plugin '{name}'.[/red]")
+        sys.exit(1)
+
+
+@plugin.command(name="unload")
+@click.argument("name")
+def plugin_unload(name: str) -> None:
+    """Unload a plugin by name."""
+    mgr = _plugin_manager()
+    with console.status(f"Unloading plugin '{name}'..."):
+        ok = mgr.unload(name)
+    if ok:
+        console.print(f"[green]Plugin '{name}' unloaded.[/green]")
+    else:
+        console.print(f"[yellow]Plugin '{name}' was not loaded.[/yellow]")
+        sys.exit(1)
+
+
+@plugin.command(name="reload")
+def plugin_reload() -> None:
+    """Discover and reload all plugins."""
+    mgr = _plugin_manager()
+    with console.status("Reloading all plugins..."):
+        mgr.unload_all()
+        loaded = mgr.load_all()
+    console.print(
+        f"[green]Reloaded {len(loaded)} plugin(s): {', '.join(loaded)}[/green]"
+    )
+
+
+# ===================================================================
+# replication commands
+# ===================================================================
+
+
+@cli.group()
+def replication() -> None:
+    """Manage replication peers and sync status."""
+
+
+@replication.command(name="peers")
+def replication_peers() -> None:
+    """List replication peers."""
+    client = _sdk_client()
+    with console.status("Fetching replication peers..."):
+        client._call("list_replication_peers", ["*"])
+        rows = client._sql(
+            "SELECT * FROM replication_result "
+            "WHERE query_type = 'peers' "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+    if not rows:
+        console.print("[yellow]No replication peers found.[/yellow]")
+        return
+    peers = json.loads(rows[0].get("json_data", "[]"))
+    if not peers:
+        console.print("[yellow]No replication peers found.[/yellow]")
+        return
+    print_table(peers, title="Replication Peers")
+
+
+@replication.command(name="add")
+@click.argument("name")
+@click.argument("remote_url")
+@click.argument("remote_db")
+@click.option("--workspace-id", default="", help="Workspace ID (uses default if empty)")
+@click.option("--auth-token", default="", help="Auth token for remote instance")
+def replication_add(name: str, remote_url: str, remote_db: str,
+                    workspace_id: str, auth_token: str) -> None:
+    """Add a replication peer.
+
+    NAME is a human-readable name for the peer.
+    REMOTE_URL is the base URL of the remote instance, e.g. http://127.0.0.10:3001.
+    REMOTE_DB is the remote database identity.
+    """
+    client = _sdk_client()
+    ws_id = workspace_id
+    if not ws_id:
+        # Use the first workspace from list
+        workspaces = client.list_workspaces()
+        if not workspaces:
+            console.print("[red]No workspaces found. Create one first or specify --workspace-id.[/red]")
+            sys.exit(1)
+        ws_id = workspaces[0]["id"]
+        console.print(f"[dim]Using workspace: {ws_id}[/dim]")
+
+    with console.status(f"Adding replication peer '{name}'..."):
+        result = client._call("add_replication_peer", [
+            ws_id, name, remote_url, remote_db, auth_token,
+        ])
+    console.print(f"[green]Replication peer '{name}' added successfully.[/green]")
+    if result:
+        print_json(result)
+
+
+@replication.command(name="remove")
+@click.argument("peer_id")
+def replication_remove(peer_id: str) -> None:
+    """Remove a replication peer by ID."""
+    client = _sdk_client()
+    with console.status(f"Removing replication peer '{peer_id}'..."):
+        result = client._call("remove_replication_peer", [peer_id])
+    console.print(f"[green]Replication peer removed.[/green]")
+    if result:
+        print_json(result)
+
+
+@replication.command(name="status")
+@click.option("--workspace-id", default="", help="Workspace ID (uses default if empty)")
+def replication_status(workspace_id: str) -> None:
+    """Show replication sync status."""
+    client = _sdk_client()
+    ws_id = workspace_id
+    if not ws_id:
+        workspaces = client.list_workspaces()
+        if not workspaces:
+            console.print("[red]No workspaces found. Create one first or specify --workspace-id.[/red]")
+            sys.exit(1)
+        ws_id = workspaces[0]["id"]
+
+    with console.status("Fetching replication status..."):
+        client._call("get_replication_status", [ws_id])
+        rows = client._sql(
+            "SELECT * FROM replication_result "
+            "WHERE query_type = 'status' "
+            "AND workspace_id = '{}' "
+            "ORDER BY created_at DESC LIMIT 1".format(ws_id)
+        )
+    if not rows:
+        console.print("[yellow]No replication status available.[/yellow]")
+        return
+    status = json.loads(rows[0].get("json_data", "{}"))
+    if not status:
+        console.print("[yellow]Empty status response.[/yellow]")
+        return
+    print_json(status)
+
+
+@replication.command(name="sync")
+@click.option("--workspace-id", default="", help="Workspace ID (uses default if empty)")
+def replication_sync(workspace_id: str) -> None:
+    """Trigger a one-time sync cycle."""
+    # Import and run the daemon in --once mode
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    try:
+        from replication_daemon import ReplicationDaemon
+    except ImportError:
+        console.print("[red]Error: replication_daemon.py not found in scripts/[/red]")
+        sys.exit(1)
+
+    with console.status("Running sync cycle..."):
+        daemon = ReplicationDaemon(interval=60, once=True)
+        total = daemon.sync_once()
+    console.print(f"[green]Sync complete — {total} entries replicated.[/green]")
+
+
+@replication.command(name="daemon")
+@click.option("--interval", default=60, type=int, help="Sync interval in seconds")
+@click.option("--daemonize/--no-daemonize", default=False,
+              help="Fork to background (Unix only)")
+def replication_daemon(interval: int, daemonize: bool) -> None:
+    """Start the replication daemon.
+
+    Runs continuously, syncing mutations to remote peers at the given interval.
+    """
+    if daemonize:
+        pid = os.fork()
+        if pid > 0:
+            # Parent exits, child continues
+            console.print(f"[green]Replication daemon started (PID: {pid})[/green]")
+            sys.exit(0)
+        # Child continues
+        os.setsid()
+
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    try:
+        from replication_daemon import ReplicationDaemon
+    except ImportError:
+        console.print("[red]Error: replication_daemon.py not found in scripts/[/red]")
+        sys.exit(1)
+
+    daemon = ReplicationDaemon(interval=interval, once=False)
+    daemon.run()
+
+
+# ===================================================================
 # Entry point
 # ===================================================================
 

@@ -51,6 +51,7 @@ export function initReactiveDb() {
     'SELECT * FROM account',
     'SELECT * FROM tour',
     'SELECT * FROM tour_stop',
+    'SELECT * FROM consolidation_log',
   ]);
 
   // Bump version when initial data lands

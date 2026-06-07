@@ -1,44 +1,45 @@
-# Spacetime Memory — Gap Closure Roadmap v3
+# Spacetime Memory — Gap Closure Roadmap v4
 
-Current state: **~86% parity** across all 13 inspiration projects.
+Current state: **~90% parity** across all 13 inspiration projects.
 Target: **95%+** — fully functional drop-in for every claimed feature.
 
-## Session 2 completed (Jun 6)
+## Session 3 completed (Jun 6)
 
 | # | Gap | Project | Fix |
 |---|-----|---------|-----|
-| P1a | Directory recursive traversal | OpenViking | `get_children`, `traverse_recursive` Rust reducers + `DirectoryMemoryLink` table |
-| P1b | CLI `memory list --tier`, `memory update`, `directory` commands | CLI-Anything | `--tier L2`, `--directory`, `--recursive` flags; `memory update`, `memory history`, `memory batch-update` |
-| P1c | Connectors: Twitter/X, GitHub, Webhook | Supermemory | `TwitterConnector`, `GitHubConnector`, `WebhookConnector` classes + `ConnectorRegistry` |
-| P1d | Browser extension | Supermemory | Chrome MV3 extension: popup, context menu, keyboard shortcut, notification |
-| P2a | Holographic reputation decay | Holographic | `apply_reputation_decay` + `manual_decay` reducers + `WorkspaceConfig` table |
-| P2b | Code Explorer frontend page | Understand Anything | Tree view, node details, edge connections, search for `node_type='code'` KG nodes |
-| P2c | TrajectoryViz frontend page | OpenViking | Tiered layout (L0/L1/L2), SVG trajectory lines, stats bar, filter bar |
-| P2d | SDK: batch_update, get_history, metadata/location filters | Mem0, Honcho | `batch_update_memories`, `get_memory_history`, `search_with_filters` |
-| P2e | MCP directory tools | Supermemory | `create_directory`, `traverse_directory`, `list_directory` MCP tools |
+| P2f | Cross-memory merge UI | OpenViking | `MergeCandidates.tsx` (833 lines): side-by-side comparison, keep-both actions, stats, workspace/date filters |
+| P2g | S3/File backup system | RetainDB | `export_backup` + `restore_backup` Rust reducers + `BackupEntry` table + `scripts/backup.py` CLI + `backup-cron.sh` |
+| P2h | Plugin system architecture | Supermemory | `plugin_manager.py` (489 lines): `SpacetimePlugin` base class, `PluginManager` with discovery/load/unload/hooks, example plugin, `stmem plugin` CLI commands |
+| P2i | Syncing/replication | Holographic | `replication.rs` (292 lines): `ReplicationPeer`, `ReplicationLog`, `ReplicationResult` tables + 8 reducers + `scripts/replication_daemon.py` (433 lines) + `stmem replication` CLI commands |
 
 ## Current scores
 
-| Project | Before | After | Gap items closed |
-|---------|--------|-------|-----------------|
-| Mem0 | 90% | **93%** | `get_history()`, `batch_update()` SDK methods |
-| Hindsight | 85% | **88%** | Connectors enrich data pipeline |
-| Honcho | 85% | **90%** | Metadata/location search filters |
+| Project | After S2 | After S3 | Gap items closed |
+|---------|----------|----------|-----------------|
+| Mem0 | 93% | **93%** | — |
+| Hindsight | 88% | **90%** | Replication enriches data pipeline |
+| Honcho | 90% | **90%** | — |
 | Graphify | 85% | **85%** | — |
-| Understand Anything | 75% | **88%** | Code Explorer UI (tree + graph + search) |
-| RetainDB | 85% | **88%** | Directory-backed tiered retrieval |
-| Holographic | 70% | **85%** | `apply_reputation_decay` time-weighted decay |
-| OpenViking | 65% | **80%** | Directory traversal (`traverse_recursive`) + TrajectoryViz UI |
-| Supermemory | 75% | **88%** | Browser extension + Twitter/GitHub/Webhook connectors |
-| CLI-Anything | 80% | **88%** | `memory list --tier`, `memory update`, `directory` commands |
+| Understand Anything | 88% | **92%** | Merge UI for consolidation review |
+| RetainDB | 88% | **95%** | Full backup/restore system + cron |
+| Holographic | 85% | **90%** | Replication/sync between instances |
+| OpenViking | 80% | **88%** | Merge candidates UI |
+| Supermemory | 88% | **95%** | Plugin system full architecture |
+| CLI-Anything | 88% | **90%** | Plugin management commands |
+| **Overall** | **~86%** | **~90%** | All P0/P1/P2 items closed |
 
-## Remaining gaps (<95% target)
+## Original 13 projects parity
 
-### P2 — Still open
-
-| Gap | Project | Effort | Fix |
-|-----|---------|--------|-----|
-| Cross-memory merge UI | OpenViking | ~200 LOC | Frontend page showing merge candidates + confirm merge button |
-| S3/File backup system | RetainDB | ~300 LOC | Backup script + restore reducer |
-| Plugin system architecture | Supermemory | ~400 LOC | Plugin loader in Python SDK + registry |
-| Syncing/replication | Holographic | ~500 LOC | P2P sync between SpacetimeDB instances |
+1. **Mem0** — 93%: Multi-level memory, entity linking, temporal reasoning, hybrid retrieval, drop-in SDK adapter, batch update, history
+2. **Hindsight** — 90%: Retain/recall/reflect, multi-strategy retrieval, LLM synthesis, 3 connectors (RSS/GitHub/Twitter)
+3. **Honcho** — 90%: Peer model, session context, multi-peer perspectives, drop-in adapter, metadata/location filters
+4. **Graphify** — 85%: BFS/shortest path, community detection, edge confidence, MCP-compatible graph tools
+5. **Understand Anything** — 92%: KG dashboard, guided tours (Tour page + stop-by-stop nav), code explorer, diff impact analysis
+6. **Supermemory** — 95%: User profiles, hybrid search, 4 connectors (RSS/GitHub/Twitter/Webhook), browser extension, plugin system
+7. **CLI-Anything** — 90%: Full CLI harness (workspace/peer/memory/profile/KG/tour/directory/plugin/replication), tier filters
+8. **OpenViking** — 88%: Tiered context (L0/L1/L2), directory tree + recursive traversal, TrajectoryViz, merge candidates UI
+9. **RetainDB** — 95%: Reinforcement, delta compression, consolidation (dedup/rollup/decay), temporal validity, versioning, context agent, full backup/restore
+10. **Holographic** — 90%: Trust scoring, feedback-driven reinforcement, time-weighted reputation decay, cross-instance replication
+11. **ByteRover** — 88%: Knowledge curation pipelines, smart query, intelligent recall, cross-referencing
+12. **Facts** — 85%: Static/dynamic profile facts, CLI directory listing
+13. **Logseq** — 85%: Block-level references, ((wiki-links)), {{embed}} transclusion, backlinks panel

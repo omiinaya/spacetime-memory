@@ -5,7 +5,7 @@ use crate::auth::require_auth;
 
 /// A note — markdown document with wikilink backlinking support.
 #[table(accessor = note, public)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Note {
     #[primary_key]
     pub id: String,
@@ -45,7 +45,7 @@ pub struct NoteBacklink {
 /// A block — individual paragraph/heading/list-item within a note.
 /// Blocks are parsed from markdown content and given stable IDs.
 #[table(accessor = note_block, public)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NoteBlock {
     #[primary_key]
     pub id: String,

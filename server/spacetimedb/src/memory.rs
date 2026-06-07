@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v4};
 /// A memory entry storing world facts, experiences, or mental models
 /// for an AI agent within a workspace.
 #[table(accessor = memory, public)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Memory {
     #[primary_key]
     pub id: String,
