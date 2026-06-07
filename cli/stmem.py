@@ -240,6 +240,19 @@ def memory_search(workspace_id: str, query: str, memory_type: str | None,
     print_table(rows, title=f"Search results (workspace: {workspace_id})")
 
 
+@memory.command(name="get")
+@click.argument("memory_id")
+def memory_get(memory_id: str) -> None:
+    """Get a single memory by ID (auto-reinforces on read)."""
+    client = _sdk_client()
+    with console.status(f"Fetching memory '{memory_id}'..."):
+        rows = client.get_memory(memory_id)
+    if rows:
+        print_json(rows[0])
+    else:
+        console.print(f"[yellow]Memory '{memory_id}' not found.[/yellow]")
+
+
 @memory.command(name="reinforce")
 @click.argument("memory_id")
 def memory_reinforce(memory_id: str) -> None:

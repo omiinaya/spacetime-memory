@@ -19,6 +19,7 @@ const NotesList = React.lazy(() => import('@/pages/NotesList'));
 const NoteEditor = React.lazy(() => import('@/pages/NoteEditor'));
 const NoteGraph = React.lazy(() => import('@/pages/NoteGraph'));
 const SmartQuery = React.lazy(() => import('@/pages/SmartQuery'));
+const Tours = React.lazy(() => import('@/pages/Tours'));
 
 function LoadingFallback() {
   return (
@@ -68,6 +69,7 @@ function AuthenticatedApp() {
           <Route path="/notes/:id" component={NoteEditor} />
           <Route path="/graph/notes" component={NoteGraph} />
           <Route path="/query" component={SmartQuery} />
+          <Route path="/tours" component={Tours} />
           <Route>
             <div className="flex h-[60vh] items-center justify-center">
               <div className="text-center">

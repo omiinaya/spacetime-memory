@@ -12,8 +12,9 @@ Usage::
 
 from __future__ import annotations
 
+import json
+import os
 from typing import Any
-
 from ..client import Client
 
 
@@ -99,19 +100,61 @@ class Hindsight:
         prompt: str = "What are the key themes and patterns in my data?",
         workspace_id: str | None = None,
     ) -> dict[str, Any]:
-        """Generate insights by creating an insight node in the KG.
+        """Generate insights by analyzing memories via LLM.
 
-        The *prompt* is stored as an insight description.  The system
-        does not run an LLM call directly — use the MCP server for
-        that.  This method creates a structured insight entry that
-        downstream LLM tooling can consume.
+        Creates an insight node in the KG.  If ``OPENAI_API_KEY`` is set,
+        also calls an LLM to synthesize findings from recent memories.
         """
         ws_id = workspace_id or self._ws()
+
+        # Gather recent memories for context
+        recent = self._client.search(
+            workspace_id=ws_id, query="", limit=20, semantic=False,
+        )
+        context_lines = []
+        for r in recent:
+            content = r.get("content", r.get("memory_content", ""))
+            if content:
+                context_lines.append(f"- {content[:300]}")
+        context_str = "\n".join(context_lines[:10])
+
+        # Optionally call LLM for synthesis
+        llm_response = None
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key and context_str.strip():
+            import httpx
+            base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+            model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+            try:
+                resp = httpx.post(
+                    f"{base_url}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": "You are a memory analysis assistant. Identify key themes, patterns, and insights from the provided memory entries."},
+                            {"role": "user", "content": f"## Prompt\n\n{prompt}\n\n## Recent Memories\n\n{context_str}"},
+                        ],
+                        "temperature": 0.4,
+                        "max_tokens": 1024,
+                    },
+                    timeout=60,
+                )
+                resp.raise_for_status()
+                llm_response = resp.json()["choices"][0]["message"]["content"]
+            except Exception as exc:
+                llm_response = f"[Reflection LLM call failed: {exc}]"
+
         result = self._client._call(
             "create_insight",
             [ws_id, "hindsight_reflection", prompt, "synthesized", "{}"],
         )
-        return {"status": "ok", "prompt": prompt, "workspace_id": ws_id}
+        return {
+            "status": "ok",
+            "prompt": prompt,
+            "workspace_id": ws_id,
+            "insight": llm_response or "Created insight node (LLM not configured — use OPENAI_API_KEY for synthesis)",
+        }
 
     def forget(self, memory_id: str) -> dict[str, Any]:
         """Delete a memory by ID."""

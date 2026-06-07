@@ -17,6 +17,7 @@ import {
   CalendarDays,
   LogOut,
   User,
+  Route,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/search', label: 'Search', icon: Search },
   { href: '/query', label: 'Smart Query', icon: Sparkles },
+  { href: '/tours', label: 'Tours', icon: Route },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

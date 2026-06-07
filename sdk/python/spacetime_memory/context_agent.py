@@ -4,6 +4,11 @@ Uses the SpacetimeDB ``generate_context_pack`` and ``get_delta`` reducers
 to produce a scored, structured context pack for any query, then optionally
 sends it to an LLM for a synthesised answer.
 
+LLM integration:
+  - Set ``OPENAI_API_KEY`` env var to enable LLM calls
+  - Set ``OPENAI_BASE_URL`` to use a different endpoint (default: OpenAI)
+  - Set ``LLM_MODEL`` to override model (default: gpt-4o-mini)
+
 Example::
 
     from spacetime_memory import Client
@@ -17,6 +22,7 @@ Example::
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 
@@ -87,7 +93,64 @@ class ContextAgent:
                 "ORDER BY rank ASC"
             )
 
+        # 5. Optionally synthesize an LLM answer
+        llm_answer = self._call_llm(query, entries, pack)
+        if llm_answer:
+            result["llm_answer"] = llm_answer
+
         return result
+
+    def _call_llm(
+        self,
+        query: str,
+        entries: list[dict[str, Any]],
+        pack: dict[str, Any] | None = None,
+    ) -> str | None:
+        """Call an LLM with the context entries to produce a grounded answer.
+
+        Requires OPENAI_API_KEY env var.  Falls back to None if not set.
+        """
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            return None
+
+        base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+
+        context_text = self.format_context(entries)
+        system_prompt = (
+            "You are a memory-augmented AI assistant.  Answer the user's query "
+            "based **only** on the context entries below.  If the context doesn't "
+            "contain enough information, say so.  Cite the source entry numbers "
+            "in brackets, e.g. [1][3]."
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"## Query\n\n{query}\n\n## Context\n\n{context_text}"},
+        ]
+
+        try:
+            import httpx
+            resp = httpx.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "temperature": 0.3,
+                    "max_tokens": 2048,
+                },
+                timeout=60,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        except Exception as exc:
+            return f"[LLM call failed: {exc}]"
 
     def format_context(self, entries: list[dict[str, Any]]) -> str:
         """Format context entries into a text block for an LLM prompt."""

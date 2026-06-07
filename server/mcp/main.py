@@ -177,6 +177,13 @@ def escalate_memories(workspace_id: str, l2_to_l1: int = 5, l1_to_l0: int = 20) 
     return f"Tier escalation triggered for workspace {workspace_id[:16]}..."
 
 
+@mcp.tool()
+def dedup_memories(workspace_id: str) -> str:
+    """Deduplicate near-duplicate memories in a workspace (cosine >= 0.85 + edit dist <= 30%)."""
+    get_client()._call("dedup_memories", [workspace_id])
+    return f"Dedup complete for workspace {workspace_id[:16]}..."
+
+
 # ---------------------------------------------------------------------------
 # Profile tools
 # ---------------------------------------------------------------------------

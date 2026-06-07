@@ -49,6 +49,8 @@ export function initReactiveDb() {
     'SELECT * FROM note_block',
     'SELECT * FROM block_reference',
     'SELECT * FROM account',
+    'SELECT * FROM tour',
+    'SELECT * FROM tour_stop',
   ]);
 
   // Bump version when initial data lands
