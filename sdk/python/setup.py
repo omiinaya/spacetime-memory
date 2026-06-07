@@ -15,6 +15,13 @@ setup(
         "httpx>=0.27",
     ],
     python_requires=">=3.10",
+    extras_require={
+        "dev": [
+            "pytest>=7",
+            "pytest-mock>=3",
+            "click>=8",
+        ],
+    },
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

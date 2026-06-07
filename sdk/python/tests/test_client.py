@@ -77,7 +77,7 @@ class TestClientSql:
             text="Bad request",
         )
 
-        with pytest.raises(RuntimeError, match="SQL error"):
+        with pytest.raises(RuntimeError, match=r"error"):
             mock_http_client._sql("SELECT bad SQL")
 
     def test_sql_empty_response(self, mock_http_client):

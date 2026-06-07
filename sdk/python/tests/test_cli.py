@@ -9,7 +9,7 @@ import json
 import pytest
 from unittest.mock import Mock
 from click.testing import CliRunner
-from cli.stmem import cli, _make_client
+from cli.stmem import cli, _sdk_client
 from tests.conftest import make_sql_response
 
 
@@ -46,7 +46,7 @@ def mock_client():
 @pytest.fixture
 def mocked_cli_runner(monkeypatch, runner, mock_client):
     """A CliRunner where the CLI's ``_make_client`` returns a mocked Client."""
-    monkeypatch.setattr("cli.stmem._make_client", lambda **kw: mock_client)
+    monkeypatch.setattr("cli.stmem._sdk_client", lambda **kw: mock_client)
     return runner, mock_client
 
 
@@ -91,7 +91,7 @@ class TestCliWorkspace:
         runner, mock_client = mocked_cli_runner
         result = runner.invoke(cli, ["workspace", "list"])
         assert result.exit_code == 0
-        assert "(no workspaces)" in result.output
+        assert "No results found" in result.output
 
     def test_workspace_list_with_data(self, mocked_cli_runner):
         """workspace list shows workspace JSON."""
@@ -127,8 +127,7 @@ class TestCliMemory:
             text="{}",
         )
         result = runner.invoke(cli, [
-            "memory", "store", "ws1", "hello world",
-            "--peer-id", "cli-test",
+            "memory", "store", "ws1", "cli-test", "hello world",
         ])
         assert result.exit_code == 0
         assert '"status": "ok"' in result.output
@@ -142,7 +141,7 @@ class TestCliMemory:
         )
         result = runner.invoke(cli, ["memory", "list", "ws1"])
         assert result.exit_code == 0
-        assert "(no memories)" in result.output or "no memories" in result.output
+        assert "No results found" in result.output
 
     def test_memory_list_with_data(self, mocked_cli_runner):
         """memory list shows memory JSON."""
@@ -175,4 +174,4 @@ class TestCliMemory:
             "memory", "search", "ws1", "test query",
         ])
         assert result.exit_code == 0
-        assert "(no results)" in result.output or "no results" in result.output
+        assert "No results found" in result.output

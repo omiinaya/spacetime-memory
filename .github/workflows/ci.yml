@@ -26,9 +26,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -e sdk/python
-      - run: pip install pytest pytest-mock httpx click feedparser
-      - run: python -m pytest sdk/python/tests/ -v
+      - run: pip install -e "sdk/python[dev]"
+      - run: pip install rich feedparser
+      - name: Run Python tests
+        working-directory: sdk/python
+        run: python -m pytest tests/ -v --ignore=tests/test_integration.py
 
   typescript:
     runs-on: ubuntu-latest

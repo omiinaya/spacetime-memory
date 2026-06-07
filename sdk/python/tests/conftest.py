@@ -1,9 +1,18 @@
 """Pytest fixtures for spacetime-memory SDK tests."""
 
+import os
+import sys
 import json
 import pytest
 import httpx
 from unittest.mock import Mock, MagicMock, patch
+
+# Add repo root to sys.path so tests can import the CLI and other modules
+# that live outside the SDK package (e.g., cli/stmem.py).
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
 from spacetime_memory import Client
 
 
