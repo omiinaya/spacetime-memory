@@ -1,6 +1,7 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::workspace::check_space_access;
 
 /// A node in the knowledge graph, representing a concept, entity, or document.
 #[table(accessor = kg_node, public)]
@@ -66,6 +67,8 @@ pub fn create_node(
     summary: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -102,11 +105,14 @@ pub fn create_node(
 
 #[reducer]
 pub fn delete_node(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    ctx.db
+    let node = ctx
+        .db
         .kg_node()
         .id()
         .find(&id)
         .ok_or_else(|| format!("KgNode '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &node.workspace_id, &caller, "editor")?;
 
     ctx.db.kg_node().id().delete(&id);
     Ok(())
@@ -127,6 +133,8 @@ pub fn create_edge(
     confidence: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -163,11 +171,14 @@ pub fn create_edge(
 
 #[reducer]
 pub fn delete_edge(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    ctx.db
+    let edge = ctx
+        .db
         .kg_edge()
         .id()
         .find(&id)
         .ok_or_else(|| format!("KgEdge '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &edge.workspace_id, &caller, "editor")?;
 
     ctx.db.kg_edge().id().delete(&id);
     Ok(())

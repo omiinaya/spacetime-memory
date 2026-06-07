@@ -92,6 +92,9 @@ class Honcho:
     ) -> User:
         """Create a user (workspace).
 
+        If a user with the same name already exists, returns the existing
+        user instead of raising an error.
+
         Args:
             name: The user's name.  Maps to a workspace name.
             metadata: Optional metadata dict (stored as workspace
@@ -108,9 +111,25 @@ class Honcho:
             'a1b2c3d4...'
 
         """
-        self._client.create_workspace(
-            name, json.dumps(metadata or {})
-        )
+        # Check if user already exists first
+        existing = self.get_user(name)
+        if existing is not None:
+            return existing
+
+        try:
+            self._client.create_workspace(
+                name, json.dumps(metadata or {})
+            )
+        except RuntimeError as exc:
+            err_msg = str(exc).lower()
+            # If the error says "already exists", return the existing user
+            if "already exists" in err_msg or "duplicate" in err_msg:
+                existing = self.get_user(name)
+                if existing is not None:
+                    return existing
+            # Re-raise with context if it's a different error
+            raise RuntimeError(f"honcho.create_user('{name}') failed: {exc}") from exc
+
         user = User(name, self._client)
         self._user_cache[name] = user
         return user
@@ -125,12 +144,17 @@ class Honcho:
             A :class:`User` instance if found, or ``None``.
 
         """
-        for ws in self._client.list_workspaces():
-            if ws.get("name") == name:
-                u = User(name, self._client)
-                self._user_cache[name] = u
-                return u
-        return None
+        try:
+            for ws in self._client.list_workspaces():
+                if ws.get("name") == name:
+                    u = User(name, self._client)
+                    self._user_cache[name] = u
+                    return u
+            return None
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"honcho.get_user('{name}') failed: {exc}") from exc
 
     def get_or_create_user(self, name: str) -> User:
         """Get an existing user or create one.
@@ -181,14 +205,24 @@ class Honcho:
         user = self._user_cache.get(user_id)
         if user is None:
             # Try workspace ID lookup
-            for ws in self._client.list_workspaces():
-                if ws.get("id") == user_id or ws.get("name") == user_id:
-                    name = ws.get("name", user_id)
-                    user = User(name, self._client)
-                    self._user_cache[name] = user
-                    break
+            try:
+                for ws in self._client.list_workspaces():
+                    if ws.get("id") == user_id or ws.get("name") == user_id:
+                        name = ws.get("name", user_id)
+                        user = User(name, self._client)
+                        self._user_cache[name] = user
+                        break
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                raise RuntimeError(
+                    f"honcho.create_session(user_id='{user_id}') lookup failed: {exc}"
+                ) from exc
+
         if user is None:
-            raise ValueError(f"User '{user_id}' not found. Create the user first with create_user().")
+            raise ValueError(
+                f"User '{user_id}' not found. Create the user first with create_user()."
+            )
 
         session = Session(user, location=location, client=self._client)
         self._session_cache[session.id] = session
@@ -205,6 +239,79 @@ class Honcho:
 
         """
         return self._session_cache.get(session_id)
+
+    def get_or_create_session(
+        self,
+        user_id: str,
+        location: str = "",
+    ) -> Session:
+        """Get an existing session for a user+location, or create one.
+
+        Searches the session cache and the backend for a session matching
+        the given user and location.  If none exists, creates a new one.
+
+        Args:
+            user_id: The user's ID (workspace UUID or user name).
+            location: Optional location label (e.g. ``"room1"``).
+
+        Returns:
+            A :class:`Session` instance.
+
+        Example::
+
+            >>> session = honcho.get_or_create_session(user_id=user.id, location="room1")
+
+        """
+        # First check cache
+        for sid, sess in self._session_cache.items():
+            if sess.user_id == user_id and sess.location == location:
+                return sess
+
+        # Look up user to get workspace_id
+        user = self._user_cache.get(user_id)
+        if user is None:
+            try:
+                for ws in self._client.list_workspaces():
+                    if ws.get("id") == user_id or ws.get("name") == user_id:
+                        name = ws.get("name", user_id)
+                        user = User(name, self._client)
+                        self._user_cache[name] = user
+                        break
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                raise RuntimeError(
+                    f"honcho.get_or_create_session(user_id='{user_id}') lookup failed: {exc}"
+                ) from exc
+
+        if user is None:
+            raise ValueError(
+                f"User '{user_id}' not found. Create the user first with create_user()."
+            )
+
+        # Check backend for existing session with this user+location
+        try:
+            rows = self._client.get_peer_sessions(user.workspace_id)
+            for r in rows:
+                r_loc = r.get("location", "")
+                if r_loc == location:
+                    sess = Session(
+                        user, location=location, client=self._client,
+                    )
+                    sess.id = r.get("id", sess.id)
+                    self._session_cache[sess.id] = sess
+                    return sess
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"honcho.get_or_create_session() backend lookup failed: {exc}"
+            ) from exc
+
+        # No existing session found — create one
+        session = Session(user, location=location, client=self._client)
+        self._session_cache[session.id] = session
+        return session
 
     # -------------------------------------------------------------------
     # Honcho API — Memory management (root-level)
@@ -238,7 +345,14 @@ class Honcho:
                 f"Session '{session_id}' not found in cache. "
                 "Create it first with create_session()."
             )
-        return session.create_memory(content, metadata)
+        try:
+            return session.create_memory(content, metadata)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"honcho.add(session_id='{session_id}') failed: {exc}"
+            ) from exc
 
     def search(
         self,
@@ -256,6 +370,7 @@ class Honcho:
         Returns:
             A list of memory dicts sorted by relevance, each with
             ``entity_id``, ``memory_content``, ``score``, and other fields.
+            Returns an empty list (not None) on empty results.
 
         Example::
 
@@ -269,7 +384,21 @@ class Honcho:
                 f"Session '{session_id}' not found in cache. "
                 "Create it first with create_session()."
             )
-        return session.search(query, limit)
+        try:
+            results = session.search(query, limit)
+            return results if results else []
+        except RuntimeError:
+            # Invalidate session cache on backend errors (stale session)
+            if session_id in self._session_cache:
+                del self._session_cache[session_id]
+            raise
+        except Exception as exc:
+            # Invalidate session cache on unexpected errors
+            if session_id in self._session_cache:
+                del self._session_cache[session_id]
+            raise RuntimeError(
+                f"honcho.search(session_id='{session_id}') failed: {exc}"
+            ) from exc
 
 
 class User:
@@ -329,7 +458,14 @@ class User:
             A list of :class:`Session` instances.
 
         """
-        rows = self._client.get_peer_sessions(self.workspace_id)
+        try:
+            rows = self._client.get_peer_sessions(self.workspace_id)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"User.get_sessions() failed for user '{self.name}': {exc}"
+            ) from exc
         sessions = []
         for r in rows:
             sess = Session(self, location=r.get("location", ""), client=self._client)
@@ -376,12 +512,19 @@ class Session:
             A dict with operation status.
 
         """
-        return self._client.store(
-            workspace_id=self.user.workspace_id,
-            content=content,
-            peer_id=self.location or self.id,
-            memory_type="experience",
-        )
+        try:
+            return self._client.store(
+                workspace_id=self.user.workspace_id,
+                content=content,
+                peer_id=self.location or self.id,
+                memory_type="experience",
+            )
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"Session.create_memory() failed in session '{self.id}': {exc}"
+            ) from exc
 
     def search(
         self,
@@ -395,15 +538,24 @@ class Session:
             limit: Max results to return (default 20).
 
         Returns:
-            A list of memory dicts sorted by relevance.
+            A list of memory dicts sorted by relevance.  Empty list if
+            no results.
 
         """
-        return self._client.search(
-            workspace_id=self.user.workspace_id,
-            query=query,
-            limit=limit,
-            semantic=True,
-        )
+        try:
+            results = self._client.search(
+                workspace_id=self.user.workspace_id,
+                query=query,
+                limit=limit,
+                semantic=True,
+            )
+            return results if results else []
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"Session.search() failed in session '{self.id}': {exc}"
+            ) from exc
 
     def get_memories(self, limit: int = 100) -> list[dict[str, Any]]:
         """List all memories in this session.
@@ -415,6 +567,13 @@ class Session:
             A list of memory dicts.
 
         """
-        return self._client.list_memories(
-            workspace_id=self.user.workspace_id, limit=limit,
-        )
+        try:
+            return self._client.list_memories(
+                workspace_id=self.user.workspace_id, limit=limit,
+            )
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"Session.get_memories() failed in session '{self.id}': {exc}"
+            ) from exc

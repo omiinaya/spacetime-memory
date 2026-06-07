@@ -1,6 +1,7 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::workspace::check_space_access;
 
 /// A memory entry storing world facts, experiences, or mental models
 /// for an AI agent within a workspace.
@@ -75,6 +76,8 @@ pub fn store_memory(
     source_session_id: String,
     source_message_id: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -126,6 +129,8 @@ pub fn update_memory(
         .id()
         .find(&id)
         .ok_or_else(|| format!("Memory '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
 
     mem.content = content;
     mem.summary = summary;
@@ -144,6 +149,8 @@ pub fn deactivate_memory(ctx: &ReducerContext, id: String) -> Result<(), String>
         .id()
         .find(&id)
         .ok_or_else(|| format!("Memory '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
 
     mem.is_active = false;
     mem.updated_at = now_micros(ctx);

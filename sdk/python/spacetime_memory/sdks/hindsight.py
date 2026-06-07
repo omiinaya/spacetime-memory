@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
+from typing import Any, Callable
 
 from ..client import Client
 
@@ -44,7 +44,11 @@ class Hindsight:
 
     """
 
-    def __init__(self, config: dict | None = None):
+    def __init__(
+        self,
+        config: dict | None = None,
+        token_refresh_callback: Callable[[], str] | None = None,
+    ):
         config = config or {}
         self._client = Client(
             host=config.get("host"),
@@ -52,15 +56,16 @@ class Hindsight:
             database=config.get("db", config.get("database")),
             embedder_url=config.get("embedder_url"),
         )
+        self._token_refresh_callback = token_refresh_callback
         self._workspace_id: str = config.get("workspace_id", "")
         if not self._workspace_id:
             # Use or create a default workspace
-            ws_list = self._client.list_workspaces()
+            ws_list = self._call("list_workspaces")
             if ws_list:
                 self._workspace_id = ws_list[0]["id"]
             else:
-                self._client.create_workspace("default", "Hindsight default workspace")
-                ws_list = self._client.list_workspaces()
+                self._call("create_workspace", "default", "Hindsight default workspace")
+                ws_list = self._call("list_workspaces")
                 if ws_list:
                     self._workspace_id = ws_list[0]["id"]
 
@@ -72,6 +77,17 @@ class Hindsight:
         if not self._workspace_id:
             raise RuntimeError("No workspace configured")
         return self._workspace_id
+
+    def _call(self, method: str, *args: Any, **kwargs: Any) -> Any:
+        """Call a client method with automatic token-refresh retry on auth errors."""
+        try:
+            return getattr(self._client, method)(*args, **kwargs)
+        except RuntimeError as exc:
+            msg = str(exc).lower()
+            if self._token_refresh_callback and ("unauthorized" in msg or "authentication" in msg or "401" in msg):
+                self._token_refresh_callback()
+                return getattr(self._client, method)(*args, **kwargs)
+            raise
 
     # -------------------------------------------------------------------
     # Hindsight API
@@ -100,22 +116,20 @@ class Hindsight:
             {'status': 'ok'}
 
         """
-        meta_json = json.dumps(metadata or {})
-        result = self._client.store(
-            workspace_id=self._ws(),
-            content=content,
-            summary=content[:200],
-            memory_type=source or "experience",
-            peer_id="hindsight",
-        )
-        # If metadata was provided and store succeeded, try to persist it
-        if metadata and result.get("status") == "ok":
-            try:
-                # Store metadata as a note or profile field (best-effort)
-                pass
-            except Exception:
-                pass
-        return result
+        try:
+            result = self._call(
+                "store",
+                workspace_id=self._ws(),
+                content=content,
+                summary=content[:200],
+                memory_type=source or "experience",
+                peer_id="hindsight",
+            )
+            return result
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"hindsight.retain(content='{content[:50]}...') failed: {exc}") from exc
 
     def recall(
         self,
@@ -142,24 +156,75 @@ class Hindsight:
             {'results': [{'id': '...', 'memory': 'I like pizza', 'score': 0.92, ...}]}
 
         """
-        rows = self._client.search(
-            workspace_id=self._ws(),
-            query=query,
-            limit=limit,
-            semantic=True,
-        )
-        if threshold > 0.0:
-            rows = [r for r in rows if r.get("score", 0.0) >= threshold]
+        try:
+            rows = self._call(
+                "search",
+                workspace_id=self._ws(),
+                query=query,
+                limit=limit,
+                semantic=True,
+            )
+            if not rows:
+                return {"results": []}
+            if threshold > 0.0:
+                rows = [r for r in rows if r.get("score", 0.0) >= threshold]
+            results = []
+            for r in rows:
+                results.append({
+                    "id": r.get("entity_id", ""),
+                    "memory": r.get("memory_content", r.get("content", "")),
+                    "score": r.get("score", 0.0),
+                    "source": r.get("memory_type", ""),
+                    "metadata": {},
+                })
+            return {"results": results}
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"hindsight.recall('{query}') failed: {exc}") from exc
+
+    def batch_retain(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Store multiple memories in batch.
+
+        Args:
+            items: A list of dicts, each with ``content`` (required) and
+                optional ``source``, ``metadata`` keys::
+
+                    [
+                        {"content": "I like pizza", "source": "chat"},
+                        {"content": "User likes hiking", "source": "note", "metadata": {"priority": "high"}},
+                    ]
+
+        Returns:
+            A list of result dicts, one per item, each with ``"status"``.
+
+        Example::
+
+            >>> h.batch_retain([
+            ...     {"content": "I like pizza", "source": "chat"},
+            ...     {"content": "User likes hiking"},
+            ... ])
+            [{'status': 'ok'}, {'status': 'ok'}]
+
+        """
         results = []
-        for r in rows:
-            results.append({
-                "id": r.get("entity_id", ""),
-                "memory": r.get("memory_content", r.get("content", "")),
-                "score": r.get("score", 0.0),
-                "source": r.get("memory_type", ""),
-                "metadata": {},
-            })
-        return {"results": results}
+        errors = []
+        for i, item in enumerate(items):
+            try:
+                content = item.get("content", "")
+                if not content:
+                    results.append({"status": "error", "error": "content is required"})
+                    continue
+                source = item.get("source", "")
+                metadata = item.get("metadata")
+                result = self.retain(content, source=source, metadata=metadata)
+                results.append(result)
+            except Exception as exc:
+                errors.append({"index": i, "error": str(exc)})
+                results.append({"status": "error", "error": str(exc)})
+        if errors:
+            results.append({"_batch_errors": errors})
+        return results
 
     def reflect(
         self,
@@ -170,6 +235,8 @@ class Hindsight:
 
         Creates an insight node in the KG.  If ``OPENAI_API_KEY`` is set,
         also calls an LLM to synthesise findings from recent memories.
+
+        Gracefully handles the case where no memories exist.
 
         Args:
             prompt: The reflection question to ask about the stored memories.
@@ -189,15 +256,36 @@ class Hindsight:
         ws_id = workspace_id or self._ws()
 
         # Gather recent memories for context
-        recent = self._client.search(
-            workspace_id=ws_id, query="", limit=20, semantic=False,
-        )
+        try:
+            recent = self._call(
+                "search",
+                workspace_id=ws_id, query="", limit=20, semantic=False,
+            )
+        except Exception as exc:
+            recent = []
         context_lines = []
-        for r in recent:
+        for r in recent or []:
             content = r.get("content", r.get("memory_content", ""))
             if content:
                 context_lines.append(f"- {content[:300]}")
         context_str = "\n".join(context_lines[:10])
+
+        if not context_str.strip():
+            # No memories — return a graceful empty insight
+            llm_response = "[No memories available to reflect on.]"
+            try:
+                self._call(
+                    "_call", "create_insight",
+                    [ws_id, "hindsight_reflection", prompt, "synthesized", "{}"],
+                )
+            except Exception:
+                pass
+            return {
+                "status": "ok",
+                "prompt": prompt,
+                "workspace_id": ws_id,
+                "insight": llm_response,
+            }
 
         # Optionally call LLM for synthesis
         llm_response = None
@@ -226,8 +314,8 @@ class Hindsight:
             except Exception as exc:
                 llm_response = f"[Reflection LLM call failed: {exc}]"
 
-        result = self._client._call(
-            "create_insight",
+        result = self._call(
+            "_call", "create_insight",
             [ws_id, "hindsight_reflection", prompt, "synthesized", "{}"],
         )
         return {
@@ -252,7 +340,12 @@ class Hindsight:
             {'status': 'ok'}
 
         """
-        return self._client.delete_memory(memory_id)
+        try:
+            return self._call("delete_memory", memory_id)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"hindsight.forget('{memory_id}') failed: {exc}") from exc
 
     def list_all(self, limit: int = 100) -> list[dict[str, Any]]:
         """List all memories in this workspace.
@@ -264,7 +357,12 @@ class Hindsight:
             A list of memory records.
 
         """
-        return self._client.list_memories(workspace_id=self._ws(), limit=limit)
+        try:
+            return self._call("list_memories", workspace_id=self._ws(), limit=limit)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"hindsight.list_all() failed: {exc}") from exc
 
     def stats(self) -> dict[str, Any]:
         """Return workspace statistics.
@@ -274,22 +372,30 @@ class Hindsight:
             and ``kg_nodes`` counts.
 
         """
-        ws_id = self._ws()
-        memories = self._client._sql(
-            f"SELECT COUNT(*) as cnt FROM memory WHERE workspace_id = '{_esc_sql(ws_id)}' AND is_active = TRUE"
-        )
-        sessions = self._client._sql(
-            f"SELECT COUNT(*) as cnt FROM session WHERE workspace_id = '{_esc_sql(ws_id)}'"
-        )
-        nodes = self._client._sql(
-            f"SELECT COUNT(*) as cnt FROM kg_node WHERE workspace_id = '{_esc_sql(ws_id)}'"
-        )
-        return {
-            "workspace_id": ws_id,
-            "memories": memories[0]["cnt"] if memories else 0,
-            "sessions": sessions[0]["cnt"] if sessions else 0,
-            "kg_nodes": nodes[0]["cnt"] if nodes else 0,
-        }
+        try:
+            ws_id = self._ws()
+            memories = self._call(
+                "_sql",
+                f"SELECT COUNT(*) as cnt FROM memory WHERE workspace_id = '{_esc_sql(ws_id)}' AND is_active = TRUE",
+            )
+            sessions = self._call(
+                "_sql",
+                f"SELECT COUNT(*) as cnt FROM session WHERE workspace_id = '{_esc_sql(ws_id)}'",
+            )
+            nodes = self._call(
+                "_sql",
+                f"SELECT COUNT(*) as cnt FROM kg_node WHERE workspace_id = '{_esc_sql(ws_id)}'",
+            )
+            return {
+                "workspace_id": ws_id,
+                "memories": memories[0]["cnt"] if memories else 0,
+                "sessions": sessions[0]["cnt"] if sessions else 0,
+                "kg_nodes": nodes[0]["cnt"] if nodes else 0,
+            }
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"hindsight.stats() failed: {exc}") from exc
 
     def reset(self) -> dict[str, Any]:
         """Reset workspace cache.

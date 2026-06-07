@@ -20,7 +20,7 @@ Usage::
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from ..client import Client
 
@@ -46,7 +46,11 @@ class Memory:
 
     """
 
-    def __init__(self, config: dict | None = None):
+    def __init__(
+        self,
+        config: dict | None = None,
+        token_refresh_callback: Callable[[], str] | None = None,
+    ):
         # Config dict is per Mem0's API — we extract our own settings
         config = config or {}
         self._client = Client(
@@ -56,6 +60,7 @@ class Memory:
             embedder_url=config.get("embedder_url"),
         )
         self._user_id_to_ws: dict[str, str] = {}
+        self._token_refresh_callback = token_refresh_callback
 
     # -------------------------------------------------------------------
     # Internal helpers
@@ -66,17 +71,31 @@ class Memory:
         if not user_id:
             return ""
         if user_id not in self._user_id_to_ws:
-            ws = self._client.list_workspaces()
+            ws = self._call("list_workspaces")
             match = [w for w in ws if w.get("name") == user_id]
             if match:
                 self._user_id_to_ws[user_id] = match[0]["id"]
             else:
-                self._client.create_workspace(user_id, f"Mem0 user: {user_id}")
-                ws_list = self._client.list_workspaces()
+                self._call("create_workspace", user_id, f"Mem0 user: {user_id}")
+                ws_list = self._call("list_workspaces")
                 match = [w for w in ws_list if w.get("name") == user_id]
                 if match:
                     self._user_id_to_ws[user_id] = match[0]["id"]
         return self._user_id_to_ws.get(user_id, "")
+
+    def _call(self, method: str, *args: Any, **kwargs: Any) -> Any:
+        """Call a client method with automatic token-refresh retry on auth errors."""
+        try:
+            result = getattr(self._client, method)(*args, **kwargs)
+            return result
+        except RuntimeError as exc:
+            msg = str(exc).lower()
+            if self._token_refresh_callback and ("unauthorized" in msg or "authentication" in msg or "401" in msg):
+                self._token_refresh_callback()
+                # Retry once after refresh
+                result = getattr(self._client, method)(*args, **kwargs)
+                return result
+            raise
 
     # -------------------------------------------------------------------
     # Mem0 API
@@ -118,54 +137,58 @@ class Memory:
             {'results': [{'id': '...', 'memory': 'I like pizza', ...}], 'relation_events': []}
 
         """
-        if isinstance(messages, list):
-            content = "\n".join(
-                f"{m.get('role', 'user')}: {m.get('content', '')}"
-                for m in messages
-            )
-            summary = content[:200]
-        else:
-            content = str(messages)
-            summary = ""
-
-        ws_id = self._ws(user_id)
-
-        self._client.store(
-            workspace_id=ws_id,
-            content=content,
-            summary=summary or content[:200],
-            memory_type="experience",
-            peer_id=agent_id or "",
-            source_session_id=run_id or "",
-        )
-
-        # If user_id is provided, scope the stored memory to that user
-        if user_id:
-            stored = self._client.search(ws_id, content, limit=1, semantic=True)
-            if stored:
-                mem_id = stored[0].get("entity_id", "") or stored[0].get("id", "")
-                if mem_id:
-                    try:
-                        self._client._call("set_memory_scope", [mem_id, user_id])
-                    except Exception:
-                        pass  # Non-critical; memory still exists
-
-        # Return Mem0-compatible shape — search for the stored memory
-        return {
-            "results": [
-                {
-                    "id": r["id"],
-                    "memory": r.get("content", ""),
-                    "event": "ADD",
-                    "user_id": user_id or "",
-                    "agent_id": agent_id or "",
-                }
-                for r in self._client.search(
-                    ws_id, content, limit=1, semantic=True
+        try:
+            if isinstance(messages, list):
+                content = "\n".join(
+                    f"{m.get('role', 'user')}: {m.get('content', '')}"
+                    for m in messages
                 )
-            ],
-            "relation_events": [],
-        }
+                summary = content[:200]
+            else:
+                content = str(messages)
+                summary = ""
+
+            ws_id = self._ws(user_id)
+
+            self._call(
+                "store",
+                workspace_id=ws_id,
+                content=content,
+                summary=summary or content[:200],
+                memory_type="experience",
+                peer_id=agent_id or "",
+                source_session_id=run_id or "",
+            )
+
+            # If user_id is provided, scope the stored memory to that user
+            if user_id:
+                stored = self._call("search", ws_id, content, limit=1, semantic=True)
+                if stored:
+                    mem_id = stored[0].get("entity_id", "") or stored[0].get("id", "")
+                    if mem_id:
+                        try:
+                            self._client._call("set_memory_scope", [mem_id, user_id])
+                        except Exception:
+                            pass  # Non-critical; memory still exists
+
+            # Return Mem0-compatible shape — search for the stored memory
+            return {
+                "results": [
+                    {
+                        "id": r["id"],
+                        "memory": r.get("content", ""),
+                        "event": "ADD",
+                        "user_id": user_id or "",
+                        "agent_id": agent_id or "",
+                    }
+                    for r in self._call("search", ws_id, content, limit=1, semantic=True)
+                ],
+                "relation_events": [],
+            }
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"mem0.add('{messages!r}') failed: {exc}") from exc
 
     def get(self, memory_id: str) -> dict[str, Any]:
         """Retrieve a single memory by its ID.
@@ -183,19 +206,24 @@ class Memory:
             {'results': [{'id': 'abc123', 'memory': 'I like pizza', ...}]}
 
         """
-        rows = self._client.get_memory(memory_id)
-        if rows:
-            record = rows[0]
-            result = {
-                "id": record.get("id", ""),
-                "memory": record.get("content", ""),
-                "user_id": record.get("peer_id", ""),
-                "agent_id": record.get("observer_id", ""),
-                "metadata": {},
-            }
-        else:
-            result = {}
-        return {"results": [result] if result else []}
+        try:
+            rows = self._call("get_memory", memory_id)
+            if rows:
+                record = rows[0]
+                result = {
+                    "id": record.get("id", ""),
+                    "memory": record.get("content", ""),
+                    "user_id": record.get("peer_id", ""),
+                    "agent_id": record.get("observer_id", ""),
+                    "metadata": {},
+                }
+            else:
+                result = {}
+            return {"results": [result] if result else []}
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"mem0.get('{memory_id}') failed: {exc}") from exc
 
     def search(
         self,
@@ -223,7 +251,8 @@ class Memory:
         Returns:
             A dict with a ``"results"`` key containing a list of matching
             memory records, each with ``id``, ``memory``, ``score``,
-            ``user_id``, ``agent_id``, and ``metadata``.
+            ``user_id``, ``agent_id``, and ``metadata``.  Always returns
+            a dict (even for empty results).
 
         Example::
 
@@ -231,36 +260,42 @@ class Memory:
             {'results': [{'id': '...', 'memory': 'I like pizza', 'score': 0.92, ...}]}
 
         """
-        ws_id = self._ws(user_id)
-        rows = self._client.search(
-            workspace_id=ws_id,
-            query=query,
-            limit=limit,
-            semantic=True,
-        )
-        results = []
-        for r in rows:
-            score = r.get("score", 0.0)
-            if threshold > 0.0 and score < threshold:
-                continue
-            # If user_id is specified, verify user_scope isolation
-            mem_id = r.get("entity_id", "")
-            if user_id and mem_id:
-                # Fetch the full record to check user_scope
-                mem_records = self._client.get_memory(mem_id)
-                if mem_records:
-                    mem_user_scope = mem_records[0].get("user_scope", "")
-                    if mem_user_scope != "" and mem_user_scope != user_id:
-                        continue  # Skip: scoped to a different user
-            results.append({
-                "id": mem_id,
-                "memory": r.get("memory_content", r.get("content", "")),
-                "score": score,
-                "user_id": user_id or "",
-                "agent_id": agent_id or "",
-                "metadata": {},
-            })
-        return {"results": results}
+        try:
+            ws_id = self._ws(user_id)
+            rows = self._call(
+                "search",
+                workspace_id=ws_id,
+                query=query,
+                limit=limit,
+                semantic=True,
+            )
+            results = []
+            for r in rows or []:
+                score = r.get("score", 0.0)
+                if threshold > 0.0 and score < threshold:
+                    continue
+                # If user_id is specified, verify user_scope isolation
+                mem_id = r.get("entity_id", "")
+                if user_id and mem_id:
+                    # Fetch the full record to check user_scope
+                    mem_records = self._call("get_memory", mem_id)
+                    if mem_records:
+                        mem_user_scope = mem_records[0].get("user_scope", "")
+                        if mem_user_scope != "" and mem_user_scope != user_id:
+                            continue  # Skip: scoped to a different user
+                results.append({
+                    "id": mem_id,
+                    "memory": r.get("memory_content", r.get("content", "")),
+                    "score": score,
+                    "user_id": user_id or "",
+                    "agent_id": agent_id or "",
+                    "metadata": {},
+                })
+            return {"results": results}
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"mem0.search('{query}') failed: {exc}") from exc
 
     def get_all(
         self,
@@ -288,26 +323,31 @@ class Memory:
             {'results': [{'id': '...', 'memory': 'I like pizza', ...}]}
 
         """
-        if user_id:
-            ws_id = self._ws(user_id)
-            rows = self._client.get_user_memories(
-                user_scope=user_id, workspace_id=ws_id
-            )[:limit]
-        else:
-            ws_id = self._ws(None)
-            rows = self._client.list_memories(workspace_id=ws_id, limit=limit)
-        return {
-            "results": [
-                {
-                    "id": r["memory_id"] if "memory_id" in r else r["id"],
-                    "memory": r.get("content", ""),
-                    "user_id": user_id or "",
-                    "agent_id": agent_id or "",
-                    "metadata": {},
-                }
-                for r in rows
-            ]
-        }
+        try:
+            if user_id:
+                ws_id = self._ws(user_id)
+                rows = self._call(
+                    "get_user_memories", user_scope=user_id, workspace_id=ws_id
+                )[:limit]
+            else:
+                ws_id = self._ws(None)
+                rows = self._call("list_memories", workspace_id=ws_id, limit=limit)
+            return {
+                "results": [
+                    {
+                        "id": r["memory_id"] if "memory_id" in r else r["id"],
+                        "memory": r.get("content", ""),
+                        "user_id": user_id or "",
+                        "agent_id": agent_id or "",
+                        "metadata": {},
+                    }
+                    for r in rows
+                ]
+            }
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"mem0.get_all(user_id='{user_id}') failed: {exc}") from exc
 
     def update(self, memory_id: str, data: str | dict) -> dict[str, Any]:
         """Update a memory's content.
@@ -326,13 +366,18 @@ class Memory:
             {'status': 'ok'}
 
         """
-        if isinstance(data, dict):
-            content = data.get("content", data.get("memory", str(data)))
-        else:
-            content = str(data)
-        return self._client.update_memory(
-            memory_id, content=content, summary=content[:200]
-        )
+        try:
+            if isinstance(data, dict):
+                content = data.get("content", data.get("memory", str(data)))
+            else:
+                content = str(data)
+            return self._call(
+                "update_memory", memory_id, content=content, summary=content[:200]
+            )
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"mem0.update('{memory_id}') failed: {exc}") from exc
 
     def delete(self, memory_id: str) -> dict[str, Any]:
         """Delete a memory by ID.
@@ -349,7 +394,12 @@ class Memory:
             {'status': 'ok'}
 
         """
-        return self._client.delete_memory(memory_id)
+        try:
+            return self._call("delete_memory", memory_id)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"mem0.delete('{memory_id}') failed: {exc}") from exc
 
     def delete_all(
         self,
@@ -357,7 +407,7 @@ class Memory:
         agent_id: str | None = None,
         run_id: str | None = None,
     ) -> dict[str, Any]:
-        """Delete all memories for a user.
+        """Delete all memories for a user by iterating get_all().
 
         Args:
             user_id: User whose memories to delete.
@@ -368,11 +418,18 @@ class Memory:
             A dict with status and count of deleted memories.
 
         """
-        ws_id = self._ws(user_id)
-        rows = self._client.list_memories(workspace_id=ws_id, limit=9999)
-        for r in rows:
-            self._client.delete_memory(r["id"])
-        return {"status": "ok", "deleted": len(rows)}
+        try:
+            result = self.get_all(user_id=user_id, agent_id=agent_id, run_id=run_id)
+            memories = result.get("results", [])
+            for mem in memories:
+                mem_id = mem.get("id", "")
+                if mem_id:
+                    self._call("delete_memory", mem_id)
+            return {"status": "ok", "deleted": len(memories)}
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"mem0.delete_all(user_id='{user_id}') failed: {exc}") from exc
 
     def history(self, memory_id: str) -> list[dict[str, Any]]:
         """Get version history for a memory.
@@ -392,7 +449,12 @@ class Memory:
              {'version': 1, 'content': 'I like pizza', ...}]
 
         """
-        return self._client.get_memory_history(memory_id)
+        try:
+            return self._call("get_memory_history", memory_id)
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(f"mem0.history('{memory_id}') failed: {exc}") from exc
 
     def reset(self) -> dict[str, Any]:
         """Reset all state (clear workspace cache).

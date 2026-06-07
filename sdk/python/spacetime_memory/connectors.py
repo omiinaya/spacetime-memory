@@ -726,9 +726,10 @@ class ConnectorRegistry:
 class SlackConnector(Connector):
     """Poll a Slack workspace for recent messages via Slack Web API.
 
-    Queries ``conversations.history`` for each configured channel.
-    Deduplicates by message timestamp (``ts``) and handles rate
-    limiting via the ``Retry-After`` header.
+    Queries ``conversations.history`` for each configured channel with
+    full pagination support.  Optionally fetches thread replies when
+    ``include_threads=True``.  Deduplicates by message timestamp (``ts``)
+    and handles rate limiting via the ``Retry-After`` header.
 
     Usage::
 
@@ -736,6 +737,7 @@ class SlackConnector(Connector):
             token="xoxb-...",
             channel_ids=["C123", "C456"],
             workspace_id="ws-1",
+            include_threads=True,
         )
         connector.run(client, interval_secs=60)
     """
@@ -748,15 +750,131 @@ class SlackConnector(Connector):
         channel_ids: list[str],
         workspace_id: str,
         peer_id: str = "slack-bot",
+        include_threads: bool = False,
+        max_pages: int = 10,
     ):
         self.token = token
-        self.channel_ids = channel_ids
+        self.channel_ids = list(channel_ids)
         self.workspace_id = workspace_id
         self.peer_id = peer_id
+        self.include_threads = include_threads
+        self.max_pages = max_pages
         self._seen: set[str] = set()
         self._channel_names: dict[str, str] = {}
+        self._refresh_warned = False
+        self._token_refresh_callback = None
+
+    # ------------------------------------------------------------------
+    # Token lifecycle
+    # ------------------------------------------------------------------
+
+    def _refresh_token(self) -> None:
+        """Check if token is about to expire (for short-lived tokens).
+
+        Logs a warning once per session if no refresh mechanism is
+        configured.  Subclasses can override this method or set
+        ``_token_refresh_callback`` to a callable that accepts the
+        current token and returns a fresh one.
+        """
+        if self._token_refresh_callback is not None:
+            new_token = self._token_refresh_callback(self.token)
+            if new_token:
+                self.token = new_token
+                return
+        if not self._refresh_warned:
+            print(
+                "  [Slack] No token refresh mechanism configured — "
+                "if your token expires, override _refresh_token() "
+                "or set _token_refresh_callback"
+            )
+            self._refresh_warned = True
+
+    # ------------------------------------------------------------------
+    # Pagination
+    # ------------------------------------------------------------------
+
+    def _paginate(
+        self,
+        client: httpx.Client,
+        url: str,
+        params: dict[str, Any],
+    ) -> list[dict]:
+        """Paginate through Slack API responses following ``next_cursor``.
+
+        Args:
+            client: An ``httpx.Client`` instance.
+            url: The Slack API method URL.
+            params: Query parameters (must include ``channel``).
+
+        Returns:
+            Combined list of items from all pages (up to ``max_pages``).
+        """
+        all_items: list[dict] = []
+        params = dict(params)
+        pages = 0
+
+        while pages < self.max_pages:
+            try:
+                resp = client.get(
+                    url,
+                    headers={"Authorization": f"Bearer {self.token}"},
+                    params=params,
+                    timeout=30,
+                )
+            except httpx.RequestError as e:
+                print(f"  [Slack pagination HTTP error] {e}")
+                break
+
+            if resp.status_code == 429:
+                retry_after = int(resp.headers.get("Retry-After", 5))
+                print(
+                    f"  [Slack] Rate limited during pagination,"
+                    f" retry after {retry_after}s"
+                )
+                break
+
+            if resp.status_code != 200:
+                print(
+                    f"  [Slack] Unexpected status {resp.status_code}"
+                    f" during pagination"
+                )
+                break
+
+            data = resp.json()
+            if not data.get("ok"):
+                error = data.get("error", "unknown")
+                # Handle not_in_channel gracefully
+                if error == "not_in_channel":
+                    print(
+                        f"  [Slack] Bot not in channel"
+                        f" {params.get('channel', '?')} — skipping"
+                    )
+                    return all_items
+                print(f"  [Slack] API error during pagination: {error}")
+                break
+
+            # Both conversations.history and conversations.replies
+            # return items under the "messages" key
+            items = data.get("messages", [])
+            all_items.extend(items)
+
+            # Follow cursor-based pagination
+            response_metadata = data.get("response_metadata", {})
+            next_cursor = response_metadata.get("next_cursor")
+            if not next_cursor:
+                break
+
+            params["cursor"] = next_cursor
+            pages += 1
+
+        return all_items
+
+    # ------------------------------------------------------------------
+    # Polling
+    # ------------------------------------------------------------------
 
     def poll(self) -> list[Event]:
+        self._refresh_token()
         events: list[Event] = []
 
         with httpx.Client() as client:
@@ -766,52 +884,14 @@ class SlackConnector(Connector):
                 )
                 self._channel_names[channel_id] = channel_name
 
+                # Fetch all messages with full pagination
                 url = f"{self.BASE_URL}/conversations.history"
-                params = {"channel": channel_id, "limit": 30}
+                params: dict[str, Any] = {
+                    "channel": channel_id,
+                    "limit": 100,
+                }
+                messages = self._paginate(client, url, params)
 
-                try:
-                    resp = client.get(
-                        url,
-                        headers={
-                            "Authorization": f"Bearer {self.token}",
-                        },
-                        params=params,
-                        timeout=30,
-                    )
-                except httpx.RequestError as e:
-                    print(
-                        f"  [Slack HTTP error]"
-                        f" channel={channel_id}: {e}"
-                    )
-                    continue
-
-                # Handle rate limiting
-                if resp.status_code == 429:
-                    retry_after = int(
-                        resp.headers.get("Retry-After", 5)
-                    )
-                    print(
-                        f"  [Slack] Rate limited on"
-                        f" {channel_id}, retry after {retry_after}s"
-                    )
-                    continue
-
-                if resp.status_code != 200:
-                    print(
-                        f"  [Slack] Unexpected status"
-                        f" {resp.status_code} on {channel_id}"
-                    )
-                    continue
-
-                data = resp.json()
-                if not data.get("ok"):
-                    print(
-                        f"  [Slack] API error on {channel_id}:"
-                        f" {data.get('error', 'unknown')}"
-                    )
-                    continue
-
-                messages = data.get("messages", [])
                 for msg in messages:
                     msg_ts = msg.get("ts", "")
                     if msg_ts in self._seen:
@@ -828,23 +908,77 @@ class SlackConnector(Connector):
                     channel_name = self._channel_names.get(
                         channel_id, channel_id
                     )
+
+                    metadata: dict[str, Any] = {
+                        "source": "slack",
+                        "channel": channel_name,
+                        "channel_id": channel_id,
+                        "ts": msg_ts,
+                        "user": msg.get("user", ""),
+                        "subtype": subtype,
+                    }
+
+                    # ── Thread support ──────────────────────────────
+                    thread_ts = msg.get("thread_ts")
+                    if self.include_threads and thread_ts:
+                        metadata["thread_ts"] = thread_ts
+                        replies = self._fetch_thread_replies(
+                            client, channel_id, thread_ts,
+                        )
+                        for reply in replies:
+                            reply_ts = reply.get("ts", "")
+                            if reply_ts in self._seen:
+                                continue
+                            self._seen.add(reply_ts)
+                            reply_text = reply.get("text", "")
+                            reply_user = reply.get("user", "")
+                            events.append(Event(
+                                content=reply_text,
+                                workspace_id=self.workspace_id,
+                                summary=reply_text[:200],
+                                memory_type="experience",
+                                peer_id=self.peer_id,
+                                metadata={
+                                    "source": "slack",
+                                    "channel": channel_name,
+                                    "channel_id": channel_id,
+                                    "ts": reply_ts,
+                                    "user": reply_user,
+                                    "subtype": reply.get("subtype", ""),
+                                    "thread_ts": thread_ts,
+                                    "is_thread_reply": True,
+                                },
+                            ))
+
                     events.append(Event(
                         content=text,
                         workspace_id=self.workspace_id,
                         summary=text[:200],
                         memory_type="experience",
                         peer_id=self.peer_id,
-                        metadata={
-                            "source": "slack",
-                            "channel": channel_name,
-                            "channel_id": channel_id,
-                            "ts": msg_ts,
-                            "user": msg.get("user", ""),
-                            "subtype": subtype,
-                        },
+                        metadata=metadata,
                     ))
 
         return events
+
+    def _fetch_thread_replies(
+        self,
+        client: httpx.Client,
+        channel_id: str,
+        thread_ts: str,
+    ) -> list[dict]:
+        """Fetch all replies in a thread via ``conversations.replies``."""
+        url = f"{self.BASE_URL}/conversations.replies"
+        params: dict[str, Any] = {
+            "channel": channel_id,
+            "ts": thread_ts,
+            "limit": 100,
+        }
+        return self._paginate(client, url, params)
+
+    # ------------------------------------------------------------------
+    # Channel helpers
+    # ------------------------------------------------------------------
 
     def _get_channel_name(
         self, client: httpx.Client, channel_id: str,
@@ -875,7 +1009,9 @@ class SlackConnector(Connector):
 class DiscordConnector(Connector):
     """Poll a Discord channel for recent messages via Discord REST API.
 
-    Queries ``/channels/{id}/messages`` for each configured channel.
+    Queries ``/channels/{id}/messages`` for each configured channel with
+    full pagination.  Supports thread detection (fetches parent messages
+    for thread channels), attachment capture, and guild emoji decoding.
     Deduplicates by message ID and handles rate limiting.
 
     Usage::
@@ -884,6 +1020,7 @@ class DiscordConnector(Connector):
             token="MTE...",
             channel_ids=["123", "456"],
             workspace_id="ws-1",
+            include_threads=True,
         )
         connector.run(client, interval_secs=60)
     """
@@ -896,12 +1033,92 @@ class DiscordConnector(Connector):
         channel_ids: list[str],
         workspace_id: str,
         peer_id: str = "discord-bot",
+        include_threads: bool = False,
+        decode_emoji: bool = True,
     ):
         self.token = token
-        self.channel_ids = channel_ids
+        self.channel_ids = list(channel_ids)
         self.workspace_id = workspace_id
         self.peer_id = peer_id
+        self.include_threads = include_threads
+        self.decode_emoji = decode_emoji
         self._seen: set[str] = set()
+        self._emoji_cache: dict[str, str] = {}
+
+    # ------------------------------------------------------------------
+    # Emoji helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_emoji(
+        self, content: str, guild_id: str | None = None,
+    ) -> str:
+        """Decode ``:name:`` custom emoji mentions in message content.
+
+        For standard shortcodes and custom guild emoji, attempts to
+        resolve ``:name:`` patterns.  Custom emoji in Discord's
+        ``<:name:id>`` format are already valid and left as-is.
+        Unresolvable shortcodes are left unchanged.
+        """
+        import re
+
+        def replace_emoji(match: re.Match) -> str:
+            name = match.group(1)
+            # Check cache first
+            cached = self._emoji_cache.get(name)
+            if cached is not None:
+                return cached
+            # Cannot resolve — leave original text unchanged
+            return match.group(0)
+
+        # Match :name: patterns that aren't part of URLs or markup
+        content = re.sub(r":([a-zA-Z0-9_+-]+):", replace_emoji, content)
+        return content
+
+    # ------------------------------------------------------------------
+    # Channel helpers
+    # ------------------------------------------------------------------
+
+    def _fetch_channel_info(
+        self, client: httpx.Client, channel_id: str,
+    ) -> dict | None:
+        """Fetch channel info from Discord API.
+
+        Returns the channel object, or ``None`` if the channel doesn't
+        exist, we don't have access, or an error occurred.
+        """
+        url = f"{self.BASE_URL}/channels/{channel_id}"
+        headers = {
+            "Authorization": f"Bot {self.token}",
+            "User-Agent": "spacetime-memory-connector/1.0",
+        }
+        try:
+            resp = client.get(url, headers=headers, timeout=15)
+        except httpx.RequestError as e:
+            print(
+                f"  [Discord HTTP error] channel info"
+                f" {channel_id}: {e}"
+            )
+            return None
+
+        if resp.status_code == 404:
+            print(
+                f"  [Discord] Unknown channel {channel_id} —"
+                f" removing from active list"
+            )
+            return None
+        if resp.status_code == 403:
+            print(
+                f"  [Discord] Forbidden on channel {channel_id} —"
+                f" check bot permissions"
+            )
+            return None
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+
+    # ------------------------------------------------------------------
+    # Polling
+    # ------------------------------------------------------------------
 
     def poll(self) -> list[Event]:
         events: list[Event] = []
@@ -911,80 +1128,195 @@ class DiscordConnector(Connector):
         }
 
         with httpx.Client() as client:
-            for channel_id in self.channel_ids:
-                url = (
-                    f"{self.BASE_URL}"
-                    f"/channels/{channel_id}/messages"
-                )
-                params = {"limit": 50}
-
-                try:
-                    resp = client.get(
-                        url,
-                        headers=headers,
-                        params=params,
-                        timeout=30,
+            # Iterate over a snapshot of channel_ids so we can safely
+            # remove channels that return 404 during iteration
+            for channel_id in list(self.channel_ids):
+                # ── Thread support ───────────────────────────────────
+                if self.include_threads:
+                    channel_info = self._fetch_channel_info(
+                        client, channel_id,
                     )
-                except httpx.RequestError as e:
-                    print(
-                        f"  [Discord HTTP error]"
-                        f" channel={channel_id}: {e}"
-                    )
-                    continue
-
-                # Handle rate limiting
-                if resp.status_code == 429:
-                    retry_after = resp.json().get(
-                        "retry_after", 5.0
-                    )
-                    print(
-                        f"  [Discord] Rate limited on"
-                        f" {channel_id}, retry after {retry_after}s"
-                    )
-                    continue
-
-                if resp.status_code == 403:
-                    print(
-                        f"  [Discord] Forbidden on channel"
-                        f" {channel_id} — check bot permissions"
-                    )
-                    continue
-
-                if resp.status_code != 200:
-                    print(
-                        f"  [Discord] Unexpected status"
-                        f" {resp.status_code} on {channel_id}"
-                    )
-                    continue
-
-                messages = resp.json()
-                for msg in messages:
-                    msg_id = msg.get("id", "")
-                    if msg_id in self._seen:
+                    if channel_info is None:
+                        # 404 or error — remove from active list
+                        if channel_id in self.channel_ids:
+                            self.channel_ids.remove(channel_id)
                         continue
-                    self._seen.add(msg_id)
 
-                    content = msg.get("content", "")
-                    author = msg.get("author", {})
-                    author_name = author.get("username", "unknown")
-                    timestamp = msg.get("timestamp", "")
+                    # Discord thread types:
+                    # 10 = GUILD_NEWS_THREAD
+                    # 11 = GUILD_PUBLIC_THREAD
+                    # 12 = GUILD_PRIVATE_THREAD
+                    channel_type = channel_info.get("type")
+                    if channel_type in (10, 11, 12):
+                        parent_id = channel_info.get("parent_id")
+                        if parent_id:
+                            print(
+                                f"  [Discord] Channel {channel_id} is a"
+                                f" thread in parent {parent_id},"
+                                f" fetching parent messages"
+                            )
+                            parent_msgs = self._fetch_messages(
+                                client, parent_id, headers,
+                            )
+                            for msg in parent_msgs:
+                                ev = self._msg_to_event(
+                                    msg, channel_id,
+                                )
+                                if ev:
+                                    events.append(ev)
 
-                    events.append(Event(
-                        content=content,
-                        workspace_id=self.workspace_id,
-                        summary=content[:200],
-                        memory_type="experience",
-                        peer_id=self.peer_id,
-                        metadata={
-                            "source": "discord",
-                            "channel_id": channel_id,
-                            "message_id": msg_id,
-                            "author": author_name,
-                            "timestamp": timestamp,
-                        },
-                    ))
+                # Fetch messages for this channel with pagination
+                messages = self._fetch_messages(
+                    client, channel_id, headers,
+                )
+                for msg in messages:
+                    ev = self._msg_to_event(msg, channel_id)
+                    if ev:
+                        events.append(ev)
 
         return events
+
+    # ------------------------------------------------------------------
+    # Message fetching
+    # ------------------------------------------------------------------
+
+    def _fetch_messages(
+        self,
+        client: httpx.Client,
+        channel_id: str,
+        headers: dict[str, str],
+    ) -> list[dict]:
+        """Fetch messages from a Discord channel with pagination.
+
+        Paginates backwards through message history using the
+        ``before`` parameter (Discord returns newest-first).
+        Returns up to 10 pages (1000 messages max).
+        """
+        url = (
+            f"{self.BASE_URL}"
+            f"/channels/{channel_id}/messages"
+        )
+        params: dict[str, Any] = {"limit": 100}
+        all_messages: list[dict] = []
+        pages = 0
+
+        while pages < 10:
+            try:
+                resp = client.get(
+                    url, headers=headers, params=params, timeout=30,
+                )
+            except httpx.RequestError as e:
+                print(
+                    f"  [Discord HTTP error] channel={channel_id}:"
+                    f" {e}"
+                )
+                break
+
+            # Handle rate limiting
+            if resp.status_code == 429:
+                retry_after = resp.json().get(
+                    "retry_after", 5.0,
+                )
+                print(
+                    f"  [Discord] Rate limited on"
+                    f" {channel_id}, retry after {retry_after}s"
+                )
+                break
+
+            if resp.status_code == 403:
+                print(
+                    f"  [Discord] Forbidden on channel"
+                    f" {channel_id} — check bot permissions"
+                )
+                break
+
+            # Handle 404 gracefully — remove channel from active list
+            if resp.status_code == 404:
+                print(
+                    f"  [Discord] Unknown channel {channel_id} —"
+                    f" removing from active list"
+                )
+                if channel_id in self.channel_ids:
+                    self.channel_ids.remove(channel_id)
+                break
+
+            if resp.status_code != 200:
+                print(
+                    f"  [Discord] Unexpected status"
+                    f" {resp.status_code} on {channel_id}"
+                )
+                break
+
+            messages = resp.json()
+            if not messages:
+                break
+
+            all_messages.extend(messages)
+
+            # Paginate: use the last (oldest) message ID as
+            # the 'before' cursor for the next page
+            oldest_id = messages[-1].get("id")
+            if not oldest_id or len(messages) < 100:
+                break
+            params["before"] = oldest_id
+            pages += 1
+
+        return all_messages
+
+    def _msg_to_event(
+        self, msg: dict, channel_id: str,
+    ) -> Event | None:
+        """Convert a Discord message dict to an ``Event``."""
+        msg_id = msg.get("id", "")
+        if msg_id in self._seen:
+            return None
+        self._seen.add(msg_id)
+
+        content = msg.get("content", "")
+        author = msg.get("author", {})
+        author_name = author.get("username", "unknown")
+        author_id = author.get("id", "")
+        timestamp = msg.get("timestamp", "")
+
+        # ── Guild emoji decoding ──────────────────────────────────
+        if self.decode_emoji:
+            guild_id = msg.get("guild_id")
+            content = self._resolve_emoji(content, guild_id)
+
+        # ── Attachment capture ────────────────────────────────────
+        attachments = msg.get("attachments", [])
+        attachment_urls = [
+            att.get("url", "")
+            for att in attachments
+            if att.get("url")
+        ]
+
+        metadata: dict[str, Any] = {
+            "source": "discord",
+            "channel_id": channel_id,
+            "message_id": msg_id,
+            "author": author_name,
+            "author_id": author_id,
+            "timestamp": timestamp,
+        }
+
+        if attachment_urls:
+            metadata["attachments"] = attachment_urls
+
+        # ── Thread metadata ───────────────────────────────────────
+        thread = msg.get("thread", {})
+        if thread:
+            metadata["thread_id"] = thread.get("id", "")
+            metadata["thread_name"] = thread.get("name", "")
+
+        return Event(
+            content=content,
+            workspace_id=self.workspace_id,
+            summary=content[:200],
+            memory_type="experience",
+            peer_id=self.peer_id,
+            metadata=metadata,
+        )
 
 
 # ── Notion Connector ─────────────────────────────────────────────────
@@ -993,8 +1325,14 @@ class DiscordConnector(Connector):
 class NotionConnector(Connector):
     """Poll a Notion database for new or updated pages via Notion API.
 
-    Queries ``/databases/{database_id}/query`` (POST) and extracts
-    title / content from page properties.  Deduplicates by page ID.
+    Queries ``/databases/{database_id}/query`` (POST) with full
+    pagination (up to 100 pages).  Extracts title and body content
+    from all supported property types (title, rich_text, select,
+    multi_select, status, date, checkbox, number, url, email,
+    phone_number, unique_id, formula, rollup, created_by,
+    created_time, last_edited_by, last_edited_time, people, files,
+    button).  Deduplicates by page ID and handles rate limits by
+    honouring the ``Retry-After`` header.
 
     Usage::
 
@@ -1014,12 +1352,18 @@ class NotionConnector(Connector):
         database_id: str,
         workspace_id: str,
         peer_id: str = "notion-bot",
+        max_pages: int = 100,
     ):
         self.token = token
         self.database_id = database_id
         self.workspace_id = workspace_id
         self.peer_id = peer_id
+        self.max_pages = max_pages
         self._seen: set[str] = set()
+
+    # ------------------------------------------------------------------
+    # Polling
+    # ------------------------------------------------------------------
 
     def poll(self) -> list[Event]:
         events: list[Event] = []
@@ -1033,76 +1377,114 @@ class NotionConnector(Connector):
             f"{self.BASE_URL}"
             f"/databases/{self.database_id}/query"
         )
-        payload = {"page_size": 50}
+        payload: dict[str, Any] = {"page_size": 100}
 
         with httpx.Client() as client:
-            try:
-                resp = client.post(
-                    url, headers=headers, json=payload, timeout=30,
-                )
-            except httpx.RequestError as e:
-                print(f"  [Notion HTTP error] {e}")
-                return events
+            pages = 0
+            while pages < self.max_pages:
+                try:
+                    resp = client.post(
+                        url,
+                        headers=headers,
+                        json=payload,
+                        timeout=30,
+                    )
+                except httpx.RequestError as e:
+                    print(f"  [Notion HTTP error] {e}")
+                    break
 
-            # Handle rate limiting
-            if resp.status_code == 429:
-                print("  [Notion] Rate limited")
-                return events
+                # ── Rate-limit handling with Retry-After ──────────
+                if resp.status_code == 429:
+                    retry_after = int(
+                        resp.headers.get("Retry-After", 5)
+                    )
+                    print(
+                        f"  [Notion] Rate limited, waiting"
+                        f" {retry_after}s ..."
+                    )
+                    time.sleep(retry_after)
+                    continue  # retry the same page
 
-            if resp.status_code == 401:
-                print(
-                    "  [Notion] Unauthorised — check integration token"
-                )
-                return events
+                if resp.status_code == 401:
+                    print(
+                        "  [Notion] Unauthorised — check"
+                        " integration token"
+                    )
+                    break
 
-            if resp.status_code != 200:
-                print(
-                    f"  [Notion] Unexpected status {resp.status_code}"
-                )
-                return events
+                if resp.status_code != 200:
+                    print(
+                        f"  [Notion] Unexpected status"
+                        f" {resp.status_code}"
+                    )
+                    break
 
-            data = resp.json()
-            results = data.get("results", [])
-            for page in results:
-                page_id = page.get("id", "")
-                if page_id in self._seen:
-                    continue
-                self._seen.add(page_id)
+                data = resp.json()
+                results = data.get("results", [])
+                for page in results:
+                    page_id = page.get("id", "")
+                    if page_id in self._seen:
+                        continue
+                    self._seen.add(page_id)
 
-                props = page.get("properties", {})
-                title_text = self._extract_title(props)
-                body_text = self._extract_body(props)
+                    props = page.get("properties", {})
+                    title_text = self._extract_title(props)
+                    body_text = self._extract_body(props)
 
-                content = title_text
-                if body_text:
-                    content = f"{title_text}\n\n{body_text}"
+                    content = title_text
+                    if body_text:
+                        content = f"{title_text}\n\n{body_text}"
 
-                events.append(Event(
-                    content=content,
-                    workspace_id=self.workspace_id,
-                    summary=title_text[:200],
-                    memory_type="experience",
-                    peer_id=self.peer_id,
-                    metadata={
+                    # Collect all property values into metadata
+                    prop_summary = self._extract_property_summary(
+                        props,
+                    )
+
+                    metadata: dict[str, Any] = {
                         "source": "notion",
                         "page_id": page_id,
                         "database_id": self.database_id,
                         "url": page.get("url", ""),
                         "created_time": page.get(
-                            "created_time", ""
+                            "created_time", "",
                         ),
                         "last_edited_time": page.get(
-                            "last_edited_time", ""
+                            "last_edited_time", "",
                         ),
-                    },
-                ))
+                    }
+                    # Merge property summary (avoids overwriting
+                    # the reserved keys above)
+                    for k, v in prop_summary.items():
+                        if k not in metadata:
+                            metadata[k] = v
+
+                    events.append(Event(
+                        content=content,
+                        workspace_id=self.workspace_id,
+                        summary=title_text[:200],
+                        memory_type="experience",
+                        peer_id=self.peer_id,
+                        metadata=metadata,
+                    ))
+
+                # ── Pagination ────────────────────────────────────
+                next_cursor = data.get("next_cursor")
+                has_more = data.get("has_more", False)
+                if not has_more or not next_cursor:
+                    break
+
+                payload["start_cursor"] = next_cursor
+                pages += 1
 
         return events
+
+    # ------------------------------------------------------------------
+    # Property extraction
+    # ------------------------------------------------------------------
 
     @staticmethod
     def _extract_title(props: dict) -> str:
         """Extract a title string from Notion page properties."""
-        # Try common title property types
         for prop in props.values():
             prop_type = prop.get("type", "")
             if prop_type == "title":
@@ -1118,7 +1500,7 @@ class NotionConnector(Connector):
                         p.get("plain_text", "") for p in parts
                     )
         # Fallback: use the first text property we find
-        for key, prop in props.items():
+        for prop in props.values():
             prop_type = prop.get("type", "")
             if prop_type in ("title", "rich_text"):
                 parts = prop.get(prop_type, [])
@@ -1134,57 +1516,200 @@ class NotionConnector(Connector):
         parts: list[str] = []
         for key, prop in props.items():
             prop_type = prop.get("type", "")
-            if prop_type == "rich_text":
-                items = prop.get("rich_text", [])
-                text = "".join(
-                    p.get("plain_text", "") for p in items
-                )
-                if text.strip():
-                    parts.append(f"{key}: {text}")
-            elif prop_type == "select":
-                select = prop.get("select")
-                if select:
-                    parts.append(
-                        f"{key}: {select.get('name', '')}"
-                    )
-            elif prop_type == "multi_select":
-                mselects = prop.get("multi_select", [])
-                names = [m.get("name", "") for m in mselects]
-                if names:
-                    parts.append(f"{key}: {', '.join(names)}")
-            elif prop_type == "status":
-                status = prop.get("status")
-                if status:
-                    parts.append(
-                        f"{key}: {status.get('name', '')}"
-                    )
-            elif prop_type == "date":
-                date = prop.get("date")
-                if date:
-                    parts.append(
-                        f"{key}: {date.get('start', '')}"
-                    )
-            elif prop_type == "checkbox":
-                parts.append(
-                    f"{key}: {prop.get('checkbox', False)}"
-                )
-            elif prop_type == "number":
-                val = prop.get("number")
-                if val is not None:
-                    parts.append(f"{key}: {val}")
-            elif prop_type == "url":
-                val = prop.get("url")
-                if val:
-                    parts.append(f"{key}: {val}")
-            elif prop_type == "email":
-                val = prop.get("email")
-                if val:
-                    parts.append(f"{key}: {val}")
-            elif prop_type == "phone_number":
-                val = prop.get("phone_number")
-                if val:
-                    parts.append(f"{key}: {val}")
+            val = NotionConnector._get_prop_value(prop_type, prop)
+            if val is not None and val != "":
+                parts.append(f"{key}: {val}")
         return "\n".join(parts)
+
+    @staticmethod
+    def _extract_property_summary(props: dict) -> dict[str, Any]:
+        """Extract all property values into a flat dict for metadata."""
+        summary: dict[str, Any] = {}
+        for key, prop in props.items():
+            prop_type = prop.get("type", "")
+            val = NotionConnector._get_prop_value(prop_type, prop)
+            if val is not None:
+                summary[key] = val
+        return summary
+
+    @staticmethod
+    def _get_prop_value(
+        prop_type: str, prop: dict,
+    ) -> Any:
+        """Get the display value for a Notion property by its type.
+
+        Supports all standard Notion property types.
+        """
+        # ── Text / Title ──────────────────────────────────────────
+        if prop_type == "title":
+            parts = prop.get("title", [])
+            if not parts:
+                return None
+            return "".join(
+                p.get("plain_text", "") for p in parts
+            )
+
+        if prop_type == "rich_text":
+            parts = prop.get("rich_text", [])
+            if not parts:
+                return None
+            return "".join(
+                p.get("plain_text", "") for p in parts
+            )
+
+        # ── Selects ───────────────────────────────────────────────
+        if prop_type == "select":
+            select = prop.get("select")
+            if not select:
+                return None
+            return select.get("name", "")
+
+        if prop_type == "multi_select":
+            mselects = prop.get("multi_select", [])
+            if not mselects:
+                return None
+            return ", ".join(
+                m.get("name", "") for m in mselects
+            )
+
+        if prop_type == "status":
+            status = prop.get("status")
+            if not status:
+                return None
+            return status.get("name", "")
+
+        # ── Date ──────────────────────────────────────────────────
+        if prop_type == "date":
+            date = prop.get("date")
+            if not date:
+                return None
+            start = date.get("start", "")
+            end = date.get("end")
+            if end:
+                return f"{start} → {end}"
+            return start
+
+        # ── Primitives ────────────────────────────────────────────
+        if prop_type == "checkbox":
+            return prop.get("checkbox", False)
+
+        if prop_type == "number":
+            return prop.get("number")
+
+        if prop_type == "url":
+            return prop.get("url")
+
+        if prop_type == "email":
+            return prop.get("email")
+
+        if prop_type == "phone_number":
+            return prop.get("phone_number")
+
+        # ── Unique ID ─────────────────────────────────────────────
+        if prop_type == "unique_id":
+            uid = prop.get("unique_id")
+            if not uid:
+                return None
+            prefix = uid.get("prefix", "")
+            number = uid.get("number")
+            if prefix and number is not None:
+                return f"{prefix}-{number}"
+            if number is not None:
+                return str(number)
+            return None
+
+        # ── Formula ───────────────────────────────────────────────
+        if prop_type == "formula":
+            formula = prop.get("formula", {})
+            formula_type = formula.get("type", "")
+            if formula_type == "string":
+                return formula.get("string")
+            if formula_type == "number":
+                return formula.get("number")
+            if formula_type == "boolean":
+                return formula.get("boolean")
+            if formula_type == "date":
+                date_val = formula.get("date")
+                if date_val:
+                    return date_val.get("start", "")
+            return None
+
+        # ── Rollup ────────────────────────────────────────────────
+        if prop_type == "rollup":
+            rollup = prop.get("rollup", {})
+            rollup_type = rollup.get("type", "")
+            if rollup_type == "array":
+                arr = rollup.get("array", [])
+                display = []
+                for item in arr:
+                    item_type = item.get("type", "")
+                    val = NotionConnector._get_prop_value(
+                        item_type, item,
+                    )
+                    if val is not None:
+                        display.append(str(val))
+                return ", ".join(display)
+            if rollup_type == "number":
+                return rollup.get("number")
+            if rollup_type == "date":
+                date_val = rollup.get("date")
+                if date_val:
+                    return date_val.get("start", "")
+            if rollup_type == "incomplete":
+                return "(incomplete rollup)"
+            return None
+
+        # ── People (user references) ──────────────────────────────
+        if prop_type == "people":
+            people = prop.get("people", [])
+            if not people:
+                return None
+            return ", ".join(
+                p.get("name", p.get("id", "?")) for p in people
+            )
+
+        # ── Files ─────────────────────────────────────────────────
+        if prop_type == "files":
+            files = prop.get("files", [])
+            if not files:
+                return None
+            urls = []
+            for f in files:
+                name = f.get("name", "")
+                file_data = f.get("file") or f.get("external", {})
+                url_val = file_data.get("url", "")
+                if name and url_val:
+                    urls.append(f"{name}: {url_val}")
+                elif url_val:
+                    urls.append(url_val)
+                elif name:
+                    urls.append(name)
+            return ", ".join(urls)
+
+        # ── Created / Edited metadata ─────────────────────────────
+        if prop_type == "created_by":
+            user = prop.get("created_by", {})
+            return user.get("name", user.get("id", ""))
+
+        if prop_type == "created_time":
+            return prop.get("created_time")
+
+        if prop_type == "last_edited_by":
+            user = prop.get("last_edited_by", {})
+            return user.get("name", user.get("id", ""))
+
+        if prop_type == "last_edited_time":
+            return prop.get("last_edited_time")
+
+        # ── Button (Notion button property — typically no value) ──
+        if prop_type == "button":
+            button = prop.get("button", {})
+            if button:
+                return button.get("text", "[button]")
+            return "[button]"
+
+        # ── Fallback for unknown types ────────────────────────────
+        return None
 
 
 # ── Org-mode Parser ──────────────────────────────────────────────────

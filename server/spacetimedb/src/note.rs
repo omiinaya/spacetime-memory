@@ -2,6 +2,7 @@ use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
 use crate::auth::require_auth;
+use crate::workspace::check_space_access;
 
 /// A note — markdown document with wikilink backlinking support.
 #[table(accessor = note, public)]
@@ -104,6 +105,8 @@ pub fn create_note(
     embedding_json: String,
 ) -> Result<(), String> {
     require_auth(ctx)?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -159,6 +162,8 @@ pub fn update_note(
         .id()
         .find(&id)
         .ok_or_else(|| format!("Note '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &note.workspace_id, &caller, "editor")?;
 
     let final_title = if title.is_empty() {
         extract_title_from_markdown(&content)
@@ -188,6 +193,14 @@ pub fn update_note(
 #[reducer]
 pub fn delete_note(ctx: &ReducerContext, id: String) -> Result<(), String> {
     require_auth(ctx)?;
+    let note = ctx
+        .db
+        .note()
+        .id()
+        .find(&id)
+        .ok_or_else(|| format!("Note '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &note.workspace_id, &caller, "editor")?;
     clear_backlinks(ctx, &id);
 
     // Clean up blocks
