@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Save, Eye, Edit3, ArrowLeft, ExternalLink, Trash2,
-  CornerDownRight,
+  CornerDownRight, MessageSquare, Hash,
 } from 'lucide-react';
 import { useTable } from '@/lib/useReactiveDb';
-import { MarkdownRenderer, wikiLinkPattern, targetTitleFromWikiLink } from '@/components/MarkdownRenderer';
+import { MarkdownRenderer, BlockView, BlockBacklinksPanel } from '@/components/MarkdownRenderer';
 import { callReducer } from '@/lib/spacetimedb';
 
 interface NoteRow {
@@ -19,6 +19,7 @@ interface NoteRow {
   note_date: string;
   embedding_json: string;
   backlink_count: number;
+  block_ref_count: number;
   created_at: number;
   updated_at: number;
   is_active: boolean;
@@ -32,6 +33,30 @@ interface NoteBacklinkRow {
   created_at: number;
 }
 
+interface NoteBlockRow {
+  id: string;
+  note_id: string;
+  block_type: string;
+  content: string;
+  source: string;
+  block_order: number;
+  heading_level: number;
+  task_state: string;
+  properties_json: string;
+  is_active: boolean;
+  created_at: number;
+}
+
+interface BlockReferenceRow {
+  id: string;
+  source_note_id: string;
+  source_block_id: string;
+  target_block_id: string;
+  target_note_id: string;
+  ref_type: string;
+  created_at: number;
+}
+
 
 export default function NoteEditor() {
   const [, params] = useRoute('/notes/:id');
@@ -41,6 +66,8 @@ export default function NoteEditor() {
 
   const { data: notes } = useTable<NoteRow>('note');
   const { data: allBacklinks, loading: blLoading } = useTable<NoteBacklinkRow>('note_backlink');
+  const { data: noteBlocks } = useTable<NoteBlockRow>('note_block');
+  const { data: blockReferences } = useTable<BlockReferenceRow>('block_reference');
 
   const note = useMemo(() => {
     if (isNew) return null;
@@ -57,11 +84,31 @@ export default function NoteEditor() {
       });
   }, [allBacklinks, noteId, notes]);
 
+  // Get blocks for this note
+  const thisNotesBlocks = useMemo(() => {
+    if (!noteId) return [];
+    return (noteBlocks || [])
+      .filter((b: NoteBlockRow) => b.note_id === noteId)
+      .sort((a: NoteBlockRow, b: NoteBlockRow) => a.block_order - b.block_order);
+  }, [noteBlocks, noteId]);
+
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [showBlocks, setShowBlocks] = useState(false);
+  const [highlightBlock, setHighlightBlock] = useState<number | null>(null);
+
+  // Check for ?block=N query param on mount
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const blockParam = searchParams.get('block');
+    if (blockParam) {
+      setHighlightBlock(parseInt(blockParam, 10));
+      setShowBlocks(true);
+    }
+  }, []);
 
   // Initialize state from note or new
   useEffect(() => {
@@ -96,9 +143,9 @@ export default function NoteEditor() {
   // Parse wikilinks in content for link targets
   const wikiTargets = useMemo(() => {
     const targets: string[] = [];
-    const m = content.matchAll(wikiLinkPattern);
+    const m = content.matchAll(/\[\[([^\[\]]+?)\]\]/g);
     for (const match of m) {
-      const t = targetTitleFromWikiLink(match[0]);
+      const t = match[1].trim();
       if (t) targets.push(t);
     }
     return targets;
@@ -127,6 +174,17 @@ export default function NoteEditor() {
     });
   }, [wikiTargets, notes, noteId]);
 
+  // Block refs in this note's content
+  const blockRefCount = useMemo(() => {
+    const refs = content.match(/\(\([^()]+?\)\)/g);
+    return refs?.length || 0;
+  }, [content]);
+
+  const embedCount = useMemo(() => {
+    const embeds = content.match(/\{\{embed\s*\(\([^()]+?\)\)\}\}/g);
+    return embeds?.length || 0;
+  }, [content]);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -143,6 +201,19 @@ export default function NoteEditor() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {!isNew && (
+            <>
+              <Button
+                variant={showBlocks ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowBlocks(!showBlocks)}
+                title="Toggle block view"
+              >
+                <Hash className="mr-2 h-4 w-4" />
+                Blocks
+              </Button>
+            </>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -159,47 +230,92 @@ export default function NoteEditor() {
       </div>
 
       {/* Content area */}
-      <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: preview ? '1fr' : '1fr 1fr' }}>
-        {/* Editor panel */}
-        {!preview && (
-          <Card className="min-h-[60vh]">
-            <CardContent className="p-4">
-              <input
-                type="text"
-                placeholder="Note title (or use # Heading in content)"
-                className="w-full bg-transparent text-lg font-semibold border-b border-border pb-2 mb-4 outline-none placeholder:text-muted-foreground/50"
-                value={title}
-                onChange={e => { setTitle(e.target.value); setDirty(true); }}
-              />
-              <textarea
-                className="w-full min-h-[50vh] bg-transparent resize-none outline-none font-mono text-sm leading-relaxed"
-                placeholder="Write in markdown...&#10;&#10;Use [[WikiLinks]] to link to other notes.&#10;# Heading auto-becomes the title.&#10;"
-                value={content}
-                onChange={e => { setContent(e.target.value); setDirty(true); }}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Preview panel (or full-screen in preview mode) */}
-        <Card className="min-h-[60vh]">
-          <CardContent className="p-4">
-            {!content && !preview ? (
-              <div className="flex flex-col items-center justify-center h-[50vh] text-muted-foreground">
-                <Edit3 className="h-8 w-8 mb-2 opacity-30" />
-                <p className="text-sm">Start typing markdown on the left</p>
-              </div>
-            ) : (
-              <div className="prose prose-sm prose-invert max-w-none">
-                {title && <h1 className="text-2xl font-bold mb-4">{title}</h1>}
-                <MarkdownRenderer content={content} notes={notes} currentNoteId={noteId || undefined} />
-              </div>
-            )}
+      {showBlocks && thisNotesBlocks.length > 0 && !preview ? (
+        /* Block view */
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Hash className="h-4 w-4" />
+              Blocks ({thisNotesBlocks.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <BlockView
+              blocks={thisNotesBlocks}
+              notes={notes}
+              currentNoteId={noteId || undefined}
+              noteBlocks={noteBlocks}
+              highlightBlock={highlightBlock}
+            />
           </CardContent>
         </Card>
-      </div>
+      ) : (
+        /* Editor/Preview panels */
+        <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: preview ? '1fr' : '1fr 1fr' }}>
+          {/* Editor panel */}
+          {!preview && (
+            <Card className="min-h-[60vh]">
+              <CardContent className="p-4">
+                <input
+                  type="text"
+                  placeholder="Note title (or use # Heading in content)"
+                  className="w-full bg-transparent text-lg font-semibold border-b border-border pb-2 mb-4 outline-none placeholder:text-muted-foreground/50"
+                  value={title}
+                  onChange={e => { setTitle(e.target.value); setDirty(true); }}
+                />
+                <textarea
+                  className="w-full min-h-[50vh] bg-transparent resize-none outline-none font-mono text-sm leading-relaxed"
+                  placeholder={
+                    'Write in markdown...\n\n' +
+                    '[[WikiLinks]] to link to other notes.\n' +
+                    '((block-id)) to reference a specific block.\n' +
+                    '{{embed ((block-id))}} to transclude a block.\n' +
+                    '# Heading auto-becomes the title.\n'
+                  }
+                  value={content}
+                  onChange={e => { setContent(e.target.value); setDirty(true); }}
+                />
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Quick info: wikilinks + backlinks */}
+          {/* Preview panel (or full-screen in preview mode) */}
+          <Card className="min-h-[60vh]">
+            <CardContent className="p-4">
+              {!content && !preview ? (
+                <div className="flex flex-col items-center justify-center h-[50vh] text-muted-foreground">
+                  <Edit3 className="h-8 w-8 mb-2 opacity-30" />
+                  <p className="text-sm">Start typing markdown on the left</p>
+                </div>
+              ) : (
+                <div className="prose prose-sm prose-invert max-w-none">
+                  {title && <h1 className="text-2xl font-bold mb-4">{title}</h1>}
+                  <MarkdownRenderer
+                    content={content}
+                    notes={notes}
+                    currentNoteId={noteId || undefined}
+                    noteBlocks={noteBlocks}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Block ref count badge */}
+      {(blockRefCount > 0 || embedCount > 0) && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <MessageSquare className="h-3 w-3" />
+          <span>{blockRefCount} block reference(s)</span>
+          {embedCount > 0 && <>, {embedCount} embed(s)</>}
+          <span className="text-[10px] text-muted-foreground/50">
+            (Use ((id)) syntax to reference blocks. Hover blocks to see their IDs.)
+          </span>
+        </div>
+      )}
+
+      {/* Quick info: wikilinks + backlinks + block refs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Outgoing wikilinks */}
         {wikiTargets.length > 0 && (
@@ -264,6 +380,16 @@ export default function NoteEditor() {
           </Card>
         )}
       </div>
+
+      {/* Block references panel */}
+      {!isNew && blockReferences && blockReferences.length > 0 && (
+        <BlockBacklinksPanel
+          noteId={noteId!}
+          blockReferences={blockReferences}
+          notes={notes}
+          onNavigate={(path: string) => setLocation(path)}
+        />
+      )}
 
       {/* Delete button for existing notes */}
       {!isNew && (

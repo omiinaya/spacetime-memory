@@ -46,6 +46,9 @@ export function initReactiveDb() {
     'SELECT * FROM doc_chunk',
     'SELECT * FROM note',
     'SELECT * FROM note_backlink',
+    'SELECT * FROM note_block',
+    'SELECT * FROM block_reference',
+    'SELECT * FROM account',
   ]);
 
   // Bump version when initial data lands

@@ -1,10 +1,11 @@
 import React, { Suspense, useEffect } from 'react';
 import { Route, Switch } from 'wouter';
 import Layout from '@/components/Layout';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { initReactiveDb } from '@/lib/useReactiveDb';
+import { AuthProvider, useAuth } from '@/lib/auth';
 
-// Lazy load pages
+const AuthPage = React.lazy(() => import('@/pages/AuthPage'));
 const Dashboard = React.lazy(() => import('@/pages/Dashboard'));
 const Peers = React.lazy(() => import('@/pages/Peers'));
 const Sessions = React.lazy(() => import('@/pages/Sessions'));
@@ -21,21 +22,34 @@ const SmartQuery = React.lazy(() => import('@/pages/SmartQuery'));
 
 function LoadingFallback() {
   return (
-    <div className="flex h-[60vh] items-center justify-center">
+    <div className="flex h-screen items-center justify-center bg-background">
       <div className="text-center">
-        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+        <Sparkles className="mx-auto h-8 w-8 animate-pulse text-primary mb-4" />
+        <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
         <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
       </div>
     </div>
   );
 }
 
-export default function App() {
-  // Connect + subscribe all tables once on mount
-  useEffect(() => {
-    initReactiveDb();
-  }, []);
+function AuthenticatedApp() {
+  const { status } = useAuth();
 
+  // Still loading auth state
+  if (status.type === 'loading') {
+    return <LoadingFallback />;
+  }
+
+  // Not authenticated — show auth page
+  if (status.type === 'needs_account' || status.type === 'login') {
+    return (
+      <Suspense fallback={<LoadingFallback />}>
+        <AuthPage />
+      </Suspense>
+    );
+  }
+
+  // Authenticated — show the main app
   return (
     <Layout>
       <Suspense fallback={<LoadingFallback />}>
@@ -65,5 +79,18 @@ export default function App() {
         </Switch>
       </Suspense>
     </Layout>
+  );
+}
+
+export default function App() {
+  // Connect + subscribe all tables once on mount
+  useEffect(() => {
+    initReactiveDb();
+  }, []);
+
+  return (
+    <AuthProvider>
+      <AuthenticatedApp />
+    </AuthProvider>
   );
 }

@@ -15,15 +15,13 @@
 
 | Project | Features Incorporated |
 |---|---|
-| [Mem0](https://github.com/mem0ai/mem0) | Multi-level memory (user/session/agent), entity linking, temporal reasoning, hybrid retrieval |
-| [Hindsight](https://github.com/vectorize-io/hindsight) | Biomimetic memory model (world facts, experiences, mental models), retain/recall/reflect operations, multi-strategy retrieval |
-| [Honcho](https://github.com/plastic-labs/honcho) | Peer-centric entity model, session context, reasoning-first memory, multi-peer perspectives |
-| [Graphify](https://github.com/safishamsi/graphify) | Knowledge graphs with community detection, god nodes, edge confidence tagging |
+| [Mem0](https://github.com/mem0ai/mem0) | Multi-level memory (user/session/agent), entity linking, temporal reasoning, hybrid retrieval, **drop-in SDK adapter** |
+| [Hindsight](https://github.com/vectorize-io/hindsight) | Biomimetic memory model (world facts, experiences, mental models), retain/recall/reflect operations, multi-strategy retrieval, **drop-in SDK adapter** |
+| [Honcho](https://github.com/plastic-labs/honcho) | Peer-centric entity model, session context, reasoning-first memory, multi-peer perspectives, **drop-in SDK adapter** |
+| [Graphify](https://github.com/safishamsi/graphify) | Knowledge graphs with community detection, god nodes, edge confidence tagging, BFS/shortest-path traversal, **MCP-compatible tools** |
 | [Understand Anything](https://github.com/Lum1104/Understand-Anything) | Codebase knowledge graph, interactive dashboard, diff impact analysis, guided tours |
 | [Supermemory](https://github.com/supermemoryai/supermemory) | User profiles with static/dynamic facts, hybrid search (RAG + memory), connectors, MCP server |
-| [Logseq](https://github.com/logseq/logseq) | Graph-based knowledge management, block-level referencing, backlinks |
 | [CLI-Anything](https://github.com/HKUDS/CLI-Anything) | CLI harness patterns for agent-native interfaces |
-| [Obsidian](https://obsidian.md) | Graph view, plugins, daily notes, canvas, backlinks |
 | [OpenViking](https://github.com/volcengine/OpenViking) | Filesystem paradigm context database, tiered context loading (L0/L1/L2), directory recursive retrieval, visualized retrieval trajectories |
 | [RetainDB](https://github.com/RetainDB/RetainDB) | Memory reinforcement (strength/access counts), delta compression, consolidation (dedup/rollup/decay), temporal validity, versioned memories, context router |
 | [Holographic](https://github.com/Def-AI/Holographic) | Trust scoring through user feedback, memory reputation and reliability scoring, feedback-driven reinforcement |
@@ -41,29 +39,33 @@
 │  │                                                              │   │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │   │
 │  │  │ Peers    │  │ Sessions │  │ Messages │  │ Memories │     │   │
-│  │  │ (Users,  │  │ (Conver- │  │ (Text,   │  │ (World,  │     │   │
-│  │  │  Agents) │  │  sations)│  │  Tools)  │  │  Exper.) │     │   │
+│  │  │  + Auth  │  │          │  │          │  │ (Tiers,  │     │   │
+│  │  │ (Accoun) │  │          │  │          │  │  Trust)  │     │   │
 │  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘     │   │
 │  │                                                              │   │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │   │
 │  │  │ Knowledge│  │Documents │  │ Profiles │  │ Insights │     │   │
-│  │  │  Graph   │  │ (RAG)    │  │ (Static+ │  │ (Reflect)│     │   │
-│  │  │ (Nodes,  │  │ (Chunks, │  │  Dynamic)│  │ (Memory  │     │   │
-│  │  │  Edges)  │  │  Files)  │  │          │  │  Reason) │     │   │
+│  │  │  Graph   │  │          │  │          │  │          │     │   │
+│  │  │ (Commun- │  │          │  │          │  │          │     │   │
+│  │  │  ities)  │  │          │  │          │  │          │     │   │
 │  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘     │   │
 │  │                                                              │   │
 │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │   │
-│  │  │ Entity   │  │  Tags    │  │  Search  │  │  Auth    │     │   │
-│  │  │ Linking  │  │ (Collec- │  │  Index   │  │  (API    │     │   │
-│  │  │ (Canon.) │  │  tions)  │  │  (Multi- │  │   Keys)  │     │   │
-│  │  └──────────┘  └──────────┘  │  strat)  │  └──────────┘     │   │
-│  │                              └──────────┘                    │   │
+│  │  │ Notes +  │  │  Tours   │  │  Search  │  │Consolid- │     │   │
+│  │  │  Blocks  │  │ (Guided  │  │  (Multi- │  │ ation    │     │   │
+│  │  │ (WikiLn) │  │  Tours)  │  │  strat)  │  │ (Dedup)  │     │   │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘     │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                                                                     │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │         React Frontend (Vite + shadcn + Lucide)              │   │
-│  │  Dashboard │ Peers │ Sessions │ KG │ Memories │ Docs │ Search │   │
-│  └──────────────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────┐  ┌────────────┐  │
+│  │  Python SDK + CLI + MCP Server               │  │ React      │  │
+│  │  (Client + Mem0/Honcho/Hindsight adapters)   │  │ Frontend   │  │
+│  └──────────────────────────────────────────────┘  └────────────┘  │
+│                                                                     │
+│  ┌──────────────────────────────────────────────┐                   │
+│  │  Rust ONNX Embedder Sidecar (:9090)          │                   │
+│  │  (all-MiniLM-L6-v2, 384d)                    │                   │
+│  └──────────────────────────────────────────────┘                   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -80,23 +82,34 @@
 | `Insight` | Reflective reasoning over memories | Hindsight Reflect |
 | `KgNode` | Knowledge graph nodes | Graphify, Understand Anything |
 | `KgEdge` | Knowledge graph relationships | Graphify |
-| `KgCommunity` | Graph community clusters (Leiden) | Graphify |
+| `KgCommunity` | Graph community clusters (label propagation) | Graphify |
 | `Document` | RAG content with metadata | Supermemory |
 | `DocChunk` | Document chunks with embeddings | Supermemory |
 | `EntityLink` | Canonical entity resolution with aliases | Mem0 |
 | `Tag` | Memory/document labels | Common |
 | `MemoryTag` | N:M relationship between memories and tags | Common |
 | `SearchIndex` | Multi-strategy search metadata (semantic, BM25, graph, temporal) | Mem0, Hindsight |
+| `Account` | User accounts with PBKDF2 password auth | Common |
 | `ApiKey` | API keys for programmatic access | Common |
-| `AuthSession` | Identity-based session tokens | Common |
-| `ContextDirectory` | Hierarchical directory organization for memories and resources (path-based) | OpenViking |
-| `ConsolidationLog` | Tracks memory consolidation operations (dedup, rollup, decay, version_merge) | RetainDB |
-| `ContextPack` | Cached compressed context packs with query_hash for lookups | RetainDB |
-| `MemoryFeedback` | User feedback ratings for trust scoring (helpful/unhelpful) | Holographic |
+| `Note` | Markdown notes with wikilink backlinking | Logseq-style |
+| `NoteBlock` | Block-level content (paragraphs, headings, lists, todos) | Logseq-style |
+| `BlockReference` | `((block-id))` references and `{{embed ((id))}}` transclusions | Logseq-style |
+| `NoteBacklink` | Forward edges from note A → note B via [[wikilinks]] | Common |
+| `Tour` | Guided tours through KG nodes | Understand Anything |
+| `ContextDirectory` | Hierarchical directory organization for memories | OpenViking |
+| `ConsolidationLog` | Tracks memory consolidation operations | RetainDB |
+| `ContextPack` | Cached compressed context packs | RetainDB |
+| `MemoryFeedback` | User feedback ratings for trust scoring | Holographic |
+| `HybridResult` | Temporary table for hybrid search result sets | Common |
 
 ### Reducer API
 
-The module exposes ~51 reducers covering full CRUD for all entity types plus special operations:
+The module exposes ~80 reducers covering full CRUD plus special operations:
+
+**Auth:**
+- `register`, `login`, `logout`, `update_account`, `deactivate_account`
+- `create_api_key`, `deactivate_api_key`
+- `require_auth`, `require_admin`, `is_authenticated` (guard functions)
 
 **Peers & Sessions:**
 - `create_workspace`, `update_workspace`, `delete_workspace`
@@ -106,7 +119,7 @@ The module exposes ~51 reducers covering full CRUD for all entity types plus spe
 
 **Memory Layer:**
 - `store_memory`, `update_memory`, `deactivate_memory`, `expire_memories`
-- `rate_memory`
+- `rate_memory`, `reinforce_memory`, `update_memory_tier`, `escalate_memories`
 - `upsert_profile`, `add_profile_fact`, `add_dynamic_context`
 - `create_insight`, `delete_insight`
 
@@ -114,21 +127,49 @@ The module exposes ~51 reducers covering full CRUD for all entity types plus spe
 - `create_node`, `delete_node`
 - `create_edge`, `delete_edge`
 - `create_community`, `assign_to_community`
+- `detect_communities`, `seed_communities`
+- `graph_bfs`, `shortest_path`, `get_neighbors` (traversal)
+- `compute_god_nodes` (degree centrality)
+
+**Notes & Tours:**
+- `create_note`, `update_note`, `delete_note`, `parse_note_blocks`
+- `create_tour`, `add_tour_stop`, `remove_tour_stop`, `delete_tour`
 
 **Documents & Search:**
 - `create_document`, `add_chunk`, `delete_document`
 - `index_entity`, `remove_from_index`
 - `create_tag`, `tag_memory`, `untag_memory`
+- `hybrid_search` (multi-strategy fusion)
 
-**Entity & Auth:**
+**Entity & Linking:**
 - `create_entity_link`, `add_alias`, `resolve_entity`
-- `create_api_key`, `deactivate_api_key`
-- `create_auth_session`, `revoke_auth_session`, `cleanup_expired_sessions`
 
-**Context & Consolidation (OpenViking / RetainDB):**
+**Context & Consolidation:**
 - `create_directory`, `delete_directory`
-- `consolidate_memories`, `decay_weak_memories`
-- `store_context_pack`, `reinforce_memory`, `update_memory_tier`
+- `consolidate_memories`, `decay_weak_memories`, `dedup_memories`
+- `store_context_pack`, `manual_maintenance`
+- `generate_context_pack` (for context routing)
+
+## Drop-in SDK Adapters
+
+All three adapters live in `sdk/python/spacetime_memory/sdks/` and are importable as drop-in replacements:
+
+```python
+# Mem0
+from spacetime_memory.sdks import Mem0Memory
+m = Mem0Memory()
+m.add("I like pizza", user_id="alice")
+
+# Hindsight
+from spacetime_memory.sdks import Hindsight
+h = Hindsight()
+h.retain("I like pizza", source="chat")
+
+# Honcho
+from spacetime_memory.sdks import Honcho
+honcho = Honcho()
+user = honcho.create_user(name="alice")
+```
 
 ## Quick Start
 
@@ -137,6 +178,7 @@ The module exposes ~51 reducers covering full CRUD for all entity types plus spe
 - Rust toolchain (`cargo`, `rustup`)
 - SpacetimeDB CLI v2.4+ (`spacetime version upgrade`)
 - Node.js 18+ and npm
+- Python 3.10+ (for SDK/CLI/MCP)
 
 ### 1. Clone & Setup
 
@@ -159,172 +201,68 @@ cargo build --target wasm32-unknown-unknown
 spacetime publish spacetime-memory -p ./ --yes
 ```
 
-### 4. Start Frontend
+### 4. Start Embedder Sidecar
+
+```bash
+# The embedder is a compiled Rust binary (tract + all-MiniLM-L6-v2)
+# It's pre-built at server/embedder/target/release/embedder
+# Or build from source:
+cd server/embedder && cargo build --release
+./target/release/embedder   # Listens on :9090
+```
+
+### 5. Install Python SDK & CLI
+
+```bash
+cd sdk/python
+pip install -e .
+# CLI available as `stmem`:
+stmem --help
+```
+
+### 6. Start MCP Server
+
+```bash
+python server/mcp/main.py  # stdio transport for LLM agents
+```
+
+### 7. Start Frontend
 
 ```bash
 cd client
 npm install
-npm run dev
+cp .env.example .env       # configure host/db
+npm run dev                 # opens on localhost:5173
 ```
 
-The dashboard will be available at `http://localhost:5173`.
+### 8. Login (First Run)
 
-## Feature Reference
+Open the frontend. On first launch, register as the admin user. Subsequent launches will prompt for login. All note operations are auth-gated.
 
-### Memory Types (Biomimetic)
+## Features
 
-```
-┌──────────────────┐
-│  World Facts     │  "The stove is hot" — declarative knowledge
-├──────────────────┤
-│  Experiences     │  "I touched the stove and it hurt" — episodic
-├──────────────────┤
-│  Mental Models   │  "Stoves are dangerous when hot" — learned patterns
-└──────────────────┘
-```
+### Notes with Block-Level References
 
-### Retrieval Strategies
+Write markdown notes with `[[wikilinks]]`, `((block-id))` references, and `{{embed ((id))}}` transclusions. Each paragraph, heading, and list item becomes a trackable block with a stable ID:
 
-| Strategy | Description |
-|---|---|
-| **Semantic** | Vector similarity search via embeddings |
-| **BM25** | Keyword exact matching on content |
-| **Graph** | Entity/temporal/causal link traversal |
-| **Temporal** | Time-range filtering and recency ranking |
-| **Hybrid Fusion** | Combined ranking via reciprocal rank fusion |
+```markdown
+# My Note
 
-### User Profiles (Supermemory-style)
+This is a paragraph with a [[wikilink]] to another note.
 
-```typescript
-const profile = {
-  static: ["Senior engineer at Acme", "Prefers dark mode", "Uses Vim"],
-  dynamic: ["Working on auth migration", "Debugging rate limits"]
-};
+And a ((0002)) reference to a specific block in this note.
+
+{{embed ((other_note_id:0001))}} transcludes a block from another note.
 ```
 
-### Knowledge Graph (Graphify-style)
+### Guided Tours
 
-Nodes have types (`code`, `concept`, `entity`, `document`, `topic`) and are organized into communities. Edges have confidence levels:
+Create interactive walkthroughs through knowledge graph nodes, with ordered stops, headings, and descriptions.
 
-- **EXTRACTED** — Directly observed (e.g., AST analysis)
-- **INFERRED** — Deduced from context
-- **AMBIGUOUS** — Uncertain
+### Tiered Memory
 
-### Entity Resolution (Mem0-style)
+Memories auto-escalate through L2→L1→L0 tiers based on access count (5 and 20 thresholds). Trust scores weigh search results. Strength decays over time.
 
-Canonical entity names with alias tracking. Entities are linked across memories for retrieval boosting.
+### Scheduled Maintenance
 
-### Tiered Context Loading (OpenViking)
-
-```
-L0 ─ Critical context    — loaded on every request (identity, active task)
-L1 ─ Normal context      — loaded on demand, default tier
-L2 ─ Archival context    — deep memory, loaded only for specific queries
-```
-
-Each memory has a `tier` field. Retrieval strategies can filter by tier or escalate from L2 → L1 on access.
-
-### Hierarchical Directory Organization (OpenViking)
-
-Memories can be organized into a filesystem-like directory hierarchy:
-
-```
-/user/preferences/           → user-level static preferences
-/user/sessions/              → per-session memories
-/agent/{id}/knowledge/       → agent's learned knowledge
-/project/{id}/decisions/     → project-specific decisions
-```
-
-Directories enable recursive retrieval: query a directory and all subdirectories are searched.
-
-### Memory Consolidation & Reinforcement (RetainDB)
-
-- **Reinforcement**: Each memory tracks `access_count` and `strength` (0.0–1.0). Frequently accessed memories grow stronger, making them more likely to surface in search results.
-- **Consolidation**: Redundant or overlapping memories can be merged into a single consolidated memory. Source memories are deactivated but preserved for audit.
-- **Decay**: Weak memories (strength below threshold) that haven't been recently reinforced are automatically deactivated.
-- **Versioning**: Memories have a `version` field. Corrections create a new version while the superseded version remains for rollback.
-- **Temporal Validity**: `valid_from` and `expires_at` fields define a memory's active time window, preventing stale facts from being retrieved.
-
-### Delta Context Packs (RetainDB)
-
-Agents can request compressed context packs with a token budget. The system returns only the most relevant memories, file chunks, and tool output — compressed to fit within the budget. On subsequent requests, only delta (changed) context is returned.
-
-### Trust Scoring & Feedback (Holographic)
-
-Every memory carries a `trust_score` (0.0–1.0, default 0.5) and a `feedback_count`. Users can rate memories as `"helpful"` or `"unhelpful"`:
-
-```
-rate_memory(memory_id, "helpful", peer_id)   → trust_score += 0.05
-rate_memory(memory_id, "unhelpful", peer_id) → trust_score -= 0.05
-```
-
-The score is clamped to `[0.0, 1.0]` and `feedback_count` is incremented with each rating. This enables:
-
-- **Reputation-weighted retrieval** — favour memories with high trust scores
-- **Crowd-sourced quality** — aggregated ratings from multiple peers
-- **Confidence calibration** — low-trust memories can be flagged for review or deprioritized
-- **Feedback auditing** — every rating is recorded in the `MemoryFeedback` table with peer identity and timestamp
-
-The table schema:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `String` (PK) | Unique feedback record ID |
-| `memory_id` | `String` | The memory being rated |
-| `rating` | `String` | `"helpful"` or `"unhelpful"` |
-| `peer_id` | `String` | Who submitted the rating |
-| `created_at` | `i64` | Microsecond timestamp |
-
-### Knowledge Curation & Query (ByteRover)
-
-ByteRover-inspired patterns for intelligent memory curation and retrieval:
-
-- **Smart-query building** — compose filters (type, tier, time range, trust threshold) into targeted queries
-- **Cross-referencing** — automatically link related memories via shared entities, tags, or parent directories
-- **Knowledge curation pipelines** — chain operations (filter → rank → consolidate → pack) for automated memory maintenance
-- **Intelligent recall amplification** — boost retrieval scores for memories with high trust, strength, or access counts
-
-These curation patterns build on top of the existing multi-strategy retrieval system, adding trust-aware and curation-aware ranking layers.
-
-## Project Structure
-
-```
-spacetime-memory/
-├── server/
-│   └── spacetimedb/          # SpacetimeDB Rust module
-│       ├── Cargo.toml
-│       └── src/
-│           ├── lib.rs        # Module entry, helpers (uuid_v4, now_micros)
-│           ├── workspace.rs  # Workspace entity
-│           ├── peer.rs       # Peers (users, agents, entities)
-│           ├── session.rs    # Sessions and participants
-│           ├── message.rs    # Messages
-│           ├── memory.rs     # Core memory (world facts, experiences, mental models)
-│           ├── memory_feedback.rs  # Holographic trust scoring & feedback
-│           ├── profile.rs    # User profiles (static + dynamic)
-│           ├── insight.rs    # Reasoning/reflection over memories
-│           ├── knowledge_graph.rs  # KG nodes, edges, communities
-│           ├── document.rs   # Documents and chunks
-│           ├── entity_linking.rs   # Entity resolution with aliases
-│           ├── tag.rs        # Tags and memory-tag associations
-│           ├── retrieval.rs  # Search index for multi-strategy retrieval
-│           ├── context_directory.rs  # OpenViking hierarchical directories
-│           ├── consolidation.rs  # RetainDB dedup/rollup/decay
-│           ├── context_compression.rs  # RetainDB context packs + reinforcement
-│           └── auth.rs       # API keys and auth sessions
-├── client/                   # React frontend
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   ├── index.css
-│   │   ├── lib/utils.ts
-│   │   ├── components/ui/    # shadcn components
-│   │   └── pages/            # Dashboard, KG, Memories, etc.
-│   ├── package.json
-│   └── vite.config.ts
-└── README.md
-```
-
-## License
-
-MIT
+Automatic dedup (cosine ≥0.85 + edit distance ≤30%), decay (strength <0.1 + 7 days), tier escalation, community detection, and god-node computation — all running on configurable schedules.

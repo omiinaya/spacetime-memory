@@ -56,7 +56,14 @@ pub fn store_context_pack(
     Ok(())
 }
 
-/// Reinforce a memory: increment access count and bump strength.
+/// Reinforce a memory: increment access count, bump strength, and
+/// auto-escalate tier based on access_count thresholds.
+///
+/// Thresholds (matching the roadmap):
+///   L2 → L1 at 5+ accesses
+///   L1 → L0 at 20+ accesses
+///
+/// Strength-based escalation is also applied as a secondary mechanism.
 #[reducer]
 pub fn reinforce_memory(ctx: &ReducerContext, memory_id: String) -> Result<(), String> {
     let mut mem = ctx
@@ -70,7 +77,14 @@ pub fn reinforce_memory(ctx: &ReducerContext, memory_id: String) -> Result<(), S
     mem.strength = (mem.strength + 0.05).min(1.0);
     mem.updated_at = now_micros(ctx);
 
-    // Tier escalation based on strength thresholds
+    // Access-count-based tier escalation (roadmap spec)
+    if mem.access_count >= 20 && mem.tier != "L0" {
+        mem.tier = "L0".to_string();
+    } else if mem.access_count >= 5 && mem.tier == "L2" {
+        mem.tier = "L1".to_string();
+    }
+
+    // Strength-based escalation (secondary mechanism)
     if mem.strength >= 0.8 && mem.tier != "L0" {
         mem.tier = "L0".to_string();
     } else if mem.strength >= 0.5 && mem.tier == "L2" {
@@ -102,5 +116,42 @@ pub fn update_memory_tier(ctx: &ReducerContext, memory_id: String, tier: String)
     mem.updated_at = now_micros(ctx);
 
     ctx.db.memory().id().update(mem);
+    Ok(())
+}
+
+/// Batch-escalate all memories in a workspace based on access_count thresholds.
+#[reducer]
+pub fn escalate_memories(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    l2_to_l1: u64,
+    l1_to_l0: u64,
+) -> Result<(), String> {
+    let t_l2l1 = if l2_to_l1 == 0 { 5 } else { l2_to_l1 };
+    let t_l1l0 = if l1_to_l0 == 0 { 20 } else { l1_to_l0 };
+    let now = now_micros(ctx);
+
+    let to_update: Vec<_> = ctx
+        .db
+        .memory()
+        .iter()
+        .filter(|m| {
+            m.workspace_id == workspace_id
+                && m.is_active
+                && ((m.tier == "L2" && m.access_count >= t_l2l1)
+                    || (m.tier == "L1" && m.access_count >= t_l1l0))
+        })
+        .collect();
+
+    for mut mem in to_update {
+        if mem.tier == "L2" && mem.access_count >= t_l2l1 {
+            mem.tier = "L1".to_string();
+        } else if mem.tier == "L1" && mem.access_count >= t_l1l0 {
+            mem.tier = "L0".to_string();
+        }
+        mem.updated_at = now;
+        ctx.db.memory().id().update(mem);
+    }
+
     Ok(())
 }

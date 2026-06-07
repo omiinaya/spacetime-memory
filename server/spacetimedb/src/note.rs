@@ -1,9 +1,9 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::auth::require_auth;
 
 /// A note — markdown document with wikilink backlinking support.
-/// Sits alongside the document/ingestion pipeline but is user-authored.
 #[table(accessor = note, public)]
 #[derive(Debug, Clone)]
 pub struct Note {
@@ -20,6 +20,8 @@ pub struct Note {
     pub embedding_json: String,
     /// Number of backlinks pointing *to* this note (denormalised for sorting)
     pub backlink_count: u32,
+    /// Number of block-level references pointing to blocks in this note
+    pub block_ref_count: u32,
     pub created_at: i64,
     pub updated_at: i64,
     pub is_active: bool,
@@ -35,8 +37,56 @@ pub struct NoteBacklink {
     pub source_note_id: String,
     /// The note being linked to
     pub target_note_id: String,
-    /// The display text used in the wikilink (e.g. "My Note" from [[My Note]])
+    /// The display text used in the wikilink
     pub display_text: String,
+    pub created_at: i64,
+}
+
+/// A block — individual paragraph/heading/list-item within a note.
+/// Blocks are parsed from markdown content and given stable IDs.
+#[table(accessor = note_block, public)]
+#[derive(Debug, Clone)]
+pub struct NoteBlock {
+    #[primary_key]
+    pub id: String,
+    /// Parent note
+    pub note_id: String,
+    /// Block type: "paragraph", "heading", "list_item", "todo", "code_block", "quote", "hr", "table"
+    pub block_type: String,
+    /// Raw text content (without markdown delimiters for the block itself)
+    pub content: String,
+    /// Full markdown source line(s) for this block
+    pub source: String,
+    /// Order within the note (0-indexed, sequential)
+    pub block_order: u32,
+    /// Heading level (1-6 for headings, 0 otherwise)
+    pub heading_level: u8,
+    /// Indent level for nested list items
+    pub indent_level: u32,
+    /// Task state: "none", "todo", "done", "later", "now", "waiting", "cancelled"
+    pub task_state: String,
+    /// JSON metadata (tags, priority, deadline, custom properties)
+    pub properties_json: String,
+    pub is_active: bool,
+    pub created_at: i64,
+}
+
+/// A block-level reference — ((block-id)) or {{embed ((block-id))}}
+#[table(accessor = block_reference, public)]
+#[derive(Debug, Clone)]
+pub struct BlockReference {
+    #[primary_key]
+    pub id: String,
+    /// The note containing the reference
+    pub source_note_id: String,
+    /// The block containing the reference
+    pub source_block_id: String,
+    /// The target block being referenced
+    pub target_block_id: String,
+    /// The target note (denormalised for quick queries)
+    pub target_note_id: String,
+    /// Reference type: "ref" for ((id)), "embed" for {{embed ((id))}}
+    pub ref_type: String,
     pub created_at: i64,
 }
 
@@ -53,6 +103,7 @@ pub fn create_note(
     note_date: String,
     embedding_json: String,
 ) -> Result<(), String> {
+    require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -72,10 +123,11 @@ pub fn create_note(
         id: id.clone(),
         workspace_id,
         title: final_title,
-        content,
+        content: content.clone(),
         note_date,
         embedding_json: if embedding_json.is_empty() { String::from("[]") } else { embedding_json },
         backlink_count: 0,
+        block_ref_count: 0,
         created_at: now,
         updated_at: now,
         is_active: true,
@@ -83,10 +135,9 @@ pub fn create_note(
 
     ctx.db.note().insert(note);
 
-    // Parse and insert backlinks — borrow content from the struct
-    if let Some(n) = ctx.db.note().id().find(&id) {
-        resolve_backlinks(ctx, &id, &n.content, now);
-    }
+    // Parse blocks and backlinks
+    parse_note_blocks_inner(ctx, &id, &content, now);
+    resolve_backlinks(&ctx, &id, &content, now);
 
     Ok(())
 }
@@ -99,6 +150,7 @@ pub fn update_note(
     content: String,
     embedding_json: String,
 ) -> Result<(), String> {
+    require_auth(ctx)?;
     let now = now_micros(ctx);
 
     let mut note = ctx
@@ -123,51 +175,423 @@ pub fn update_note(
     ctx.db.note().id().update(note);
 
     // Re-parse backlinks: delete old ones, insert new ones
-    let old_links: Vec<_> = ctx
-        .db
-        .note_backlink()
-        .iter()
-        .filter(|bl: &NoteBacklink| bl.source_note_id == id)
-        .map(|bl| bl.id.clone())
-        .collect();
-    for link_id in &old_links {
-        // Decrement target backlink_count
-        if let Some(bl) = ctx.db.note_backlink().id().find(link_id) {
-            if let Some(mut target) = ctx.db.note().id().find(&bl.target_note_id) {
-                target.backlink_count = target.backlink_count.saturating_sub(1);
-                ctx.db.note().id().update(target);
-            }
-        }
-        ctx.db.note_backlink().id().delete(link_id);
-    }
+    clear_backlinks(ctx, &id);
+    resolve_backlinks(&ctx, &id, &content, now);
 
-    resolve_backlinks(ctx, &id, &content, now);
+    // Re-parse blocks
+    clear_blocks(ctx, &id);
+    parse_note_blocks_inner(ctx, &id, &content, now);
 
     Ok(())
 }
 
 #[reducer]
 pub fn delete_note(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    // Clean up backlinks
-    let backlinks: Vec<_> = ctx
+    require_auth(ctx)?;
+    clear_backlinks(ctx, &id);
+
+    // Clean up blocks
+    clear_blocks(ctx, &id);
+
+    // Clean up block references pointing to this note's blocks
+    let refs_targeting: Vec<_> = ctx
         .db
-        .note_backlink()
+        .block_reference()
         .iter()
-        .filter(|bl: &NoteBacklink| bl.source_note_id == id || bl.target_note_id == id)
-        .map(|bl| bl.id.clone())
+        .filter(|br: &BlockReference| br.target_note_id == id)
+        .map(|br| br.id.clone())
         .collect();
-    for bl_id in &backlinks {
-        if let Some(bl) = ctx.db.note_backlink().id().find(bl_id) {
-            if let Some(mut target) = ctx.db.note().id().find(&bl.target_note_id) {
-                target.backlink_count = target.backlink_count.saturating_sub(1);
-                ctx.db.note().id().update(target);
-            }
-        }
-        ctx.db.note_backlink().id().delete(bl_id);
+    for rid in &refs_targeting {
+        ctx.db.block_reference().id().delete(rid);
     }
 
     ctx.db.note().id().delete(&id);
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Block parsing reducer (callable standalone or from create/update)
+// ---------------------------------------------------------------------------
+
+#[reducer]
+pub fn parse_note_blocks(ctx: &ReducerContext, note_id: String) -> Result<(), String> {
+    let note = ctx
+        .db
+        .note()
+        .id()
+        .find(&note_id)
+        .ok_or_else(|| format!("Note '{}' not found", note_id))?;
+    let now = now_micros(ctx);
+    clear_blocks(ctx, &note_id);
+    parse_note_blocks_inner(ctx, &note_id, &note.content, now);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Block parsing logic
+// ---------------------------------------------------------------------------
+
+fn parse_note_blocks_inner(ctx: &ReducerContext, note_id: &str, content: &str, now: i64) {
+    let blocks = split_into_blocks(content);
+
+    for (order, block) in blocks.iter().enumerate() {
+        let block_id = format!("{}:{:04x}", note_id, order);
+        let (block_type, heading_level, task_state, indent_level, props, text) = classify_block(block);
+
+        ctx.db.note_block().insert(NoteBlock {
+            id: block_id.clone(),
+            note_id: note_id.to_string(),
+            block_type,
+            content: text,
+            source: block.to_string(),
+            block_order: order as u32,
+            heading_level,
+            indent_level,
+            task_state,
+            properties_json: props,
+            is_active: true,
+            created_at: now,
+        });
+    }
+
+    // Resolve ((block-ref)) references between blocks
+    resolve_block_refs(ctx, note_id, &blocks, now);
+}
+
+/// Split raw markdown into blocks at paragraph/heading/list-item boundaries.
+fn split_into_blocks(content: &str) -> Vec<String> {
+    let mut blocks: Vec<String> = Vec::new();
+    let mut current = String::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        // Blank lines separate blocks (except inside code fences)
+        if trimmed.is_empty() {
+            if !current.is_empty() {
+                blocks.push(current.trim_end().to_string());
+                current = String::new();
+            }
+            continue;
+        }
+
+        // Headings are always their own block
+        if trimmed.starts_with('#') && !current.is_empty() && !current.contains('\n') {
+            // If current has content and this is a heading, finalize current
+            if !current.trim().is_empty() {
+                blocks.push(current.trim_end().to_string());
+                current = String::new();
+            }
+            blocks.push(trimmed.to_string());
+            continue;
+        }
+
+        // Horizontal rules are their own block
+        if trimmed.starts_with("---") || trimmed.starts_with("***") || trimmed.starts_with("___") {
+            if !current.is_empty() {
+                blocks.push(current.trim_end().to_string());
+                current = String::new();
+            }
+            blocks.push(trimmed.to_string());
+            continue;
+        }
+
+        // List items and blockquotes start new blocks when there's a blank line before them
+        // But inline continuation is fine
+        if !current.is_empty() && (trimmed.starts_with("- ") || trimmed.starts_with("* ") || trimmed.starts_with("> ")) {
+            // Check if current is likely the same type of list
+            let last_line = current.lines().last().unwrap_or("");
+            let last_trimmed = last_line.trim();
+            let same_type = (last_trimmed.starts_with("- ") && trimmed.starts_with("- "))
+                || (last_trimmed.starts_with("* ") && trimmed.starts_with("* "))
+                || (last_trimmed.starts_with("> ") && trimmed.starts_with("> "))
+                || (last_trimmed.starts_with("- [") && trimmed.starts_with("- ["));
+            if !same_type && !current.trim().is_empty() {
+                blocks.push(current.trim_end().to_string());
+                current = String::new();
+            }
+        }
+
+        current.push_str(line);
+        current.push('\n');
+    }
+
+    if !current.trim().is_empty() {
+        blocks.push(current.trim_end().to_string());
+    }
+
+    // If completely empty content, produce no blocks
+    if blocks.is_empty() && !content.trim().is_empty() {
+        blocks.push(content.trim().to_string());
+    }
+
+    blocks
+}
+
+/// Classify a block and extract metadata.
+fn classify_block(block: &str) -> (String, u8, String, u32, String, String) {
+    let trimmed = block.trim();
+
+    // Heading
+    if let Some(rest) = trimmed.strip_prefix("###### ") { return ("heading".to_string(), 6, "none".to_string(), 0, "{}".to_string(), rest.trim().to_string()); }
+    if let Some(rest) = trimmed.strip_prefix("##### ") { return ("heading".to_string(), 5, "none".to_string(), 0, "{}".to_string(), rest.trim().to_string()); }
+    if let Some(rest) = trimmed.strip_prefix("#### ") { return ("heading".to_string(), 4, "none".to_string(), 0, "{}".to_string(), rest.trim().to_string()); }
+    if let Some(rest) = trimmed.strip_prefix("### ") { return ("heading".to_string(), 3, "none".to_string(), 0, "{}".to_string(), rest.trim().to_string()); }
+    if let Some(rest) = trimmed.strip_prefix("## ") { return ("heading".to_string(), 2, "none".to_string(), 0, "{}".to_string(), rest.trim().to_string()); }
+    if let Some(rest) = trimmed.strip_prefix("# ") { return ("heading".to_string(), 1, "none".to_string(), 0, "{}".to_string(), rest.trim().to_string()); }
+
+    // Checkbox task — - [ ] or - [x] or TODO/DONE variants
+    if trimmed.starts_with("- [") || trimmed.starts_with("* [") {
+        let is_checked = trimmed.contains("[x]") || trimmed.contains("[X]");
+        let indent = count_indent(block);
+        let content = if let Some(idx) = trimmed.find(']') {
+            trimmed[idx+1..].trim().to_string()
+        } else {
+            trimmed.to_string()
+        };
+        let state = if is_checked { "done".to_string() } else { "todo".to_string() };
+        return ("todo".to_string(), 0, state, indent, "{}".to_string(), content);
+    }
+
+    // TODO/DONE/LATER/NOW/WAITING/CANCELLED inline markers
+    for prefix in &["TODO ", "DONE ", "LATER ", "NOW ", "WAITING ", "CANCELLED ", "DOING "] {
+        if trimmed.starts_with(prefix) || trimmed.to_uppercase().starts_with(prefix) {
+            let state = prefix.trim().to_lowercase();
+            let content = trimmed[prefix.len().saturating_sub(if trimmed.starts_with(prefix) { 0 } else { prefix.len() - 1 })..].trim().to_string();
+            return ("todo".to_string(), 0, state, count_indent(block), "{}".to_string(), if content.is_empty() { trimmed.to_string() } else { content });
+        }
+    }
+
+    // List item
+    if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+        let indent = count_indent(block);
+        let content = if let Some(c) = trimmed.strip_prefix("- ") { c.trim().to_string() }
+                      else if let Some(c) = trimmed.strip_prefix("* ") { c.trim().to_string() }
+                      else { trimmed.to_string() };
+        return ("list_item".to_string(), 0, "none".to_string(), indent, "{}".to_string(), content);
+    }
+
+    // Ordered list item — 1. item
+    if trimmed.chars().next().map_or(false, |c| c.is_ascii_digit())
+        && trimmed.contains(". ")
+    {
+        let indent = count_indent(block);
+        let content = trimmed.splitn(2, ". ").nth(1).unwrap_or("").trim().to_string();
+        return ("list_item".to_string(), 0, "none".to_string(), indent, "{}".to_string(), content);
+    }
+
+    // Blockquote
+    if trimmed.starts_with("> ") {
+        let content = trimmed.strip_prefix("> ").unwrap_or("").trim().to_string();
+        return ("quote".to_string(), 0, "none".to_string(), 0, "{}".to_string(), content);
+    }
+
+    // Code block (multiline)
+    if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+        let lang = trimmed.trim_start_matches('`').trim_start_matches('~').trim().to_string();
+        // Extract code content (remove fence lines)
+        let mut code_content = String::new();
+        for line in block.lines().skip(1) {
+            if line.trim().starts_with("```") || line.trim().starts_with("~~~") { break; }
+            code_content.push_str(line);
+            code_content.push('\n');
+        }
+        return ("code_block".to_string(), 0, "none".to_string(), 0, format!("{{\"lang\":\"{}\"}}", lang), code_content.trim().to_string());
+    }
+
+    // Horizontal rule
+    if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+        return ("hr".to_string(), 0, "none".to_string(), 0, "{}".to_string(), String::new());
+    }
+
+    // Default: paragraph
+    ("paragraph".to_string(), 0, "none".to_string(), 0, "{}".to_string(), trimmed.to_string())
+}
+
+fn count_indent(block: &str) -> u32 {
+    let first = block.lines().next().unwrap_or("");
+    first.chars().take_while(|c| *c == ' ' || *c == '\t').count() as u32
+}
+
+// ---------------------------------------------------------------------------
+// Block reference resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve ((block-id)) and {{embed ((block-id))}} references in parsed blocks.
+fn resolve_block_refs(ctx: &ReducerContext, note_id: &str, blocks: &[String], now: i64) {
+    // First pass: build block_id -> order mapping from current parse
+    let block_ids: Vec<String> = (0..blocks.len())
+        .map(|i| format!("{}:{:04x}", note_id, i))
+        .collect();
+
+    for (order, block_text) in blocks.iter().enumerate() {
+        let source_block_id = &block_ids[order];
+        // Find all ((...)) references in this block
+        for (target_block_id, is_embed) in find_block_refs(block_text) {
+            let target_note_id = if target_block_id.contains(':') {
+                // Full ref: note_id:order
+                let colon = target_block_id.find(':').unwrap();
+                target_block_id[..colon].to_string()
+            } else {
+                // Local ref: just order hex, same note
+                // Reconstruct full ref: current_note_id:order
+                let full_id = format!("{}:{:04x}", note_id, order);
+                full_id
+            };
+
+            // Verify the target block exists
+            let target_exists = if target_note_id == note_id {
+                // Verify within this parse
+                if let Ok(parsed_order) = u32::from_str_radix(&target_block_id, 16) {
+                    (parsed_order as usize) < blocks.len()
+                } else {
+                    false
+                }
+            } else {
+                // Check DB
+                let full_target_id = if target_block_id.contains(':') {
+                    target_block_id.clone()
+                } else {
+                    format!("{}:{}", note_id, target_block_id)
+                };
+                ctx.db.note_block().id().find(&full_target_id).is_some()
+            };
+
+            if target_exists {
+                let full_target_id = if target_block_id.contains(':') {
+                    target_block_id.clone()
+                } else {
+                    format!("{}:{}", note_id, target_block_id)
+                };
+
+                let full_target_note_id = if target_note_id == note_id {
+                    note_id.to_string()
+                } else {
+                    // Extract note_id from full ref
+                    target_block_id.split(':').next().unwrap_or(note_id).to_string()
+                };
+
+                ctx.db.block_reference().insert(BlockReference {
+                    id: uuid_v4(ctx),
+                    source_note_id: note_id.to_string(),
+                    source_block_id: source_block_id.clone(),
+                    target_block_id: full_target_id.clone(),
+                    target_note_id: full_target_note_id.clone(),
+                    ref_type: if is_embed { "embed".to_string() } else { "ref".to_string() },
+                    created_at: now,
+                });
+            }
+        }
+    }
+}
+
+/// Find all ((block-id)) and {{embed ((block-id))}} references in text.
+/// Returns (target_block_id, is_embed) pairs.
+fn find_block_refs(text: &str) -> Vec<(String, bool)> {
+    let mut refs = Vec::new();
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        // {{embed ((id))}} pattern
+        if i + 2 < len && chars[i] == '{' && chars[i+1] == '{' {
+            let rest: String = chars[i..].iter().collect();
+            if let Some(embed_start) = rest.find("((") {
+                if let Some(embed_end) = rest[embed_start..].find("))") {
+                    let inner = &rest[embed_start+2..embed_start+embed_end];
+                    let target = inner.trim().to_string();
+                    if !target.is_empty() {
+                        refs.push((target, true));
+                    }
+                    i += embed_start + embed_end + 2;
+                    continue;
+                }
+            }
+        }
+
+        // ((id)) pattern
+        if chars[i] == '(' && i + 1 < len && chars[i+1] == '(' {
+            let rest: String = chars[i..].iter().collect();
+            if let Some(end) = rest.find("))") {
+                let inner = &rest[2..end];
+                let target = inner.trim().to_string();
+                if !target.is_empty() {
+                    refs.push((target, false));
+                }
+                i += end + 2;
+                continue;
+            }
+        }
+
+        i += 1;
+    }
+
+    refs
+}
+
+// ---------------------------------------------------------------------------
+// Backlink helpers
+// ---------------------------------------------------------------------------
+
+fn clear_backlinks(ctx: &ReducerContext, note_id: &str) {
+    let old_links: Vec<_> = ctx
+        .db
+        .note_backlink()
+        .iter()
+        .filter(|bl: &NoteBacklink| bl.source_note_id == note_id)
+        .map(|bl| (bl.id.clone(), bl.target_note_id.clone()))
+        .collect();
+    for (link_id, target_id) in &old_links {
+        if let Some(mut target) = ctx.db.note().id().find(target_id) {
+            target.backlink_count = target.backlink_count.saturating_sub(1);
+            ctx.db.note().id().update(target);
+        }
+        ctx.db.note_backlink().id().delete(link_id);
+    }
+}
+
+fn clear_blocks(ctx: &ReducerContext, note_id: &str) {
+    // Delete all block references from this note's blocks
+    let block_ids: Vec<(String, Vec<String>)> = ctx
+        .db
+        .note_block()
+        .iter()
+        .filter(|b: &NoteBlock| b.note_id == note_id)
+        .map(|b| b.id.clone())
+        .collect::<Vec<_>>()
+        .chunks(1)
+        .map(|c| {
+            let bid = c[0].clone();
+            let refs: Vec<_> = ctx
+                .db
+                .block_reference()
+                .iter()
+                .filter(|br: &BlockReference| br.source_block_id == bid || br.target_block_id == bid)
+                .map(|br| br.id.clone())
+                .collect();
+            (bid, refs)
+        })
+        .collect();
+
+    for (bid, ref_ids) in &block_ids {
+        for ref_id in ref_ids {
+            ctx.db.block_reference().id().delete(ref_id);
+        }
+        ctx.db.note_block().id().delete(bid);
+    }
+
+    // Also delete block references where source_note_id matches
+    let source_refs: Vec<_> = ctx
+        .db
+        .block_reference()
+        .iter()
+        .filter(|br: &BlockReference| br.source_note_id == note_id)
+        .map(|br| br.id.clone())
+        .collect();
+    for rid in &source_refs {
+        ctx.db.block_reference().id().delete(rid);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +629,7 @@ fn resolve_backlinks(ctx: &ReducerContext, source_id: &str, content: &str, now: 
     for cap in content.split('[') {
         if !cap.starts_with('[') { continue; }
         let inner = match cap.find(']') {
-            Some(end) => &cap[1..end],  // skip the first [
+            Some(end) => &cap[1..end],
             None => continue,
         };
 
@@ -229,13 +653,7 @@ fn resolve_backlinks(ctx: &ReducerContext, source_id: &str, content: &str, now: 
             .map(|n| n.id.clone())
             .collect();
 
-        // If no exact match, don't create backlinks (orphan wikilink — still try fuzzy)
-        // We just skip backlinks for non-existent targets; the link still renders
-        if matches.is_empty() {
-            // Still store a backlink with empty target? No, that creates garbage.
-            // The frontend will render [[Unknown Note]] as a dead link instead.
-            continue;
-        }
+        if matches.is_empty() { continue; }
 
         for target_id in &matches {
             let bl = NoteBacklink {
@@ -247,7 +665,6 @@ fn resolve_backlinks(ctx: &ReducerContext, source_id: &str, content: &str, now: 
             };
             ctx.db.note_backlink().insert(bl);
 
-            // Increment target backlink count
             if let Some(mut target) = ctx.db.note().id().find(target_id) {
                 target.backlink_count += 1;
                 ctx.db.note().id().update(target);

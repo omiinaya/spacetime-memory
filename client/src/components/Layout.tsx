@@ -15,8 +15,11 @@ import {
   Sparkles,
   StickyNote,
   CalendarDays,
+  LogOut,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/auth';
 
 interface NavItem {
   href: string;
@@ -98,11 +101,34 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
       {/* Footer */}
       {!collapsed && (
-        <div className="border-t border-border p-4">
+        <div className="border-t border-border p-3 space-y-2">
+          <UserInfo />
           <p className="text-xs text-muted-foreground">Spacetime Memory v0.1</p>
         </div>
       )}
     </aside>
+  );
+}
+
+function UserInfo() {
+  const { status, logout } = useAuth();
+  if (status.type !== 'authenticated') return null;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <User className="h-3 w-3" />
+        <span className="truncate font-medium">{status.account.display_name || status.account.username}</span>
+        <span className="text-[10px] bg-muted px-1 rounded">{status.account.role}</span>
+      </div>
+      <button
+        onClick={logout}
+        className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 hover:text-destructive transition-colors"
+      >
+        <LogOut className="h-3 w-3" />
+        Logout
+      </button>
+    </div>
   );
 }
 
