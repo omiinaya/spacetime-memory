@@ -1,0 +1,465 @@
+/* Spacetime Memory Clipper - Styles */
+/* shadcn-inspired dark theme */
+
+:root {
+  --bg-primary: #0f0f13;
+  --bg-secondary: #1a1a24;
+  --bg-tertiary: #252533;
+  --bg-hover: #2a2a3d;
+  --border-primary: #2e2e42;
+  --border-secondary: #3a3a54;
+  --text-primary: #f1f1f7;
+  --text-secondary: #a1a1b5;
+  --text-muted: #6b6b80;
+  --accent: #6366f1;
+  --accent-hover: #5558e6;
+  --accent-subtle: rgba(99, 102, 241, 0.15);
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.12);
+  --error: #ef4444;
+  --error-bg: rgba(239, 68, 68, 0.12);
+  --info: #3b82f6;
+  --info-bg: rgba(59, 130, 246, 0.12);
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-lg: 12px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  width: 360px;
+  min-height: 300px;
+  overflow-x: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ---------------------------------------------------------------
+   Header
+   --------------------------------------------------------------- */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: var(--accent-subtle);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.header-text h1 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.header-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.header-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 13px;
+  background: var(--accent);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ---------------------------------------------------------------
+   Page Info
+   --------------------------------------------------------------- */
+.page-info {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-primary);
+}
+
+.page-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.page-url {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------
+   Selection Indicator
+   --------------------------------------------------------------- */
+.selection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--info-bg);
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--info);
+  font-size: 12px;
+}
+
+.selection-indicator svg {
+  flex-shrink: 0;
+}
+
+.selection-indicator span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------
+   Clip Button
+   --------------------------------------------------------------- */
+.clip-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 16px;
+  padding: 11px 20px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  letter-spacing: -0.01em;
+}
+
+.clip-btn:hover {
+  background: var(--accent-hover);
+}
+
+.clip-btn:active {
+  transform: scale(0.98);
+}
+
+.clip-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------
+   Toast Container
+   --------------------------------------------------------------- */
+.toast-container {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0;
+  transform: translateY(-12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-hiding {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
+.toast-success {
+  background: var(--success-bg);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: var(--success);
+}
+
+.toast-error {
+  background: var(--error-bg);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--error);
+}
+
+.toast-info {
+  background: var(--info-bg);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--info);
+}
+
+/* ---------------------------------------------------------------
+   Status
+   --------------------------------------------------------------- */
+.status {
+  padding: 0 16px 8px;
+  font-size: 12px;
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------
+   Sections
+   --------------------------------------------------------------- */
+.section {
+  border-top: 1px solid var(--border-primary);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.section-header h2 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.section-header .chevron {
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+/* ---------------------------------------------------------------
+   Clip List
+   --------------------------------------------------------------- */
+.clip-list {
+  padding: 0 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clip-list-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 0;
+  text-align: center;
+}
+
+.clip-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+}
+
+.clip-item-error {
+  border-color: rgba(239, 68, 68, 0.2);
+  background: var(--error-bg);
+}
+
+.clip-item-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.clip-item-error .clip-item-icon {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.clip-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.clip-item-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clip-item-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------------------------------------------------------
+   Settings Panel
+   --------------------------------------------------------------- */
+.settings-panel {
+  padding: 0 16px 14px;
+}
+
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.form-group input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.form-group input::placeholder {
+  color: var(--text-muted);
+}
+
+.save-btn {
+  width: 100%;
+  padding: 8px 16px;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  margin-top: 4px;
+}
+
+.save-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.save-status {
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.save-status-success {
+  color: var(--success);
+}
+
+.save-status-error {
+  color: var(--error);
+}
+
+/* ---------------------------------------------------------------
+   Footer
+   --------------------------------------------------------------- */
+.footer {
+  padding: 10px 16px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+/* ---------------------------------------------------------------
+   Scrollbar
+   --------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

@@ -18,6 +18,8 @@ import {
   LogOut,
   User,
   Route,
+  Code2,
+  GitFork,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
@@ -41,6 +43,8 @@ const navItems: NavItem[] = [
   { href: '/search', label: 'Search', icon: Search },
   { href: '/query', label: 'Smart Query', icon: Sparkles },
   { href: '/tours', label: 'Tours', icon: Route },
+  { href: '/code-explorer', label: 'Code Explorer', icon: Code2 },
+  { href: '/trajectories', label: 'Trajectories', icon: GitFork },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

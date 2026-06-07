@@ -307,6 +307,32 @@ def add_tour_stop(tour_id: str, node_id: str, heading: str, description: str = "
 
 
 # ---------------------------------------------------------------------------
+# Directory tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def create_directory(workspace_id: str, name: str, path: str, parent_id: str = "", description: str = "") -> str:
+    """Create a directory in the context directory tree."""
+    get_client().create_directory(workspace_id, name, path, parent_id, description)
+    return f"Directory '{name}' created."
+
+
+@mcp.tool()
+def traverse_directory(workspace_id: str, root_directory_id: str) -> str:
+    """Recursively traverse directory tree showing all children."""
+    rows = get_client().traverse_directory(workspace_id, root_directory_id)
+    return json.dumps(rows, default=str)
+
+
+@mcp.tool()
+def list_directory(directory_id: str) -> str:
+    """List children of a directory."""
+    rows = get_client().list_directory(directory_id)
+    return json.dumps(rows, default=str)
+
+
+# ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
 

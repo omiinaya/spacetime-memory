@@ -280,14 +280,209 @@ def memory_rate(memory_id: str, rating: str, peer_id: str) -> None:
 @memory.command(name="list")
 @click.argument("workspace_id")
 @click.option("--type", "memory_type", help="Filter by memory type (world_fact/experience/mental_model)")
-def memory_list(workspace_id: str, memory_type: str | None) -> None:
+@click.option("--tier", default="", type=click.Choice(["", "L0", "L1", "L2"]), help="Filter by tier")
+@click.option("--directory", default="", help="Directory ID — list memories linked to this directory")
+@click.option("--recursive", is_flag=True, help="When used with --directory, recursively traverse subdirectories")
+def memory_list(workspace_id: str, memory_type: str | None, tier: str,
+                directory: str, recursive: bool) -> None:
     """List memories in a workspace."""
+    client = _sdk_client()
+    if directory:
+        with console.status(f"Listing directory '{directory[:16]}...'..."):
+            if recursive:
+                rows = client.traverse_directory(workspace_id, directory)
+            else:
+                rows = client.list_directory(directory)
+        # Show linked memories if any rows have memory_id
+        linked_memories = []
+        for r in rows:
+            mid = r.get("memory_id", "")
+            if mid:
+                mems = client.get_memory(mid)
+                if mems:
+                    linked_memories.append(mems[0])
+        if linked_memories:
+            print_table(linked_memories, title=f"Memories in directory (workspace: {workspace_id})")
+        else:
+            print_table(rows, title=f"Directory contents (workspace: {workspace_id})")
+        return
+
     with console.status(f"Fetching memories for workspace '{workspace_id}'..."):
-        rows = _sdk_client().list_memories(
-            workspace_id=workspace_id,
-            memory_type=memory_type or "",
-        )
+        if tier:
+            # Use raw SQL when tier is specified since list_memories doesn't filter by tier
+            clauses = [
+                f"workspace_id = '{workspace_id}'",
+                "is_active = true",
+            ]
+            if memory_type:
+                clauses.append(f"memory_type = '{memory_type}'")
+            if tier:
+                clauses.append(f"tier = '{tier}'")
+            where = " AND ".join(clauses)
+            rows = client._sql(f"SELECT * FROM memory WHERE {where}")
+            rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        else:
+            rows = client.list_memories(
+                workspace_id=workspace_id,
+                memory_type=memory_type or "",
+            )
     print_table(rows, title=f"Memories (workspace: {workspace_id})")
+
+
+@memory.command(name="update")
+@click.argument("memory_id")
+@click.option("--content", default="", help="New content")
+@click.option("--summary", default="", help="New summary")
+@click.option("--confidence", type=float, default=None, help="New confidence 0.0-1.0")
+@click.option("--tier", type=click.Choice(["", "L0", "L1", "L2"]), default="", help="New tier")
+def memory_update(memory_id: str, content: str, summary: str,
+                  confidence: float | None, tier: str) -> None:
+    """Update a memory's content, summary, confidence, and/or tier."""
+    client = _sdk_client()
+    updates: dict[str, Any] = {}
+    if content:
+        updates["content"] = content
+    if summary:
+        updates["summary"] = summary
+    if confidence is not None:
+        updates["confidence"] = confidence
+    if tier:
+        updates["tier"] = tier
+
+    if not updates:
+        console.print("[yellow]No changes specified. Use --content, --summary, --confidence, or --tier.[/yellow]")
+        return
+
+    with console.status(f"Updating memory '{memory_id[:16]}...'..."):
+        # Update content/summary/confidence via the existing reducer
+        if "content" in updates or "summary" in updates or "confidence" in updates:
+            client.update_memory(
+                memory_id,
+                content=updates.get("content", ""),
+                summary=updates.get("summary", ""),
+                confidence=updates.get("confidence", 0.8),
+            )
+        if "tier" in updates:
+            client._call("update_memory_tier", [memory_id, updates["tier"]])
+    console.print(f"[green]Memory '{memory_id[:16]}...' updated.[/green]")
+
+
+@memory.command(name="batch-update")
+@click.argument("workspace_id")
+@click.argument("memory_ids")
+@click.option("--content", default="", help="New content (applied to all)")
+@click.option("--summary", default="", help="New summary (applied to all)")
+@click.option("--confidence", type=float, default=None, help="New confidence (applied to all)")
+@click.option("--tier", type=click.Choice(["", "L0", "L1", "L2"]), default="", help="New tier (applied to all)")
+@click.option("--is-active", type=bool, default=None, help="Set active/inactive")
+def memory_batch_update(workspace_id: str, memory_ids: str, content: str,
+                        summary: str, confidence: float | None,
+                        tier: str, is_active: bool | None) -> None:
+    """Batch update multiple memories. MEMORY_IDS is a comma-separated list of IDs."""
+    client = _sdk_client()
+    ids = [m.strip() for m in memory_ids.split(",") if m.strip()]
+    if not ids:
+        console.print("[yellow]No memory IDs provided.[/yellow]")
+        return
+    updates: dict[str, Any] = {}
+    if content:
+        updates["content"] = content
+    if summary:
+        updates["summary"] = summary
+    if confidence is not None:
+        updates["confidence"] = confidence
+    if tier:
+        updates["tier"] = tier
+    if is_active is not None:
+        updates["is_active"] = is_active
+    if not updates:
+        console.print("[yellow]No updates specified.[/yellow]")
+        return
+    with console.status(f"Batch updating {len(ids)} memories..."):
+        result = client.batch_update_memories(workspace_id, ids, updates)
+    console.print(f"[green]Batch update completed for {len(ids)} memories.[/green]")
+    if result:
+        print_json(result)
+
+
+@memory.command(name="history")
+@click.argument("memory_id")
+def memory_history(memory_id: str) -> None:
+    """Get version history for a memory."""
+    client = _sdk_client()
+    with console.status(f"Fetching history for memory '{memory_id[:16]}...'..."):
+        rows = client.get_memory_history(memory_id)
+    print_table(rows, title=f"Memory History ({memory_id[:16]}...)")
+
+
+# ===================================================================
+# directory commands
+# ===================================================================
+
+
+@cli.group()
+def directory() -> None:
+    """Manage context directory trees."""
+
+
+@directory.command(name="list")
+@click.argument("directory_id")
+def directory_list(directory_id: str) -> None:
+    """List children of a directory."""
+    with console.status(f"Listing directory '{directory_id[:16]}...'..."):
+        rows = _sdk_client().list_directory(directory_id)
+    print_table(rows, title=f"Directory: {directory_id[:16]}...")
+
+
+@directory.command(name="tree")
+@click.argument("workspace_id")
+@click.argument("root_directory_id")
+def directory_tree(workspace_id: str, root_directory_id: str) -> None:
+    """Recursively traverse directory tree."""
+    with console.status(f"Traversing tree from '{root_directory_id[:16]}...'..."):
+        rows = _sdk_client().traverse_directory(workspace_id, root_directory_id)
+    print_table(rows, title=f"Directory tree (root: {root_directory_id[:16]}...)")
+
+
+@directory.command(name="create")
+@click.argument("workspace_id")
+@click.argument("name")
+@click.argument("path")
+@click.option("--parent-id", default="", help="Parent directory ID")
+@click.option("--description", default="", help="Directory description")
+def directory_create(workspace_id: str, name: str, path: str,
+                     parent_id: str, description: str) -> None:
+    """Create a directory in the context directory tree."""
+    with console.status(f"Creating directory '{name}'..."):
+        result = _sdk_client().create_directory(workspace_id, name, path, parent_id, description)
+    console.print(f"[green]Directory '{name}' created.[/green]")
+    if result:
+        print_json(result)
+
+
+@directory.command(name="link")
+@click.argument("directory_id")
+@click.argument("memory_id")
+@click.argument("workspace_id")
+def directory_link(directory_id: str, memory_id: str, workspace_id: str) -> None:
+    """Link a memory to a directory."""
+    with console.status(f"Linking memory '{memory_id[:16]}...' to directory..."):
+        result = _sdk_client().link_memory_to_directory(directory_id, memory_id, workspace_id)
+    console.print(f"[green]Memory linked to directory.[/green]")
+    if result:
+        print_json(result)
+
+
+@directory.command(name="unlink")
+@click.argument("directory_id")
+@click.argument("memory_id")
+def directory_unlink(directory_id: str, memory_id: str) -> None:
+    """Unlink a memory from a directory."""
+    with console.status(f"Unlinking memory '{memory_id[:16]}...' from directory..."):
+        result = _sdk_client().unlink_memory_from_directory(directory_id, memory_id)
+    console.print(f"[green]Memory unlinked from directory.[/green]")
+    if result:
+        print_json(result)
 
 
 # ===================================================================

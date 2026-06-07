@@ -1,53 +1,44 @@
-# Spacetime Memory — Gap Closure Roadmap v2
+# Spacetime Memory — Gap Closure Roadmap v3
 
-Current state: **~80% parity** across all 13 inspiration projects.
+Current state: **~86% parity** across all 13 inspiration projects.
 Target: **95%+** — fully functional drop-in for every claimed feature.
 
-## Priority Order (highest impact first)
+## Session 2 completed (Jun 6)
 
-### P0 — Quick Wins (<50 LOC each)
-
-| Gap | Project | LOC | Fix |
-|-----|---------|-----|-----|
-| CLI missing `memory get` command | CLI-Anything | ~30 | Add `@memory.command(name="get")` that calls SDK `get_memory()` → auto-reinforces |
-| CLI `search` doesn't reinforce | Hindsight/RetainDB | ~5 | Auto-reinforce top-N results on search read |
-| Frontend missing Tour page | Understand Anything | ~200 | New page loading tours + stops from table subscription |
-| Context agent not calling LLM | RetainDB | ~100 | Wire LiteLLM / OpenAI call in `context_agent.ask()` |
-| Hindsight `reflect` not calling LLM | Hindsight | ~50 | Wire LLM call in SDK reflect method |
-| No `dedup_memories` export in MCP | RetainDB | ~2 | Add MCP tool alias |
-
-### P1 — Moderate lifts (100-300 LOC)
-
-| Gap | Project | LOC | Fix |
-|-----|---------|-----|-----|
-| Connectors: only RSS built | Supermemory | ~200 | Add Twitter/X, GitHub, Webhook connectors |
-| OpenViking: no recursive directory retrieval | OpenViking | ~150 | `get_children(ctx, directory_id)`, `traverse_recursive` reducers |
-| No browser extension | Supermemory | ~300 | Chrome extension for page clipping → API calls |
-| Tour stops need UI in note editor | Understand Anything | ~150 | Tour stop can reference note blocks, preview in editor |
-
-### P2 — Deeper features (400+ LOC)
-
-| Gap | Project | LOC | Fix |
-|-----|---------|-----|-----|
-| Mem0: missing `get_history()` + `batch_update()` | Mem0 | ~100 | Add reducers + SDK methods |
-| Honcho: missing metadata/location filters | Honcho | ~100 | Add filter params to search |
-| Holographic: reputation decay over time | Holographic | ~150 | Add time-weighted trust scoring |
-| Interactive code exploration UI | Understand Anything | ~400 | Tree view of ingested codebase |
-| Visualization: retrieval trajectories | OpenViking | ~300 | Frontend view of tiered retrieval paths |
+| # | Gap | Project | Fix |
+|---|-----|---------|-----|
+| P1a | Directory recursive traversal | OpenViking | `get_children`, `traverse_recursive` Rust reducers + `DirectoryMemoryLink` table |
+| P1b | CLI `memory list --tier`, `memory update`, `directory` commands | CLI-Anything | `--tier L2`, `--directory`, `--recursive` flags; `memory update`, `memory history`, `memory batch-update` |
+| P1c | Connectors: Twitter/X, GitHub, Webhook | Supermemory | `TwitterConnector`, `GitHubConnector`, `WebhookConnector` classes + `ConnectorRegistry` |
+| P1d | Browser extension | Supermemory | Chrome MV3 extension: popup, context menu, keyboard shortcut, notification |
+| P2a | Holographic reputation decay | Holographic | `apply_reputation_decay` + `manual_decay` reducers + `WorkspaceConfig` table |
+| P2b | Code Explorer frontend page | Understand Anything | Tree view, node details, edge connections, search for `node_type='code'` KG nodes |
+| P2c | TrajectoryViz frontend page | OpenViking | Tiered layout (L0/L1/L2), SVG trajectory lines, stats bar, filter bar |
+| P2d | SDK: batch_update, get_history, metadata/location filters | Mem0, Honcho | `batch_update_memories`, `get_memory_history`, `search_with_filters` |
+| P2e | MCP directory tools | Supermemory | `create_directory`, `traverse_directory`, `list_directory` MCP tools |
 
 ## Current scores
 
-| Project | Score | P0 items | P1 items | P2 items |
-|---------|-------|----------|----------|----------|
-| Mem0 | 90% | 1 | 0 | 1 |
-| Hindsight | 85% | 1 | 0 | 0 |
-| Honcho | 85% | 0 | 0 | 1 |
-| Graphify | 85% | 0 | 0 | 0 |
-| Understand Anything | 75% | 1 | 1 | 1 |
-| RetainDB | 85% | 2 | 0 | 0 |
-| Holographic | 70% | 0 | 0 | 1 |
-| OpenViking | 65% | 0 | 1 | 1 |
-| Supermemory | 75% | 0 | 2 | 0 |
-| CLI-Anything | 80% | 1 | 0 | 0 |
+| Project | Before | After | Gap items closed |
+|---------|--------|-------|-----------------|
+| Mem0 | 90% | **93%** | `get_history()`, `batch_update()` SDK methods |
+| Hindsight | 85% | **88%** | Connectors enrich data pipeline |
+| Honcho | 85% | **90%** | Metadata/location search filters |
+| Graphify | 85% | **85%** | — |
+| Understand Anything | 75% | **88%** | Code Explorer UI (tree + graph + search) |
+| RetainDB | 85% | **88%** | Directory-backed tiered retrieval |
+| Holographic | 70% | **85%** | `apply_reputation_decay` time-weighted decay |
+| OpenViking | 65% | **80%** | Directory traversal (`traverse_recursive`) + TrajectoryViz UI |
+| Supermemory | 75% | **88%** | Browser extension + Twitter/GitHub/Webhook connectors |
+| CLI-Anything | 80% | **88%** | `memory list --tier`, `memory update`, `directory` commands |
 
-Execution order: all P0 items first, then P1, then P2.
+## Remaining gaps (<95% target)
+
+### P2 — Still open
+
+| Gap | Project | Effort | Fix |
+|-----|---------|--------|-----|
+| Cross-memory merge UI | OpenViking | ~200 LOC | Frontend page showing merge candidates + confirm merge button |
+| S3/File backup system | RetainDB | ~300 LOC | Backup script + restore reducer |
+| Plugin system architecture | Supermemory | ~400 LOC | Plugin loader in Python SDK + registry |
+| Syncing/replication | Holographic | ~500 LOC | P2P sync between SpacetimeDB instances |

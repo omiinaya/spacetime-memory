@@ -20,6 +20,8 @@ const NoteEditor = React.lazy(() => import('@/pages/NoteEditor'));
 const NoteGraph = React.lazy(() => import('@/pages/NoteGraph'));
 const SmartQuery = React.lazy(() => import('@/pages/SmartQuery'));
 const Tours = React.lazy(() => import('@/pages/Tours'));
+const CodeExplorer = React.lazy(() => import('@/pages/CodeExplorer'));
+const TrajectoryViz = React.lazy(() => import('@/pages/TrajectoryViz'));
 
 function LoadingFallback() {
   return (
@@ -70,6 +72,8 @@ function AuthenticatedApp() {
           <Route path="/graph/notes" component={NoteGraph} />
           <Route path="/query" component={SmartQuery} />
           <Route path="/tours" component={Tours} />
+          <Route path="/code-explorer" component={CodeExplorer} />
+          <Route path="/trajectories" component={TrajectoryViz} />
           <Route>
             <div className="flex h-[60vh] items-center justify-center">
               <div className="text-center">

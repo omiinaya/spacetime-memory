@@ -322,6 +322,101 @@ class Client:
         return rows[:limit]
 
     # -----------------------------------------------------------------------
+    # Directory (context directory tree)
+    # -----------------------------------------------------------------------
+
+    def list_directory(self, directory_id: str) -> list[dict[str, Any]]:
+        """Get children of a directory."""
+        self._call("get_children", [directory_id, True])
+        return self._sql(
+            "SELECT * FROM directory_result WHERE "
+            f"query_hash = '{_esc(directory_id)}' "
+            "ORDER BY depth ASC, name ASC"
+        )
+
+    def traverse_directory(self, workspace_id: str, root_directory_id: str) -> list[dict[str, Any]]:
+        """Recursive BFS traversal of directory tree."""
+        self._call("traverse_recursive", [workspace_id, root_directory_id])
+        return self._sql(
+            "SELECT * FROM directory_result WHERE "
+            f"query_hash = '{_esc(root_directory_id)}' "
+            "ORDER BY depth ASC, name ASC"
+        )
+
+    def get_directory(self, workspace_id: str, path_or_id: str) -> list[dict[str, Any]]:
+        """Get a directory by ID or path."""
+        self._call("get_directory", [workspace_id, path_or_id])
+        return self._sql(
+            "SELECT * FROM directory_result WHERE "
+            f"workspace_id = '{_esc(workspace_id)}' "
+            "ORDER BY depth ASC"
+        )
+
+    def create_directory(self, workspace_id: str, name: str, path: str, parent_id: str = "", description: str = "") -> dict[str, Any]:
+        """Create a directory in the context directory tree."""
+        return self._call("create_directory", [workspace_id, name, path, parent_id, description])
+
+    def link_memory_to_directory(self, directory_id: str, memory_id: str, workspace_id: str) -> dict[str, Any]:
+        """Link a memory to a directory."""
+        return self._call("link_memory_to_directory", [directory_id, memory_id, workspace_id])
+
+    def unlink_memory_from_directory(self, directory_id: str, memory_id: str) -> dict[str, Any]:
+        """Unlink a memory from a directory."""
+        return self._call("unlink_memory_from_directory", [directory_id, memory_id])
+
+    # -----------------------------------------------------------------------
+    # Batch update & history (Mem0 parity)
+    # -----------------------------------------------------------------------
+
+    def batch_update_memories(self, workspace_id: str, memory_ids: list[str], updates: dict[str, Any]) -> dict[str, Any]:
+        """Batch update multiple memories. Mem0 parity.
+        updates can contain: content, summary, confidence, tier, is_active
+        """
+        return self._call("batch_update_memories", [
+            workspace_id, json.dumps(memory_ids), json.dumps(updates)
+        ])
+
+    def get_memory_history(self, memory_id: str) -> list[dict[str, Any]]:
+        """Get version history for a memory. Mem0 parity."""
+        return self._sql(
+            "SELECT * FROM memory_version WHERE "
+            f"memory_id = '{_esc(memory_id)}' "
+            "ORDER BY version DESC"
+        )
+
+    # -----------------------------------------------------------------------
+    # Search with metadata/location filters (Honcho parity)
+    # -----------------------------------------------------------------------
+
+    def search_with_filters(self, workspace_id: str, query: str = "",
+                             memory_type: str = "",
+                             tier: str = "",
+                             metadata_filter: str = "",
+                             location_filter: str = "",
+                             limit: int = 20) -> list[dict[str, Any]]:
+        """Search with metadata and location filters. Honcho parity."""
+        # For metadata/location filters, we do a keyword search first then filter in Python
+        rows = self.search(workspace_id, query, memory_type, tier, limit, semantic=True)
+        if metadata_filter:
+            import json
+            mf = json.loads(metadata_filter) if isinstance(metadata_filter, str) else metadata_filter
+            filtered = []
+            for r in rows:
+                meta_str = r.get("metadata_json", "{}")
+                try:
+                    meta = json.loads(meta_str) if isinstance(meta_str, str) else meta_str
+                except Exception:
+                    meta = {}
+                matches = all(meta.get(k) == v for k, v in mf.items())
+                if matches:
+                    filtered.append(r)
+            rows = filtered[:limit]
+        if location_filter:
+            loc = location_filter.lower()
+            rows = [r for r in rows if loc in r.get("content", "").lower() or loc in r.get("summary", "").lower()][:limit]
+        return rows
+
+    # -----------------------------------------------------------------------
     # Knowledge Graph
     # -----------------------------------------------------------------------
 
