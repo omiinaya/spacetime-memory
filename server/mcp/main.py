@@ -673,7 +673,7 @@ def list_facts(
     return []
 
 
-# -------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Directory tools
 # ---------------------------------------------------------------------------
 
@@ -700,6 +700,201 @@ def list_directory(directory_id: str) -> str:
     """List children of a directory."""
     rows = get_client().list_directory(directory_id)
     return json.dumps(rows, default=str)
+
+
+# ---------------------------------------------------------------------------
+# Org-mode sync tool
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def org_sync(
+    workspace_id: str,
+    directory: str = "~/org",
+    dry_run: bool = False,
+) -> str:
+    """One-shot sync of .org files in a directory to Spacetime Memory as notes and KG task nodes.
+
+    Scans all .org files under DIRECTORY, parses headings with OrgModeParser,
+    and stores each heading as a memory. TODO items are additionally created
+    as knowledge graph nodes (type="task").
+
+    Args:
+        workspace_id: The target workspace to sync into.
+        directory: Path to directory containing .org files (default: ~/org).
+        dry_run: If True, preview changes without writing any data.
+
+    Returns:
+        A summary string describing how many events were synced.
+    """
+    import os
+    import sys
+
+    sys.path.insert(
+        0,
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "scripts"),
+    )
+    from org_sync_daemon import OrgSyncDaemon
+
+    daemon = OrgSyncDaemon(
+        org_dir=directory,
+        workspace_id=workspace_id,
+        client=get_client(),
+        dry_run=dry_run,
+    )
+    total = daemon.scan()
+    if dry_run:
+        return f"[dry-run] Org sync would produce {total} events from {daemon.get_status()['files_tracked']} file(s)."
+    return f"Org sync complete — {total} events synced from {daemon.get_status()['files_tracked']} file(s)."
+
+
+# ---------------------------------------------------------------------------
+# Space tools (Supermemory shareable workspace permissions)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def grant_space_access(workspace_id: str, peer_id: str, permission: str) -> str:
+    """Grant a peer access to a workspace with a specific permission level.
+
+    Only an existing owner can grant access. Permission levels: owner, editor, viewer.
+
+    Args:
+        workspace_id: The workspace (space) ID.
+        peer_id: The peer ID to grant access to.
+        permission: One of 'owner', 'editor', 'viewer'.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client()._call("grant_space_access", [workspace_id, peer_id, permission])
+    return f"Granted '{permission}' access to peer '{peer_id[:16]}...' for workspace '{workspace_id[:16]}...'."
+
+
+@mcp.tool()
+@require_api_key
+def revoke_space_access(workspace_id: str, peer_id: str) -> str:
+    """Revoke a peer's access to a workspace.
+
+    Only an existing owner can revoke access.
+
+    Args:
+        workspace_id: The workspace (space) ID.
+        peer_id: The peer ID to revoke access from.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client()._call("revoke_space_access", [workspace_id, peer_id])
+    return f"Revoked access for peer '{peer_id[:16]}...' from workspace '{workspace_id[:16]}...'."
+
+
+@mcp.tool()
+@require_api_key
+def list_space_members(workspace_id: str) -> list[dict[str, str]]:
+    """List all members with their permissions for a workspace.
+
+    Calls the list_space_members reducer and reads results from
+    the space_member_result table.
+
+    Args:
+        workspace_id: The workspace (space) ID.
+
+    Returns:
+        A list of dicts, each with keys: peer_id, permission, granted_by, created_at.
+    """
+    client = get_client()
+    client._call("list_space_members", [workspace_id])
+    rows = client._sql(
+        f"SELECT peer_id, permission, granted_by, created_at "
+        f"FROM space_member_result WHERE "
+        f"workspace_id = '{workspace_id}' "
+        f"ORDER BY created_at ASC"
+    )
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Agent Step tools (P3g agent orchestration hooks)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def add_agent_step(
+    session_id: str,
+    workspace_id: str,
+    step_type: str,
+    content: str,
+    summary: str = "",
+) -> str:
+    """Record an agent reasoning step (thought, action, tool_call, etc.).
+
+    Args:
+        session_id: The session to attach the step to.
+        workspace_id: The workspace containing the session.
+        step_type: One of "thought", "action", "observation", "tool_call", "tool_result".
+        content: The step content (text or JSON).
+        summary: Optional short summary of the step.
+
+    Returns:
+        Confirmation message with step ID.
+    """
+    get_client()._call(
+        "add_agent_step",
+        [session_id, workspace_id, step_type, content, summary, ""],
+    )
+    return f"Agent step recorded for session {session_id[:16]}..."
+
+
+@mcp.tool()
+@require_api_key
+def get_session_steps(session_id: str) -> list[dict[str, Any]]:
+    """Retrieve all reasoning steps for a session.
+
+    Args:
+        session_id: The session to get steps for.
+
+    Returns:
+        A list of step dicts ordered by creation time.
+    """
+    client = get_client()
+    client._call("get_session_steps", [session_id])
+    query_hash = f"steps:{session_id}"
+    steps = client._sql(
+        "SELECT * FROM session_step_result WHERE "
+        f"query_hash = '{query_hash}' "
+        "ORDER BY created_at ASC"
+    )
+    return steps
+
+
+@mcp.tool()
+@require_api_key
+def get_agent_context(
+    workspace_id: str,
+    query: str = "",
+    session_id: str = "",
+    top_k: int = 10,
+) -> str:
+    """Retrieve relevant context for an agent prompt from memories + session steps.
+
+    Args:
+        workspace_id: The workspace to search in.
+        query: Natural language query for relevant memories.
+        session_id: Optional session to include recent steps from.
+        top_k: Maximum context entries (default: 10).
+
+    Returns:
+        JSON string with context entries.
+    """
+    from spacetime_memory.agent_orchestrator import AgentOrchestrator
+
+    orch = AgentOrchestrator(get_client(), workspace_id=workspace_id)
+    context = orch.get_context(query=query, top_k=top_k, session_id=session_id)
+    return json.dumps(context, default=str)
 
 
 # ---------------------------------------------------------------------------

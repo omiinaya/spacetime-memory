@@ -14,6 +14,26 @@ pub struct Workspace {
     pub updated_at: i64,
 }
 
+/// Permission entry granting a peer access to a workspace (space).
+///
+/// `permission` is one of:
+/// - `"owner"`   — full control (grant/revoke, read, write, delete)
+/// - `"editor"`  — read and write
+/// - `"viewer"`  — read only
+#[table(accessor = space_permission, public)]
+#[derive(Debug, Clone)]
+pub struct SpacePermission {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub peer_id: String,      // who has access
+    pub permission: String,   // "owner", "editor", "viewer"
+    pub granted_by: String,   // peer_id who granted access
+    pub created_at: i64,
+}
+
+// ── Workspace reducers ────────────────────────────────────────────────
+
 #[reducer]
 pub fn create_workspace(ctx: &ReducerContext, name: String, description: String, id: String) -> Result<(), String> {
     let now = now_micros(ctx);
@@ -58,4 +78,260 @@ pub fn delete_workspace(ctx: &ReducerContext, id: String) -> Result<(), String> 
 
     ctx.db.workspace().id().delete(&id);
     Ok(())
+}
+
+// ── Space permission guard ────────────────────────────────────────────
+
+/// Check if `peer_id` has at least the `required` permission level
+/// for the given workspace.
+///
+/// Permission hierarchy: owner > editor > viewer.
+///
+/// Returns `Ok(())` if allowed, `Err(String)` with a message if denied.
+///
+/// **Note:** Full ACL enforcement across all memory/note/KG reducers is the
+/// next step. This guard is available for use but is not yet called from
+/// every reducer.
+pub fn check_space_access(
+    ctx: &ReducerContext,
+    workspace_id: &str,
+    peer_id: &str,
+    required: &str,
+) -> Result<(), String> {
+    // Check if this peer has any permission record for this workspace
+    let perm = ctx
+        .db
+        .space_permission()
+        .iter()
+        .find(|sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id);
+
+    let perm = match perm {
+        Some(p) => p,
+        None => {
+            return Err(format!(
+                "Access denied: peer '{}' has no permission for workspace '{}'",
+                peer_id, workspace_id
+            ))
+        }
+    };
+
+    let rank = |p: &str| -> u8 {
+        match p {
+            "owner" => 3,
+            "editor" => 2,
+            "viewer" => 1,
+            _ => 0,
+        }
+    };
+
+    let actual_rank = rank(&perm.permission);
+    let required_rank = rank(required);
+
+    if actual_rank >= required_rank {
+        Ok(())
+    } else {
+        Err(format!(
+            "Access denied: peer '{}' has '{}' permission but '{}' is required for workspace '{}'",
+            peer_id, perm.permission, required, workspace_id
+        ))
+    }
+}
+
+// ── Space permission reducers ─────────────────────────────────────────
+
+/// Grant a peer access to a workspace with a given permission level.
+///
+/// Only an existing owner of the workspace can grant access to others.
+#[reducer]
+pub fn grant_space_access(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    peer_id: String,
+    permission: String,
+) -> Result<(), String> {
+    let caller = ctx.sender().to_hex().to_string();
+
+    // Validate permission value
+    match permission.as_str() {
+        "owner" | "editor" | "viewer" => {}
+        _ => {
+            return Err(format!(
+                "Invalid permission '{}': must be 'owner', 'editor', or 'viewer'",
+                permission
+            ))
+        }
+    }
+
+    // Verify the workspace exists
+    ctx.db
+        .workspace()
+        .id()
+        .find(&workspace_id)
+        .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
+
+    // Only an existing owner can grant access
+    let is_owner = ctx
+        .db
+        .space_permission()
+        .iter()
+        .any(|sp: SpacePermission| {
+            sp.workspace_id == workspace_id && sp.peer_id == caller && sp.permission == "owner"
+        });
+
+    if !is_owner {
+        return Err("Only an owner of the workspace can grant access".to_string());
+    }
+
+    // Check for existing permission — update or insert
+    let now = now_micros(ctx);
+    let existing = ctx
+        .db
+        .space_permission()
+        .iter()
+        .find(|sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id);
+
+    if let Some(existing) = existing {
+        // Update existing permission
+        let updated = SpacePermission {
+            permission: permission.clone(),
+            granted_by: caller.clone(),
+            ..existing
+        };
+        ctx.db.space_permission().id().update(updated);
+    } else {
+        // Insert new permission
+        ctx.db.space_permission().insert(SpacePermission {
+            id: uuid_v4(ctx),
+            workspace_id: workspace_id.clone(),
+            peer_id: peer_id.clone(),
+            permission: permission.clone(),
+            granted_by: caller.clone(),
+            created_at: now,
+        });
+    }
+
+    Ok(())
+}
+
+/// Revoke a peer's access to a workspace.
+///
+/// Only an existing owner can revoke access. Owners cannot revoke their own
+/// access this way (they must use a separate owner escalation process).
+#[reducer]
+pub fn revoke_space_access(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    peer_id: String,
+) -> Result<(), String> {
+    let caller = ctx.sender().to_hex().to_string();
+
+    // Verify the workspace exists
+    ctx.db
+        .workspace()
+        .id()
+        .find(&workspace_id)
+        .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
+
+    // Only an existing owner can revoke access
+    let is_owner = ctx
+        .db
+        .space_permission()
+        .iter()
+        .any(|sp: SpacePermission| {
+            sp.workspace_id == workspace_id && sp.peer_id == caller && sp.permission == "owner"
+        });
+
+    if !is_owner {
+        return Err("Only an owner of the workspace can revoke access".to_string());
+    }
+
+    // Cannot revoke your own access
+    if caller == peer_id {
+        return Err("Cannot revoke your own access. Have another owner do it.".to_string());
+    }
+
+    // Find and delete the permission record
+    let existing = ctx
+        .db
+        .space_permission()
+        .iter()
+        .find(|sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id)
+        .ok_or_else(|| {
+            format!(
+                "Peer '{}' has no permission for workspace '{}'",
+                peer_id, workspace_id
+            )
+        })?;
+
+    ctx.db.space_permission().id().delete(&existing.id);
+
+    Ok(())
+}
+
+/// List all members with their permissions for a workspace.
+///
+/// Stores results in the `space_member_result` table so the caller can
+/// query them via SQL. Any caller with at least viewer access can list members.
+#[reducer]
+pub fn list_space_members(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let caller = ctx.sender().to_hex().to_string();
+
+    // Verify the workspace exists
+    ctx.db
+        .workspace()
+        .id()
+        .find(&workspace_id)
+        .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
+
+    // Check the caller has at least viewer access
+    let has_access = ctx
+        .db
+        .space_permission()
+        .iter()
+        .any(|sp: SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == caller);
+
+    if !has_access {
+        return Err(format!(
+            "Access denied: you do not have access to workspace '{}'",
+            workspace_id
+        ));
+    }
+
+    // Gather all members
+    let members: Vec<SpacePermission> = ctx
+        .db
+        .space_permission()
+        .iter()
+        .filter(|sp: &SpacePermission| sp.workspace_id == workspace_id)
+        .collect();
+
+    // Store results in a result table for SQL querying
+    let now = now_micros(ctx);
+    for member in &members {
+        ctx.db.space_member_result().insert(SpaceMemberResult {
+            id: uuid_v4(ctx),
+            workspace_id: workspace_id.clone(),
+            peer_id: member.peer_id.clone(),
+            permission: member.permission.clone(),
+            granted_by: member.granted_by.clone(),
+            created_at: member.created_at,
+            queried_at: now,
+        });
+    }
+
+    Ok(())
+}
+
+/// Result table for `list_space_members`. Each row represents one member.
+#[table(accessor = space_member_result, public)]
+#[derive(Debug, Clone)]
+pub struct SpaceMemberResult {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub peer_id: String,
+    pub permission: String,
+    pub granted_by: String,
+    pub created_at: i64,
+    pub queried_at: i64,
 }

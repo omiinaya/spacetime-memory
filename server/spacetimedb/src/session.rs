@@ -27,6 +27,39 @@ pub struct SessionParticipant {
     pub joined_at: i64,
 }
 
+/// Agent reasoning step — records chain-of-thought, tool calls, observations.
+#[table(accessor = agent_step, public)]
+#[derive(Debug, Clone)]
+pub struct AgentStep {
+    #[primary_key]
+    pub id: String,
+    pub session_id: String,
+    pub workspace_id: String,
+    /// "thought", "action", "observation", "tool_call", "tool_result"
+    pub step_type: String,
+    /// JSON or text content
+    pub content: String,
+    pub summary: String,
+    /// For chain-of-thought linking
+    pub parent_step_id: String,
+    pub created_at: i64,
+}
+
+/// Result table for get_session_steps reducer.
+#[table(accessor = session_step_result, public)]
+#[derive(Debug, Clone)]
+pub struct SessionStepResult {
+    pub query_hash: String,
+    pub id: String,
+    pub session_id: String,
+    pub workspace_id: String,
+    pub step_type: String,
+    pub content: String,
+    pub summary: String,
+    pub parent_step_id: String,
+    pub created_at: i64,
+}
+
 #[reducer]
 pub fn create_session(
     ctx: &ReducerContext,
@@ -139,5 +172,98 @@ pub fn update_session_summary(
     session.updated_at = now_micros(ctx);
 
     ctx.db.session().id().update(session);
+    Ok(())
+}
+
+// ── Agent step reducers ──────────────────────────────────────────────────
+
+/// Add an agent reasoning step (thought, action, tool_call, etc.).
+#[reducer]
+pub fn add_agent_step(
+    ctx: &ReducerContext,
+    session_id: String,
+    workspace_id: String,
+    step_type: String,
+    content: String,
+    summary: String,
+    parent_step_id: String,
+) -> Result<(), String> {
+    let now = now_micros(ctx);
+    let id = uuid_v4(ctx);
+
+    // Verify session exists
+    ctx.db
+        .session()
+        .id()
+        .find(&session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    ctx.db.agent_step().insert(AgentStep {
+        id: id.clone(),
+        session_id: session_id.clone(),
+        workspace_id,
+        step_type,
+        content,
+        summary,
+        parent_step_id,
+        created_at: now,
+    });
+
+    // Update session's updated_at timestamp
+    if let Some(mut sess) = ctx.db.session().id().find(&session_id) {
+        sess.updated_at = now;
+        ctx.db.session().id().update(sess);
+    }
+
+    Ok(())
+}
+
+/// Retrieve all steps for a session, stored in session_step_result table.
+#[reducer]
+pub fn get_session_steps(
+    ctx: &ReducerContext,
+    session_id: String,
+) -> Result<(), String> {
+    let query_hash = format!("steps:{}", session_id);
+
+    // Clear previous results for this hash
+    let old: Vec<_> = ctx.db.session_step_result().iter()
+        .filter(|r| r.query_hash == query_hash)
+        .collect();
+    for r in old {
+        ctx.db.session_step_result().delete(r);
+    }
+
+    let mut steps: Vec<_> = ctx.db.agent_step().iter()
+        .filter(|s| s.session_id == session_id)
+        .collect();
+    steps.sort_by_key(|s| s.created_at);
+
+    for s in &steps {
+        ctx.db.session_step_result().insert(SessionStepResult {
+            query_hash: query_hash.clone(),
+            id: s.id.clone(),
+            session_id: s.session_id.clone(),
+            workspace_id: s.workspace_id.clone(),
+            step_type: s.step_type.clone(),
+            content: s.content.clone(),
+            summary: s.summary.clone(),
+            parent_step_id: s.parent_step_id.clone(),
+            created_at: s.created_at,
+        });
+    }
+
+    Ok(())
+}
+
+/// Delete all agent steps for a given session.
+#[reducer]
+pub fn delete_session_steps(ctx: &ReducerContext, session_id: String) -> Result<(), String> {
+    let to_delete: Vec<_> = ctx.db.agent_step().iter()
+        .filter(|s| s.session_id == session_id)
+        .collect();
+    for s in to_delete {
+        ctx.db.agent_step().delete(s);
+    }
     Ok(())
 }

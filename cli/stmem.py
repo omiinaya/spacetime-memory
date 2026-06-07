@@ -306,6 +306,72 @@ def workspace_list() -> None:
 
 
 # ===================================================================
+# space commands (Supermemory shareable workspace permissions)
+# ===================================================================
+
+
+@cli.group()
+def space() -> None:
+    """Manage Supermemory spaces (shareable workspace permissions)."""
+
+
+@space.command(name="members")
+@click.argument("workspace_id")
+def space_members(workspace_id: str) -> None:
+    """List members with their permissions for a workspace.
+
+    Calls list_space_members reducer and reads from space_member_result.
+    """
+    client = _sdk_client()
+    with console.status(f"Fetching members for workspace '{workspace_id[:16]}...'..."):
+        client._call("list_space_members", [workspace_id])
+        rows = client._sql(
+            f"SELECT * FROM space_member_result WHERE "
+            f"workspace_id = '{_esc(workspace_id)}' "
+            f"ORDER BY created_at ASC"
+        )
+    if not rows:
+        console.print("[yellow]No members found for this workspace.[/yellow]")
+        return
+    print_table(rows, title=f"Space Members (workspace: {workspace_id[:16]}...)")
+
+
+@space.command(name="grant")
+@click.argument("workspace_id")
+@click.argument("peer_id")
+@click.argument("permission", type=click.Choice(["owner", "editor", "viewer"]))
+def space_grant(workspace_id: str, peer_id: str, permission: str) -> None:
+    """Grant a peer access to a workspace with a specific permission level.
+
+    Only an existing owner can grant access. Permission levels: owner, editor, viewer.
+    """
+    client = _sdk_client()
+    with console.status(f"Granting '{permission}' access to peer '{peer_id[:16]}...'..."):
+        client._call("grant_space_access", [workspace_id, peer_id, permission])
+    _quiet_print(
+        f"[green]Granted '{permission}' access to peer '{peer_id[:16]}...' "
+        f"for workspace '{workspace_id[:16]}...'.[/green]"
+    )
+
+
+@space.command(name="revoke")
+@click.argument("workspace_id")
+@click.argument("peer_id")
+def space_revoke(workspace_id: str, peer_id: str) -> None:
+    """Revoke a peer's access to a workspace.
+
+    Only an existing owner can revoke access.
+    """
+    client = _sdk_client()
+    with console.status(f"Revoking access for peer '{peer_id[:16]}...'..."):
+        client._call("revoke_space_access", [workspace_id, peer_id])
+    _quiet_print(
+        f"[green]Revoked access for peer '{peer_id[:16]}...' "
+        f"from workspace '{workspace_id[:16]}...'.[/green]"
+    )
+
+
+# ===================================================================
 # peer commands
 # ===================================================================
 
@@ -1525,6 +1591,245 @@ def mental_get(id: str) -> None:
         console.print(f"[yellow]Mental model '{id[:16]}...' not found.[/yellow]")
         return
     print_json(rows[0])
+
+
+# ===================================================================
+# agent — Agent orchestration commands (P3g)
+# ===================================================================
+
+
+@cli.group()
+def agent() -> None:
+    """Manage agent sessions and reasoning steps."""
+
+
+@agent.command(name="start")
+@click.argument("workspace_id")
+@click.option("--agent-name", default="assistant", help="Agent name")
+@click.option("--user-id", default="user1", help="User identifier")
+@click.option("--context", default="", help="JSON context string")
+def agent_start(workspace_id: str, agent_name: str, user_id: str, context: str) -> None:
+    """Start a new agent session in a workspace."""
+    from spacetime_memory.agent_orchestrator import AgentOrchestrator
+
+    orch = AgentOrchestrator(_sdk_client(), workspace_id=workspace_id)
+    session_id = orch.start_session(agent_name=agent_name, user_id=user_id, context=context)
+    _quiet_print(f"[green]Agent session started: {session_id}[/green]")
+    print_json({"session_id": session_id})
+
+
+@agent.command(name="step")
+@click.argument("session_id")
+@click.argument("step_type")
+@click.argument("content")
+@click.option("--summary", default="", help="Short summary of the step")
+@click.option("--workspace-id", default="", help="Workspace ID (auto-detected if possible)")
+def agent_step(session_id: str, step_type: str, content: str, summary: str, workspace_id: str) -> None:
+    """Add an agent reasoning step.
+
+    STEP_TYPE must be one of: thought, action, observation, tool_call, tool_result.
+    CONTENT is the step text (or JSON for tool calls).
+    """
+    from spacetime_memory.agent_orchestrator import AgentOrchestrator
+
+    # For a simple step without orchestration state, just call the reducer directly
+    client = _sdk_client()
+    if workspace_id:
+        w_id = workspace_id
+    else:
+        # Try to infer workspace from session
+        rows = client._sql(f"SELECT workspace_id FROM session WHERE id = '{_esc(session_id)}'")
+        w_id = rows[0]["workspace_id"] if rows else "default"
+
+    client._call("add_agent_step", [session_id, w_id, step_type, content, summary, ""])
+    # Discover step ID
+    rows = client._sql(
+        "SELECT id FROM agent_step WHERE "
+        f"session_id = '{_esc(session_id)}' "
+        "ORDER BY created_at DESC LIMIT 1"
+    )
+    step_id = rows[0]["id"] if rows else "unknown"
+    _quiet_print(f"[green]Step recorded: {step_id}[/green]")
+    print_json({"step_id": step_id})
+
+
+@agent.command(name="steps")
+@click.argument("session_id")
+@click.option("--output", "-o", help="Output format override")
+def agent_steps(session_id: str, output: str | None) -> None:
+    """List all reasoning steps for a session."""
+    client = _sdk_client()
+    client._call("get_session_steps", [session_id])
+    query_hash = f"steps:{session_id}"
+    rows = client._sql(
+        "SELECT * FROM session_step_result WHERE "
+        f"query_hash = '{query_hash}' "
+        "ORDER BY created_at ASC"
+    )
+    if not rows:
+        console.print("[yellow]No steps found for this session.[/yellow]")
+        return
+    print_table(rows, title=f"Agent Steps (session: {session_id[:16]}...)", output=output)
+
+
+@agent.command(name="context")
+@click.argument("session_id")
+@click.argument("query")
+@click.option("--top-k", default=10, type=int, help="Max context entries")
+@click.option("--workspace-id", default="", help="Workspace ID")
+def agent_context(session_id: str, query: str, top_k: int, workspace_id: str) -> None:
+    """Get relevant context for an agent from memories + session steps."""
+    from spacetime_memory.agent_orchestrator import AgentOrchestrator
+
+    client = _sdk_client()
+    if workspace_id:
+        w_id = workspace_id
+    else:
+        rows = client._sql(f"SELECT workspace_id FROM session WHERE id = '{_esc(session_id)}'")
+        w_id = rows[0]["workspace_id"] if rows else "default"
+
+    orch = AgentOrchestrator(client, workspace_id=w_id)
+    context = orch.get_context(query=query, top_k=top_k, session_id=session_id)
+    if not context:
+        console.print("[yellow]No context found.[/yellow]")
+        return
+    print_table(context, title=f"Agent Context (session: {session_id[:16]}...)")
+
+
+# ===================================================================
+# org — Org-mode sync
+# ===================================================================
+
+
+@cli.group()
+def org() -> None:
+    """Sync .org files to Spacetime Memory."""
+
+
+@org.command(name="sync")
+@click.argument("workspace_id")
+@click.option("--dir", "org_dir", default="~/org",
+              help="Directory with .org files (default: ~/org)")
+@click.option("--dry-run", is_flag=True,
+              help="Preview without writing data")
+def org_sync(workspace_id: str, org_dir: str, dry_run: bool) -> None:
+    """One-shot sync of .org files to Spacetime Memory."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    try:
+        from org_sync_daemon import OrgSyncDaemon
+    except ImportError:
+        console.print("[red]Error: org_sync_daemon.py not found in scripts/[/red]")
+        sys.exit(1)
+
+    client = None if dry_run else _sdk_client()
+    daemon = OrgSyncDaemon(
+        org_dir=org_dir,
+        workspace_id=workspace_id,
+        client=client,
+        dry_run=dry_run,
+    )
+    total = daemon.scan()
+    _quiet_print(f"[green]Org sync complete — {total} events synced.[/green]")
+    if dry_run:
+        _quiet_print("[dim](dry-run — no data written)[/dim]")
+    else:
+        s = daemon.get_status()
+        _quiet_print(f"[dim]Tracked {s['files_tracked']} file(s)[/dim]")
+
+
+@org.command(name="daemon")
+@click.argument("workspace_id")
+@click.option("--dir", "org_dir", default="~/org",
+              help="Directory with .org files (default: ~/org)")
+@click.option("--interval", default=30, type=int,
+              help="Poll interval in seconds (default: 30)")
+@click.option("--dry-run", is_flag=True,
+              help="Preview without writing data")
+@click.option("--daemonize/--no-daemonize", default=False,
+              help="Fork to background (Unix only)")
+def org_daemon(workspace_id: str, org_dir: str,
+               interval: int, dry_run: bool, daemonize: bool) -> None:
+    """Start the org sync daemon (continuous watch)."""
+    if daemonize:
+        pid = os.fork()
+        if pid > 0:
+            _quiet_print(f"[green]Org sync daemon started (PID: {pid})[/green]")
+            sys.exit(0)
+        os.setsid()
+
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+    try:
+        from org_sync_daemon import OrgSyncDaemon, _start_watchdog_observer
+    except ImportError:
+        console.print("[red]Error: org_sync_daemon.py not found in scripts/[/red]")
+        sys.exit(1)
+
+    client = None if dry_run else _sdk_client()
+    daemon = OrgSyncDaemon(
+        org_dir=org_dir,
+        workspace_id=workspace_id,
+        client=client,
+        interval=interval,
+        dry_run=dry_run,
+    )
+
+    # Try watchdog first
+    observer = _start_watchdog_observer(org_dir, daemon)
+    if observer is not None:
+        _quiet_print(f"[green]Watchdog observer started on {org_dir}[/green]")
+        try:
+            while observer.is_alive():
+                observer.join(timeout=1)
+        except KeyboardInterrupt:
+            observer.stop()
+        observer.join()
+    else:
+        # Polling fallback
+        _quiet_print(f"[green]Org sync daemon running (polling every {interval}s)[/green]")
+        if dry_run:
+            _quiet_print("[dim](dry-run — no data written)[/dim]")
+        daemon.run()
+
+
+@org.command(name="status")
+@click.option("--dir", "org_dir", default="~/org",
+              help="Directory with .org files (default: ~/org)")
+def org_status(org_dir: str) -> None:
+    """Show org sync state (tracked files, last sync)."""
+    try:
+        from org_sync_daemon import OrgSyncDaemon, STATE_FILE
+    except ImportError:
+        console.print("[red]Error: org_sync_daemon.py not found in scripts/[/red]")
+        sys.exit(1)
+
+    state_path = os.path.expanduser("~/.spacetime-memory/org_sync_state.json")
+    if not os.path.exists(state_path):
+        console.print("[yellow]No org sync state found. Run `stmem org sync` first.[/yellow]")
+        return
+
+    import time as _time
+
+    rows = []
+    try:
+        with open(state_path) as f:
+            state = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        console.print(f"[red]Error reading sync state: {e}[/red]")
+        return
+
+    last_mtime = os.path.getmtime(state_path) if os.path.exists(state_path) else 0
+    if last_mtime:
+        rows.append({
+            "key": "last_sync_time",
+            "value": _time.strftime("%Y-%m-%d %H:%M:%S", _time.localtime(last_mtime)),
+        })
+    rows.append({"key": "files_tracked", "value": str(len(state))})
+
+    for file_path, file_hash in sorted(state.items()):
+        short = file_path if len(file_path) < 80 else f"...{file_path[-77:]}"
+        rows.append({"key": f"file: {short}", "value": file_hash[:16] + "..."})
+
+    print_table(rows, title="Org Sync Status")
 
 
 # ===================================================================

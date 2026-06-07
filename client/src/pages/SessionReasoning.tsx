@@ -454,6 +454,12 @@ export default function SessionReasoning() {
   const [showFilters, setShowFilters] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [sharedSessionIds, setSharedSessionIds] = useState<Set<string>>(new Set());
+  const [sharingPeerId, setSharingPeerId] = useState<string>('');
+  const [shareStatus, setShareStatus] = useState<string>('');
+
   // Build lookup maps
   const peerMap = useMemo(() => {
     const map = new Map<string, PeerRow>();
@@ -650,6 +656,29 @@ export default function SessionReasoning() {
     alert('Re-activate would call update_session reducer. (Placeholder)');
   }
 
+  function handleShare() {
+    if (!selectedSession) return;
+    setShowShareModal(true);
+    setSharingPeerId('');
+    setShareStatus('');
+  }
+
+  function handleConfirmShare() {
+    if (!selectedSession || !sharingPeerId) return;
+    // In a real app this would call the join_session reducer
+    // For now we mark the session as shared in local state
+    setSharedSessionIds(prev => {
+      const next = new Set(prev);
+      next.add(selectedSession.id);
+      return next;
+    });
+    setShareStatus(`Shared with peer ${sharingPeerId.slice(0, 12)}...`);
+    setTimeout(() => {
+      setShowShareModal(false);
+      setShareStatus('');
+    }, 1500);
+  }
+
   // ─── Render ──────────────────────────────
 
   if (error) {
@@ -669,6 +698,7 @@ export default function SessionReasoning() {
   }
 
   return (
+    <>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -848,11 +878,13 @@ export default function SessionReasoning() {
                     session={selectedSession}
                     participants={selectedParticipants}
                     duration={formatDuration(selectedSession.createdAt, selectedSession.updatedAt || undefined)}
+                    isShared={sharedSessionIds.has(selectedSession.id)}
                   />
                   <SessionActions
                     onExport={handleExportSession}
                     onCreateNote={handleCreateNote}
                     onReactivate={handleReactivate}
+                    onShare={handleShare}
                   />
                 </div>
                 <div className="flex-1 flex items-center justify-center">
@@ -871,11 +903,13 @@ export default function SessionReasoning() {
                     session={selectedSession}
                     participants={selectedParticipants}
                     duration={formatDuration(selectedSession.createdAt, selectedSession.updatedAt || undefined)}
+                    isShared={sharedSessionIds.has(selectedSession.id)}
                   />
                   <SessionActions
                     onExport={handleExportSession}
                     onCreateNote={handleCreateNote}
                     onReactivate={handleReactivate}
+                    onShare={handleShare}
                   />
                 </div>
 
@@ -1313,6 +1347,131 @@ export default function SessionReasoning() {
         </div>
       )}
     </div>
+
+    {/* Share modal */}
+    {showShareModal && selectedSession && (
+      <ShareModal
+        sessionId={selectedSession.id}
+        peers={peers}
+        onShare={handleConfirmShare}
+        onClose={() => { setShowShareModal(false); setShareStatus(''); }}
+        sharingPeerId={sharingPeerId}
+        setSharingPeerId={setSharingPeerId}
+        shareStatus={shareStatus}
+      />
+    )}
+  </>);
+}
+
+// ──────────────────────────────────────────────
+// ShareModal — share a session with workspace peers
+// ──────────────────────────────────────────────
+
+function ShareModal({
+  sessionId,
+  peers,
+  onShare,
+  onClose,
+  sharingPeerId,
+  setSharingPeerId,
+  shareStatus,
+}: {
+  sessionId: string;
+  peers: PeerRow[];
+  onShare: () => void;
+  onClose: () => void;
+  sharingPeerId: string;
+  setSharingPeerId: (id: string) => void;
+  shareStatus: string;
+}) {
+  // Filter to only user-type peers for sharing
+  const shareablePeers = peers.filter(p => p.peerType === 'user' || p.peerType === 'agent');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div
+        className="bg-card border border-border rounded-lg shadow-lg w-96 max-w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            Share Session
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Select a workspace peer to share this session with:
+          </p>
+
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {shareablePeers.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-2">
+                No shareable peers found. Create a peer first.
+              </p>
+            ) : (
+              shareablePeers.map((peer) => (
+                <label
+                  key={peer.id}
+                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                    sharingPeerId === peer.id
+                      ? 'bg-primary/10 border border-primary/30'
+                      : 'hover:bg-accent/50 border border-transparent'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="sharePeer"
+                    value={peer.id}
+                    checked={sharingPeerId === peer.id}
+                    onChange={(e) => setSharingPeerId(e.target.value)}
+                    className="accent-primary"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm">{peer.name || peer.id.slice(0, 16)}</span>
+                    <span className="text-[10px] text-muted-foreground">({peer.peerType})</span>
+                  </div>
+                </label>
+              ))
+            )}
+          </div>
+
+          {shareStatus && (
+            <div className="text-xs text-green-600 dark:text-green-400 bg-green-100/20 dark:bg-green-900/20 rounded px-2 py-1">
+              {shareStatus}
+            </div>
+          )}
+
+          <div className="text-[10px] text-muted-foreground bg-muted/50 rounded p-2">
+            Session ID: {sessionId.slice(0, 16)}...
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 p-4 border-t border-border">
+          <Button variant="ghost" size="sm" onClick={onClose} className="text-xs h-8">
+            Cancel
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onShare}
+            disabled={!sharingPeerId || !!shareStatus}
+            className="text-xs h-8"
+          >
+            <Users className="h-3.5 w-3.5 mr-1" />
+            Share
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1324,18 +1483,28 @@ function SessionDetailHeader({
   session,
   participants,
   duration,
+  isShared,
 }: {
   session: SessionRow;
   participants: PeerRow[];
   duration: string;
+  isShared?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold">
-            {session.name || 'Unnamed Session'}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">
+              {session.name || 'Unnamed Session'}
+            </h2>
+            {isShared && (
+              <Badge variant="default" className="shrink-0 text-[10px] bg-blue-500/20 text-blue-600 border-blue-400 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
+                <Users className="h-3 w-3 mr-1" />
+                Shared
+              </Badge>
+            )}
+          </div>
           {session.summary && (
             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
               {session.summary}
@@ -1381,13 +1550,26 @@ function SessionActions({
   onExport,
   onCreateNote,
   onReactivate,
+  onShare,
 }: {
   onExport: () => void;
   onCreateNote: () => void;
   onReactivate: () => void;
+  onShare?: () => void;
 }) {
   return (
     <div className="flex items-center gap-2 mt-3 flex-wrap">
+      {onShare && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onShare}
+          className="text-xs h-8"
+        >
+          <Users className="h-3.5 w-3.5 mr-1" />
+          Share
+        </Button>
+      )}
       <Button
         variant="outline"
         size="sm"
