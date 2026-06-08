@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+### Drop-in Adapters
+
+- **Graphiti-compatible adapter** — `spacetime_memory.sdks.graphiti.Graphiti`
+  — `add_triplet()`, `add_episode()`, `search()`, `search_()`,
+  `get_entity_edge_summary()`, `remove_episode()`, `build_communities()`.
+  Maps Graphiti's entity-node/entity-edge API onto StmDB's knowledge graph
+  (kg_node/kg_edge tables) with label-based dedup. 15 integration tests.
+
+- **LangChain/LangGraph BaseStore adapter** — `spacetime_memory.sdks.langchain`
+  — `StmemStore` implements LangGraph's `BaseStore` (get/put/delete/search/
+  list_namespaces/batch) with namespace→workspace mapping and hybrid search.
+  `StmemMemoryStore` implements LangChain's `BaseStore` (mget/mset/mdelete/
+  yield_keys). 17 integration tests. Optional `[langchain]` extras.
+
+- **Zep-compatible adapter** — `spacetime_memory.sdks.zep.Zep`
+  — Session-based memory API: `add()`, `get()`, `delete()`, session CRUD,
+  search, messages, facts. 18 integration tests.
+
+### SDK & Packaging
+
+- **PyPI packaging** — setup.py version bumped to 0.4.0. Added `[langchain]`
+  and `[all]` extras for optional LangChain/LangGraph dependencies.
+- **All 4 planned adapters shipped** — Mem0 (existing), Graphiti, LangChain,
+  Zep. Full drop-in coverage of the most-used memory library APIs.
+
 ## 0.2.0 (unreleased)
 
 ### Features

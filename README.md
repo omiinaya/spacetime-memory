@@ -11,21 +11,18 @@
 
 ---
 
-**Spacetime Memory** is a unified memory layer for AI agents inspired by:
+**Spacetime Memory** is a unified memory layer for AI agents with **drop-in adapters** for the most popular memory library APIs.
 
-| Project | Features Incorporated |
-|---|---|
-| [Mem0](https://github.com/mem0ai/mem0) | Multi-level memory (user/session/agent), entity linking, temporal reasoning, hybrid retrieval, **drop-in SDK adapter** |
-| [Hindsight](https://github.com/vectorize-io/hindsight) | Biomimetic memory model (world facts, experiences, mental models), retain/recall/reflect operations, multi-strategy retrieval, **drop-in SDK adapter** |
-| [Honcho](https://github.com/plastic-labs/honcho) | Peer-centric entity model, session context, reasoning-first memory, multi-peer perspectives, **drop-in SDK adapter** |
-| [Graphify](https://github.com/safishamsi/graphify) | Knowledge graphs with community detection, god nodes, edge confidence tagging, BFS/shortest-path traversal, **MCP-compatible tools** |
-| [Understand Anything](https://github.com/Lum1104/Understand-Anything) | Codebase knowledge graph, interactive dashboard, diff impact analysis, guided tours |
-| [Supermemory](https://github.com/supermemoryai/supermemory) | User profiles with static/dynamic facts, hybrid search (RAG + memory), connectors, MCP server |
-| [CLI-Anything](https://github.com/HKUDS/CLI-Anything) | CLI harness patterns for agent-native interfaces |
-| [OpenViking](https://github.com/volcengine/OpenViking) | Filesystem paradigm context database, tiered context loading (L0/L1/L2), directory recursive retrieval, visualized retrieval trajectories |
-| [RetainDB](https://github.com/RetainDB/RetainDB) | Memory reinforcement (strength/access counts), delta compression, consolidation (dedup/rollup/decay), temporal validity, versioned memories, context router |
-| [Holographic](https://github.com/Def-AI/Holographic) | Trust scoring through user feedback, memory reputation and reliability scoring, feedback-driven reinforcement |
-| [ByteRover](https://github.com/ByteRover) | Knowledge curation pipelines, smart-query builders, intelligent memory recall, cross-referencing |
+| Project | Adapter | API Surface |
+|---------|---------|------------|
+| [Mem0](https://github.com/mem0ai/mem0) | `sdks.mem0.Memory` | `add()`, `search()`, `get()`, `get_all()`, `update()`, `delete()`, `delete_all()`, `history()` |
+| [Graphiti](https://github.com/getzep/graphiti) | `sdks.graphiti.Graphiti` | `add_triplet()`, `add_episode()`, `search()`, `search_()`, `get_entity_edge_summary()`, `remove_episode()`, `build_communities()` |
+| [LangGraph](https://langchain-ai.github.io/langgraph/) / [LangChain](https://python.langchain.com/) | `sdks.langchain.StmemStore` / `StmemMemoryStore` | `get/put/delete/search/list_namespaces/batch` (LangGraph BaseStore), `mget/mset/mdelete/yield_keys` (LangChain BaseStore) |
+| [Zep](https://www.getzep.com/) | `sdks.zep.Zep` | `add()`, `get()`, `delete()`, sessions CRUD, search, messages, facts |
+| [Hindsight](https://github.com/vectorize-io/hindsight) | `sdks.hindsight.Hindsight` | `retain()`, `recall()`, `reflect()`, `forget()` |
+| [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | `create_user()`, `create_session()`, `add()`, `search()`, `get_user_memories()` |
+
+Plus native features inspired by many projects (see below).
 
 ## Architecture
 

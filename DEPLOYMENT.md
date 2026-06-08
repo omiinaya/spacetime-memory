@@ -15,6 +15,37 @@
 
 ---
 
+## Quick Start (Python SDK)
+
+```bash
+# Install from PyPI
+pip install spacetime-memory
+
+# With LangChain/LangGraph support
+pip install "spacetime-memory[langchain]"
+
+# All extras
+pip install "spacetime-memory[all]"
+```
+
+### Running
+
+You need a running SpacetimeDB instance with the module published.
+The quickest way is Docker (see below).
+
+```python
+from spacetime_memory import Client
+
+client = Client()
+ws_id = client.create_workspace("my-workspace")["id"]
+client.store(ws_id, "Hello, world!")
+
+# Use drop-in adapters
+from spacetime_memory.sdks.mem0 import Memory as Mem0Memory
+m = Mem0Memory()
+m.add("I like pizza", user_id="alice")
+```
+
 ## Quick Start (Docker)
 
 **Prerequisites:** Docker Engine 24+ and Docker Compose v2.
