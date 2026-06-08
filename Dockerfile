@@ -9,10 +9,11 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/li
 COPY server/embedder/Cargo.toml server/embedder/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 # Cache dependencies
-RUN cargo build --release 2>/dev/null; true
+RUN cargo build --release 2>/dev/null || true
 COPY server/embedder/src/ src/
-# Force rebuild of our actual code
-RUN touch src/main.rs && cargo build --release
+# Force rebuild of our actual code with retry for network flakes
+RUN touch src/main.rs && \
+    for i in 1 2 3; do cargo build --release && break; sleep 5; done
 
 # ============================================================================
 # Stage 2: Build the SpacetimeDB module (Rust → wasm)
