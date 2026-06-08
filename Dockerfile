@@ -3,7 +3,7 @@
 # ============================================================================
 # Stage 1: Build the ONNX embedder sidecar (Rust binary, listens :9090)
 # ============================================================================
-FROM rust:1.80-slim AS embedder-builder
+FROM rust:1-slim AS embedder-builder
 ENV CARGO_NET_RETRY=5 \
     CARGO_HTTP_TIMEOUT=120 \
     CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
@@ -24,7 +24,7 @@ RUN touch src/main.rs && \
 # ============================================================================
 # Stage 2: Build the SpacetimeDB module (Rust → wasm)
 # ============================================================================
-FROM rust:1.80-slim AS module-builder
+FROM rust:1-slim AS module-builder
 ENV CARGO_NET_RETRY=5 \
     CARGO_HTTP_TIMEOUT=120 \
     CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
