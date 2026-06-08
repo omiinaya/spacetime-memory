@@ -288,9 +288,13 @@ class SpacetimeMemoryProvider(MemoryProvider):
         port = cfg["port"]
         import urllib.request
         try:
-            # SpacetimeDB standalone doesn't serve /health; just verify the server responds
-            req = urllib.request.Request(f"http://{host}:{port}/", method="HEAD")
-            urllib.request.urlopen(req, timeout=3)
+            # SpacetimeDB standalone returns 404 for HEAD / — accept any response
+            # as proof the server is reachable. Use a socket connect check instead.
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(3)
+            s.connect((host, int(port)))
+            s.close()
             return True
         except Exception:
             return False
