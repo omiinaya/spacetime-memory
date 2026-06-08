@@ -282,13 +282,15 @@ class SpacetimeMemoryProvider(MemoryProvider):
         return "spacetime"
 
     def is_available(self) -> bool:
-        """Quick availability — checks if we can reach the SpacetimeDB HTTP API."""
+        """Quick availability — checks if SpacetimeDB HTTP API is reachable."""
         cfg = _load_config()
         host = cfg["host"]
         port = cfg["port"]
         import urllib.request
         try:
-            resp = urllib.request.urlopen(f"http://{host}:{port}/health", timeout=3)
+            # SpacetimeDB standalone doesn't serve /health; just verify the server responds
+            req = urllib.request.Request(f"http://{host}:{port}/", method="HEAD")
+            urllib.request.urlopen(req, timeout=3)
             return True
         except Exception:
             return False
