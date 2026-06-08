@@ -154,7 +154,7 @@ class Client:
         )
         self.embedder_type = (
             embedder_type
-            or os.environ.get("EMBEDDER_TYPE", "auto")
+            or os.environ.get("EMBEDDER_TYPE") or self._default_embedder_type()
         )
         self.verbose = verbose
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
@@ -360,6 +360,18 @@ class Client:
             raise RuntimeError(friendly)
         return {"status": "ok"}
 
+    @staticmethod
+    def _default_embedder_type() -> str:
+        """Choose a sensible default based on environment.
+        If OPENAI_API_KEY is set, default to openai so the sidecar
+        is not tried first on every store call.
+        """
+        if os.environ.get('OPENAI_API_KEY'):
+            return 'openai'
+        return 'auto'
+
+    _DEFAULT_EMBEDDER_URL = 'http://localhost:9090'
+
     def _embed(self, text: str) -> list[float]:
         """Get an embedding vector.
 
@@ -375,6 +387,12 @@ class Client:
             return self._embed_local(text)
 
         # "auto" — try local, fall back to OpenAI
+        # Skip local trial when EMBEDDER_URL is the default and a cloud
+        # API key is available — no point waiting for a connection timeout.
+        if self.embedder_url == self._DEFAULT_EMBEDDER_URL and os.environ.get('OPENAI_API_KEY'):
+            result = self._embed_openai(text)
+            if result:
+                return result
         try:
             return self._embed_local(text)
         except EmbedderUnavailableError:

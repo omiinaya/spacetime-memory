@@ -1950,3 +1950,110 @@ class OrgModeParser(Connector):
             "todo_state": todo_state,
             "tags": tags,
         }
+
+
+# ── Connector Daemon ────────────────────────────────────────────
+
+
+class ConnectorDaemon:
+    """Background daemon that loads connector configs from the database
+    and runs them in a poll loop.
+
+    Usage::
+
+        daemon = ConnectorDaemon(client)
+        daemon.start()  # blocks until interrupted
+    """
+
+    def __init__(self, client, db_poll_secs=60):
+        self.client = client
+        self.db_poll_secs = db_poll_secs
+        self._runners = {}
+        self._running = False
+
+    def _load_configs(self):
+        """Fetch active connector configs from the database."""
+        rows = self.client._sql(
+            "SELECT id, name, connector_type, config_json, "
+            "workspace_id, schedule_secs FROM connector_config "
+            "WHERE is_active = true"
+        )
+        return rows
+
+    def _build_connector(self, cfg):
+        """Build a Connector instance from a config row."""
+        import json
+        conn_type = cfg["connector_type"]
+        params = json.loads(cfg.get("config_json", "{}"))
+        ws = cfg["workspace_id"]
+
+        if conn_type == "rss":
+            from .connectors import RssFeedConnector
+            return RssFeedConnector(feed_url=params.get("feed_url", ""), workspace_id=ws)
+        elif conn_type == "github":
+            from .connectors import GitHubConnector
+            return GitHubConnector(token=params.get("token", ""), username=params.get("username", ""), workspace_id=ws)
+        elif conn_type == "twitter":
+            from .connectors import TwitterConnector
+            return TwitterConnector(bearer_token=params.get("bearer_token", ""), user_id=params.get("user_id", ""), workspace_id=ws)
+        elif conn_type == "slack":
+            from .connectors import SlackConnector
+            return SlackConnector(token=params.get("token", ""), channel_ids=params.get("channel_ids", []), workspace_id=ws)
+        elif conn_type == "discord":
+            from .connectors import DiscordConnector
+            return DiscordConnector(token=params.get("token", ""), channel_ids=params.get("channel_ids", []), workspace_id=ws)
+        else:
+            raise ValueError(f"Unknown connector type: {conn_type}")
+
+    def start(self):
+        """Run the daemon loop. Blocks until KeyboardInterrupt."""
+        import logging
+        logger = logging.getLogger(__name__)
+        self._running = True
+        logger.info("Connector daemon starting...")
+
+        while self._running:
+            try:
+                configs = self._load_configs()
+                active_ids = {c["id"] for c in configs}
+
+                for cid in list(self._runners):
+                    if cid not in active_ids:
+                        logger.info("Removing connector %s", cid)
+                        del self._runners[cid]
+
+                for cfg in configs:
+                    cid = cfg["id"]
+                    if cid not in self._runners:
+                        try:
+                            conn = self._build_connector(cfg)
+                            logger.info("Starting connector %s (%s, %ss interval)", cfg["name"], cfg["connector_type"], cfg["schedule_secs"])
+                            self._runners[cid] = conn
+                        except Exception as e:
+                            logger.error("Failed to build connector %s: %s", cid, e)
+
+                for cid, conn in list(self._runners.items()):
+                    try:
+                        events = conn.poll()
+                        for ev in events:
+                            try:
+                                conn.on_event(ev, self.client)
+                            except Exception as e:
+                                logger.error("Event handler error for %s: %s", cid, e)
+                        if events:
+                            logger.info("Connector %s: %d events", cid, len(events))
+                    except Exception as e:
+                        logger.error("Poll error for %s: %s", cid, e)
+
+            except Exception as e:
+                logger.error("Daemon tick error: %s", e)
+
+            for _ in range(self.db_poll_secs):
+                if not self._running:
+                    break
+                import time
+                time.sleep(1)
+
+    def stop(self):
+        """Gracefully stop the daemon."""
+        self._running = False

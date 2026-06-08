@@ -1168,6 +1168,64 @@ def connector_run(rss: str | None, workspace_id: str,
         _quiet_print("[green]Connector finished.[/green]")
     else:
         console.print("[yellow]No connector specified. Use --rss <url>[/yellow]")
+
+@connector.command(name="register")
+@click.option("--name", required=True, help="Connector name")
+@click.option("--type", "conn_type", required=True, help="Connector type: rss, github, twitter, slack, discord")
+@click.option("--config", default="{}", help="JSON config blob for the connector")
+@click.option("--workspace-id", required=True, help="Target workspace ID")
+@click.option("--interval", default=300, type=int, help="Poll interval (seconds)")
+def connector_register(name: str, conn_type: str, config: str, workspace_id: str, interval: int) -> None:
+    """Register a connector config in the database."""
+    client = _sdk_client()
+    # Validate JSON
+    try:
+        import json
+        json.loads(config)
+    except json.JSONDecodeError as e:
+        console.print(f"[red]Invalid config JSON: {e}[/red]")
+        sys.exit(1)
+    result = client._call("register_connector", [name, conn_type, config, workspace_id, interval])
+    console.print(f"[green]Connector '{name}' registered.[/green]")
+    if result.get("id"):
+        console.print(f"  ID: {result['id']}")
+
+
+@connector.command(name="list")
+def connector_list() -> None:
+    """List registered connectors."""
+    client = _sdk_client()
+    rows = client._sql(
+        "SELECT id, name, connector_type, workspace_id, "
+        "schedule_secs, is_active, created_at "
+        "FROM connector_config"
+    )
+    if not rows:
+        console.print("[yellow]No connectors registered.[/yellow]")
+        return
+    headers = ["Name", "Type", "Workspace", "Interval", "Active", "ID"]
+    table_data = [
+        [r["name"], r["connector_type"], r["workspace_id"][:12]+"...",
+         f"{r['schedule_secs']}s", "Y" if r["is_active"] else "N", r["id"][:16]]
+        for r in rows
+    ]
+    print_table(table_data, headers=headers, title="Connectors")
+
+
+@connector.command(name="start")
+@click.option("--db-poll", default=60, type=int, help="DB poll interval (seconds)")
+def connector_start(db_poll: int) -> None:
+    """Start the connector daemon. Polls DB for configs and runs all active connectors."""
+    from spacetime_memory.connectors import ConnectorDaemon
+    client = _sdk_client()
+    daemon = ConnectorDaemon(client, db_poll_secs=db_poll)
+    try:
+        daemon.start()
+    except KeyboardInterrupt:
+        daemon.stop()
+        console.print("\n[yellow]Connector daemon stopped.[/yellow]")
+
+
         sys.exit(1)
 
 
