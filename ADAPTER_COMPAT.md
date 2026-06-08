@@ -193,7 +193,7 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 | Honcho | 579 | 21 | ~80% |
 | LangChain | 778 | 16 | ~85% |
 
-**Overall: ~80% coverage across all adapters.**
+**Overall: ~83% coverage across all adapters.**
 
 Core CRUD operations are fully supported for all adapters. The remaining gaps
 are generally advanced capabilities of the upstream projects.
