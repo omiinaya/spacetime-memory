@@ -1,77 +1,308 @@
-# Spacetime Memory — Production Roadmap
+# Spacetime Memory — Roadmap
 
-**Current state:** v0.6.0. 181 tests passing. All core CRUD works against real SpacetimeDB. ACL with anonymous bypass + JWT support. Hermes Agent plugin functional but untested e2e.
+**Goal:** production-grade unified memory backend with genuine drop-in adapter parity.
 
-**Target:** Verified, deployed, Hermes-integrated memory backend.
+**Completed recently (June 8, 2026):**
+- ✅ Hermes plugin `is_available()` fixed (socket connect, was broken HTTP HEAD)
+- ✅ Hermes plugin e2e verified — store→search→retrieve round-trips work against live STDB
+- ✅ Roadmaps synced across spacetime-llm and spacetime-memory repos
 
----
+**Prioritized next:**
 
-## Current Reality — June 8, 2026
+| # | Task | Effort |
+|---|------|--------|
+| 1 | Docker build verification | 2 hr |
+| 2 | Hermes deep integration (sync_turn, prefetch, workspace isolation) | 3 hr |
+| 3 | Spaces/ACL UI | 1 day |
+| 4 | Adapter source consolidation (langchain/graphiti/zep tests exist, sources scattered) | 1 hr |
+| 5 | Integration tests against real STDB | 1 day |
 
-| Area | Verdict | Reality |
-|---|---|---|
-| **STDB module** | ✅ Solid | 27 source files, 138 public reducers, 0 `todo!()` macros. No dead code flags. |
-| **Tests** | ✅ 181 passing | 74 unit + 21 integration + adapter suites. Mock-based, runs in CI. |
-| **Frontend** | 🟡 21/23 pages real | 21 pages fetch live data. 11 pages still have hardcoded arrays mixed in (BlockGraph, SmartQuery, GraphViz, TrajectoryViz worst). Dashboard is empty shell. |
-| **Adapters** | 🟡 4 built, source scattered | Mem0 adapter at `sdk/adapters/mem0/`. LangChain, Graphiti, Zep adapter source files missing from `sdk/adapters/` — tests exist at `sdk/python/tests/` but source location unclear. |
-| **Hermes plugin** | 🟡 Fixed but untested | 703 lines, 32 methods, 5 tools (`spacetime_search`, `spacetime_store`, `spacetime_notes`, `spacetime_kg`, `spacetime_profile`). `is_available()` fixed. Never tested e2e against running STDB. |
-| **Docker** | 🟡 Untested | Dockerfile + compose exist, never verified. Multi-stage build (embedder + module + frontend). JWT key generation at build time. `.dockerignore` fixed. |
-| **Embedder** | ✅ Working | ONNX all-MiniLM-L6-v2 (384d). Health check at :9090/health. Error logging added. Model downloaded at Docker build time. |
-| **Python SDK** | ✅ Solid | Retry with backoff, JWT auth, structured logging. Full CRUD for all table types. LIKE workaround (client-side filter). |
-| **ACL** | ✅ Functional | Anonymous bypass for unauthenticated peers. JWT-based identity for authenticated. `create_workspace` auto-grants owner. Graceful permission model. |
-| **Replication** | ✅ Built | Cross-instance sync: `ReplicationPeer` table, mutation log, Python daemon. CLI commands. |
-| **Backup/Restore** | ✅ Built | `export_backup` + `restore_backup` reducers. CLI: `export <ws> [--output]`, `import <ws> <file>`. Cron wrapper for auto-cleanup. |
-| **Connectors** | ✅ Built | Plugin-style framework: `RssFeedConnector`, `GitHubConnector`, `TwitterConnector`, `WebhookConnector`. `ConnectorRegistry` with polling. |
-| **Plugin system** | ✅ Built | `PluginManager` with lifecycle hooks, discovery, dependency auto-install. CLI: `stmem plugin list|load|unload|reload`. |
-
----
-
-## Prioritized Next Steps
-
-### Q0 — Wire What's Already Built (1-2 hours)
-
-| # | Task | Problem | Effort |
-|---|------|---------|--------|
-| Q0a | **Hermes plugin e2e validation** | Plugin is "fixed" but never tested against live STDB. Fire all 5 tools, verify round-trips. | 30 min |
-| Q0b | **Locate adapter source files** | LangChain/Graphiti/Zep tests reference adapter classes. Sources not in `sdk/adapters/`. Find and consolidate. | 20 min |
-| Q0c | **Dashboard → live data** | Dashboard.tsx has 0 fetches. Wire to tables that already exist: workspace count, peer count, memory count, session count. | 30 min |
-
-### Q1 — Frontend Polish (1-2 days)
-
-| # | Task | Problem | Effort |
-|---|------|---------|--------|
-| 1a | **Hardcoded data scrub** | 11 pages mix real fetches with hardcoded arrays. Replace with `useTable` subscriptions or fetches. Priority: BlockGraph (6), SmartQuery (5), GraphViz (4), TrajectoryViz (4). | 4 hr |
-| 1b | **Observability dashboard** | No way to see memory stats. Add: total memories, embeddings, searches/day, kg nodes/edges, session count. Tables already exist. | 2 hr |
-| 1c | **Spaces/ACL UI** | Permission table exists. No UI to manage workspace members. Add member management to Settings. | 3 hr |
-
-### Q2 — Integration & Deployment (2-3 days)
-
-| # | Task | Problem | Effort |
-|---|------|---------|--------|
-| 2a | **Docker build verification** | Dockerfile + compose exist, never built. Verify `docker compose up --build` works, passes smoke test. | 2 hr |
-| 2b | **Integration tests against real STDB** | 181 tests are all mocked. Add 5 E2E tests: store+search, auth+ACL, connector→memory, plugin→STDB, backup→restore. | 1 day |
-| 2c | **CI Docker job** | Add Docker build + smoke test to CI. Catches regressions. | 1 hr |
-
-### Q3 — Hermes Deep Integration (1 week)
-
-| # | Task | Problem | Effort |
-|---|------|---------|--------|
-| 3a | **Plugin sync_turn verification** | `sync_turn()` stores conversation turns as memories. Verify with real Hermes session. Check content, metadata, timestamps. | 2 hr |
-| 3b | **Plugin prefetch → context injection** | `prefetch()` searches for relevant memories before each LLM call. Verify results appear in system prompt. | 2 hr |
-| 3c | **Multi-workspace isolation** | Hermes uses per-session workspaces. Verify different sessions don't leak memories. | 2 hr |
-| 3d | **Cron consolidation integration** | The `consolidate.py` cron script (30m interval) should run against the same STDB Hermes uses. Wire and verify. | 2 hr |
+| Phase | Theme | Lanes | Effort |
+|-------|-------|-------|--------|
+| I | Ship It Properly | 1–4 | 2 weeks |
+| II | Adapter Parity | 5–10 | 3 weeks |
+| III | Production Polish | 11–15 | 2 weeks |
+| IV | Ecosystem | 16–19 | ongoing |
 
 ---
 
-## Effort Summary
+## Phase I — Ship It Properly (foundations)
 
-| Phase | Wall Time | Delivers |
-|-------|-----------|----------|
-| **Q0 — Wire** | 1-2 hr | Hermes plugin verified, adapters located, dashboard lit |
-| **Q1 — Polish** | 1-2 days | No hardcoded data, observability dashboard, ACL UI |
-| **Q2 — Deployment** | 2-3 days | Docker verified, E2E tests, CI Docker job |
-| **Q3 — Hermes** | 1 week | Full memory lifecycle verified in Hermes Agent |
+Every lane below blocks everything above it.
+
+### Lane 1 — Test infrastructure that actually works
+
+**What:** The module must be auto-published in CI before integration tests run.
+**Why:** Right now tests fail with "No such database" because the published module is stale. This makes CI and local dev unreliable.
+
+- [ ] `pytest` fixture that calls `spacetime publish` against the standalone before integration tests
+- [ ] Skip integration tests (require standalone) vs unit tests (mock-only) cleanly with markers
+- [ ] Clean data dir per test run to prevent cross-test contamination
+- [ ] CI pipeline (GitHub Actions): Rust build + publish + pytest integration + pytest adapter tests
+- [ ] CI runs on every push to main + PRs
+
+**Files:** `sdk/python/tests/conftest.py`, `.github/workflows/test.yml`
+
+### Lane 2 — Version pinning & dependency hardening
+
+**What:** Pin exact versions of SpacetimeDB CLI, Rust toolchain, Python deps. Auto-detect mismatch.
+**Why:** The CLI says v2.4.0 but standalone server is v2.4.1. These drift silently and break everything.
+
+- [ ] `.spacetime-version` file with expected SpacetimeDB CLI + standalone version
+- [ ] `scripts/check-version.py` that verifies CLI, standalone, and Rust deps at startup
+- [ ] Rust `rust-toolchain.toml` with pinned channel
+- [ ] Python `requirements.txt` with pinned + hashed deps
+- [ ] Docker images that match pinned versions exactly
+
+**Files:** `server/spacetimedb/rust-toolchain.toml`, `sdk/python/requirements.txt`, `.spacetime-version`
+
+### Lane 3 — Compatibility matrix
+
+**What:** Document, per adapter method, what's Supported / Mapped / Not Supported.
+**Why:** Users need to decide upfront if this project fits their use case instead of discovering gaps mid-migration.
+
+- [ ] Create `ADAPTER_COMPAT.md` with a table per adapter:
+
+| Method | Status | Notes |
+|--------|--------|-------|
+| `add()` | ✅ Mapped | → `store_memory` |
+| `search()` | ✅ Mapped | → `hybrid_search` |
+| `get()` | ✅ Mapped | → SQL query by id |
+| `batch_update()` | ❌ Missing | Not yet implemented |
+
+- [ ] Add status badges per adapter to README
+- [ ] Add automated tests that enforce the matrix (each "Supported" method has a test)
+
+**Files:** `ADAPTER_COMPAT.md`, `sdk/python/tests/test_compat_matrix.py`
+
+### Lane 4 — Kill silent failures
+
+**What:** Every operation that fails should surface clearly, not silently no-op.
+**Why:** The embedder and some reducer paths can fail silently or with confusing messages.
+
+- [ ] Audit all adapter methods for hidden no-ops (methods that accept args but never use them)
+- [ ] Add structured error wrapping so Python errors trace back to the exact reducer call
+- [ ] Logging should be on by default for unexpected failures, off for normal operation
+- [ ] Every adapter method documents which SpacetimeDB error it surfaces
+
+**Files:** `sdk/python/spacetime_memory/sdks/*.py`
 
 ---
 
-*Last updated: June 8, 2026. Replaces ROADMAP-PRODUCTION.md (now superseded).*
+## Phase II — Adapter Parity
+
+### Lane 5 — Mem0 parity
+
+**Current:** 10 methods. Missing modern Mem0 features.
+
+**Gaps to fill (by severity):**
+
+| Method | Priority | Why |
+|--------|----------|-----|
+| `batch_update()` | High | Mem0 callers batch frequently |
+| `create_memory_tool()` | Medium | LangChain tool integration |
+| Memory `metadata` dedup across adds | Medium | Mem0 re-uses existing memories |
+| `get_history()` more complete | Low | Already have `history()` |
+| Custom LLM config support | Low | Mem0 allows per-user model config |
+
+**Also:** The standalone adapter at `sdk/adapters/mem0/` duplicates the SDK adapter at `sdk/python/spacetime_memory/sdks/mem0.py`. Pick one, delete the other, or document the difference.
+
+**Files:** `sdk/python/spacetime_memory/sdks/mem0.py`, `sdk/adapters/mem0/`, `sdk/python/tests/test_mem0_adapter.py`
+
+### Lane 6 — Zep parity
+
+**Current:** 12 methods. Missing facts and Cloud-specific features.
+
+**Gaps to fill:**
+
+| Method | Priority | Why |
+|--------|----------|-----|
+| `add_fact()` / `list_facts()` | High | Zep's core value prop |
+| `update_memory()` in Zep | Medium | Zep supports memory update |
+| `search_memory()` with `min_score` | Medium | Missing filter param |
+| `summarize_memory()` | Low | Zep Cloud feature |
+| Session classification | Low | Zep classifies sessions |
+
+**Files:** `sdk/python/spacetime_memory/sdks/zep.py`, `sdk/python/tests/test_zep_adapter.py`
+
+### Lane 7 — Graphiti parity
+
+**Current:** 15 methods. Best adapter but still missing features.
+
+**Gaps to fill:**
+
+| Method | Priority | Why |
+|--------|----------|-----|
+| Temporal edge diff tracking | High | Graphiti's unique feature |
+| `node_expansion()` | Medium | Returns expanded nodes |
+| `search()` with time range filter | Medium | Important for temporal queries |
+| Entity dedup during add_triplet | Medium | Graphiti dedups entities |
+| Community summary text | Low | LLM-generated summary per community |
+
+**Files:** `sdk/python/spacetime_memory/sdks/graphiti.py`, `sdk/python/tests/test_graphiti_adapter.py`
+
+### Lane 8 — Hindsight parity
+
+**Current:** 11 methods. Most complete adapter.
+
+**Gaps to fill:**
+
+| Method | Priority | Why |
+|--------|----------|-----|
+| `reflect()` with custom prompt templates | Medium | Hindsight supports template-based reflection |
+| `batch_retain()` dedup | Low | Minor optimization |
+| `stats()` more detailed | Low | Show tier distribution, etc. |
+
+**Files:** `sdk/python/spacetime_memory/sdks/hindsight.py`, `sdk/python/tests/test_hindsight_adapter.py` (new)
+
+### Lane 9 — Honcho parity
+
+**Current:** 21 methods. Good coverage.
+
+**Gaps to fill:**
+
+| Method | Priority | Why |
+|--------|----------|-----|
+| Session-level memory visibility | Medium | Honcho's `session.memories` |
+| User metadata API | Low | Honcho stores user metadata |
+| Memory update timestamp | Low | Already covered by backend |
+
+**Files:** `sdk/python/spacetime_memory/sdks/honcho.py`, `sdk/python/tests/test_honcho_adapter.py` (new)
+
+### Lane 10 — LangChain parity
+
+**Current:** 16 methods. Good coverage of BaseStore + BaseVectorStore.
+
+**Gaps to fill:**
+
+| Method | Priority | Why |
+|--------|----------|-----|
+| `BaseChatMemory` wrapper | Medium | Facilitates chat history use with LangChain |
+| `AIMessage` content dedup | Low | Edge case in chat history |
+
+**Files:** `sdk/python/spacetime_memory/sdks/langchain.py`, `sdk/python/tests/test_langchain_adapter.py`
+
+---
+
+## Phase III — Production Polish
+
+### Lane 11 — HTTP gateway auth
+
+**What:** API key auth on the HTTP endpoints so you can expose the MCP server and Python SDK over a network without being wide open.
+**Why:** Currently anyone who can reach the port can call any reducer.
+
+- [ ] Python FastAPI/Starlette middleware that validates `Authorization: Bearer <key>` against `api_key` table
+- [ ] `stmem serve` or integrate into MCP server
+- [ ] CLI: `stmem auth create-key`, `stmem auth revoke-key`
+
+**Files:** `server/gateway/` (new), `cli/stmem.py`
+
+### Lane 12 — Performance benchmarks
+
+**What:** Measure latency and throughput so users know what to expect.
+**Why:** Every call goes Python → HTTP → SpacetimeDB SQL API → WASM. That's heavy. Without benchmarks, users can't evaluate.
+
+- [ ] Benchmark suite: `pytest --benchmark` or standalone script
+- [ ] Measure: single memory store, batch store, search (semantic, BM25, hybrid), graph queries
+- [ ] Compare to: direct Mem0/Zep/Hindsight calls (or publish numbers from other backends)
+- [ ] Document: "100ms per store call under X load"
+
+**Files:** `scripts/benchmark.py`, `docs/PERFORMANCE.md`
+
+### Lane 13 — Documentation site
+
+**What:** Real docs, not just a README.
+**Why:** The README is already 265 lines and growing. Migration guides, API reference, and deployment docs need a proper home.
+
+- [ ] MkDocs site under `docs/`
+- [ ] Quickstart (5-min setup)
+- [ ] Migration guides: from Mem0, from Zep, from Hindsight, from Honcho
+- [ ] API reference (auto-generated from docstrings or hand-written)
+- [ ] Deployment: Docker compose, bare-metal, SpacetimeDB Cloud
+- [ ] Hosted on GitHub Pages via CI
+
+**Files:** `docs/`, `mkdocs.yml`, `.github/workflows/docs.yml`
+
+### Lane 14 — Docker deployment
+
+**What:** One `docker compose up` that starts SpacetimeDB + embedder + MCP.
+**Why:** The Docker setup is overly complex (multi-stage builder, separate images for module and embedder) and the startup sequence is fragile.
+
+- [ ] Clean `compose.yaml` with health checks
+- [ ] Health check: wait for SpacetimeDB → publish module → wait for embedder → start MCP
+- [ ] `.env` file for config
+- [ ] Remove stale Docker build scripts (consolidate into `docker/`)
+
+**Files:** `compose.yaml`, `Dockerfile` (single if possible)
+
+### Lane 15 — Consolidated adapter package
+
+**What:** One import path, no split between `sdk/python/` and `sdk/adapters/`.
+**Why:** The standalone Mem0 adapter in `sdk/adapters/mem0/` duplicates the SDK adapter and there's no clear split.
+
+- [ ] Decide: drop standalone adapter, or keep as separate thin wrapper
+- [ ] If keeping standalone, document the distinction
+- [ ] Publish to PyPI as `spacetime-memory` (or `stmem`)
+
+---
+
+## Phase IV — Ecosystem
+
+### Lane 16 — Connector polish
+
+**What:** The connector framework exists (RSS, GitHub, Twitter, Webhook, Slack, Discord) but needs production hardening.
+**Why:** Connectors are the main data ingestion path.
+
+- [ ] Retry with backoff for all HTTP-based connectors
+- [ ] Rate-limit awareness (GitHub API limits, Twitter/X rate limits)
+- [ ] Connector health status reporting
+- [ ] Tests for each connector type
+
+### Lane 17 — In-process embedder
+
+**What:** An optional pure-Python or ONNX-Runtime embedder to remove the Rust sidecar dependency.
+**Why:** The sidecar is a massive dependency (tract, all-MiniLM-L6-v2, must compile). Many users will want to skip it entirely.
+
+- [ ] `pip install spacetime-memory[local-embed]` with onnxruntime
+- [ ] ~10MB model download on first use
+- [ ] No separate server process needed
+
+### Lane 18 — Replication & HA
+
+**What:** Multi-node SpacetimeDB is experimental. Document the story and add support for the replication table.
+**Why:** The `replication_peer` and `replication_log` tables exist already but have no Python-level support and no docs.
+
+- [ ] Document how replication works with the existing tables
+- [ ] CLI commands: `stmem replication add-peer`, `stmem replication status`
+
+### Lane 19 — Community & contributions
+
+**What:** CONTRIBUTING.md, issue templates, RFC process for new adapters.
+
+- [ ] CONTRIBUTING.md with dev setup, test conventions, PR checklist
+- [ ] Issue templates: bug report, feature request, adapter request
+- [ ] Adapter authoring guide ("How to add a new drop-in adapter")
+
+---
+
+## Effort Estimate
+
+| Phase | Lanes | Estimated time | Parallelizable |
+|-------|-------|----------------|----------------|
+| I | 1–4 | 1–2 weeks | Partially (1→2→3→4 sequential) |
+| II | 5–10 | 2–3 weeks | Yes — each adapter is independent |
+| III | 11–15 | 1–2 weeks | Mostly parallel |
+| IV | 16–19 | Ongoing | Independent |
+
+**Total to "production-ready drop-in replacement": ~6–8 weeks focused.**
+
+---
+
+## Quick wins (can do today)
+
+| Task | Time |
+|------|------|
+| Publish module before integration tests | 30 min |
+| Add `ADAPTER_COMPAT.md` | 1 hour |
+| Kill the duplicate standalone adapter | 15 min |
+| Pin SpacetimeDB version in docs | 10 min |
