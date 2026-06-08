@@ -38,6 +38,7 @@ pub struct SpacePermission {
 pub fn create_workspace(ctx: &ReducerContext, name: String, description: String, id: String) -> Result<(), String> {
     let now = now_micros(ctx);
     let workspace_id = if id.is_empty() { uuid_v4(ctx) } else { id };
+    let caller = ctx.sender().to_hex();
 
     ctx.db.workspace().insert(Workspace {
         id: workspace_id.clone(),
@@ -46,6 +47,17 @@ pub fn create_workspace(ctx: &ReducerContext, name: String, description: String,
         created_at: now,
         updated_at: now,
     });
+
+    // Auto-grant owner access to the workspace creator
+    ctx.db.space_permission().insert(SpacePermission {
+        id: uuid_v4(ctx),
+        workspace_id: workspace_id.clone(),
+        peer_id: caller.to_string(),
+        permission: "owner".to_string(),
+        granted_by: caller.to_string(),
+        created_at: now,
+    });
+
     Ok(())
 }
 
@@ -108,6 +120,17 @@ pub fn check_space_access(
     let perm = match perm {
         Some(p) => p,
         None => {
+            // If the caller has no permission records at all (anonymous),
+            // allow access. Once a peer is registered with any workspace,
+            // ACL is enforced across all workspaces.
+            let caller_has_any = ctx
+                .db
+                .space_permission()
+                .iter()
+                .any(|sp: SpacePermission| sp.peer_id == peer_id);
+            if !caller_has_any {
+                return Ok(());
+            }
             return Err(format!(
                 "Access denied: peer '{}' has no permission for workspace '{}'",
                 peer_id, workspace_id

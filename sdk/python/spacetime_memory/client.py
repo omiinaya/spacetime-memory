@@ -453,20 +453,32 @@ class Client:
             return rows[:limit]
 
         # Non-semantic (keyword) fallback
+        # SpacetimeDB SQL doesn't support LIKE, so we fetch all and filter client-side
         clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
-        if query:
-            escaped = _esc(query)
-            clauses.append(
-                f"(content LIKE '%{escaped}%' OR summary LIKE '%{escaped}%')"
-            )
         if memory_type:
             clauses.append(f"memory_type = '{_esc(memory_type)}'")
         if tier:
             clauses.append(f"tier = '{_esc(tier)}'")
         where = " AND ".join(clauses)
-        rows = self._sql(
-            f"SELECT * FROM memory WHERE {where}"
-        )
+        try:
+            rows = self._sql(
+                f"SELECT * FROM memory WHERE {where}"
+            )
+        except RuntimeError as e:
+            if "unsupported" in str(e).lower() or "like" in str(e).lower():
+                rows = self._sql(f"SELECT * FROM memory WHERE {clauses[0]}")
+            else:
+                raise
+
+        # Client-side keyword filter (SpacetimeDB doesn't support LIKE)
+        if query:
+            q = query.lower()
+            rows = [
+                r for r in rows
+                if q in r.get("content", "").lower()
+                or q in r.get("summary", "").lower()
+            ]
+
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         return rows[:limit]
 
@@ -489,8 +501,13 @@ class Client:
         return self._call("update_memory", [memory_id, content, summary, confidence])
 
     def delete_memory(self, memory_id: str) -> dict[str, Any]:
-        """Deactivate a memory."""
-        return self._call("deactivate_memory", [memory_id])
+        """Deactivate a memory. Idempotent — succeeds if already deleted."""
+        try:
+            return self._call("deactivate_memory", [memory_id])
+        except RuntimeError as e:
+            if "not found" in str(e).lower():
+                return {"status": "ok", "note": "already deleted"}
+            raise
 
     def reinforce(self, memory_id: str) -> dict[str, Any]:
         """Reinforce a memory (bump access_count + strength)."""
@@ -706,33 +723,44 @@ class Client:
         self, workspace_id: str, query: str = ""
     ) -> list[dict[str, Any]]:
         """Search KG nodes by label within a workspace."""
+        rows = self._sql(
+            "SELECT * FROM kg_node WHERE "
+            f"workspace_id = '{_esc(workspace_id)}'"
+        )
         if query:
-            escaped = _esc(query)
-            rows = self._sql(
-                "SELECT * FROM kg_node WHERE "
-                f"workspace_id = '{_esc(workspace_id)}' AND "
-                f"label LIKE '%{escaped}%'"
-            )
-        else:
-            rows = self._sql(
-                "SELECT * FROM kg_node WHERE "
-                f"workspace_id = '{_esc(workspace_id)}'"
-            )
-        rows.sort(key=lambda r: r.get("label", ""))
+            # Client-side filter (SpacetimeDB doesn't support LIKE)
+            q = query.lower()
+            rows = [
+                r for r in rows
+                if q in r.get("label", "").lower()
+                or q in r.get("summary", "").lower()
+            ]
         return rows
 
     def get_neighbors(self, node_id: str) -> list[dict[str, Any]]:
         """Get edges connected to a node."""
-        rows = self._sql(
-            "SELECT e.*, src.label AS source_label, tgt.label AS target_label "
-            "FROM kg_edge e "
-            "LEFT JOIN kg_node src ON e.source_node_id = src.id "
-            "LEFT JOIN kg_node tgt ON e.target_node_id = tgt.id "
-            f"WHERE e.source_node_id = '{_esc(node_id)}' "
-            f"   OR e.target_node_id = '{_esc(node_id)}' "
+        edges = self._sql(
+            f"SELECT * FROM kg_edge WHERE "
+            f"source_node_id = '{_esc(node_id)}' "
+            f"OR target_node_id = '{_esc(node_id)}' "
         )
-        rows.sort(key=lambda r: r.get("weight", 0.0), reverse=True)
-        return rows
+        # Enrich with labels
+        node_ids = set()
+        for e in edges:
+            node_ids.add(e.get("source_node_id", ""))
+            node_ids.add(e.get("target_node_id", ""))
+        node_ids.discard("")
+        label_map = {}
+        for nid in node_ids:
+            rows = self._sql(f"SELECT id, label FROM kg_node WHERE id = '{_esc(nid)}'")
+            if rows:
+                label_map[nid] = rows[0].get("label", "")
+
+        for e in edges:
+            e["source_label"] = label_map.get(e.get("source_node_id", ""), "")
+            e["target_label"] = label_map.get(e.get("target_node_id", ""), "")
+        edges.sort(key=lambda r: r.get("weight", 0.0), reverse=True)
+        return edges
 
     def detect_communities(self, workspace_id: str) -> dict[str, Any]:
         """Run label-propagation community detection."""
@@ -1024,7 +1052,7 @@ class Client:
         Results in shortest_path_result table, ordered by step_order."""
         self._call("shortest_path", [workspace_id, source_id, target_id, max_hops])
 
-    def get_neighbors(self, workspace_id: str, node_id: str) -> None:
+    def get_neighbors_via_reducer(self, workspace_id: str, node_id: str) -> None:
         """Get immediate neighbours of a node.
         Results in graph_traversal_result table with depth=1."""
         self._call("get_neighbors", [workspace_id, node_id])
