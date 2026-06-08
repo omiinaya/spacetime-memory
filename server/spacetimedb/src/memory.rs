@@ -217,6 +217,9 @@ pub fn set_memory_scope(
         .find(&memory_id)
         .ok_or_else(|| format!("Memory '{}' not found", memory_id))?;
 
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
+
     mem.user_scope = user_scope;
     mem.updated_at = now_micros(ctx);
 
@@ -233,6 +236,9 @@ pub fn get_user_memories(
     user_scope: String,
     workspace_id: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "viewer")?;
+
     for mem in ctx.db.memory().iter() {
         if mem.user_scope == user_scope && mem.workspace_id == workspace_id {
             ctx.db.user_memory_result().insert(UserMemoryResult {

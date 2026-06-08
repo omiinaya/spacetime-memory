@@ -1,6 +1,7 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::workspace::check_space_access;
 
 /// An insight represents a Hindsight reflect-style reasoning result.
 #[table(accessor = insight, public)]
@@ -29,6 +30,8 @@ pub fn create_insight(
     source_memory_ids_json: String,
     confidence: f64,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -49,11 +52,14 @@ pub fn create_insight(
 
 #[reducer]
 pub fn delete_insight(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    ctx.db
+    let insight = ctx
+        .db
         .insight()
         .id()
         .find(&id)
         .ok_or_else(|| format!("Insight '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &insight.workspace_id, &caller, "editor")?;
 
     ctx.db.insight().id().delete(&id);
     Ok(())
@@ -91,6 +97,8 @@ pub fn synthesize_mental_models(
     workspace_id: String,
     memory_ids_json: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -125,11 +133,15 @@ pub fn update_mental_model(
 ) -> Result<(), String> {
     let now = now_micros(ctx);
 
-    let mut model = ctx.db
+    let mut model = ctx
+        .db
         .mental_model()
         .id()
         .find(&id)
         .ok_or_else(|| format!("MentalModel '{}' not found", id))?;
+
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &model.workspace_id, &caller, "editor")?;
 
     model.content = content;
     model.confidence = confidence;
@@ -142,11 +154,15 @@ pub fn update_mental_model(
 
 #[reducer]
 pub fn delete_mental_model(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    ctx.db
+    let model = ctx
+        .db
         .mental_model()
         .id()
         .find(&id)
         .ok_or_else(|| format!("MentalModel '{}' not found", id))?;
+
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &model.workspace_id, &caller, "editor")?;
 
     ctx.db.mental_model().id().delete(&id);
     Ok(())

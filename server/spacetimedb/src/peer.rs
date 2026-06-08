@@ -1,6 +1,7 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::workspace::check_space_access;
 
 /// A peer represents a user, AI agent, or other entity participating in sessions.
 #[table(accessor = peer, public)]
@@ -26,6 +27,8 @@ pub fn create_peer(
     peer_type: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     // Validate peer_type
     match peer_type.as_str() {
         "user" | "agent" | "entity" => {}
@@ -69,6 +72,8 @@ pub fn update_peer(
         .id()
         .find(&id)
         .ok_or_else(|| format!("Peer '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &existing.workspace_id, &caller, "editor")?;
 
     ctx.db.peer().id().update(Peer {
         id: id.clone(),
@@ -88,11 +93,14 @@ pub fn update_peer(
 
 #[reducer]
 pub fn delete_peer(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    ctx.db
+    let peer = ctx
+        .db
         .peer()
         .id()
         .find(&id)
         .ok_or_else(|| format!("Peer '{}' not found", id))?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &peer.workspace_id, &caller, "editor")?;
 
     ctx.db.peer().id().delete(&id);
     Ok(())

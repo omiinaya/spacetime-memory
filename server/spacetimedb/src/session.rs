@@ -1,6 +1,7 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::workspace::check_space_access;
 
 /// A session represents a conversation or interaction within a workspace.
 #[table(accessor = session, public)]
@@ -67,6 +68,8 @@ pub fn create_session(
     name: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -93,12 +96,9 @@ pub fn join_session(
     peer_id: String,
     role: String,
 ) -> Result<(), String> {
-    // Verify session exists
-    ctx.db
-        .session()
-        .id()
-        .find(&session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    // Verify session exists + caller has permission
+    let caller = ctx.sender().to_hex();
+    let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
 
     // Check if already a participant
     let already = ctx
@@ -129,7 +129,11 @@ pub fn leave_session(
     session_id: String,
     peer_id: String,
 ) -> Result<(), String> {
-    // Verify the participant exists (composite key lookup via iteration)
+    // Verify session exists + caller has permission
+    let caller = ctx.sender().to_hex();
+    let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
+
+    // Verify the participant exists
     let exists = ctx
         .db
         .session_participant()
@@ -161,6 +165,9 @@ pub fn update_session_summary(
     session_id: String,
     summary: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
+
     let mut session = ctx
         .db
         .session()
@@ -188,6 +195,8 @@ pub fn add_agent_step(
     summary: String,
     parent_step_id: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -224,6 +233,8 @@ pub fn get_session_steps(
     ctx: &ReducerContext,
     session_id: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    let _workspace_id = check_session_access(ctx, &session_id, &caller, "viewer")?;
     let query_hash = format!("steps:{}", session_id);
 
     // Clear previous results for this hash
@@ -259,6 +270,8 @@ pub fn get_session_steps(
 /// Delete all agent steps for a given session.
 #[reducer]
 pub fn delete_session_steps(ctx: &ReducerContext, session_id: String) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
     let to_delete: Vec<_> = ctx.db.agent_step().iter()
         .filter(|s| s.session_id == session_id)
         .collect();
@@ -266,4 +279,28 @@ pub fn delete_session_steps(ctx: &ReducerContext, session_id: String) -> Result<
         ctx.db.agent_step().delete(s);
     }
     Ok(())
+}
+
+// ── Session ACL guard ─────────────────────────────────────────────────
+
+/// Resolve a session_id to its workspace_id and check that `peer_id`
+/// has at least the `required` permission level on that workspace.
+///
+/// This is the standard guard for session-scoped operations
+/// (messages, participant management, session updates).
+pub fn check_session_access(
+    ctx: &ReducerContext,
+    session_id: &str,
+    peer_id: &str,
+    required: &str,
+) -> Result<String, String> {
+    let session = ctx
+        .db
+        .session()
+        .id()
+        .find(session_id.to_string())
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    check_space_access(ctx, &session.workspace_id, peer_id, required)?;
+    Ok(session.workspace_id)
 }

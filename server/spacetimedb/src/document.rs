@@ -1,6 +1,7 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::workspace::check_space_access;
 
 /// A document ingested into the workspace.
 #[table(accessor = document, public)]
@@ -51,6 +52,8 @@ pub fn create_document(
     source_url: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -106,6 +109,9 @@ pub fn add_chunk(
         .find(&document_id)
         .ok_or_else(|| format!("Document '{}' not found", document_id))?;
 
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &doc.workspace_id, &caller, "editor")?;
+
     let chunk = DocChunk {
         id: id.clone(),
         document_id: document_id.clone(),
@@ -131,11 +137,15 @@ pub fn add_chunk(
 
 #[reducer]
 pub fn delete_document(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    ctx.db
+    let doc = ctx
+        .db
         .document()
         .id()
         .find(&id)
         .ok_or_else(|| format!("Document '{}' not found", id))?;
+
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &doc.workspace_id, &caller, "editor")?;
 
     ctx.db.document().id().delete(&id);
     Ok(())

@@ -1,6 +1,7 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::session::check_session_access;
 
 /// A message within a session. Content types: "text", "tool_call", "tool_result", "event".
 #[table(accessor = message, public)]
@@ -26,6 +27,10 @@ pub fn send_message(
     content_type: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    // Verify session exists + caller has permission
+    let caller = ctx.sender().to_hex();
+    let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
+
     // Validate content_type
     match content_type.as_str() {
         "text" | "tool_call" | "tool_result" | "event" => {}
@@ -58,11 +63,15 @@ pub fn send_message(
 
 #[reducer]
 pub fn delete_message(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    ctx.db
+    let msg = ctx
+        .db
         .message()
         .id()
         .find(&id)
         .ok_or_else(|| format!("Message '{}' not found", id))?;
+
+    let caller = ctx.sender().to_hex();
+    check_session_access(ctx, &msg.session_id, &caller, "editor")?;
 
     ctx.db.message().id().delete(&id);
     Ok(())
