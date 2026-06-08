@@ -118,7 +118,7 @@ class TestClientReducer:
             text="Internal server error",
         )
 
-        with pytest.raises(RuntimeError, match="Reducer error"):
+        with pytest.raises(RuntimeError, match="Request failed after"):
             mock_http_client._call("bad_reducer", [])
 
 

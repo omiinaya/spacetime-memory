@@ -100,6 +100,7 @@ class Client:
         )
         self.verbose = verbose
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
+        self.max_retries = int(os.environ.get("STMEM_MAX_RETRIES", "3"))
 
         base = f"http://{self.host}:{self.port}"
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
@@ -135,15 +136,53 @@ class Client:
     # HTTP helpers
     # -----------------------------------------------------------------------
 
+    def _request_with_retry(
+        self, method: str, url: str, **kwargs: Any
+    ) -> httpx.Response:
+        """Make an HTTP request with retry on connection/timeout errors.
+
+        Retries up to ``self.max_retries`` times with exponential backoff.
+        Does NOT retry on 4xx responses (client errors).
+        """
+        import time as _time
+
+        last_exc: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                if method == "POST":
+                    resp = self._http.post(url, **kwargs)
+                elif method == "GET":
+                    resp = self._http.get(url, **kwargs)
+                else:
+                    resp = self._http.request(method, url, **kwargs)
+                # Don't retry client errors (4xx)
+                code = int(getattr(resp, "status_code", 500))
+                if code < 500 or code >= 600:
+                    return resp
+                # Server error — retry
+                last_exc = RuntimeError(f"Server error (HTTP {code}) on {url}")
+            except (httpx.ConnectError, httpx.TimeoutException) as e:
+                last_exc = e
+            except httpx.RemoteProtocolError as e:
+                last_exc = e
+            if attempt < self.max_retries:
+                delay = 0.5 * (2 ** attempt)
+                logger.warning(
+                    "Request failed (attempt %d/%d): %s. Retrying in %.1fs...",
+                    attempt + 1, self.max_retries + 1, last_exc, delay,
+                )
+                _time.sleep(delay)
+        raise RuntimeError(
+            f"Request failed after {self.max_retries + 1} attempts: {last_exc}"
+        ) from last_exc
+
     def _sql(self, query: str) -> list[dict[str, Any]]:
         """Run a SELECT query against the SpacetimeDB SQL API."""
         headers = {"Content-Type": "text/plain"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        resp = self._http.post(
-            self.sql_url,
-            content=query,
-            headers=headers,
+        resp = self._request_with_retry(
+            "POST", self.sql_url, content=query, headers=headers,
         )
         if resp.status_code >= 400:
             error_text = resp.text[:500]
@@ -174,10 +213,9 @@ class Client:
         headers = {"Content-Type": "application/json"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        resp = self._http.post(
-            f"{self.reducer_url}/{reducer}",
-            content=json.dumps(args),
-            headers=headers,
+        resp = self._request_with_retry(
+            "POST", f"{self.reducer_url}/{reducer}",
+            content=json.dumps(args), headers=headers,
         )
         if resp.status_code >= 400:
             error_text = resp.text[:500]
