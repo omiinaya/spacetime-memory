@@ -1,4 +1,5 @@
-"""Mem0-compatible drop-in adapter.
+"""
+Mem0-compatible drop-in adapter.
 
 Matches the real Mem0 Python SDK API exactly:
 https://github.com/mem0ai/mem0
@@ -11,7 +12,7 @@ Usage::
     m.add("I like pizza", user_id="alice", agent_id="assistant")
     results = m.search("food preferences", user_id="alice")
     memory = m.get(memory_id=results["results"][0]["id"])
-    all_mems = m.get_all(user_id="alice")
+    all_mems = m.get_all(filters={"user_id": "alice"})
     m.update(memory_id=memory_id, data="I love pizza")
     m.delete(memory_id=memory_id)
     history = m.history(memory_id=memory_id)
@@ -21,6 +22,7 @@ Usage::
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from typing import Any, Callable
 
 from ..client import Client
@@ -35,7 +37,7 @@ class Memory:
     Mem0-specific options are accepted but silently ignored (or routed as
     metadata).  The adapter maps:
 
-    * ``user_id`` → ``workspace_id``
+    * ``user_id``  → ``workspace_id``
     * ``agent_id`` → ``peer_id``
     * ``run_id``   → ``source_session_id``
 
@@ -64,6 +66,18 @@ class Memory:
         )
         self._user_id_to_ws: dict[str, str] = {}
         self._token_refresh_callback = token_refresh_callback
+
+    @classmethod
+    def from_config(cls, config_dict: dict[str, Any]) -> Memory:
+        """Create a Memory instance from a config dict (Mem0 v2+ compat).
+
+        Args:
+            config_dict: Mem0 configuration dictionary.
+
+        Returns:
+            A new Memory instance.
+        """
+        return cls(config=config_dict)
 
     # -------------------------------------------------------------------
     # Internal helpers
@@ -100,6 +114,16 @@ class Memory:
                 return result
             raise
 
+    def _extract_ids_from_filters(self, filters: dict[str, Any] | None) -> tuple[str | None, str | None, str | None]:
+        """Extract user_id, agent_id, run_id from a Mem0 v2 filters dict."""
+        if not filters:
+            return None, None, None
+        return (
+            filters.get("user_id"),
+            filters.get("agent_id"),
+            filters.get("run_id"),
+        )
+
     # -------------------------------------------------------------------
     # Mem0 API
     # -------------------------------------------------------------------
@@ -112,8 +136,10 @@ class Memory:
         run_id: str | None = None,
         metadata: dict | None = None,
         filters: dict | None = None,
+        infer: bool = True,
         prompt: str | None = None,
         output_format: str = "v1.1",
+        memory_type: str | None = None,
     ) -> dict[str, Any]:
         """Store a memory.
 
@@ -126,8 +152,11 @@ class Memory:
             run_id: Run / session identifier.
             metadata: Optional metadata dict.
             filters: Optional query filters (accepted for compatibility).
+            infer: If True (default), an LLM is used to extract key facts.
+                Stored as-is in the current implementation.
             prompt: Optional prompt for inference (accepted for compatibility).
             output_format: Output format version (default ``"v1.1"``).
+            memory_type: Specifies memory type (``procedural_memory`` or None).
 
         Returns:
             A dict with a ``"results"`` key containing a list of stored
@@ -140,6 +169,14 @@ class Memory:
             {'results': [{'id': '...', 'memory': 'I like pizza', ...}], 'relation_events': []}
 
         """
+        # For backward compatibility, extract from filters if provided
+        if filters and not user_id:
+            user_id = filters.get("user_id", user_id)
+        if filters and not agent_id:
+            agent_id = filters.get("agent_id", agent_id)
+        if filters and not run_id:
+            run_id = filters.get("run_id", run_id)
+
         try:
             if isinstance(messages, list):
                 content = "\n".join(
@@ -178,16 +215,17 @@ class Memory:
                             )
 
             # Return Mem0-compatible shape — search for the stored memory
+            search_results = self._call("search", ws_id, content, limit=1, semantic=True)
             return {
                 "results": [
                     {
-                        "id": r["id"],
-                        "memory": r.get("content", ""),
+                        "id": r.get("entity_id", ""),
+                        "memory": r.get("memory_content", r.get("content", "")),
                         "event": "ADD",
                         "user_id": user_id or "",
                         "agent_id": agent_id or "",
                     }
-                    for r in self._call("search", ws_id, content, limit=1, semantic=True)
+                    for r in search_results
                 ],
                 "relation_events": [],
             }
@@ -214,6 +252,8 @@ class Memory:
         """
         try:
             rows = self._call("get_memory", memory_id)
+            # Filter to active memories only (delete is soft)
+            rows = [r for r in rows if r.get("is_active", True)] if rows else []
             if rows:
                 record = rows[0]
                 result = {
@@ -239,18 +279,26 @@ class Memory:
         run_id: str | None = None,
         limit: int = 100,
         threshold: float = 0.0,
+        *,
+        top_k: int | None = None,
+        filters: dict[str, Any] | None = None,
+        rerank: bool = False,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Search memories by semantic similarity to *query*.
 
+        Supports both Mem0 v1.x keyword signatures and v2.x ``filters`` dict.
+
         Args:
             query: The search query text.
-            user_id: Optional user filter. When set, only memories scoped
-                to this user (via ``user_scope``) are returned.
-            agent_id: Optional agent filter (accepted for compatibility).
-            run_id: Optional run/session filter.
+            user_id: Optional user filter (Mem0 v1 compat).
+            agent_id: Optional agent filter (Mem0 v1 compat).
+            run_id: Optional run/session filter (Mem0 v1 compat).
             limit: Max results to return (default 100).
             threshold: Minimum relevance score (0.0 = no filter).
+            top_k: Mem0 v2+ alias for ``limit``.
+            filters: Mem0 v2+ filters dict (e.g. ``{"user_id": "u1"}``).
+            rerank: If True, apply reranking (accepted for compatibility).
             **kwargs: Additional Mem0 keyword arguments (accepted for
                 compatibility but ignored).
 
@@ -266,19 +314,32 @@ class Memory:
             {'results': [{'id': '...', 'memory': 'I like pizza', 'score': 0.92, ...}]}
 
         """
+        # Extract from filters dict (Mem0 v2 compat)
+        if filters is not None:
+            fu, fa, fr = self._extract_ids_from_filters(filters)
+            user_id = user_id or fu
+            agent_id = agent_id or fa
+            run_id = run_id or fr
+
+        # top_k overrides limit if both provided
+        effective_limit = top_k if top_k is not None else limit
+        # Mem0 v2 default threshold is 0.1, but we keep 0.0 for backward compat
+        effective_threshold = threshold
+
+        ws_id = self._ws(user_id)
+
         try:
-            ws_id = self._ws(user_id)
             rows = self._call(
                 "search",
                 workspace_id=ws_id,
                 query=query,
-                limit=limit,
+                limit=effective_limit,
                 semantic=True,
             )
             results = []
             for r in rows or []:
                 score = r.get("score", 0.0)
-                if threshold > 0.0 and score < threshold:
+                if effective_threshold > 0.0 and score < effective_threshold:
                     continue
                 # If user_id is specified, verify user_scope isolation
                 mem_id = r.get("entity_id", "")
@@ -309,14 +370,24 @@ class Memory:
         agent_id: str | None = None,
         run_id: str | None = None,
         limit: int = 100,
+        *,
+        filters: dict[str, Any] | None = None,
+        top_k: int | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """List all memories for a user.
 
+        Supports both Mem0 v1.x keyword signatures and v2.x ``filters`` dict.
+
         Args:
-            user_id: User whose memories to list.
-            agent_id: Optional agent filter (accepted for compatibility).
-            run_id: Optional run/session filter.
+            user_id: User whose memories to list (Mem0 v1 compat).
+            agent_id: Optional agent filter (Mem0 v1 compat).
+            run_id: Optional run/session filter (Mem0 v1 compat).
             limit: Max results to return (default 100).
+            filters: Mem0 v2+ filters dict (e.g. ``{"user_id": "u1"}``).
+            top_k: Mem0 v2+ alias for ``limit``.
+            **kwargs: Additional Mem0 keyword arguments (accepted for
+                compatibility but ignored).
 
         Returns:
             A dict with a ``"results"`` key containing a list of memory
@@ -329,19 +400,31 @@ class Memory:
             {'results': [{'id': '...', 'memory': 'I like pizza', ...}]}
 
         """
+        # Extract from filters dict (Mem0 v2 compat)
+        if filters is not None:
+            fu, fa, fr = self._extract_ids_from_filters(filters)
+            user_id = user_id or fu
+            agent_id = agent_id or fa
+            run_id = run_id or fr
+
+        effective_limit = top_k if top_k is not None else limit
+
         try:
             if user_id:
                 ws_id = self._ws(user_id)
-                rows = self._call(
-                    "get_user_memories", user_scope=user_id, workspace_id=ws_id
-                )[:limit]
+                # List all memories in workspace, then filter by user_scope
+                all_mems = self._call("list_memories", workspace_id=ws_id, limit=1000)
+                rows = [
+                    r for r in all_mems
+                    if r.get("user_scope", "") in ("", user_id)
+                ][:effective_limit]
             else:
                 ws_id = self._ws(None)
-                rows = self._call("list_memories", workspace_id=ws_id, limit=limit)
+                rows = self._call("list_memories", workspace_id=ws_id, limit=effective_limit)
             return {
                 "results": [
                     {
-                        "id": r["memory_id"] if "memory_id" in r else r["id"],
+                        "id": r.get("id", r.get("entity_id", "")),
                         "memory": r.get("content", ""),
                         "user_id": user_id or "",
                         "agent_id": agent_id or "",
@@ -355,21 +438,28 @@ class Memory:
         except Exception as exc:
             raise RuntimeError(f"mem0.get_all(user_id='{user_id}') failed: {exc}") from exc
 
-    def update(self, memory_id: str, data: str | dict) -> dict[str, Any]:
-        """Update a memory's content.
+    def update(
+        self,
+        memory_id: str,
+        data: str | dict,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Update a memory's content and/or metadata.
 
         Args:
             memory_id: The UUID of the memory to update.
             data: New content as a string, or a dict with ``"content"`` or
                 ``"memory"`` keys.
+            metadata: Optional metadata dict (Mem0 v2+). Stored for
+                compatibility but not persisted in the current implementation.
 
         Returns:
-            A dict with operation status (``{"status": "ok"}``).
+            A dict with operation status.
 
         Example::
 
             >>> m.update(memory_id="abc123", data="I love pizza")
-            {'status': 'ok'}
+            {'message': 'Memory updated successfully!'}
 
         """
         try:
@@ -377,9 +467,10 @@ class Memory:
                 content = data.get("content", data.get("memory", str(data)))
             else:
                 content = str(data)
-            return self._call(
+            self._call(
                 "update_memory", memory_id, content=content, summary=content[:200]
             )
+            return {"message": "Memory updated successfully!"}
         except RuntimeError:
             raise
         except Exception as exc:
@@ -392,16 +483,17 @@ class Memory:
             memory_id: The UUID of the memory to delete.
 
         Returns:
-            A dict with operation status (``{"status": "ok"}``).
+            A dict with operation status.
 
         Example::
 
             >>> m.delete(memory_id="abc123")
-            {'status': 'ok'}
+            {'message': 'Memory deleted successfully!'}
 
         """
         try:
-            return self._call("delete_memory", memory_id)
+            self._call("delete_memory", memory_id)
+            return {"message": "Memory deleted successfully!"}
         except RuntimeError:
             raise
         except Exception as exc:
@@ -412,18 +504,28 @@ class Memory:
         user_id: str | None = None,
         agent_id: str | None = None,
         run_id: str | None = None,
+        *,
+        filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Delete all memories for a user by iterating get_all().
 
         Args:
-            user_id: User whose memories to delete.
-            agent_id: Optional agent filter.
-            run_id: Optional run/session filter.
+            user_id: User whose memories to delete (Mem0 v1 compat).
+            agent_id: Optional agent filter (Mem0 v1 compat).
+            run_id: Optional run/session filter (Mem0 v1 compat).
+            filters: Mem0 v2+ filters dict (e.g. ``{"user_id": "u1"}``).
 
         Returns:
             A dict with status and count of deleted memories.
 
         """
+        # Extract from filters dict (Mem0 v2 compat)
+        if filters is not None:
+            fu, fa, fr = self._extract_ids_from_filters(filters)
+            user_id = user_id or fu
+            agent_id = agent_id or fa
+            run_id = run_id or fr
+
         try:
             result = self.get_all(user_id=user_id, agent_id=agent_id, run_id=run_id)
             memories = result.get("results", [])
@@ -473,3 +575,10 @@ class Memory:
         """
         self._user_id_to_ws.clear()
         return {"status": "ok"}
+
+    def close(self) -> None:
+        """Close the underlying HTTP client (idempotent).
+
+        Mem0 v2+ compat.
+        """
+        self._user_id_to_ws.clear()

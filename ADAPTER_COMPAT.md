@@ -19,28 +19,30 @@ equivalents, and which are explicitly not supported.
 
 Reference: [github.com/mem0ai/mem0](https://github.com/mem0ai/mem0) — `Memory` class.
 
-Adapter: `spacetime_memory.sdks.mem0.Memory` (469 lines, 12 public methods)
+Adapter: `spacetime_memory.sdks.mem0.Memory` (604 lines, 16 public methods)
 
 | Method | Status | Notes |
 |--------|--------|-------|
 | `__init__(config, token_refresh_callback)` | ✅ | Accepts standard Mem0 config dict |
 | `add(data, user_id, agent_id, run_id, metadata)` | ✅ | `data` → `store_memory`, maps `user_id` → workspace |
 | `get(memory_id)` | ✅ | SQL lookup by ID |
-| `search(query, user_id, agent_id, limit, ...)` | ✅ | → `hybrid_search`, supports Mem0 filter shape |
-| `get_all(user_id, agent_id, limit)` | ✅ | SQL query with workspace filter |
-| `update(memory_id, data)` | ✅ | → `update_memory` |
+| `search(query, user_id, agent_id, limit, ...)` | ✅ | → `hybrid_search`, supports Mem0 filter shape + v2 `filters` dict |
+| `get_all(user_id, agent_id, limit)` | ✅ | SQL query with workspace filter, supports v2 `filters` + `top_k` |
+| `update(memory_id, data)` | ✅ | → `update_memory`, accepts `metadata` param |
 | `delete(memory_id)` | ✅ | → `deactivate_memory` |
-| `delete_all(user_id, agent_id)` | ✅ | Workspace-scoped deletion |
+| `delete_all(user_id, agent_id)` | ✅ | Workspace-scoped deletion, supports v2 `filters` dict |
 | `history(memory_id)` | ✅ | Returns memory version history |
 | `reset()` | ✅ | Clear all cached workspace mappings |
-| `batch_update(memories)` | ❌ | Not implemented |
-| `create_memory_tool()` | ❌ | LangChain tool integration |
-| Memory merging (v1.1+) | ❌ | Mem0 merges similar memories |
+| `from_config(config_dict)` | ✅ | Classmethod (Mem0 v2+ compat) |
+| `close()` | ✅ | No-op (HTTP client is long-lived) |
+| `batch_update(memories)` | ❌ | Removed from Mem0 v2 API; not applicable |
+| `create_memory_tool()` | ❌ | Removed from Mem0 v2 API; not applicable |
+| Memory merging (v1.1+) | ⚠️ | `infer=True` accepted but stored as-is (no LLM) |
 | Graph memory | ❌ | Mem0's knowledge graph integration |
 | Custom LLM per user | ❌ | Mem0 allows per-user model config |
-| Memory recommendation | ❌ | `recommend()` method |
+| `chat()` | ❌ | Mem0 v2 agent chat feature |
 
-**Coverage: ~65%.** Covers core CRUD. Missing advanced Mem0 features (merging, graph memory, custom LLM configs).
+**Coverage: ~85%.** Covers all core CRUD + v2 API shape. Missing advanced features (graph, LLM-based merging, per-user models).
 
 ---
 
@@ -184,7 +186,7 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 
 | Adapter | Lines | Methods | Coverage |
 |---------|-------|---------|----------|
-| Mem0 | 469 | 12 | ~65% |
+| Mem0 | 604 | 16 | ~85% |
 | Zep | 647 | 15 | ~90% |
 | Graphiti | 915 | 15 | ~75% |
 | Hindsight | 415 | 11 | ~85% |
