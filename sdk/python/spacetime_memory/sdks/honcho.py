@@ -20,7 +20,7 @@ import json
 import uuid
 from typing import Any
 
-from ..client import Client
+from ..client import Client, _esc
 
 
 class Honcho:
@@ -224,7 +224,7 @@ class Honcho:
                 f"User '{user_id}' not found. Create the user first with create_user()."
             )
 
-        session = Session(user, location=location, client=self._client)
+        session = Session(user, location=location, metadata=metadata, client=self._client)
         self._session_cache[session.id] = session
         return session
 
@@ -449,7 +449,7 @@ class User:
             A :class:`Session` instance.
 
         """
-        return Session(self, location=location, client=self._client)
+        return Session(self, location=location, metadata=metadata, client=self._client)
 
     def get_sessions(self) -> list[Session]:
         """List all sessions for this user.
@@ -537,10 +537,11 @@ class Session:
         location: The location label (e.g. ``"room1"``).
     """
 
-    def __init__(self, user: User, location: str = "", client: Client | None = None):
+    def __init__(self, user: User, location: str = "", metadata: dict | None = None, client: Client | None = None):
         self.id = uuid.uuid4().hex[:32]
         self.user = user
         self.location = location
+        self._metadata = metadata or {}
         self._client = client or user._client
 
     @property
@@ -627,4 +628,76 @@ class Session:
         except Exception as exc:
             raise RuntimeError(
                 f"Session.get_memories() failed in session '{self.id}': {exc}"
+            ) from exc
+
+    # -------------------------------------------------------------------
+    # Session metadata API (Honcho parity)
+    # -------------------------------------------------------------------
+
+    def get_metadata(self) -> dict:
+        """Get metadata for this session.
+
+        Returns the locally cached metadata dict.  Call :meth:`refresh` to
+        re-fetch from the backend.
+
+        Returns:
+            A dictionary of metadata, or an empty dict if none set.
+        """
+        return self._metadata
+
+    def set_metadata(self, metadata: dict) -> None:
+        """Set metadata for this session (persisted as a memory record).
+
+        Stores the metadata dict as a memory record with
+        ``memory_type="session_metadata"`` and
+        ``source_session_id`` set to this session's ID.
+
+        Args:
+            metadata: A dictionary of metadata to store.
+        """
+        try:
+            self._client.store(
+                workspace_id=self.user.workspace_id,
+                content=json.dumps(metadata),
+                memory_type="session_metadata",
+                peer_id=self.location or self.id,
+                source_session_id=self.id,
+            )
+            self._metadata = metadata
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"Session.set_metadata() failed in session '{self.id}': {exc}"
+            ) from exc
+
+    def refresh(self) -> None:
+        """Re-fetch session metadata from the backend.
+
+        Queries the memory table for the most recent ``session_metadata``
+        record tied to this session's ID and updates the local cache.
+        """
+        try:
+            rows = self._client._sql(
+                "SELECT content FROM memory WHERE "
+                f"workspace_id = '{_esc(self.user.workspace_id)}' AND "
+                f"source_session_id = '{_esc(self.id)}' AND "
+                f"memory_type = 'session_metadata' "
+                "ORDER BY created_at DESC LIMIT 1"
+            )
+            if rows:
+                content = rows[0].get("content", "{}")
+                try:
+                    self._metadata = (
+                        json.loads(content) if isinstance(content, str) else content
+                    )
+                except (json.JSONDecodeError, TypeError):
+                    self._metadata = {}
+            else:
+                self._metadata = {}
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"Session.refresh() failed in session '{self.id}': {exc}"
             ) from exc

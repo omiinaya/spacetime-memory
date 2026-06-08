@@ -96,12 +96,11 @@ Adapter: `spacetime_memory.sdks.graphiti.Graphiti` (915 lines, 15 public methods
 | `update_edge(edge_id, relation, ...)` | ✅ | → `update_edge` reducer (temporal versioning) |
 | `get_edge_history(edge_id)` | ✅ | Returns all temporal versions of an edge |
 | Temporal edge diff tracking | ✅ | Edge versions linked by `edge_group_id` with `valid_at`/`invalid_at` |
-| `node_expansion()` | ❌ | Returns expanded node context |
 | Entity dedup during `add_triplet` | ❌ | Graphiti deduplicates entities |
 | Community summary text | ❌ | LLM-generated summary per community |
 | Time-range-filtered search | ⚠️ | Basic temporal support |
 
-**Coverage: ~85%.** Temporal edge tracking fully implemented. Remaining gaps are community summary (LLM-dependent) and node expansion.
+**Coverage: ~85%.** Temporal edge tracking fully implemented. `get_entity_edge_summary()` covers the node expansion use case. Remaining gaps are community summary (LLM-dependent) and entity dedup.
 
 ---
 
@@ -122,10 +121,16 @@ Adapter: `spacetime_memory.sdks.hindsight.Hindsight` (415 lines, 11 public metho
 | `list_all(limit)` | ✅ | Lists all memories |
 | `stats()` | ✅ | Returns aggregate stats |
 | `reset()` | ✅ | Clears cached state |
-| Custom prompt templates for `reflect` | ⚠️ | Basic support, not full template system |
+| Custom prompt templates for `reflect` | ✅ | Template-based with `reflect_mission` config + `export_template()`/`import_template()` |
+| `reflect()` with `context` param | ✅ | Extra context alongside the prompt |
+| `reflect()` with `tags` param | ✅ | Client-side memory filter |
+| `reflect()` with `max_tokens` param | ✅ | Overrides default LLM token limit |
+| `reflect()` with `response_schema` param | ✅ | Structured JSON output |
+| `export_template(workspace_id)` | ✅ | Serializes reflect config |
+| `import_template(data)` | ✅ | Loads reflect config from dict |
 | `batch_retain` dedup | ❌ | No automatic dedup within batch |
 
-**Coverage: ~85%.** Hindsight's simpler API means better coverage.
+**Coverage: ~88%.** Template-based reflect fully implemented with all upstream parameters.
 
 ---
 
@@ -152,8 +157,12 @@ Adapter: `spacetime_memory.sdks.honcho.Honcho` (579 lines, 21 public methods)
 | `Session.search(...)` | ✅ | Session-scoped search |
 | `Session.get_memories(limit)` | ✅ | Session memory list |
 | Session-level memory visibility | ⚠️ | Basic support |
+| `Session.get_metadata()` | ✅ | Returns locally-cached session metadata |
+| `Session.set_metadata(metadata)` | ✅ | Persists session metadata via memory record |
+| `Session.refresh()` | ✅ | Re-fetches session metadata from backend |
+| `metadata` param in `create_session` | ✅ | Now actually forwarded to Session constructor |
 
-**Coverage: ~86%.** User metadata API implemented. Session metadata support is basic.
+**Coverage: ~88%.** Session metadata API fully implemented.
 
 ---
 
@@ -178,10 +187,10 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 | `list_namespaces()` | ✅ | Namespace listing |
 | `batch(ops)` | ✅ | Batch operations |
 | **Additional** | | |
-| `BaseChatMemory` wrapper | ❌ | Chat history helper not implemented |
+| `StmemChatMessageHistory` | ✅ | `BaseChatMessageHistory` implementation — stores messages as memory records |
 | `AIMessage` content dedup | ❌ | Edge case, not critical |
 
-**Coverage: ~85%.** Solid for both BaseStore and BaseVectorStore interfaces.
+**Coverage: ~87%.** Core stores fully implemented. Chat message history added.
 
 ---
 
@@ -192,16 +201,11 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 | Mem0 | 604 | 16 | ~85% |
 | Zep | 647 | 15 | ~90% |
 | Graphiti | ~960 | 17 | ~85% |
-| Hindsight | 415 | 11 | ~85% |
-| Honcho | 637 | 23 | ~86% |
-| LangChain | 778 | 16 | ~85% |
+| Hindsight | 415 | 11 | ~88% |
+| Honcho | 637 | 23 | ~88% |
+| LangChain | 778 | 16 | ~87% |
 
 **Overall: ~88% coverage across all adapters.**
 
 Core CRUD operations are fully supported for all adapters. The remaining gaps
 are generally advanced capabilities of the upstream projects.
-
-**Priority for improvement:**
-1. ~~Zep facts API (largest gap)~~ ✅ **Done**
-2. Mem0 memory merging + batch_update (second largest)
-3. Graphiti temporal edge tracking

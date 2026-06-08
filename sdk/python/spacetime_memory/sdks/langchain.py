@@ -756,6 +756,278 @@ def _esc(val: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# BaseChatMessageHistory interface
+# ---------------------------------------------------------------------------
+
+
+class StmemChatMessageHistory:
+    """LangChain ``BaseChatMessageHistory`` implementation backed by Spacetime-Memory.
+
+    Stores chat messages as SpacetimeDB memory records with
+    ``memory_type='chat_message'``.  Each conversation is identified by a
+    ``session_id``, and messages are persisted in creation order.
+
+    Usage::
+
+        from langchain_core.messages import HumanMessage, AIMessage
+        from spacetime_memory.sdks.langchain import StmemChatMessageHistory
+
+        history = StmemChatMessageHistory(
+            session_id="conversation-1",
+            config={"host": "localhost", "port": 3001},
+        )
+
+        # Add messages
+        history.add_messages([
+            HumanMessage(content="Hello!"),
+            AIMessage(content="Hi there!"),
+        ])
+
+        # Retrieve all messages
+        for msg in history.messages:
+            print(f"{msg.type}: {msg.content}")
+
+        # Clear the history
+        history.clear()
+
+    .. note::
+       LangChain's ``BaseChatMessageHistory`` defines async methods
+       (``async_add_messages``, ``aclear``) that are not implemented
+       here.  Use the sync versions in non-async contexts.
+    """
+
+    def __init__(
+        self,
+        session_id: str,
+        config: dict[str, Any] | None = None,
+        client: Client | None = None,
+    ):
+        """Initialise a new chat-message history.
+
+        Args:
+            session_id: Identifier for the conversation.  All messages
+                for this session will be stored with
+                ``source_session_id = session_id``.
+            config: Dict with ``host``, ``port``, ``database``,
+                ``token``, ``embedder_url`` keys.  Ignored if
+                ``client`` is provided.  May also contain
+                ``workspace_id`` to specify the target workspace.
+            client: An existing ``Client`` instance.
+        """
+        self.session_id = session_id
+        config = config or {}
+        if client is not None:
+            self._client = client
+        else:
+            self._client = Client(
+                host=config.get("host"),
+                port=config.get("port"),
+                database=config.get("db", config.get("database")),
+                embedder_url=config.get("embedder_url"),
+                token=config.get("token"),
+            )
+        self._workspace_id: str = config.get("workspace_id", "")
+
+    # -------------------------------------------------------------------
+    # Workspace resolution
+    # -------------------------------------------------------------------
+
+    def _resolve_workspace(self) -> str:
+        """Return a workspace ID for storing chat messages.
+
+        If ``workspace_id`` was provided in ``config`` it is returned
+        directly.  Otherwise a workspace named ``"chat_history"`` is
+        created (or looked up) and cached.
+        """
+        if self._workspace_id:
+            return self._workspace_id
+        name = "chat_history"
+        try:
+            workspaces = self._client.list_workspaces()
+        except RuntimeError:
+            workspaces = []
+        if isinstance(workspaces, list):
+            for ws in workspaces:
+                if ws.get("name") == name:
+                    self._workspace_id = ws["id"]
+                    return ws["id"]
+        # Create the workspace
+        try:
+            self._client.create_workspace(name)
+        except RuntimeError:
+            pass
+        try:
+            workspaces = self._client.list_workspaces()
+        except RuntimeError:
+            workspaces = []
+        if isinstance(workspaces, list):
+            for ws in workspaces:
+                if ws.get("name") == name:
+                    self._workspace_id = ws["id"]
+                    return ws["id"]
+        self._workspace_id = "default"
+        return "default"
+
+    # -------------------------------------------------------------------
+    # BaseChatMessageHistory API
+    # -------------------------------------------------------------------
+
+    @property
+    def messages(self) -> list:
+        """Return all messages for this session ordered by creation time.
+
+        Returns:
+            List of LangChain ``BaseMessage`` subclass instances
+            (``HumanMessage``, ``AIMessage``, ``SystemMessage``,
+            ``ToolMessage``, etc.) in the order they were stored.
+        """
+        ws_id = self._resolve_workspace()
+        from langchain_core.messages import messages_from_dict
+
+        try:
+            rows = self._client._sql(
+                "SELECT id, content, memory_type, entities_json, created_at "
+                "FROM memory WHERE "
+                f"source_session_id = '{_esc(self.session_id)}' "
+                f"AND workspace_id = '{_esc(ws_id)}' "
+                "AND memory_type = 'chat_message' "
+                "AND is_active = true "
+                "ORDER BY created_at ASC"
+            )
+        except RuntimeError:
+            return []
+
+        if not rows:
+            return []
+
+        message_dicts = []
+        for row in rows:
+            try:
+                msg_data = json.loads(row.get("content", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                continue
+            # The stored dict should have at least "type" and "content"
+            # keys (serialised by ``message_to_dict``).  Fold in any
+            # extra metadata stored in entities_json.
+            if not isinstance(msg_data, dict):
+                continue
+            meta = _json_parse(row.get("entities_json", "{}"))
+            if isinstance(meta, dict):
+                # Merge metadata into additional_kwargs if present
+                kwargs = msg_data.setdefault("additional_kwargs", {})
+                kwargs.setdefault("memory_id", row.get("id", ""))
+            message_dicts.append(msg_data)
+
+        if not message_dicts:
+            return []
+
+        try:
+            return messages_from_dict(message_dicts)
+        except Exception:
+            # Fallback: return raw dicts if deserialisation fails
+            return message_dicts
+
+    def add_messages(self, messages: Sequence) -> None:
+        """Store a sequence of chat messages.
+
+        Each message is serialised with ``message_to_dict`` and stored
+        as a SpacetimeDB memory record with ``memory_type='chat_message'``.
+
+        Args:
+            messages: Sequence of ``BaseMessage`` instances to persist.
+        """
+        ws_id = self._resolve_workspace()
+        from langchain_core.messages import message_to_dict
+
+        for msg in messages:
+            try:
+                msg_dict = message_to_dict(msg)
+            except Exception:
+                # Fallback: manual serialisation
+                msg_dict = {
+                    "type": getattr(msg, "type", "human"),
+                    "content": getattr(msg, "content", ""),
+                    "additional_kwargs": getattr(msg, "additional_kwargs", {}),
+                }
+
+            content_str = json.dumps(msg_dict, ensure_ascii=False)
+
+            # Store tool_calls metadata if present
+            meta = {}
+            tool_calls = getattr(msg, "tool_calls", [])
+            if tool_calls:
+                meta["tool_calls"] = tool_calls
+            invalid_tool_calls = getattr(msg, "invalid_tool_calls", [])
+            if invalid_tool_calls:
+                meta["invalid_tool_calls"] = invalid_tool_calls
+
+            try:
+                self._client.store(
+                    workspace_id=ws_id,
+                    content=content_str,
+                    summary=f"chat: {content_str[:200]}",
+                    memory_type="chat_message",
+                    source_session_id=self.session_id,
+                    entities_json=json.dumps(meta) if meta else "{}",
+                )
+            except RuntimeError:
+                pass
+
+    def clear(self) -> None:
+        """Remove all chat messages for this session.
+
+        Messages are soft-deleted (``is_active`` set to ``false``)
+        in SpacetimeDB.
+        """
+        ws_id = self._resolve_workspace()
+        try:
+            rows = self._client._sql(
+                f"SELECT id FROM memory WHERE "
+                f"source_session_id = '{_esc(self.session_id)}' "
+                f"AND workspace_id = '{_esc(ws_id)}' "
+                "AND memory_type = 'chat_message' "
+                "AND is_active = true"
+            )
+        except RuntimeError:
+            rows = []
+
+        for row in rows:
+            mem_id = row.get("id", "")
+            if mem_id:
+                try:
+                    self._client.delete_memory(mem_id)
+                except RuntimeError:
+                    pass
+
+    # -------------------------------------------------------------------
+    # Convenience
+    # -------------------------------------------------------------------
+
+    def __repr__(self) -> str:
+        return (
+            f"StmemChatMessageHistory(session_id={self.session_id!r}, "
+            f"message_count={len(self._try_count())})"
+        )
+
+    def _try_count(self) -> list:
+        """Quick count of stored messages (best-effort, no deserialisation)."""
+        ws_id = self._resolve_workspace()
+        try:
+            rows = self._client._sql(
+                "SELECT COUNT(*) as cnt FROM memory WHERE "
+                f"source_session_id = '{_esc(self.session_id)}' "
+                f"AND workspace_id = '{_esc(ws_id)}' "
+                "AND memory_type = 'chat_message' "
+                "AND is_active = true"
+            )
+            if rows:
+                return [rows[0].get("cnt", 0)]
+        except RuntimeError:
+            pass
+        return []
+
+
+# ---------------------------------------------------------------------------
 # Type stubs for LangGraph types
 # ---------------------------------------------------------------------------
 
