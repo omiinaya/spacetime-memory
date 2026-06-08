@@ -155,11 +155,11 @@ class Client:
                     resp = self._http.get(url, **kwargs)
                 else:
                     resp = self._http.request(method, url, **kwargs)
-                # Don't retry client errors (4xx)
+                # Don't retry client errors (4xx) or application errors (530)
                 code = int(getattr(resp, "status_code", 500))
-                if code < 500 or code >= 600:
+                if code < 500 or code >= 600 or code == 530:
                     return resp
-                # Server error — retry
+                # Server error — retry (502/503/504)
                 last_exc = RuntimeError(f"Server error (HTTP {code}) on {url}")
             except (httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e

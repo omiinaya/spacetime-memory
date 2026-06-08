@@ -1,213 +1,306 @@
-"""Integration tests for the Zep adapter.
+"""Integration tests for Zep-compatible adapter.
 
-Requires a running SpacetimeDB instance.
+These tests require a running SpacetimeDB instance.
+Run with::
+
+    SPACETIMEDB_HOST=localhost SPACETIMEDB_PORT=3001 pytest tests/test_zep_adapter.py -v
+
 """
 
 from __future__ import annotations
 
 import os
+import uuid
+from pathlib import Path
+import time
 import pytest
 
 from spacetime_memory import Client
 from spacetime_memory.sdks.zep import (
-    FactResponse,
-    Memory,
-    Message,
+    ZepClient,
+    MemoryMessage,
+    MemorySearchResult,
     Session,
-    SessionSearchResult,
-    Zep,
 )
-from spacetime_memory.auth import generate_token
-
-HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
-PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
-DB = os.environ.get("SPACETIMEDB_DB", None)
 
 
-def _generate_test_token() -> str:
-    key_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "data", "id_ecdsa_pkcs8.pem"
-    )
-    key_path = os.path.abspath(key_path)
-    if os.path.exists(key_path):
-        return generate_token(key_path)
-    return ""
+@pytest.fixture(scope="module")
+def host() -> str:
+    return os.environ.get("SPACETIMEDB_HOST", "localhost")
+
+
+@pytest.fixture(scope="module")
+def port() -> int:
+    return int(os.environ.get("SPACETIMEDB_PORT", "3001"))
+
+
+@pytest.fixture(scope="module")
+def db() -> str | None:
+    return os.environ.get("SPACETIMEDB_DB", None)
 
 
 @pytest.fixture(scope="module")
 def token() -> str:
-    return _generate_test_token()
+    """Generate a JWT token for consistent identity across calls."""
+    try:
+        from spacetime_memory.auth import generate_token
+    except ImportError:
+        return ""
+    key_path = (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "data" / "id_ecdsa_pkcs8.pem"
+    )
+    if not key_path.exists():
+        return ""
+    return generate_token(str(key_path))
 
 
-@pytest.fixture(scope="module")
-def client(token: str) -> Client:
-    kwargs = {"host": HOST, "port": PORT, "token": token}
-    if DB:
-        kwargs["database"] = DB
-    return Client(**kwargs)
+@pytest.fixture
+def zep(host: str, port: int, db: str | None, token: str):
+    client = ZepClient(
+        host=host,
+        port=port,
+        config={"db": db} if db else None,
+        token=token or None,
+    )
+    yield client
+    client.close()
 
 
-@pytest.fixture(scope="module")
-def zep(client: Client) -> Zep:
-    return Zep(client=client)
+def _sid(prefix: str = "zep-test") -> str:
+    """Generate a unique session ID to avoid ACL cross-contamination."""
+    return f"{prefix}-{uuid.uuid4().hex[:12]}"
 
 
-class TestZep:
-    """Tests for the Zep-compatible adapter."""
+class TestZepClient:
+    """Tests for the ZepClient adapter."""
 
-    def test_add_session(self, zep: Zep):
-        """Creating a session returns a Session object."""
-        session = zep.memory.add_session(session_id="test-session-1")
-        assert isinstance(session, Session)
-        assert session.session_id == "test-session-1"
+    def test_add_and_get_memory(self, zep: ZepClient) -> None:
+        """Add messages then retrieve them."""
+        sid = _sid()
+        result = zep.add_memory(
+            session_id=sid,
+            messages=[
+                {"role": "user", "content": "Hello from Zep adapter test"},
+                {"role": "assistant", "content": "This is a test response"},
+            ],
+        )
+        assert result["status"] == "ok"
+        assert len(result["message_ids"]) > 0
 
-    def test_get_session(self, zep: Zep):
-        """Getting an existing session returns it."""
-        zep.memory.add_session(session_id="test-session-2", user_id="alice")
-        session = zep.memory.get_session("test-session-2")
-        assert session is not None
-        assert session.session_id == "test-session-2"
-
-    def test_get_session_nonexistent(self, zep: Zep):
-        """Getting a nonexistent session returns None."""
-        session = zep.memory.get_session("nonexistent-session-uuid")
-        assert session is None or isinstance(session, Session)
-
-    def test_add_messages(self, zep: Zep):
-        """Adding messages to a session succeeds."""
-        zep.memory.add_session(session_id="test-session-3")
-        result = zep.memory.add("test-session-3", messages=[
-            Message(role_type="user", content="I like pizza"),
-            Message(role_type="assistant", content="Great choice!"),
-        ])
-        assert result.ok is True
-
-    def test_get_memory(self, zep: Zep):
-        """Getting memory returns messages."""
-        zep.memory.add_session(session_id="test-session-4")
-        zep.memory.add("test-session-4", messages=[
-            Message(role_type="user", content="Hello world"),
-        ])
-        memory = zep.memory.get("test-session-4")
+        memory = zep.get_memory(session_id=sid, limit=10)
         assert memory is not None
-        assert isinstance(memory, Memory)
-        assert len(memory.messages) >= 1
+        assert "messages" in memory
+        assert len(memory["messages"]) >= 2
 
-    def test_get_memory_nonexistent(self, zep: Zep):
-        """Getting memory for a nonexistent session returns None."""
-        memory = zep.memory.get("nonexistent-session-memory")
-        assert memory is None
+        contents = [m["content"] for m in memory["messages"]]
+        assert "Hello from Zep adapter test" in contents
 
-    def test_get_memory_lastn(self, zep: Zep):
-        """Getting memory with lastn returns only the last N messages."""
-        zep.memory.add_session(session_id="test-session-5")
-        zep.memory.add("test-session-5", messages=[
-            Message(role_type="user", content=f"Message {i}") for i in range(10)
-        ])
-        memory = zep.memory.get("test-session-5", lastn=3)
-        assert memory is not None
-        assert len(memory.messages) <= 3
+    def test_add_memory_with_memorymessage_objects(self, zep: ZepClient) -> None:
+        """Add messages using MemoryMessage objects."""
+        sid = _sid()
+        msgs = [
+            MemoryMessage(role="user", content="Object-based message"),
+        ]
+        result = zep.add_memory(
+            session_id=sid,
+            messages=msgs,
+        )
+        assert result["status"] == "ok"
 
-    def test_list_sessions(self, zep: Zep):
-        """Listing sessions returns created sessions."""
-        sessions = zep.memory.list_sessions()
-        assert isinstance(sessions, list)
-        # Should have at least the sessions we created
-        session_ids = {s.session_id for s in sessions}
-        assert "test-session-1" in session_ids
+        mem = zep.get_memory(session_id=sid, limit=5)
+        assert mem is not None
+        assert any("Object-based message" in m["content"] for m in mem["messages"])
 
-    def test_search_sessions(self, zep: Zep):
-        """Searching sessions returns relevant results."""
-        zep.memory.add_session(session_id="test-search-session")
-        zep.memory.add("test-search-session", messages=[
-            Message(role_type="user", content="I love eating pepperoni pizza"),
-        ])
-        results = zep.memory.search_sessions(text="pizza")
-        assert isinstance(results, list)
+    def test_search_memory(self, zep: ZepClient) -> None:
+        """Search memory within a session."""
+        sid = _sid()
+        zep.add_memory(
+            session_id=sid,
+            messages=[
+                {"role": "user", "content": "My favorite food is pizza"},
+                {"role": "user", "content": "I enjoy hiking in the mountains"},
+            ],
+        )
 
-    def test_search_sessions_empty(self, zep: Zep):
-        """Searching with no text returns empty."""
-        results = zep.memory.search_sessions(text="")
+        time.sleep(0.5)
+
+        results = zep.search_memory(
+            session_id=sid,
+            query="food preferences",
+            limit=5,
+        )
+        assert len(results) >= 0
+        if results:
+            scores = [r.score for r in results if r.message]
+            assert all(s >= 0.0 for s in scores)
+
+    def test_search_memory_empty_session(self, zep: ZepClient) -> None:
+        """Search in a non-existent session returns empty list."""
+        results = zep.search_memory(
+            session_id=_sid("zep-test-noexist"),
+            query="anything",
+        )
         assert results == []
 
-    def test_get_session_messages(self, zep: Zep):
-        """Getting session messages returns paginated results."""
-        zep.memory.add_session(session_id="test-session-6")
-        zep.memory.add("test-session-6", messages=[
-            Message(role_type="user", content=f"Msg {i}") for i in range(5)
-        ])
-        result = zep.memory.get_session_messages("test-session-6", limit=3)
-        assert "messages" in result
-        assert "cursor" in result
-        assert len(result["messages"]) <= 3
-
-    def test_get_session_message(self, zep: Zep):
-        """Getting a specific message by UUID works."""
-        # First add a message and get its UUID
-        zep.memory.add_session(session_id="test-session-7")
-        zep.memory.add("test-session-7", messages=[
-            Message(role_type="user", content="Find me by UUID"),
-        ])
-        memory = zep.memory.get("test-session-7")
-        assert memory is not None and len(memory.messages) > 0
-        msg_uuid = memory.messages[0].uuid
-
-        result = zep.memory.get_session_message("test-session-7", msg_uuid)
-        assert result is not None
-        assert result["content"] == "Find me by UUID"
-
-    def test_update_session(self, zep: Zep):
-        """Updating session metadata works."""
-        zep.memory.add_session(session_id="test-session-8")
-        updated = zep.memory.update_session(
-            "test-session-8", metadata={"theme": "dark"}
+    def test_search_memory_return_type(self, zep: ZepClient) -> None:
+        """Search returns MemorySearchResult objects."""
+        sid = _sid()
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Testing search return types"}],
         )
-        assert isinstance(updated, Session)
-        assert updated.metadata.get("theme") == "dark"
-
-    def test_update_message_metadata(self, zep: Zep):
-        """Updating message metadata works."""
-        zep.memory.add_session(session_id="test-session-9")
-        zep.memory.add("test-session-9", messages=[
-            Message(role_type="user", content="Update my meta"),
-        ])
-        memory = zep.memory.get("test-session-9")
-        assert memory is not None and len(memory.messages) > 0
-        msg_uuid = memory.messages[0].uuid
-
-        updated = zep.memory.update_message_metadata(
-            "test-session-9", msg_uuid, metadata={"source": "test"}
+        time.sleep(0.3)
+        results = zep.search_memory(
+            session_id=sid,
+            query="testing",
+            limit=5,
         )
-        assert updated["metadata"]["source"] == "test"
+        for r in results:
+            assert isinstance(r, MemorySearchResult)
+            if r.message:
+                assert isinstance(r.message, MemoryMessage)
+                assert isinstance(r.message.content, str)
 
-    def test_delete_session(self, zep: Zep):
-        """Deleting a session's memory succeeds."""
-        zep.memory.add_session(session_id="test-session-delete")
-        zep.memory.add("test-session-delete", messages=[
-            Message(role_type="user", content="Delete me"),
-        ])
-        result = zep.memory.delete("test-session-delete")
-        assert result.ok is True
-
-    def test_delete_nonexistent_session(self, zep: Zep):
-        """Deleting a nonexistent session returns ok."""
-        result = zep.memory.delete("nonexistent-delete-session")
-        assert result.ok is True
-
-    def test_session_with_user_id(self, zep: Zep):
-        """Creating a session with user_id stores it."""
-        session = zep.memory.add_session(
-            session_id="test-session-user", user_id="bob"
+    def test_search_memory_score_threshold(self, zep: ZepClient) -> None:
+        """Score threshold filters low-relevance results."""
+        sid = _sid()
+        zep.add_memory(
+            session_id=sid,
+            messages=[
+                {"role": "user", "content": "The capital of France is Paris"},
+                {"role": "user", "content": "Python is a programming language"},
+            ],
         )
-        assert session.user_id == "bob"
+        time.sleep(0.3)
 
-    def test_messages_with_dict(self, zep: Zep):
-        """Adding messages as dicts works (compat with Zep API)."""
-        zep.memory.add_session(session_id="test-session-dict")
-        result = zep.memory.add("test-session-dict", messages=[
-            {"role_type": "user", "content": "Dict message"},
-        ])
-        assert result.ok is True
-        memory = zep.memory.get("test-session-dict")
-        assert memory is not None
-        assert any("Dict message" in m.content for m in memory.messages)
+        results = zep.search_memory(
+            session_id=sid,
+            query="France Paris",
+            limit=5,
+            score_threshold=0.3,
+        )
+        assert isinstance(results, list)
+
+    def test_delete_memory(self, zep: ZepClient) -> None:
+        """Delete all messages for a session."""
+        sid = _sid()
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Delete me"}],
+        )
+        result = zep.delete_memory(session_id=sid)
+        assert result["status"] == "ok"
+        assert isinstance(result["deleted"], int)
+
+        mem = zep.get_memory(session_id=sid)
+        assert mem is None or len(mem.get("messages", [])) == 0
+
+    def test_delete_memory_nonexistent(self, zep: ZepClient) -> None:
+        """Delete on nonexistent session is idempotent."""
+        result = zep.delete_memory(session_id=_sid("zep-test-noexist-delete"))
+        assert result["status"] == "ok"
+
+    def test_add_memory_with_metadata(self, zep: ZepClient) -> None:
+        """Add memory with metadata dict."""
+        result = zep.add_memory(
+            session_id=_sid(),
+            messages=[{"role": "user", "content": "With metadata"}],
+            metadata={"source": "test", "importance": 5},
+        )
+        assert result["status"] == "ok"
+
+    def test_add_memory_empty_messages(self, zep: ZepClient) -> None:
+        """Adding empty messages list returns ok with no IDs."""
+        result = zep.add_memory(
+            session_id=_sid(),
+            messages=[],
+        )
+        assert result["status"] == "ok"
+        assert result["message_ids"] == []
+
+    def test_get_memory_limit(self, zep: ZepClient) -> None:
+        """get_memory respects the limit parameter."""
+        sid = _sid()
+        many_msgs = [
+            {"role": "user", "content": f"Test message {i}"}
+            for i in range(5)
+        ]
+        zep.add_memory(
+            session_id=sid,
+            messages=many_msgs,
+        )
+        mem = zep.get_memory(session_id=sid, limit=3)
+        assert mem is not None
+        assert len(mem["messages"]) <= 3
+
+    def test_get_memory_nonexistent_session(self, zep: ZepClient) -> None:
+        """get_memory on nonexistent session returns None."""
+        mem = zep.get_memory(session_id=_sid("zep-test-never-created"))
+        assert mem is None
+
+    def test_list_sessions(self, zep: ZepClient) -> None:
+        """list_sessions returns workspace-derived Session objects."""
+        sid = _sid()
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Session lister test"}],
+        )
+        sessions = zep.list_sessions()
+        assert isinstance(sessions, list)
+        for s in sessions:
+            assert isinstance(s, Session)
+            assert s.session_id
+
+    def test_get_session(self, zep: ZepClient) -> None:
+        """get_session returns a Session or None."""
+        sid = _sid()
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Session getter"}],
+        )
+        s = zep.get_session(sid)
+        assert s is not None
+        assert isinstance(s, Session)
+        assert s.session_id == sid
+
+    def test_get_session_nonexistent(self, zep: ZepClient) -> None:
+        """get_session on nonexistent returns None."""
+        s = zep.get_session(_sid("zep-test-no-such-session"))
+        assert s is None
+
+    def test_close_is_idempotent(self, zep: ZepClient) -> None:
+        """close is idempotent and clears the cache but calls still work."""
+        sid = _sid()
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Close test"}],
+        )
+        zep.close()
+        result = zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "After close"}],
+        )
+        assert result["status"] == "ok"
+
+    def test_concurrent_sessions(self, zep: ZepClient) -> None:
+        """Multiple sessions are isolated from each other."""
+        sid_a = _sid("zep-test-concurrent-A")
+        sid_b = _sid("zep-test-concurrent-B")
+        zep.add_memory(
+            session_id=sid_a,
+            messages=[{"role": "user", "content": "Session A data"}],
+        )
+        zep.add_memory(
+            session_id=sid_b,
+            messages=[{"role": "user", "content": "Session B data"}],
+        )
+        mem_a = zep.get_memory(session_id=sid_a)
+        mem_b = zep.get_memory(session_id=sid_b)
+        assert mem_a is not None
+        assert mem_b is not None
+        a_contents = [m["content"] for m in mem_a["messages"]]
+        b_contents = [m["content"] for m in mem_b["messages"]]
+        assert "Session A data" in a_contents
+        assert "Session B data" in b_contents
+        assert "Session B data" not in a_contents

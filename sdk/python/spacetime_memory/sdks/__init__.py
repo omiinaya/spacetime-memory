@@ -13,7 +13,7 @@ from .honcho import Honcho
 from .hindsight import Hindsight
 from .langchain import StmemMemoryStore, StmemStore
 from .mem0 import Memory as Mem0Memory
-from .zep import FactResponse, Memory, MemoryClient, Message, Session, SessionSearchResult, Summary, Zep
+from .zep import ZepClient, MemoryMessage, Memory, MemorySearchResult, Session
 
 __all__ = [
     "Mem0Memory",
@@ -30,13 +30,10 @@ __all__ = [
     "AddTripletResults",
     "StmemStore",
     "StmemMemoryStore",
-    "Zep",
-    "Message",
-    "Session",
-    "Summary",
-    "FactResponse",
+    "ZepClient",
+    "MemoryMessage",
     "Memory",
-    "SessionSearchResult",
-    "MemoryClient",
+    "MemorySearchResult",
+    "Session",
 ]
 
