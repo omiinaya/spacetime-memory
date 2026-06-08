@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="spacetime-memory",
-    version="0.4.0",
+    version="0.5.0",
     description="SpacetimeDB-powered memory infrastructure for AI agents",
     long_description=open("README.md").read() if __import__("os").path.exists("README.md") else "",
     long_description_content_type="text/markdown",

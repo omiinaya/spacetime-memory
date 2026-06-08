@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+### ACL Model — Admin Bypass & Management
+
+- **Admin identity bypass** — `check_space_access()` now grants implicit owner
+  access to all workspaces for admin accounts. Removes the need for explicit
+  permission grants per workspace.
+- **Admin management reducers** — `promote_admin()`, `demote_admin()`,
+  `set_initial_admin()`, `list_admins()` with full validation (last-admin
+  protection, self-demote prevention, duplicate detection).
+- **Permission-gated workspace CRUD** — `update_workspace()` and
+  `delete_workspace()` now require owner access. `grant_space_access()` and
+  `revoke_space_access()` now also accept admins as grantors. Deleting a
+  workspace cleans up associated `space_permission` records.
+- **`stmem admin` CLI** — `promote`, `demote`, `init`, `list` subcommands.
+- **7 integration tests** — admin bypass, grant/revoke, promote/demote,
+  list, update/delete, user delete restrictions.
+
+### Backup & Restore
+
+- **5 integration tests** — backup structure, roundtrip with data, default
+  output path, invalid path handling, partial table restore.
+
+### Observability
+
+- **`request_id`** — 8-hex-char unique identifier on every `Client` instance.
+- **Structured JSON logging** — `JSONFormatter` class and `configure_logging()`
+  helper for newline-delimited JSON or plain-text output to stderr or file.
+- **Prometheus metrics export** — `MetricsCollector.prometheus_text()` method
+  and `stmem metrics prometheus` CLI command exposing endpoint call counts,
+  latency, error rates, memory item counts, and embedder errors in Prometheus
+  exposition format.
+- **Identity token auto-capture** — `Client` now captures the
+  `spacetime-identity-token` from the server on first anonymous call and
+  reuses it, ensuring consistent identity across requests without a JWT.
+- **10 unit tests** — JSONFormatter, Client request_id, Prometheus text
+  format edge cases, logging configuration.
+
 ## 0.4.0 (unreleased)
 
 ### Drop-in Adapters

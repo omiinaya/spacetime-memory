@@ -1,6 +1,7 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::auth;
 
 /// A workspace representing a project, agent-world, or sandbox.
 #[table(accessor = workspace, public)]
@@ -65,12 +66,16 @@ pub fn create_workspace(ctx: &ReducerContext, name: String, description: String,
 
 #[reducer]
 pub fn update_workspace(ctx: &ReducerContext, id: String, name: String, description: String) -> Result<(), String> {
+    let caller = ctx.sender().to_hex().to_string();
     let existing = ctx
         .db
         .workspace()
         .id()
         .find(&id)
         .ok_or_else(|| format!("Workspace '{}' not found", id))?;
+
+    // Only owner or admin can update workspace metadata
+    check_space_access(ctx, &id, &caller, "owner")?;
 
     ctx.db.workspace().id().update(Workspace {
         id: id.clone(),
@@ -85,11 +90,26 @@ pub fn update_workspace(ctx: &ReducerContext, id: String, name: String, descript
 
 #[reducer]
 pub fn delete_workspace(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let caller = ctx.sender().to_hex().to_string();
+
     ctx.db
         .workspace()
         .id()
         .find(&id)
         .ok_or_else(|| format!("Workspace '{}' not found", id))?;
+
+    // Only owner or admin can delete a workspace
+    check_space_access(ctx, &id, &caller, "owner")?;
+
+    let permissions: Vec<SpacePermission> = ctx
+        .db
+        .space_permission()
+        .iter()
+        .filter(|sp: &SpacePermission| sp.workspace_id == id)
+        .collect();
+    for perm in permissions {
+        ctx.db.space_permission().id().delete(&perm.id);
+    }
 
     ctx.db.workspace().id().delete(&id);
     Ok(())
@@ -134,6 +154,11 @@ pub fn check_space_access(
     peer_id: &str,
     required: &str,
 ) -> Result<(), String> {
+    // Admin bypass: admins have implicit owner access to all workspaces
+    if auth::is_admin(peer_id, ctx) {
+        return Ok(());
+    }
+
     // Permission rank helper
     let rank = |p: &str| -> u8 {
         match p {
@@ -208,17 +233,14 @@ pub fn grant_space_access(
         .find(&workspace_id)
         .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
 
-    // Only an existing owner can grant access
-    let is_owner = ctx
-        .db
-        .space_permission()
-        .iter()
-        .any(|sp: SpacePermission| {
+    // Only an existing owner or admin can grant access
+    let is_admin_or_owner = auth::is_admin(&caller, ctx)
+        || ctx.db.space_permission().iter().any(|sp: SpacePermission| {
             sp.workspace_id == workspace_id && sp.peer_id == caller && sp.permission == "owner"
         });
 
-    if !is_owner {
-        return Err("Only an owner of the workspace can grant access".to_string());
+    if !is_admin_or_owner {
+        return Err("Only an owner or admin can grant access".to_string());
     }
 
     // Check for existing permission — update or insert
@@ -271,36 +293,25 @@ pub fn revoke_space_access(
         .find(&workspace_id)
         .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
 
-    // Only an existing owner can revoke access
-    let is_owner = ctx
-        .db
-        .space_permission()
-        .iter()
-        .any(|sp: SpacePermission| {
+    // Only an existing owner or admin can revoke access
+    let is_admin_or_owner = auth::is_admin(&caller, ctx)
+        || ctx.db.space_permission().iter().any(|sp: SpacePermission| {
             sp.workspace_id == workspace_id && sp.peer_id == caller && sp.permission == "owner"
         });
 
-    if !is_owner {
-        return Err("Only an owner of the workspace can revoke access".to_string());
+    if !is_admin_or_owner {
+        return Err("Only an owner or admin can revoke access".to_string());
     }
 
-    // Cannot revoke your own access
+    // Cannot revoke your own access (unless admin revoking a non-self peer)
     if caller == peer_id {
         return Err("Cannot revoke your own access. Have another owner do it.".to_string());
     }
 
     // Find and delete the permission record
-    let existing = ctx
-        .db
-        .space_permission()
-        .iter()
+    let existing = ctx.db.space_permission().iter()
         .find(|sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id)
-        .ok_or_else(|| {
-            format!(
-                "Peer '{}' has no permission for workspace '{}'",
-                peer_id, workspace_id
-            )
-        })?;
+        .ok_or_else(|| format!("Peer '{}' has no permission for workspace '{}'", peer_id, workspace_id))?;
 
     ctx.db.space_permission().id().delete(&existing.id);
 

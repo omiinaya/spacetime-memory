@@ -274,6 +274,12 @@ pub fn require_admin(ctx: &ReducerContext) -> Result<Account, String> {
     Ok(account)
 }
 
+/// Check if a given identity string corresponds to an admin account.
+pub fn is_admin(identity: &str, ctx: &ReducerContext) -> bool {
+    ctx.db.account().id().find(identity.to_string())
+        .map_or(false, |a: Account| a.role == "admin" && a.is_active)
+}
+
 /// Check if the caller is authenticated (no error, just bool).
 pub fn is_authenticated(ctx: &ReducerContext) -> bool {
     let identity = ctx.sender().to_hex().to_string();
@@ -306,4 +312,139 @@ fn derive_salt(identity: &str, timestamp: i64) -> Vec<u8> {
     hasher.update(&timestamp.to_le_bytes());
     hasher.update(b"spacetime-memory-auth-salt");
     hasher.finalize().to_vec()
+}
+
+// ── Admin Management ─────────────────────────────────────────────────
+
+/// Promote a user to admin. Only an existing admin can promote others.
+#[reducer]
+pub fn promote_admin(ctx: &ReducerContext, target_identity: String) -> Result<(), String> {
+    let caller = ctx.sender().to_hex().to_string();
+
+    // Verify caller is an admin
+    let _caller_account = require_admin(ctx)?;
+
+    // Cannot promote self (already admin)
+    if caller == target_identity {
+        return Err("You are already an admin".to_string());
+    }
+
+    // Find the target account
+    let mut target = ctx.db.account().id().find(&target_identity)
+        .ok_or_else(|| format!("No account found for identity '{}'", &target_identity))?;
+
+    if target.role == "admin" {
+        return Err(format!("Identity '{}' is already an admin", &target_identity));
+    }
+
+    target.role = "admin".to_string();
+    target.updated_at = now_micros(ctx);
+    ctx.db.account().id().update(target);
+
+    Ok(())
+}
+
+/// Demote an admin to user. Only an existing admin can demote others.
+/// Cannot demote yourself.
+#[reducer]
+pub fn demote_admin(ctx: &ReducerContext, target_identity: String) -> Result<(), String> {
+    let caller = ctx.sender().to_hex().to_string();
+
+    // Verify caller is an admin
+    let _caller_account = require_admin(ctx)?;
+
+    // Cannot demote yourself
+    if caller == target_identity {
+        return Err("Cannot demote yourself. Have another admin do it.".to_string());
+    }
+
+    // Find the target account
+    let mut target = ctx.db.account().id().find(&target_identity)
+        .ok_or_else(|| format!("No account found for identity '{}'", &target_identity))?;
+
+    if target.role != "admin" {
+        return Err(format!("Identity '{}' is not an admin", &target_identity));
+    }
+
+    // Prevent demoting the last admin
+    let admin_count = ctx.db.account().iter()
+        .filter(|a: &Account| a.role == "admin" && a.is_active)
+        .count();
+    if admin_count <= 1 {
+        return Err("Cannot demote the last admin. Promote someone else first.".to_string());
+    }
+
+    target.role = "user".to_string();
+    target.updated_at = now_micros(ctx);
+    ctx.db.account().id().update(target);
+
+    Ok(())
+}
+
+/// Set the initial admin identity. Only works if no admin account exists yet.
+/// This is intended for one-time setup (e.g., from a deployment script).
+/// The specified identity must not already have an Account record.
+#[reducer]
+pub fn set_initial_admin(ctx: &ReducerContext, identity_hex: String) -> Result<(), String> {
+    // Check that no admin exists yet
+    let existing_admin = ctx.db.account().iter()
+        .any(|a: Account| a.role == "admin" && a.is_active);
+    if existing_admin {
+        return Err("An admin account already exists. Use promote_admin instead.".to_string());
+    }
+
+    // Check this identity doesn't already have an account
+    if ctx.db.account().id().find(&identity_hex).is_some() {
+        return Err("This identity already has an account. Use promote_admin instead.".to_string());
+    }
+
+    let now = now_micros(ctx);
+    let username = format!("admin-{}", &identity_hex[..8]);
+    ctx.db.account().insert(Account {
+        id: identity_hex,
+        username,
+        display_name: "Initial Admin".to_string(),
+        password_hash: String::new(),
+        password_salt: String::new(),
+        role: "admin".to_string(),
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+    });
+
+    Ok(())
+}
+
+/// List all admin accounts. Stores results in admin_list_result table.
+#[reducer]
+pub fn list_admins(ctx: &ReducerContext) -> Result<(), String> {
+    // Require auth (any authenticated user can list admins)
+    let _account = require_auth(ctx)?;
+
+    let now = now_micros(ctx);
+    for account in ctx.db.account().iter().filter(|a: &Account| a.role == "admin" && a.is_active) {
+        ctx.db.admin_list_result().insert(AdminListResult {
+            id: uuid_v4(ctx),
+            identity: account.id.clone(),
+            username: account.username.clone(),
+            display_name: account.display_name.clone(),
+            created_at: account.created_at,
+            queried_at: now,
+        });
+    }
+
+    Ok(())
+}
+
+/// Result table for list_admins.
+#[table(accessor = admin_list_result, public)]
+#[derive(Debug, Clone)]
+pub struct AdminListResult {
+    #[primary_key]
+    pub id: String,
+    pub identity: String,
+    pub username: String,
+    pub display_name: String,
+    pub created_at: i64,
+    pub queried_at: i64,
 }

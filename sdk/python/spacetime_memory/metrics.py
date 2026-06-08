@@ -197,6 +197,48 @@ class MetricsCollector:
             "memory": self._memory.to_dict(),
         }
 
+    def prometheus_text(self) -> str:
+        """Export all metrics as Prometheus exposition-format text."""
+        lines: list[str] = []
+        uptime = self.uptime_seconds()
+
+        lines.append("# HELP spacetime_memory_uptime_seconds Total uptime")
+        lines.append("# TYPE spacetime_memory_uptime_seconds gauge")
+        lines.append(f"spacetime_memory_uptime_seconds {round(uptime, 1)}")
+
+        lines.append("# HELP spacetime_memory_total_calls Total reducer/SQL calls")
+        lines.append("# TYPE spacetime_memory_total_calls counter")
+        lines.append(f"spacetime_memory_total_calls {sum(s.count for s in self._endpoints.values())}")
+
+        lines.append("# HELP spacetime_memory_total_errors Total failed calls")
+        lines.append("# TYPE spacetime_memory_total_errors counter")
+        lines.append(f"spacetime_memory_total_errors {sum(s.errors for s in self._endpoints.values())}")
+
+        lines.append("# HELP spacetime_memory_embedder_errors Embedder error count")
+        lines.append("# TYPE spacetime_memory_embedder_errors counter")
+        lines.append(f"spacetime_memory_embedder_errors {self._embedder_errors}")
+
+        lines.append("# HELP spacetime_memory_total_items Total memory items")
+        lines.append("# TYPE spacetime_memory_total_items gauge")
+        lines.append(f"spacetime_memory_total_items {self._memory.total}")
+
+        for mem_type, count in self._memory.by_type.items():
+            sanitized = mem_type.replace("-", "_").replace(" ", "_")
+            lines.append(f'spacetime_memory_items_by_type{{type="{sanitized}"}} {count}')
+
+        for tier, count in self._memory.by_tier.items():
+            lines.append(f'spacetime_memory_items_by_tier{{tier="{tier}"}} {count}')
+
+        lines.append("# HELP spacetime_memory_endpoint_calls Calls per endpoint")
+        lines.append("# TYPE spacetime_memory_endpoint_calls counter")
+        for name, stats in sorted(self._endpoints.items()):
+            sanitized = name.replace("-", "_").replace(" ", "_").replace(":", "_")
+            lines.append(f'spacetime_memory_endpoint_calls{{endpoint="{sanitized}"}} {stats.count}')
+            lines.append(f'spacetime_memory_endpoint_errors{{endpoint="{sanitized}"}} {stats.errors}')
+            lines.append(f'spacetime_memory_endpoint_latency_ms{{endpoint="{sanitized}",quantile="avg"}} {stats.avg_latency_ms}')
+
+        return "\n".join(lines) + "\n"
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

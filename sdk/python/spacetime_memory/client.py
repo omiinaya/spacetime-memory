@@ -45,6 +45,64 @@ _REDUCER_ERROR_MAP: dict[str, str] = {
 class EmbedderUnavailableError(ConnectionError):
     """Raised when the embedding sidecar is unreachable and no fallback is configured."""
 
+
+# ---------------------------------------------------------------------------
+# Logging configuration
+# ---------------------------------------------------------------------------
+
+
+class JSONFormatter(logging.Formatter):
+    """JSON log formatter. Outputs structured log records as newline-delimited JSON."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "ts": self.formatTime(record, self.datefmt or "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        # Include exception info if present
+        if record.exc_info and record.exc_info[0]:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        # Attach extra fields passed via the `extra` parameter
+        for key, value in getattr(record, "extra_fields", {}).items():
+            log_entry[key] = value
+        return json.dumps(log_entry, default=str)
+
+
+def configure_logging(
+    level: str = "INFO",
+    json_format: bool = True,
+    log_file: str | None = None,
+) -> None:
+    """Configure structured logging for the SDK.
+
+    Args:
+        level: Log level (DEBUG, INFO, WARNING, ERROR).
+        json_format: If True, output newline-delimited JSON. If False, plain text.
+        log_file: Optional path to a log file. If None, logs to stderr.
+    """
+    logger = logging.getLogger("spacetime_memory")
+    logger.setLevel(getattr(logging, level.upper(), logging.INFO))
+
+    # Remove existing handlers
+    logger.handlers.clear()
+
+    if log_file:
+        handler: logging.Handler = logging.FileHandler(log_file)
+    else:
+        handler = logging.StreamHandler()
+
+    if json_format:
+        formatter: logging.Formatter = JSONFormatter()
+    else:
+        formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        )
+
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
@@ -102,6 +160,9 @@ class Client:
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
         self.max_retries = int(os.environ.get("STMEM_MAX_RETRIES", "3"))
         self._metrics: Any = None  # Set via set_metrics_collector()
+        self.request_id: str = os.urandom(4).hex()  # Unique per-client instance
+        self._identity_token: str | None = None
+        self._identity_established: bool = False
 
         base = f"http://{self.host}:{self.port}"
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
@@ -111,9 +172,33 @@ class Client:
     def _headers(self) -> dict[str, str]:
         """Return common HTTP headers, including auth if a token is set."""
         headers: dict[str, str] = {}
-        if self.token:
-            headers["Authorization"] = f"Bearer {self.token}"
+        # Use explicit JWT token if provided, otherwise use captured identity token
+        auth_token = self.token or self._identity_token
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
         return headers
+
+    def _ensure_identity(self) -> None:
+        """Establish a consistent identity with SpacetimeDB.
+
+        Makes an anonymous request to capture the identity token
+        from the response, then uses it for all subsequent calls.
+        Only needed when no explicit JWT token is configured.
+        """
+        if self._identity_established or self.token:
+            return
+        try:
+            resp = self._http.get(
+                f"http://{self.host}:{self.port}/v1/database/{self.database}",
+                timeout=5.0,
+            )
+            token = resp.headers.get("spacetime-identity-token", "")
+            if token:
+                self._identity_token = token
+            self._identity_established = True
+        except Exception:
+            # If the handshake fails, proceed without identity
+            self._identity_established = True
 
     # -------------------------------------------------------------------
     # Metrics integration
@@ -197,9 +282,9 @@ class Client:
 
     def _sql(self, query: str) -> list[dict[str, Any]]:
         """Run a SELECT query against the SpacetimeDB SQL API."""
-        headers = {"Content-Type": "text/plain"}
-        if self.token:
-            headers["Authorization"] = f"Bearer {self.token}"
+        self._ensure_identity()
+        headers = self._headers()
+        headers["Content-Type"] = "text/plain"
 
         def _do_sql() -> httpx.Response:
             return self._request_with_retry(
@@ -237,9 +322,9 @@ class Client:
 
     def _call(self, reducer: str, args: list[Any]) -> dict[str, Any]:
         """Call a SpacetimeDB reducer with positional JSON args."""
-        headers = {"Content-Type": "application/json"}
-        if self.token:
-            headers["Authorization"] = f"Bearer {self.token}"
+        self._ensure_identity()
+        headers = self._headers()
+        headers["Content-Type"] = "application/json"
 
         def _do_call() -> httpx.Response:
             return self._request_with_retry(
