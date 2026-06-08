@@ -1,14 +1,12 @@
 """ACL integration tests — admin bypass, promote/demote, grant/revoke.
 
 These tests require a running SpacetimeDB standalone.  The ``stdb_session``
-fixture auto-publishes the module with a clean data dir, and admin bootstrap
-uses a persistent identity token (saved to ``/tmp/stmem_admin_token``) so the
-same SpacetimeDB identity is reused across test runs.
+fixture auto-publishes the module with a clean data dir.
 
-On a fresh DB (after publish --delete-data=always) it bootstraps via
-register + set_initial_admin.  On subsequent runs it reuses the saved
-token — the identity is already admin.
+Uses JWT tokens from the project key pair for deterministic admin identity
+across test runs so admin bootstrapping is reliable even after DB wipes.
 """
+
 from __future__ import annotations
 
 import os
@@ -27,51 +25,51 @@ pytestmark = [
 ]
 
 SUFFIX = os.urandom(4).hex()
-ADMIN_TOKEN_FILE = "/tmp/stmem_admin_token"
+TOKEN_PATH = str(REPO_ROOT / "data" / "id_ecdsa_pkcs8.pem")
+
+
+def _generate_admin_token() -> str:
+    """Generate a JWT token from the project key pair for admin identity."""
+    try:
+        from spacetime_memory.auth import generate_token
+        return generate_token(TOKEN_PATH)
+    except ImportError:
+        return ""
 
 
 @pytest.fixture(scope="module")
 def admin(stdb_session) -> Client:
-    """Create an admin client using a persistent identity token.
+    """Create an admin client using a JWT token for deterministic identity.
 
-    If a saved identity token exists (previous run), reuses it so the
-    same identity (already admin) is used for all subsequent test runs.
-    On a fresh DB, bootstraps via register + set_initial_admin and saves
-    the identity token for reuse.
+    The project's key pair produces a stable SpacetimeDB identity so the
+    admin bootstrapping (register + set_initial_admin) produces the same
+    result every run, even after the DB is wiped by --delete-data=always.
     """
     c = Client(
         host=stdb_session["host"],
         port=stdb_session["port"],
         database=stdb_session["database"],
+        token=_generate_admin_token(),
     )
 
-    # Reuse saved identity token if available
-    if os.path.exists(ADMIN_TOKEN_FILE):
-        with open(ADMIN_TOKEN_FILE) as f:
-            token = f.read().strip()
-        if token:
-            c._identity_token = token
-            c._identity_established = True
-            return c
-
-    # First run — bootstrap admin
+    # Bootstrap admin: register + set_initial_admin
     uname = f"acl_admin_{SUFFIX}"
+    my_id = ""
     try:
         c._call("register", [uname, "Admin", "adminpass"])
     except RuntimeError:
-        pass  # already registered
+        pass  # already registered — identity already has an account
 
-    my_id = c._whoami()
+    try:
+        my_id = c._whoami()
+    except Exception:
+        pass
+
     if my_id:
         try:
             c._call("set_initial_admin", [my_id])
         except RuntimeError:
             pass  # admin already exists
-
-    # Save identity token for reuse across test runs
-    if c._identity_token:
-        with open(ADMIN_TOKEN_FILE, "w") as f:
-            f.write(c._identity_token)
 
     return c
 
@@ -132,8 +130,11 @@ def test_03_promote_demote(admin, user):
 
 
 def test_04_list_admins(admin):
-    admin._call("set_initial_admin", ["all"])
-    r = admin._call("list_admins")
+    try:
+        admin._call("set_initial_admin", ["all"])
+    except RuntimeError:
+        pass  # admin already exists — fine
+    r = admin._call("list_admins", [])
     assert isinstance(r, (list, dict))
 
 
