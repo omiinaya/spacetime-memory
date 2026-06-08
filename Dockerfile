@@ -75,10 +75,13 @@ COPY server/spacetimedb/Cargo.toml /app/module/Cargo.toml
 COPY --from=frontend-builder /build/dist/ /app/frontend/
 
 # ---- Config ----
-COPY data/config.toml /app/data/config.toml
-# Generate JWT keys if not present (they're gitignored)
+# config.toml is generated at build time (may not exist in build context)
 RUN mkdir -p /app/data && \
-    if [ ! -f /app/data/id_ecdsa_pkcs8.pem ]; then \
+    if [ ! -f /app/data/config.toml ]; then \
+        printf '[logs]\ndirectives = [\n    "spacetimedb=debug",\n    "spacetimedb_client_api=debug",\n    "spacetimedb_lib=debug",\n    "spacetimedb_standalone=debug",\n    "spacetimedb_commitlog=info",\n    "spacetimedb_durability=info",\n]\n' > /app/data/config.toml; \
+    fi
+# Generate JWT keys if not present
+RUN if [ ! -f /app/data/id_ecdsa_pkcs8.pem ]; then \
         apt-get install -y --no-install-recommends openssl && \
         openssl ecparam -genkey -name prime256v1 -noout -out /app/data/id_ecdsa.pem && \
         openssl ec -in /app/data/id_ecdsa.pem -pubout -out /app/data/id_ecdsa.pub && \

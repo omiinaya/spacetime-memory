@@ -640,6 +640,7 @@ pub fn compute_community_hierarchy(
     #[allow(dead_code)]
     struct Cluster {
         id: String,
+        #[allow(dead_code)]
         depth: u32,
         community_set: std::collections::HashSet<u64>,
     }
