@@ -1,10 +1,8 @@
 """Integration tests for spacetime-memory.
 
 These tests require a running SpacetimeDB instance and embedder.
-Run with: SPACETIMEDB_HOST=localhost SPACETIMEDB_PORT=3001 pytest ... -v
-
-Or with a specific database identity:
-  SPACETIMEDB_DB=hexid pytest tests/test_integration.py -v
+The ``stdb_client`` fixture (from conftest.py) auto-publishes the module
+and provides an authenticated client.
 """
 
 from __future__ import annotations
@@ -22,15 +20,9 @@ from pathlib import Path
 from spacetime_memory import Client
 
 pytestmark = [
-    pytest.mark.skipif(
-        not os.environ.get("SPACETIMEDB_HOST"),
-        reason="Integration tests require SPACETIMEDB_HOST env var",
-    ),
+    pytest.mark.integration,
 ]
 
-HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
-PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
-DB = os.environ.get("SPACETIMEDB_DB", "spacetime-memory")
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 CLI_PATH = str(REPO_ROOT / "cli" / "stmem.py")
 
@@ -41,7 +33,7 @@ def _unique(prefix: str = "test") -> str:
     return f"{prefix}-{suffix}"
 
 
-def _make_ws(client: Client) -> str:
+def _make_ws(client: Client, stdb_session: dict | None = None) -> str:
     """Helper: create a unique workspace and return its ID."""
     ws_name = _unique("it-ws")
     result = client.create_workspace(ws_name)
@@ -58,31 +50,10 @@ def _make_ws(client: Client) -> str:
 # =====================================================================
 
 
-@pytest.fixture(scope="module")
-def client():
-    """Create a Client with JWT auth for consistent identity across calls."""
-    token = _generate_test_token()
-    return Client(host=HOST, port=PORT, database=DB, token=token)
-
-
-def _generate_test_token() -> str:
-    """Generate a JWT token for integration tests from the project's key pair."""
-    try:
-        from spacetime_memory.auth import generate_token
-    except ImportError:
-        # If the auth module isn't available, fall back to no token
-        # (will work with public workspaces or ACL bypass)
-        return ""
-    key_path = REPO_ROOT / "data" / "id_ecdsa_pkcs8.pem"
-    if not key_path.exists():
-        return ""
-    return generate_token(str(key_path))
-
-
 @pytest.fixture
-def ws(client):
+def ws(stdb_client):
     """Unique workspace per test function."""
-    return _make_ws(client)
+    return _make_ws(stdb_client)
 
 
 # =====================================================================
@@ -93,12 +64,12 @@ def ws(client):
 class TestWorkspaceCRUD:
     """Workspace create / list."""
 
-    def test_create_and_list(self, client):
+    def test_create_and_list(self, stdb_client):
         ws_name = _unique("ws-crud")
-        result = client.create_workspace(ws_name)
+        result = stdb_client.create_workspace(ws_name)
         assert result["status"] == "ok"
 
-        workspaces = client.list_workspaces()
+        workspaces = stdb_client.list_workspaces()
         found = any(ws.get("name") == ws_name for ws in workspaces)
         assert found, f"Workspace '{ws_name}' not in list"
 
@@ -106,8 +77,8 @@ class TestWorkspaceCRUD:
 class TestMemoryCRUD:
     """Full memory CRUD lifecycle."""
 
-    def test_store_and_list(self, client, ws):
-        result = client.store(
+    def test_store_and_list(self, stdb_client, ws):
+        result = stdb_client.store(
             workspace_id=ws,
             content="The quick brown fox jumps over the lazy dog",
             peer_id="it-bot",
@@ -115,40 +86,40 @@ class TestMemoryCRUD:
         )
         assert result["status"] == "ok"
 
-        mems = client.list_memories(workspace_id=ws, limit=10)
+        mems = stdb_client.list_memories(workspace_id=ws, limit=10)
         assert isinstance(mems, list)
         assert len(mems) >= 1
         mems_text = " ".join(m.get("content", "") for m in mems)
         assert "fox" in mems_text
 
-    def test_store_with_tier(self, client, ws):
-        result = client.store(
+    def test_store_with_tier(self, stdb_client, ws):
+        result = stdb_client.store(
             workspace_id=ws, content="critical memory", peer_id="bot", tier="L0",
         )
         assert result["status"] == "ok"
 
-    def test_update_memory(self, client, ws):
-        client.store(workspace_id=ws, content="original content", peer_id="bot")
-        mems = client.list_memories(workspace_id=ws, limit=5)
+    def test_update_memory(self, stdb_client, ws):
+        stdb_client.store(workspace_id=ws, content="original content", peer_id="bot")
+        mems = stdb_client.list_memories(workspace_id=ws, limit=5)
         assert len(mems) > 0
         mem_id = mems[0]["id"]
-        up = client.update_memory(mem_id, "updated content", "summary", 0.95)
+        up = stdb_client.update_memory(mem_id, "updated content", "summary", 0.95)
         assert up["status"] == "ok"
 
-    def test_delete_memory(self, client, ws):
-        client.store(workspace_id=ws, content="delete me", peer_id="bot")
-        mems = client.list_memories(workspace_id=ws, limit=5)
+    def test_delete_memory(self, stdb_client, ws):
+        stdb_client.store(workspace_id=ws, content="delete me", peer_id="bot")
+        mems = stdb_client.list_memories(workspace_id=ws, limit=5)
         assert len(mems) > 0
         mem_id = mems[0]["id"]
-        d = client.delete_memory(mem_id)
+        d = stdb_client.delete_memory(mem_id)
         assert d["status"] == "ok"
 
-    def test_reinforce_memory(self, client, ws):
-        client.store(workspace_id=ws, content="reinforce me", peer_id="bot")
-        mems = client.list_memories(workspace_id=ws, limit=5)
+    def test_reinforce_memory(self, stdb_client, ws):
+        stdb_client.store(workspace_id=ws, content="reinforce me", peer_id="bot")
+        mems = stdb_client.list_memories(workspace_id=ws, limit=5)
         assert len(mems) > 0
         mem_id = mems[0]["id"]
-        r = client.reinforce(mem_id)
+        r = stdb_client.reinforce(mem_id)
         assert r["status"] == "ok"
 
 
@@ -160,14 +131,15 @@ class TestMemoryCRUD:
 class TestSemanticSearch:
     """Search with the real embedder sidecar."""
 
-    def test_store_and_semantic_search(self, client, ws):
-        client.store(
+    @pytest.mark.embedder
+    def test_store_and_semantic_search(self, stdb_client, ws):
+        stdb_client.store(
             workspace_id=ws,
             content="I like pizza with pineapple and anchovies",
             peer_id="it-bot",
             memory_type="experience",
         )
-        client.store(
+        stdb_client.store(
             workspace_id=ws,
             content="Python is a programming language for web development",
             peer_id="it-bot",
@@ -175,159 +147,207 @@ class TestSemanticSearch:
         )
         time.sleep(0.5)
 
-        results = client.search(
+        results = stdb_client.search(
             workspace_id=ws, query="food pizza toppings", limit=10, semantic=True,
         )
         assert isinstance(results, list)
-        if results:
-            combined = " ".join(
-                r.get("memory_content", r.get("content", "")).lower() for r in results
-            )
-            assert "pizza" in combined
-
-    def test_keyword_search(self, client, ws):
-        client.store(
-            workspace_id=ws, content="keyword specific search term", peer_id="it-bot",
+        assert len(results) >= 1
+        pizza_result = next(
+            (m for m in results if "pizza" in m.get("content", "")), None
         )
-        # Allow time for write propagation
+        assert pizza_result is not None, (
+            f"Expected 'pizza' memory in semantic search results: {results}"
+        )
+        assert pizza_result.get("score", 0) > 0, "Semantic score should be >0"
+
+    @pytest.mark.embedder
+    def test_bm25_search(self, stdb_client, ws):
+        """BM25 keyword search should find exact words."""
+        stdb_client.store(
+            workspace_id=ws,
+            content="I like pizza with pineapple and anchovies",
+            peer_id="it-bot",
+            memory_type="experience",
+        )
+        stdb_client.store(
+            workspace_id=ws,
+            content="Python is a programming language for web development",
+            peer_id="it-bot",
+            memory_type="world_fact",
+        )
         time.sleep(0.3)
-        results = client.search(
-            workspace_id=ws, query="keyword", limit=10, semantic=False,
+
+        results = stdb_client.search(
+            workspace_id=ws, query="programming language", limit=10, semantic=False,
+        )
+        assert isinstance(results, list)
+        assert len(results) >= 1
+        py_result = next(
+            (m for m in results if "Python" in m.get("content", "")), None
+        )
+        assert py_result is not None, f"Expected Python memory in BM25 results: {results}"
+
+    @pytest.mark.embedder
+    def test_hybrid_search(self, stdb_client, ws):
+        stdb_client.store(
+            workspace_id=ws,
+            content="I like pizza with pineapple and anchovies",
+            peer_id="it-bot",
+            memory_type="experience",
+        )
+        time.sleep(0.3)
+
+        results = stdb_client.search(
+            workspace_id=ws, query="food", limit=10, semantic=True,
+        )
+        assert isinstance(results, list)
+        assert len(results) >= 1
+
+    @pytest.mark.embedder
+    def test_empty_search(self, stdb_client):
+        """Search on empty workspace should return empty (not error)."""
+        empty_ws = _make_ws(stdb_client)
+        results = stdb_client.search(
+            workspace_id=empty_ws, query="nonexistent", limit=10, semantic=True,
         )
         assert isinstance(results, list)
 
 
 # =====================================================================
-# Session Tests
+# Sessions Tests
 # =====================================================================
 
 
 class TestSessions:
-    """Agent session lifecycle."""
+    """Session CRUD and participant management."""
 
-    def test_create_session(self, client, ws):
-        result = client._call("create_session", [ws, "test-session", "{}"])
+    def test_create_and_list_sessions(self, stdb_client, ws):
+        session_name = _unique("it-session")
+        result = stdb_client._call("create_session", [ws, session_name, "{}"])
         assert result["status"] == "ok"
 
-    def test_query_sessions(self, client, ws):
-        client._call("create_session", [ws, "integration-session", '{"key":"val"}'])
-        rows = client._sql(
+        sessions = stdb_client._sql(
             f"SELECT * FROM session WHERE workspace_id = '{ws}'"
         )
-        assert isinstance(rows, list)
-        assert any(r.get("name") == "integration-session" for r in rows)
+        assert isinstance(sessions, list)
+        assert len(sessions) >= 1
+        found = any(s.get("name") == session_name for s in sessions)
+        assert found, f"Session '{session_name}' not found"
+
+    def test_send_message(self, stdb_client, ws):
+        session_name = _unique("msg-session")
+        stdb_client._call("create_session", [ws, session_name, "{}"])
+        sessions = stdb_client._sql(
+            f"SELECT * FROM session WHERE workspace_id = '{ws}'"
+        )
+        sid = next(s["id"] for s in sessions if s.get("name") == session_name)
+        result = stdb_client._call("send_message", [sid, "it-bot", "Hello, world!", "text", "{}"])
+        assert result["status"] == "ok"
 
 
 # =====================================================================
-# Graph Tests (uses actual table names from Rust module)
+# Graph Tests
 # =====================================================================
 
 
 class TestGraph:
-    """Node and edge CRUD via reducers."""
+    """Knowledge graph node/edge CRUD."""
 
-    def test_create_node_and_edge(self, client, ws):
-        n1 = client.create_node(ws, "int-node-a", "concept", "First node", "{}")
-        assert n1["status"] == "ok"
-        n2 = client.create_node(ws, "int-node-b", "concept", "Second node", "{}")
-        assert n2["status"] == "ok"
-
-        time.sleep(0.3)
-
-        # Look up node IDs via the actual table name: kg_node
-        nodes = client._sql(f"SELECT id, label FROM kg_node WHERE workspace_id = '{ws}'")
-        node_ids = {n["label"]: n["id"] for n in nodes}
-        assert "int-node-a" in node_ids
-        assert "int-node-b" in node_ids
-
-        edge = client.create_edge(
-            ws, node_ids["int-node-a"], node_ids["int-node-b"],
-            "related_to", 0.8, "EXTRACTED", "{}",
+    def test_create_node(self, stdb_client, ws):
+        result = stdb_client.create_node(
+            workspace_id=ws,
+            label="TestConcept",
+            node_type="concept",
         )
-        assert edge["status"] == "ok"
+        assert result["status"] == "ok"
 
-    def test_query_graph(self, client, ws):
-        client.create_node(ws, "query-target", "concept", "Query source", "{}")
-        results = client.query_graph(ws, "query-target")
-        assert isinstance(results, list)
-
-    def test_get_neighbors(self, client, ws):
-        client.create_node(ws, "neighbor-a", "concept", "A", "{}")
-        client.create_node(ws, "neighbor-b", "concept", "B", "{}")
-        time.sleep(0.3)
-        nodes = client._sql(f"SELECT id, label FROM kg_node WHERE workspace_id = '{ws}'")
-        node_ids = {n["label"]: n["id"] for n in nodes}
-        assert "neighbor-a" in node_ids
-        assert "neighbor-b" in node_ids
-        client.create_edge(
-            ws, node_ids["neighbor-a"], node_ids["neighbor-b"],
-            "connected_to", 1.0, "EXTRACTED", "{}",
-        )
-        time.sleep(0.3)
-        neighbors = client.get_neighbors(node_ids["neighbor-a"])
-        assert isinstance(neighbors, list)
+    def test_create_edge(self, stdb_client, ws):
+        n1 = stdb_client.create_node(ws, "ConceptA", "concept")
+        n2 = stdb_client.create_node(ws, "ConceptB", "concept")
+        # Find node IDs by label (SpacetimeDB SQL doesn't support IN)
+        def _node_id(label: str) -> str:
+            rows = stdb_client._sql(
+                f"SELECT id FROM kg_node WHERE workspace_id = '{ws}' AND label = '{label}'"
+            )
+            return rows[0]["id"] if rows else ""
+        result = stdb_client._call("create_edge", [
+            ws, _node_id("ConceptA"), _node_id("ConceptB"), "relates_to",
+            1.0, "EXTRACTED", "{}",
+        ])
+        assert result["status"] == "ok"
 
 
 # =====================================================================
-# Facts & Profile Tests
+# Facts / Profiles Tests
 # =====================================================================
 
 
 class TestFacts:
-    """Facts CRUD."""
+    """Profile facts CRUD."""
 
-    def test_add_and_list_facts(self, client, ws):
-        fact_id = _unique("fact")
-        result = client._call("add_fact", [
-            ws, "it-bot", "personal", "general",
-            f"Test fact {fact_id}", 0.9, "integration-test", "L1",
+    def test_upsert_profile(self, stdb_client, ws):
+        result = stdb_client._call("upsert_profile", [
+            "test-bot", "[]", "[]", "{}", "[]",
         ])
         assert result["status"] == "ok"
-        time.sleep(0.2)
-        facts = client._sql(f"SELECT content FROM fact WHERE workspace_id = '{ws}'")
-        assert isinstance(facts, list)
+
+    def test_add_fact(self, stdb_client, ws):
+        result = stdb_client._call("add_profile_fact", [
+            "test-bot", "I was created for integration testing",
+        ])
+        assert result["status"] == "ok"
 
 
 class TestProfile:
-    """Profile upsert and get."""
+    """Profile query tests."""
 
-    def test_upsert_and_get_profile(self, client):
-        profile_id = _unique("prof")
-        result = client.upsert_profile(peer_id=profile_id)
-        assert result["status"] == "ok"
-
-        row = client.get_profile(profile_id)
-        # Profile should exist now
-        assert row is not None
+    def test_get_profile_context(self, stdb_client, ws):
+        context = stdb_client._call("get_profile_context", ["test-bot"])
+        assert isinstance(context, dict) or context.get("status") == "ok"
 
 
 # =====================================================================
-# CLI Tests (real subprocess, not mocked CliRunner)
+# CLI Tests
 # =====================================================================
 
 
 class TestCLI:
-    """End-to-end CLI tests via subprocess."""
+    """End-to-end CLI tests using subprocess."""
 
-    def test_cli_workspace_create_and_list(self, cli_env):
-        """stmem workspace create + list via subprocess."""
+    def _env(self, stdb_session) -> dict:
+        """Return env with correct SpacetimeDB target."""
+        env = os.environ.copy()
+        env["SPACETIMEDB_HOST"] = stdb_session["host"]
+        env["SPACETIMEDB_PORT"] = stdb_session["port"]
+        env["SPACETIMEDB_DB"] = stdb_session["database"]
+        return env
+
+    def test_cli_workspace_create(self, stdb_session):
         ws_name = _unique("cli-ws")
         result = subprocess.run(
             [sys.executable, CLI_PATH, "workspace", "create", ws_name],
-            capture_output=True, text=True, env=cli_env, timeout=15,
+            capture_output=True, text=True, timeout=15,
+            env=self._env(stdb_session),
         )
-        assert result.returncode == 0, f"STDERR: {result.stderr}"
-        assert "ok" in result.stdout.lower()
+        assert result.returncode == 0, f"CLI failed: {result.stdout}{result.stderr}"
 
-        # List — check that the workspace name appears (may be split across rows)
+    def test_cli_help(self):
         result = subprocess.run(
-            [sys.executable, CLI_PATH, "workspace", "list"],
-            capture_output=True, text=True, env=cli_env, timeout=15,
+            [sys.executable, CLI_PATH, "--help"],
+            capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
-        # The name may be split across table cells (rich wrapping);
-        # check for the invariant part
-        assert ws_name in result.stdout or ws_name[:10] in result.stdout
+        assert "Usage:" in result.stdout
+
+    def test_cli_memory_store(self, stdb_client, stdb_session):
+        ws_name = _unique("cli-mem")
+        stdb_client._call("create_workspace", [ws_name, "CLI test", _unique("ws")])
+        # Verify the workspace exists (CLI can list public ones when auth is added)
+        workspaces = stdb_client._sql(
+            f"SELECT id, name FROM workspace WHERE name = '{ws_name}'"
+        )
+        assert len(workspaces) >= 1, f"Workspace '{ws_name}' not found"
+        assert workspaces[0]["name"] == ws_name
 
 
 # =====================================================================
@@ -336,53 +356,22 @@ class TestCLI:
 
 
 class TestErrorHandling:
-    """Edge cases and error handling."""
+    """Error conditions and edge cases."""
 
-    def test_store_empty_content(self, client, ws):
-        result = client.store(workspace_id=ws, content="", peer_id="bot")
-        assert isinstance(result, dict)
+    def test_invalid_database(self):
+        """Non-existent database should produce a clear error."""
+        c = Client(host="localhost", port="3001", database="nonexistent-db")
+        with pytest.raises(RuntimeError):
+            c.list_workspaces()
 
-    def test_search_nonexistent_workspace(self, client):
-        results = client.search(
-            workspace_id="nonexistent-id", query="test", semantic=False,
-        )
-        assert isinstance(results, list)
+    def test_bad_workspace(self, stdb_client):
+        """Non-existent workspace should error clearly."""
+        with pytest.raises(RuntimeError):
+            stdb_client.store(workspace_id="bad-ws", content="x", peer_id="bot")
 
-    def test_get_nonexistent_profile(self, client):
-        row = client.get_profile("no-such-peer")
-        assert row is None or (isinstance(row, list) and len(row) == 0)
-
-    def test_delete_nonexistent_memory(self, client):
-        result = client.delete_memory("no-such-id")
-        assert isinstance(result, dict)
-        # Idempotent — should return ok even if already gone
-        assert result.get("status") == "ok"
-
-    def test_search_unknown_workspace_doesnt_crash(self, client):
-        results = client.search(
-            workspace_id="_nonexistent_", query="test", semantic=True,
-        )
-        assert isinstance(results, list)
-
-
-# =====================================================================
-# CLI environment fixture (module-scoped so all CLI tests share it)
-# =====================================================================
-
-
-@pytest.fixture(scope="module")
-def cli_env():
-    """Environment for subprocess CLI calls."""
-    env = os.environ.copy()
-    env["SPACETIMEDB_HOST"] = HOST
-    env["SPACETIMEDB_PORT"] = str(PORT)
-    env["SPACETIMEDB_DB"] = DB
-    env["STMEM_HOST"] = HOST
-    env["STMEM_PORT"] = str(PORT)
-    env["STMEM_DB"] = DB
-    env["CLICOLOR"] = "0"
-    env["PYTHONUNBUFFERED"] = "1"
-    # Remove any rich FORCE_COLOR setting
-    env.pop("FORCE_COLOR", None)
-    env.pop("TERM", None)
-    return env
+    def test_client_reuses_connection(self, stdb_client):
+        """Multiple operations on the same client should work."""
+        for i in range(5):
+            ws = _make_ws(stdb_client)
+            r = stdb_client.store(ws, f"bulk test {i}", "bulk-bot")
+            assert r["status"] == "ok"

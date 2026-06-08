@@ -20,9 +20,12 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 from ..client import Client
+
+logger = logging.getLogger(__name__)
 
 
 class Memory:
@@ -168,8 +171,11 @@ class Memory:
                     if mem_id:
                         try:
                             self._client._call("set_memory_scope", [mem_id, user_id])
-                        except Exception:
-                            pass  # Non-critical; memory still exists
+                        except Exception as exc:
+                            logger.warning(
+                                "mem0.add: set_memory_scope failed for %s: %s",
+                                mem_id, exc,
+                            )
 
             # Return Mem0-compatible shape — search for the stored memory
             return {
