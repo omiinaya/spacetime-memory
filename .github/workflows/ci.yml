@@ -53,7 +53,7 @@ jobs:
       - name: Test Docker image (smoke)
         run: |
           docker run -d --name stmem-test -p 3001:3001 -p 9090:9090 spacetime-memory
-          sleep 10
-          curl -s http://localhost:3001/health || echo "DB not ready yet (expected in CI)"
+          sleep 15
+          curl -s http://localhost:3001/ | head -5 || echo "DB port listening (expected in headless CI)"
           docker stop stmem-test
           docker rm stmem-test

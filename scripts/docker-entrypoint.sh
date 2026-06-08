@@ -43,7 +43,7 @@ MODULE_NAME="${SPACETIMEDB_DB:-spacetime-memory}"
 if ! curl -sf "http://localhost:3001/v1/database/$MODULE_NAME" > /dev/null 2>&1; then
     echo "==> Publishing module '$MODULE_NAME' ..."
     spacetime publish \
-        --project-path /app/module \
+        --bin-path /app/module/spacetime_memory.wasm \
         "$MODULE_NAME" \
         --yes \
         2>&1 || echo "==> [WARN] Module publish exited non-zero (may already exist)."
