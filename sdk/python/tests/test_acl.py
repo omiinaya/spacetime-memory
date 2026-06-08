@@ -1,7 +1,9 @@
 """ACL integration tests — admin bypass, promote/demote, grant/revoke.
 
-Admin bootstraps via set_initial_admin (no register) — guarantees admin role.
-User registers normally (will always be user since admin exists).
+Admin fixture uses a persistent identity token (saved to /tmp/stmem_admin_token)
+so the same SpacetimeDB identity is reused across test runs.  On a fresh DB
+it bootstraps via set_initial_admin.  On subsequent runs it reuses the saved
+token — the identity is already admin.
 """
 import os
 import sys
@@ -16,20 +18,50 @@ from spacetime_memory import Client
 
 DB = os.environ.get("SPACETIMEDB_DB", "c200e409f602c06527d0aa66dc2d05718a6b62c4c3317b5498951cea41782713")
 SUFFIX = os.urandom(4).hex()
+ADMIN_TOKEN_FILE = "/tmp/stmem_admin_token"
 
 pytestmark = [pytest.mark.skipif(not DB, reason="SPACETIMEDB_DB required")]
 
 
 @pytest.fixture(scope="module")
 def admin() -> Client:
-    """Create an admin client via set_initial_admin (no register needed)."""
+    """Create an admin client using a persistent identity token.
+
+    If a saved identity token exists (previous run), reuses it so the
+    same identity (already admin) is used for all subsequent test runs.
+    On a fresh DB, bootstraps via register + set_initial_admin and saves
+    the identity token for reuse.
+    """
     c = Client(database=DB)
+
+    # Reuse saved identity token if available
+    if os.path.exists(ADMIN_TOKEN_FILE):
+        with open(ADMIN_TOKEN_FILE) as f:
+            token = f.read().strip()
+        if token:
+            c._identity_token = token
+            c._identity_established = True
+            return c
+
+    # First run — bootstrap admin
+    uname = f"acl_admin_{SUFFIX}"
+    try:
+        c._call("register", [uname, "Admin", "adminpass"])
+    except RuntimeError:
+        pass  # already registered
+
     my_id = c._whoami()
     if my_id:
         try:
             c._call("set_initial_admin", [my_id])
         except RuntimeError:
             pass  # admin already exists
+
+    # Save identity token for reuse across test runs
+    if c._identity_token:
+        with open(ADMIN_TOKEN_FILE, "w") as f:
+            f.write(c._identity_token)
+
     return c
 
 

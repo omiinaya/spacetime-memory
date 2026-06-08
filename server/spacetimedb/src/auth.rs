@@ -382,8 +382,11 @@ pub fn demote_admin(ctx: &ReducerContext, target_identity: String) -> Result<(),
 }
 
 /// Set the initial admin identity. Only works if no admin account exists yet.
-/// This is intended for one-time setup (e.g., from a deployment script).
-/// The specified identity must not already have an Account record.
+/// The specified identity can be:
+/// - A brand-new identity (no Account record yet): an Account is created with "admin" role.
+/// - An already-registered identity: the existing Account is promoted to "admin" role.
+/// Both paths allow a fresh test run to bootstrap, then subsequent runs to
+/// register-and-promote when the admin identity differs from the original.
 #[reducer]
 pub fn set_initial_admin(ctx: &ReducerContext, identity_hex: String) -> Result<(), String> {
     // Check that no admin exists yet
@@ -393,12 +396,17 @@ pub fn set_initial_admin(ctx: &ReducerContext, identity_hex: String) -> Result<(
         return Err("An admin account already exists. Use promote_admin instead.".to_string());
     }
 
+    let now = now_micros(ctx);
+
     // Check this identity doesn't already have an account
-    if ctx.db.account().id().find(&identity_hex).is_some() {
-        return Err("This identity already has an account. Use promote_admin instead.".to_string());
+    if let Some(mut existing) = ctx.db.account().id().find(&identity_hex) {
+        // Identity already has an account — promote to admin
+        existing.role = "admin".to_string();
+        existing.updated_at = now;
+        ctx.db.account().id().update(existing);
+        return Ok(());
     }
 
-    let now = now_micros(ctx);
     let username = format!("admin-{}", &identity_hex[..8]);
     ctx.db.account().insert(Account {
         id: identity_hex,

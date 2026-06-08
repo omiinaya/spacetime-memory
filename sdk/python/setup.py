@@ -19,6 +19,7 @@ setup(
             "pytest>=7",
             "pytest-mock>=3",
             "click>=8",
+            "feedparser>=6",
         ],
         "langchain": [
             "langchain-core>=0.3",
@@ -27,6 +28,7 @@ setup(
         "all": [
             "langchain-core>=0.3",
             "langgraph>=0.2",
+            "feedparser>=6",
         ],
     },
     python_requires=">=3.10",
