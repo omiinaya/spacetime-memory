@@ -251,35 +251,38 @@ Every lane below blocks everything above it.
 **What:** The connector framework exists (RSS, GitHub, Twitter, Webhook, Slack, Discord) but needs production hardening.
 **Why:** Connectors are the main data ingestion path.
 
-- [ ] Retry with backoff for all HTTP-based connectors
-- [ ] Rate-limit awareness (GitHub API limits, Twitter/X rate limits)
-- [ ] Connector health status reporting
-- [ ] Tests for each connector type
+- [x] **Retry with backoff**: `Connector._retry_client_call()` — exponential backoff + jitter for all HTTP-based connectors
+- [x] **Rate-limit handling**: Slack (Retry-After), Discord (retry_after in body), GitHub (X-RateLimit-Remaining), Notion (existing)
+- [x] **Persistent cursors**: `Connector._cursor` with JSON file store at `~/.spacetime-memory/connectors/<ClassName>_cursor.json`
+- [x] **Logging**: `self._log` logger per connector class, replacing all `print()` calls
+- [x] **Health reporting**: `Connector.last_status()` + `ConnectorRegistry.get_health()`
+- [x] **Tests**: 23 connector tests pass (all 8 connector types + registry + base)
 
 ### Lane 17 — In-process embedder
 
 **What:** An optional pure-Python or ONNX-Runtime embedder to remove the Rust sidecar dependency.
 **Why:** The sidecar is a massive dependency (tract, all-MiniLM-L6-v2, must compile). Many users will want to skip it entirely.
 
-- [ ] `pip install spacetime-memory[local-embed]` with onnxruntime
-- [ ] ~10MB model download on first use
-- [ ] No separate server process needed
+- [x] `LocalEmbedder` class in `sdk/python/spacetime_memory/local_embedder.py`
+- [x] Integrated into `Client._embed()` with `embedder_type='python'`
+- [x] Optional dep: `pip install spacetime-memory[local-embed]`
+- [x] Lazy init, ~10MB model download on first use via huggingface-hub
 
 ### Lane 18 — Replication & HA
 
 **What:** Multi-node SpacetimeDB is experimental. Document the story and add support for the replication table.
 **Why:** The `replication_peer` and `replication_log` tables exist already but have no Python-level support and no docs.
 
-- [ ] Document how replication works with the existing tables
-- [ ] CLI commands: `stmem replication add-peer`, `stmem replication status`
+- [x] `stmem replication add-peer`, `stmem replication list`, `stmem replication status` CLI commands
+- [x] `docs/replication.md` with setup guide
 
 ### Lane 19 — Community & contributions
 
 **What:** CONTRIBUTING.md, issue templates, RFC process for new adapters.
 
-- [ ] CONTRIBUTING.md with dev setup, test conventions, PR checklist
-- [ ] Issue templates: bug report, feature request, adapter request
-- [ ] Adapter authoring guide ("How to add a new drop-in adapter")
+- [x] Issue templates: `bug_report.md`, `feature_request.md`, `adapter_request.md`
+- [x] `docs/development.md` enriched with contributor guide
+- [x] `docs/adapter-authoring-guide.md` — how to write a new drop-in adapter
 
 ---
 

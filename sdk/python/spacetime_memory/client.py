@@ -11,12 +11,15 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import httpx
 
 import logging
 import re
+
+if TYPE_CHECKING:
+    from .local_embedder import LocalEmbedder
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +120,10 @@ class Client:
 
     Embedder type can be one of:
 
-    - ``"local"`` — use the Rust ONNX sidecar (default behaviour)
+    - ``"local"`` — use the Rust ONNX sidecar (HTTP, default behaviour)
+    - ``"python"`` — use the in-process Python ONNX embedder
+      (requires ``onnxruntime`` and ``tokenizers`` — install via
+      ``pip install 'spacetime-memory[local-embed]'``)
     - ``"openai"`` — use OpenAI's embeddings API
     - ``"auto"`` — try the sidecar first, fall back to OpenAI if unavailable
 
@@ -168,6 +174,7 @@ class Client:
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
         self.reducer_url = f"{base}/v1/database/{self.database}/call"
         self._http = httpx.Client(timeout=timeout)
+        self._local_python_embedder: LocalEmbedder | None = None
 
     def _headers(self) -> dict[str, str]:
         """Return common HTTP headers, including auth if a token is set."""
@@ -377,6 +384,7 @@ class Client:
 
         Behaviour depends on ``embedder_type``:
         - ``"local"``: use the Rust ONNX sidecar (raises on failure)
+        - ``"python"``: use the in-process Python ONNX embedder
         - ``"openai"``: call OpenAI embeddings API
         - ``"auto"``: try sidecar first, fall back to OpenAI. If both fail,
           raises ``EmbedderUnavailableError`` with a combined message.
@@ -385,6 +393,8 @@ class Client:
             return self._embed_openai(text)
         if self.embedder_type == "local":
             return self._embed_local(text)
+        if self.embedder_type == "python":
+            return self._embed_python(text)
 
         # "auto" — try local, fall back to OpenAI
         # Skip local trial when EMBEDDER_URL is the default and a cloud
@@ -429,6 +439,13 @@ class Client:
             logger.exception("Unexpected error in _embed for text (len=%d)", len(text))
             raise
 
+    def _embed_python(self, text: str) -> list[float]:
+        """Get an embedding vector via the in-process Python ONNX embedder.
+
+        Lazily initializes the :class:`LocalEmbedder` on first call.
+        """
+        return self._embed_batch_python([text])[0]
+
     def _embed_openai(self, text: str) -> list[float]:
         """Embed via OpenAI API."""
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -466,6 +483,8 @@ class Client:
             return self._embed_batch_openai(texts)
         if self.embedder_type == "local":
             return self._embed_batch_local(texts)
+        if self.embedder_type == "python":
+            return self._embed_batch_python(texts)
 
         # "auto" — try local, fall back to OpenAI
         result = self._embed_batch_local(texts)
@@ -501,6 +520,19 @@ class Client:
         except Exception:
             logger.exception("Unexpected error in _embed_batch (count=%d)", len(texts))
             return []
+
+    def _embed_batch_python(self, texts: list[str]) -> list[list[float]]:
+        """Get embeddings for multiple texts via the in-process Python ONNX embedder.
+
+        Lazily initializes the :class:`LocalEmbedder` on first call.
+        """
+        if not texts:
+            return []
+        from .local_embedder import LocalEmbedder
+
+        if self._local_python_embedder is None:
+            self._local_python_embedder = LocalEmbedder()
+        return self._local_python_embedder.embed_batch(texts)
 
     def _embed_batch_openai(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings for multiple texts via OpenAI API."""

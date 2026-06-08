@@ -11,6 +11,15 @@ Tests cover:
 import json
 import pytest
 from unittest.mock import Mock, patch, MagicMock
+
+
+# Clear connector cursor files before tests to prevent cross-test pollution
+# from persistent cursor state stored in ~/.spacetime-memory/connectors/
+import os as _os
+import shutil as _shutil
+_conn_cursor_dir = _os.path.expanduser("~/.spacetime-memory/connectors")
+if _os.path.exists(_conn_cursor_dir):
+    _shutil.rmtree(_conn_cursor_dir, ignore_errors=True)
 from spacetime_memory.connectors import (
     Connector,
     Event,

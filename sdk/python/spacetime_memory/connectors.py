@@ -15,9 +15,14 @@ Built-in connectors:
 from __future__ import annotations
 
 import hmac
+import json
+import logging
+import os
+import random
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -32,7 +37,173 @@ class Connector(ABC):
     Subclasses must implement ``poll()``, which should yield ``Event``
     objects.  The framework calls ``on_event()`` to persist each event
     as either a memory or a KG node.
+
+    Production features (built into the base class):
+
+    *   **Logging** — each connector gets a ``self._log`` logger named
+        ``connector.<ClassName>``.  Call ``self._log.info()``,
+        ``self._log.warning()``, ``self._log.error()`` instead of
+        ``print()``.
+    *   **Retry with backoff** — call
+        ``self._retry_client_call(client, \"get\", url, ...)`` instead of
+        ``client.get(url, ...)`` to get automatic exponential backoff
+        with jitter on transient HTTP errors.
+    *   **Persistent cursors** — each connector has a JSON cursor file
+        at ``~/.spacetime-memory/connectors/<ClassName>_cursor.json``.
+        Use ``self._cursor`` to read/write state that survives restarts.
+    *   **Health reporting** — ``self.last_status()`` returns the
+        connector's current health.  ``ConnectorRegistry.get_health()``
+        aggregates health for all registered connectors.
     """
+
+    def __init__(self, *, cursor_dir: str | None = None) -> None:
+        # ── Logging ────────────────────────────────────────────────
+        self._log = logging.getLogger(f"connector.{type(self).__name__}")
+
+        # ── Health tracking ────────────────────────────────────────
+        self._last_poll_time: float = 0.0
+        self._error_count: int = 0
+        self._last_status: str = "ok"
+
+        # ── Persistent cursor store ────────────────────────────────
+        self._cursor_dir = cursor_dir or os.path.expanduser(
+            "~/.spacetime-memory/connectors"
+        )
+        os.makedirs(self._cursor_dir, exist_ok=True)
+        self._cursor_file = os.path.join(
+            self._cursor_dir, f"{type(self).__name__}_cursor.json"
+        )
+        self._cursor: dict[str, Any] = {}
+        self._load_cursor()
+
+    # ── Cursor persistence ──────────────────────────────────────────
+
+    def _load_cursor(self) -> None:
+        """Restore cursor state from the JSON file on disk."""
+        if os.path.exists(self._cursor_file):
+            try:
+                with open(self._cursor_file, "r") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        self._cursor = data
+                        self._log.info(
+                            "Loaded cursor from %s (%d keys)",
+                            self._cursor_file,
+                            len(self._cursor),
+                        )
+                    else:
+                        self._cursor = {}
+            except (json.JSONDecodeError, OSError) as e:
+                self._log.warning(
+                    "Failed to load cursor from %s: %s",
+                    self._cursor_file,
+                    e,
+                )
+                self._cursor = {}
+        else:
+            self._cursor = {}
+
+    def _save_cursor(self) -> None:
+        """Persist cursor state to the JSON file on disk."""
+        try:
+            with open(self._cursor_file, "w") as f:
+                json.dump(self._cursor, f, indent=2)
+        except OSError as e:
+            self._log.warning(
+                "Failed to save cursor to %s: %s",
+                self._cursor_file,
+                e,
+            )
+
+    # ── Retry with exponential backoff + jitter ─────────────────────
+
+    def _retry_client_call(
+        self,
+        client: httpx.Client,
+        method: str,
+        url: str,
+        *,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """Make an HTTP call with retry on transient errors.
+
+        Retries on ``httpx.RequestError`` (connection errors, timeouts)
+        with exponential backoff ``base_delay * 2^attempt`` plus random
+        jitter (0–100 ms) to avoid thundering-herd effects.
+
+        Does **not** retry on HTTP 4xx status codes — those are treated
+        as client errors that should be handled by the caller.
+
+        Args:
+            client: An ``httpx.Client`` instance.
+            method: HTTP method name (``\"get\"``, ``\"post\"``, etc.).
+            url: Request URL.
+            max_retries: Maximum number of attempts (default 3).
+            base_delay: Initial delay in seconds (default 1.0).
+            **kwargs: Extra arguments forwarded to ``client.method()``.
+
+        Returns:
+            The ``httpx.Response`` from the successful attempt.
+
+        Raises:
+            httpx.RequestError: If all retries are exhausted.
+        """
+        for attempt in range(max_retries):
+            try:
+                resp = getattr(client, method)(url, **kwargs)
+                # Raise-for-status is NOT called automatically — the
+                # caller inspects resp.status_code for their own logic.
+                # We only retry on transport-level errors here.
+                return resp
+            except httpx.RequestError as e:
+                if attempt < max_retries - 1:
+                    delay = (
+                        base_delay * (2**attempt)
+                        + random.uniform(0, 0.1)
+                    )
+                    self._log.warning(
+                        "%s %s failed (attempt %d/%d): %s. "
+                        "Retrying in %.2fs …",
+                        method.upper(),
+                        url,
+                        attempt + 1,
+                        max_retries,
+                        e,
+                        delay,
+                    )
+                    time.sleep(delay)
+                else:
+                    self._log.error(
+                        "%s %s failed after %d retries: %s",
+                        method.upper(),
+                        url,
+                        max_retries,
+                        e,
+                    )
+                    raise
+
+        # Unreachable — keep the type-checker happy.
+        raise RuntimeError("unreachable")
+
+    # ── Health reporting ────────────────────────────────────────────
+
+    def last_status(self) -> dict[str, Any]:
+        """Return the connector's current health status.
+
+        Returns:
+            A dict with keys ``status`` (``\"ok\"`` | ``\"error\"``),
+            ``last_poll`` (Unix timestamp or ``0.0`` if never polled),
+            and ``errors_since_last_ok`` (integer count).
+        """
+        return {
+            "status": self._last_status,
+            "last_poll": self._last_poll_time,
+            "errors_since_last_ok": self._error_count,
+        }
+
+    # ── Abstract interface ──────────────────────────────────────────
 
     @abstractmethod
     def poll(self) -> list[Event]:
@@ -76,22 +247,29 @@ class Connector(ABC):
         """
         ticks = 0
         while stop_after is None or ticks < stop_after:
+            self._last_poll_time = time.time()
             try:
                 events = self.poll()[:max_per_tick]
                 for ev in events:
                     try:
                         self.on_event(ev, client)
                     except Exception as e:
-                        print(f"  [event error] {e}")
+                        self._log.error("Event handler error: %s", e)
+                        self._error_count += 1
                 if events:
-                    print(f"  polled {len(events)} events")
+                    self._log.info("Polled %d events", len(events))
+                self._last_status = "ok"
             except Exception as e:
-                print(f"  [poll error] {e}")
+                self._log.error("Poll error: %s", e)
+                self._last_status = "error"
+                self._error_count += 1
 
             ticks += 1
             if stop_after is not None and ticks >= stop_after:
                 break
             time.sleep(interval_secs)
+
+        self._save_cursor()
 
 
 # ── Event data ──────────────────────────────────────────────────────
@@ -128,11 +306,16 @@ class RssFeedConnector(Connector):
         feed_url: str,
         workspace_id: str,
         peer_id: str = "rss-bot",
+        *,
+        cursor_dir: str | None = None,
     ):
+        super().__init__(cursor_dir=cursor_dir)
         self.feed_url = feed_url
         self.workspace_id = workspace_id
         self.peer_id = peer_id
-        self._seen: set[str] = set()
+        self._seen: set[str] = set(
+            self._cursor.get("seen_ids", [])
+        )
 
     def poll(self) -> list[Event]:
         """Fetch the feed and return new (unseen) entries as Events."""
@@ -159,6 +342,10 @@ class RssFeedConnector(Connector):
                 memory_type="experience",
                 peer_id=self.peer_id,
             ))
+
+        # Persist cursor
+        self._cursor["seen_ids"] = list(self._seen)
+        self._save_cursor()
 
         return events
 
@@ -188,12 +375,17 @@ class GitHubConnector(Connector):
         username: str,
         workspace_id: str,
         peer_id: str = "github-bot",
+        *,
+        cursor_dir: str | None = None,
     ):
+        super().__init__(cursor_dir=cursor_dir)
         self.token = token
         self.username = username
         self.workspace_id = workspace_id
         self.peer_id = peer_id
-        self._seen: set[str] = set()
+        self._seen: set[str] = set(
+            self._cursor.get("seen_ids", [])
+        )
 
     def poll(self) -> list[Event]:
         """Fetch user events from the GitHub API and return new Events."""
@@ -212,20 +404,52 @@ class GitHubConnector(Connector):
         with httpx.Client() as client:
             while url and fetched < 30:
                 try:
-                    resp = client.get(url, headers=headers, timeout=30)
+                    resp = self._retry_client_call(
+                        client, "get", url,
+                        headers=headers, timeout=30,
+                    )
                 except httpx.RequestError as e:
-                    print(f"  [GitHub HTTP error] {e}")
+                    self._log.error(
+                        "HTTP error after retries: %s", e,
+                    )
                     break
 
+                # ── Rate-limit handling ─────────────────────────────
                 if resp.status_code == 403:
-                    print("  [GitHub] Rate limited or forbidden")
+                    remaining = resp.headers.get(
+                        "X-RateLimit-Remaining", ""
+                    )
+                    if remaining == "0":
+                        reset_epoch = resp.headers.get(
+                            "X-RateLimit-Reset", "0"
+                        )
+                        try:
+                            sleep_secs = max(
+                                0, int(reset_epoch) - int(time.time())
+                            )
+                        except (ValueError, OSError):
+                            sleep_secs = 60
+                        self._log.warning(
+                            "GitHub rate limit exhausted — "
+                            "sleeping %d s until reset (epoch %s)",
+                            sleep_secs,
+                            reset_epoch,
+                        )
+                        time.sleep(sleep_secs)
+                        continue  # retry after reset
+                    self._log.error(
+                        "Rate limited or forbidden on %s", url,
+                    )
                     break
                 if resp.status_code == 404:
-                    print(f"  [GitHub] User '{self.username}' not found")
+                    self._log.error(
+                        "User '%s' not found", self.username,
+                    )
                     break
                 if resp.status_code != 200:
-                    print(
-                        f"  [GitHub] Unexpected status {resp.status_code}"
+                    self._log.error(
+                        "Unexpected status %s on %s",
+                        resp.status_code, url,
                     )
                     break
 
@@ -271,6 +495,10 @@ class GitHubConnector(Connector):
                 # Follow pagination via Link header
                 link_header = resp.headers.get("Link", "")
                 url = self._parse_next_link(link_header)
+
+        # Persist cursor
+        self._cursor["seen_ids"] = list(self._seen)
+        self._save_cursor()
 
         return events
 

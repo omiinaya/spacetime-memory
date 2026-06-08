@@ -1439,11 +1439,12 @@ def replication() -> None:
 
 
 @replication.command(name="peers")
-def replication_peers() -> None:
+@click.option("--workspace-id", default="", help="Workspace ID (uses default if empty)")
+def replication_peers(workspace_id: str) -> None:
     """List replication peers."""
     client = _sdk_client()
     with console.status("Fetching replication peers..."):
-        client._call("list_replication_peers", ["*"])
+        client._call("list_replication_peers", [workspace_id or "*"])
         rows = client._sql(
             "SELECT * FROM replication_result "
             "WHERE query_type = 'peers' "
@@ -1457,6 +1458,14 @@ def replication_peers() -> None:
         console.print("[yellow]No replication peers found.[/yellow]")
         return
     print_table(peers, title="Replication Peers")
+
+
+@replication.command(name="list")
+@click.option("--workspace-id", default="", help="Workspace ID (uses default if empty)")
+def replication_list(workspace_id: str) -> None:
+    """List registered replication peers (alias for peers)."""
+    ctx = click.get_current_context()
+    ctx.invoke(replication_peers, workspace_id=workspace_id)
 
 
 @replication.command(name="add")
@@ -1490,6 +1499,29 @@ def replication_add(name: str, remote_url: str, remote_db: str,
     _quiet_print(f"[green]Replication peer '{name}' added successfully.[/green]")
     if result:
         print_json(result)
+
+
+@replication.command(name="add-peer")
+@click.argument("addr")
+@click.option("--workspace-id", required=True, help="Workspace ID to register the peer under")
+@click.option("--name", default="", help="Human-readable name (defaults to addr)")
+@click.option("--remote-db", default="spacetime-memory", help="Remote database identity")
+@click.option("--auth-token", default="", help="Auth token for the remote instance")
+def replication_add_peer(addr: str, workspace_id: str, name: str,
+                         remote_db: str, auth_token: str) -> None:
+    """Register a replication peer.
+
+    ADDR is the remote instance URL (e.g. http://127.0.0.10:3001).
+    Specify the workspace with --workspace-id and optionally a human-readable --name.
+    """
+    peer_name = name or addr
+    client = _sdk_client()
+    with console.status(f"Registering replication peer '{peer_name}'..."):
+        client._call("add_replication_peer", [
+            workspace_id, peer_name, addr, remote_db, auth_token,
+        ])
+    _quiet_print(f"[green]Replication peer '{peer_name}' registered for "
+                 f"workspace '{workspace_id[:16]}...'.[/green]")
 
 
 @replication.command(name="remove")
