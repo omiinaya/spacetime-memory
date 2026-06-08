@@ -8,12 +8,12 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 COPY server/embedder/Cargo.toml server/embedder/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-# Cache dependencies
-RUN cargo build --release 2>/dev/null || true
+# Cache dependencies with --locked for reproducible builds
+RUN cargo build --release --locked 2>/dev/null || true
 COPY server/embedder/src/ src/
 # Force rebuild of our actual code with retry for network flakes
 RUN touch src/main.rs && \
-    for i in 1 2 3; do cargo build --release && break; sleep 5; done
+    for i in 1 2 3; do cargo build --release --locked && break; sleep 5; done
 
 # ============================================================================
 # Stage 2: Build the SpacetimeDB module (Rust → wasm)
@@ -22,8 +22,8 @@ FROM rust:1.80-slim AS module-builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 RUN rustup target add wasm32-unknown-unknown
-COPY server/spacetimedb/ .
-RUN cargo build --release --target wasm32-unknown-unknown
+COPY server/spacetimedb/ ./
+RUN for i in 1 2 3; do cargo build --release --target wasm32-unknown-unknown --locked && break; sleep 5; done
 
 # ============================================================================
 # Stage 3: Build the frontend (Vite + React + TypeScript)
