@@ -8,7 +8,7 @@ ENV CARGO_NET_RETRY=5 \
     CARGO_HTTP_TIMEOUT=120 \
     CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 WORKDIR /build
-RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev git g++ && rm -rf /var/lib/apt/lists/*
 COPY server/embedder/Cargo.toml server/embedder/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 # Pre-fetch dependencies with retry logic
