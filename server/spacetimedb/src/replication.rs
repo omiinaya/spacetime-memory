@@ -483,6 +483,10 @@ fn apply_incoming_insert(
                 confidence: data.get("confidence").and_then(|v| v.as_str()).unwrap_or("EXTRACTED").to_string(),
                 metadata_json: data.get("metadata_json").and_then(|v| v.as_str()).unwrap_or("{}").to_string(),
                 created_at: data.get("created_at").and_then(|v| v.as_i64()).unwrap_or(now),
+                valid_at: data.get("valid_at").and_then(|v| v.as_i64()).unwrap_or(now),
+                invalid_at: data.get("invalid_at").and_then(|v| v.as_i64()).unwrap_or(0),
+                version: data.get("version").and_then(|v| v.as_u64()).map(|v| v as u32).unwrap_or(1),
+                edge_group_id: data.get("edge_group_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             };
             ctx.db.kg_edge().insert(edge);
             Ok(())

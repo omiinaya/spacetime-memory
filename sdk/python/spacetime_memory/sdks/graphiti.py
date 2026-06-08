@@ -104,6 +104,11 @@ class EntityEdge:
 
     Maps to SpacetimeDB ``kg_edge`` table.  ``fact`` contains the
     natural-language description of the relationship.
+
+    Supports temporal versioning (Graphiti parity): when an edge is
+    updated, the old version is invalidated (``invalid_at`` set) and
+    a new version is created with incremented ``version`` and the
+    same ``edge_group_id``.
     """
 
     uuid: str = field(default_factory=lambda: _uuid.uuid4().hex[:32])
@@ -119,6 +124,9 @@ class EntityEdge:
     expired_at: datetime | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Temporal versioning (Graphiti parity)
+    version: int = 1
+    edge_group_id: str = ""
 
     @classmethod
     def from_stmem(cls, row: dict[str, Any]) -> "EntityEdge":
@@ -131,6 +139,8 @@ class EntityEdge:
             except (json.JSONDecodeError, TypeError):
                 pass
         created = row.get("created_at", 0)
+        valid = row.get("valid_at", 0)
+        invalid = row.get("invalid_at", 0)
         return cls(
             uuid=row.get("id", ""),
             name=row.get("relation", ""),
@@ -144,6 +154,18 @@ class EntityEdge:
             else datetime.fromtimestamp(created, tz=timezone.utc)
             if created
             else datetime.now(timezone.utc),
+            valid_at=datetime.fromtimestamp(valid / 1_000_000, tz=timezone.utc)
+            if valid and valid > 1e12
+            else datetime.fromtimestamp(valid, tz=timezone.utc)
+            if valid
+            else None,
+            invalid_at=datetime.fromtimestamp(invalid / 1_000_000, tz=timezone.utc)
+            if invalid and invalid > 1e12
+            else datetime.fromtimestamp(invalid, tz=timezone.utc)
+            if invalid
+            else None,
+            version=row.get("version", 1),
+            edge_group_id=row.get("edge_group_id", ""),
         )
 
 
@@ -447,6 +469,24 @@ class Graphiti:
         except RuntimeError:
             pass
 
+        # Query the actual DB-assigned edge UUID and temporal fields
+        # Use a unique edge identifier: source + target + relation
+        actual_edge_id = edge.uuid  # fallback
+        actual_version = 1
+        actual_edge_group_id = ""
+        edge_rows = self._sql_query(
+            "SELECT id, version, edge_group_id FROM kg_edge WHERE "
+            f"source_node_id = '{_esc(actual_source_id)}' AND "
+            f"target_node_id = '{_esc(actual_target_id)}' AND "
+            f"relation = '{_esc(edge.name)}' AND "
+            f"workspace_id = '{_esc(ws_id)}'"
+        )
+        if edge_rows:
+            r = edge_rows[0]
+            actual_edge_id = r.get("id", edge.uuid)
+            actual_version = r.get("version", 1)
+            actual_edge_group_id = r.get("edge_group_id", "")
+
         resolved_source = EntityNode(
             uuid=actual_source_id,
             name=source_node.name,
@@ -462,13 +502,15 @@ class Graphiti:
             attributes=target_node.attributes,
         )
         resolved_edge = EntityEdge(
-            uuid=edge.uuid,
+            uuid=actual_edge_id,
             name=edge.name,
             fact=edge.fact,
             source_node_uuid=actual_source_id,
             target_node_uuid=actual_target_id,
             group_id=gid,
             attributes=edge.attributes,
+            version=actual_version,
+            edge_group_id=actual_edge_group_id,
         )
 
         return AddTripletResults(
@@ -863,6 +905,88 @@ class Graphiti:
             Dict with status.
         """
         return {"status": "ok", "note": "SpacetimeDB manages indices automatically"}
+
+    # -------------------------------------------------------------------
+    # Temporal edge tracking
+    # -------------------------------------------------------------------
+
+    def update_edge(
+        self,
+        edge_id: str,
+        relation: str | None = None,
+        weight: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Update an edge, creating a new temporal version.
+
+        Invalidates the current edge version (sets ``invalid_at``) and
+        creates a new edge with incremented ``version``.  Both share
+        the same ``edge_group_id`` for history tracking.
+
+        Args:
+            edge_id: The UUID of the current edge version to update.
+            relation: New relation name (or None to keep current).
+            weight: New weight (or None to keep current).
+            metadata: New metadata dict (or None to keep current).
+
+        Returns:
+            Dict with operation status.
+        """
+        try:
+            result = self._client._call(
+                "update_edge",
+                [
+                    edge_id,
+                    relation or "",
+                    weight if weight is not None else 1.0,
+                    json.dumps(metadata) if metadata else "{}",
+                ],
+            )
+            return result
+        except RuntimeError as exc:
+            raise RuntimeError(
+                f"graphiti.update_edge('{edge_id}') failed: {exc}"
+            ) from exc
+
+    def get_edge_history(
+        self,
+        edge_id: str,
+    ) -> list[EntityEdge]:
+        """Get all versions of an edge (temporal history).
+
+        Retrieves every version of the edge identified by its current
+        UUID, ordered from oldest to newest by ``valid_at``.
+
+        Args:
+            edge_id: The UUID of any version of the edge.
+
+        Returns:
+            List of :class:`EntityEdge` objects, one per version.
+        """
+        # First find the edge_group_id from this edge
+        edge_rows = self._sql_query(
+            f"SELECT edge_group_id FROM kg_edge WHERE id = '{_esc(edge_id)}'"
+        )
+        if not edge_rows:
+            return []
+        edge_group_id = edge_rows[0].get("edge_group_id", "")
+        if not edge_group_id:
+            return []
+
+        try:
+            self._client._call("get_edge_history", [edge_group_id])
+        except RuntimeError:
+            return []
+
+        # Read from the result table
+        result_rows = self._sql_query(
+            "SELECT * FROM edge_history_result WHERE "
+            f"edge_group_id = '{_esc(edge_group_id)}'"
+        )
+        # Sort in Python
+        result_rows.sort(key=lambda r: r.get("valid_at", 0))
+
+        return [EntityEdge.from_stmem(r) for r in result_rows]
 
     # -------------------------------------------------------------------
     # Nodes and edges by episode

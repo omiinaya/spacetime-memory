@@ -93,13 +93,15 @@ Adapter: `spacetime_memory.sdks.graphiti.Graphiti` (915 lines, 15 public methods
 | `remove_episode(episode_uuid)` | ✅ | → memory deactivation |
 | `build_indices_and_constraints(...)` | ✅ | Ensures DB state |
 | `get_nodes_and_edges_by_episode(uuid)` | ✅ | Returns KG subgraph for episode |
-| Temporal edge diff tracking | ❌ | Graphiti tracks edge evolution over time |
+| `update_edge(edge_id, relation, ...)` | ✅ | → `update_edge` reducer (temporal versioning) |
+| `get_edge_history(edge_id)` | ✅ | Returns all temporal versions of an edge |
+| Temporal edge diff tracking | ✅ | Edge versions linked by `edge_group_id` with `valid_at`/`invalid_at` |
 | `node_expansion()` | ❌ | Returns expanded node context |
 | Entity dedup during `add_triplet` | ❌ | Graphiti deduplicates entities |
 | Community summary text | ❌ | LLM-generated summary per community |
 | Time-range-filtered search | ⚠️ | Basic temporal support |
 
-**Coverage: ~75%.** Best adapter. Maps well to SpacetimeDB's KG module.
+**Coverage: ~85%.** Temporal edge tracking fully implemented. Remaining gaps are community summary (LLM-dependent) and node expansion.
 
 ---
 
@@ -188,7 +190,7 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 |---------|-------|---------|----------|
 | Mem0 | 604 | 16 | ~85% |
 | Zep | 647 | 15 | ~90% |
-| Graphiti | 915 | 15 | ~75% |
+| Graphiti | ~960 | 17 | ~85% |
 | Hindsight | 415 | 11 | ~85% |
 | Honcho | 579 | 21 | ~80% |
 | LangChain | 778 | 16 | ~85% |

@@ -24,6 +24,7 @@ pub struct KgNode {
 }
 
 /// A directed, typed edge between two knowledge graph nodes.
+/// Supports temporal versioning (Graphiti parity).
 #[table(accessor = kg_edge, public)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KgEdge {
@@ -39,6 +40,15 @@ pub struct KgEdge {
     /// JSON metadata blob
     pub metadata_json: String,
     pub created_at: i64,
+    /// Temporal versioning (Graphiti parity)
+    /// When this edge version became valid (micros)
+    pub valid_at: i64,
+    /// When this edge version became invalid (0 = still valid)
+    pub invalid_at: i64,
+    /// Version number (starts at 1)
+    pub version: u32,
+    /// Group UUID linking all versions of the same logical edge
+    pub edge_group_id: String,
 }
 
 /// A community (cluster) grouping related nodes in the knowledge graph.
@@ -163,6 +173,11 @@ pub fn create_edge(
             metadata_json
         },
         created_at: now,
+        // Temporal fields — first version is valid immediately
+        valid_at: now,
+        invalid_at: 0,
+        version: 1,
+        edge_group_id: uuid_v4(ctx),
     };
 
     ctx.db.kg_edge().insert(edge);
@@ -181,6 +196,147 @@ pub fn delete_edge(ctx: &ReducerContext, id: String) -> Result<(), String> {
     check_space_access(ctx, &edge.workspace_id, &caller, "editor")?;
 
     ctx.db.kg_edge().id().delete(&id);
+    Ok(())
+}
+
+/// Update an edge by creating a new version (temporal diff tracking).
+///
+/// Invalidates the current edge (sets `invalid_at`) and creates a new edge
+/// with the updated fields and incremented version number.  Both share the
+/// same `edge_group_id` so they can be tracked as a version history.
+///
+/// If the edge identified by `edge_id` is already invalidated (`invalid_at != 0`),
+/// the reducer finds the latest valid version with the same `edge_group_id`
+/// and invalidates that one instead.
+#[reducer]
+pub fn update_edge(
+    ctx: &ReducerContext,
+    edge_id: String,
+    relation: String,
+    weight: f64,
+    metadata_json: String,
+) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+
+    // Find the initial edge by ID
+    let initial = ctx
+        .db
+        .kg_edge()
+        .id()
+        .find(&edge_id)
+        .ok_or_else(|| format!("KgEdge '{}' not found", edge_id))?;
+
+    check_space_access(ctx, &initial.workspace_id, &caller, "editor")?;
+
+    let now = now_micros(ctx);
+
+    // Find the latest valid version in this edge group
+    // If the passed edge is already invalidated, find the current valid one
+    let latest_edge_id = if initial.invalid_at != 0 {
+        // Find the latest version with invalid_at == 0
+        ctx.db
+            .kg_edge()
+            .iter()
+            .filter(|e: &KgEdge| {
+                e.edge_group_id == initial.edge_group_id && e.invalid_at == 0
+            })
+            .next()
+            .map(|e| e.id.clone())
+            .unwrap_or(edge_id)
+    } else {
+        edge_id
+    };
+
+    // Find and invalidate the current valid edge
+    let mut current = ctx
+        .db
+        .kg_edge()
+        .id()
+        .find(&latest_edge_id)
+        .ok_or_else(|| format!("KgEdge '{}' not found", latest_edge_id))?;
+
+    current.invalid_at = now;
+    ctx.db.kg_edge().id().update(current.clone());
+
+    // Create a new edge version
+    let new_id = uuid_v4(ctx);
+    let new_edge = KgEdge {
+        id: new_id,
+        workspace_id: current.workspace_id,
+        source_node_id: current.source_node_id,
+        target_node_id: current.target_node_id,
+        relation,
+        weight,
+        confidence: current.confidence,
+        metadata_json: if metadata_json.is_empty() {
+            String::from("{}")
+        } else {
+            metadata_json
+        },
+        created_at: now,
+        valid_at: now,
+        invalid_at: 0,
+        version: current.version + 1,
+        edge_group_id: current.edge_group_id,
+    };
+
+    ctx.db.kg_edge().insert(new_edge);
+    Ok(())
+}
+
+/// Result table for `get_edge_history`.
+#[table(accessor = edge_history_result, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EdgeHistoryResult {
+    #[primary_key]
+    pub id: String,
+    pub edge_id: String,
+    pub workspace_id: String,
+    pub source_node_id: String,
+    pub target_node_id: String,
+    pub relation: String,
+    pub weight: f64,
+    pub confidence: String,
+    pub metadata_json: String,
+    pub created_at: i64,
+    pub valid_at: i64,
+    pub invalid_at: i64,
+    pub version: u32,
+    pub edge_group_id: String,
+}
+
+/// Get all versions of an edge (temporal history).
+///
+/// Queries by `edge_group_id` and stores results in `edge_history_result`.
+#[reducer]
+pub fn get_edge_history(ctx: &ReducerContext, edge_group_id: String) -> Result<(), String> {
+    // Require auth
+    let _caller = ctx.sender().to_hex();
+
+    for edge in ctx
+        .db
+        .kg_edge()
+        .iter()
+        .filter(|e: &KgEdge| e.edge_group_id == edge_group_id)
+    {
+        ctx.db.edge_history_result().insert(EdgeHistoryResult {
+            id: uuid_v4(ctx),
+            edge_id: edge.id,
+            workspace_id: edge.workspace_id,
+            source_node_id: edge.source_node_id,
+            target_node_id: edge.target_node_id,
+            relation: edge.relation,
+            weight: edge.weight,
+            confidence: edge.confidence,
+            metadata_json: edge.metadata_json,
+            created_at: edge.created_at,
+            valid_at: edge.valid_at,
+            invalid_at: edge.invalid_at,
+            version: edge.version,
+            edge_group_id: edge.edge_group_id,
+        });
+    }
+
     Ok(())
 }
 

@@ -351,3 +351,93 @@ class TestLifecycle:
         """build_indices_and_constraints is a no-op that returns ok."""
         result = graphiti.build_indices_and_constraints()
         assert result["status"] == "ok"
+
+
+class TestTemporalEdgeTracking:
+    """Tests for temporal edge versioning."""
+
+    def test_update_edge_creates_new_version(self, graphiti: Graphiti, workspace_id: str):
+        """update_edge invalidates the old edge and creates a new version."""
+        src = EntityNode(name="VersionSource", group_id=workspace_id)
+        tgt = EntityNode(name="VersionTarget", group_id=workspace_id)
+        result = graphiti.add_triplet(
+            source_node=src,
+            edge=EntityEdge(name="connects", fact="v1: connects", group_id=workspace_id),
+            target_node=tgt,
+        )
+        edge_id = result.edges[0].uuid
+
+        # Update the edge
+        update_result = graphiti.update_edge(
+            edge_id=edge_id,
+            relation="updated_connects",
+            weight=2.0,
+            metadata={"reason": "temporal test"},
+        )
+        assert update_result["status"] == "ok"
+
+    def test_get_edge_history_returns_all_versions(
+        self, graphiti: Graphiti, workspace_id: str
+    ):
+        """get_edge_history returns all temporal versions of an edge."""
+        src = EntityNode(name="HistorySource", group_id=workspace_id)
+        tgt = EntityNode(name="HistoryTarget", group_id=workspace_id)
+        result = graphiti.add_triplet(
+            source_node=src,
+            edge=EntityEdge(name="evolves", fact="v1: initial", group_id=workspace_id),
+            target_node=tgt,
+        )
+        edge_id = result.edges[0].uuid
+
+        # Create two more versions — update_edge auto-finds the latest version
+        graphiti.update_edge(edge_id=edge_id, relation="evolves_v2")
+        graphiti.update_edge(edge_id=edge_id, relation="evolves_v3")
+
+        history = graphiti.get_edge_history(edge_id)
+        assert len(history) >= 3
+
+        # Should have versions 1, 2, 3
+        versions = sorted(e.version for e in history)
+        assert versions == [1, 2, 3]
+
+    def test_get_edge_history_nonexistent(self, graphiti: Graphiti):
+        """get_edge_history for a nonexistent edge returns empty."""
+        history = graphiti.get_edge_history("nonexistent-edge-uuid")
+        assert history == []
+
+    def test_edge_has_edge_group_id(self, graphiti: Graphiti, workspace_id: str):
+        """A newly created edge has an edge_group_id linking all versions."""
+        src = EntityNode(name="GroupSource", group_id=workspace_id)
+        tgt = EntityNode(name="GroupTarget", group_id=workspace_id)
+        result = graphiti.add_triplet(
+            source_node=src,
+            edge=EntityEdge(name="grouped", fact="group test", group_id=workspace_id),
+            target_node=tgt,
+        )
+        edge = result.edges[0]
+        assert edge.edge_group_id
+        assert edge.version == 1
+
+    def test_update_edge_invalidates_old_version(
+        self, graphiti: Graphiti, workspace_id: str
+    ):
+        """After update_edge, the old version has invalid_at set and new version has valid_at."""
+        src = EntityNode(name="InvalidateSource", group_id=workspace_id)
+        tgt = EntityNode(name="InvalidateTarget", group_id=workspace_id)
+        result = graphiti.add_triplet(
+            source_node=src,
+            edge=EntityEdge(name="temporal", fact="initial", group_id=workspace_id),
+            target_node=tgt,
+        )
+        edge_id = result.edges[0].uuid
+
+        graphiti.update_edge(edge_id=edge_id, relation="temporal_v2")
+
+        history = graphiti.get_edge_history(edge_id)
+        # At least one version should have valid_at set (the new one)
+        # At least one version should have invalid_at set (the old one, unless it's the latest)
+        assert any(e.valid_at is not None for e in history)
+        # The first version (v1) should have invalid_at set (not None, not 0)
+        v1 = next((e for e in history if e.version == 1), None)
+        if v1:
+            assert v1.invalid_at is not None
