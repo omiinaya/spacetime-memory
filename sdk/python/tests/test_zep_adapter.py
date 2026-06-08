@@ -30,6 +30,7 @@ from spacetime_memory.sdks.zep import (
     MemoryMessage,
     MemorySearchResult,
     Session,
+    Fact,
 )
 
 
@@ -313,3 +314,143 @@ class TestZepClient:
         assert "Session A data" in a_contents
         assert "Session B data" in b_contents
         assert "Session B data" not in a_contents
+
+    # ------------------------------------------------------------------
+    # Facts API tests
+    # ------------------------------------------------------------------
+
+    def test_add_fact(self, zep: ZepClient) -> None:
+        """Add a fact to a session."""
+        sid = _sid("zep-test-fact-add")
+        result = zep.add_fact(
+            session_id=sid,
+            fact="User prefers dark mode over light mode",
+        )
+        assert result["status"] == "ok"
+        assert result["fact_id"]
+
+    def test_list_facts(self, zep: ZepClient) -> None:
+        """List facts for a session."""
+        sid = _sid("zep-test-fact-list")
+        zep.add_fact(session_id=sid, fact="User enjoys hiking")
+        zep.add_fact(session_id=sid, fact="User prefers tea over coffee")
+
+        facts = zep.list_facts(session_id=sid)
+        assert len(facts) >= 2
+        for f in facts:
+            assert isinstance(f, Fact)
+            assert f.fact
+            assert f.uuid
+        fact_texts = [f.fact for f in facts]
+        assert "User enjoys hiking" in fact_texts
+        assert "User prefers tea over coffee" in fact_texts
+
+    def test_list_facts_empty_session(self, zep: ZepClient) -> None:
+        """List facts on a session with no facts returns empty list."""
+        facts = zep.list_facts(session_id=_sid("zep-test-fact-empty"))
+        assert facts == []
+
+    def test_get_memory_includes_facts(self, zep: ZepClient) -> None:
+        """get_memory returns facts alongside messages."""
+        sid = _sid("zep-test-mem-facts")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "I like pizza"}],
+        )
+        zep.add_fact(session_id=sid, fact="User likes pizza")
+
+        memory = zep.get_memory(session_id=sid)
+        assert memory is not None
+        assert "messages" in memory
+        assert "facts" in memory
+        assert "relevant_facts" in memory
+        assert any("pizza" in f for f in memory["facts"])
+        assert len(memory["relevant_facts"]) >= 1
+        # relevant_facts contains Fact objects
+        rf = memory["relevant_facts"][0]
+        assert isinstance(rf, Fact)
+        assert rf.fact
+
+    def test_delete_fact(self, zep: ZepClient) -> None:
+        """Delete a specific fact by ID."""
+        sid = _sid("zep-test-fact-del")
+        result = zep.add_fact(session_id=sid, fact="This will be deleted")
+        fact_id = result["fact_id"]
+        assert fact_id
+
+        del_result = zep.delete_fact(session_id=sid, fact_id=fact_id)
+        assert del_result["status"] == "ok"
+        assert del_result["deleted"] == 1
+
+        # Should no longer be listed
+        facts = zep.list_facts(session_id=sid)
+        fact_texts = [f.fact for f in facts]
+        assert "This will be deleted" not in fact_texts
+
+    def test_delete_fact_nonexistent(self, zep: ZepClient) -> None:
+        """Delete a nonexistent fact is idempotent."""
+        result = zep.delete_fact(
+            session_id=_sid("zep-test-fact-noexist"),
+            fact_id="nonexistent-uuid-123",
+        )
+        assert result["status"] == "ok"
+        assert result["deleted"] == 0
+
+    # ------------------------------------------------------------------
+    # update_memory tests
+    # ------------------------------------------------------------------
+
+    def test_update_memory(self, zep: ZepClient) -> None:
+        """Update a memory's content."""
+        sid = _sid("zep-test-update")
+        add_result = zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Original content"}],
+        )
+        memory_id = add_result["message_ids"][0]
+        assert memory_id
+
+        result = zep.update_memory(
+            session_id=sid,
+            memory_id=memory_id,
+            messages=[{"role": "user", "content": "Updated content"}],
+        )
+        assert result["status"] == "ok"
+
+        # Verify the update
+        memory = zep.get_memory(session_id=sid)
+        assert memory is not None
+        contents = [m["content"] for m in memory["messages"]]
+        assert "Updated content" in contents
+
+    def test_update_memory_empty_messages(self, zep: ZepClient) -> None:
+        """update_memory with no messages is a no-op."""
+        sid = _sid("zep-test-update-noop")
+        add_result = zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Do not change"}],
+        )
+        memory_id = add_result["message_ids"][0]
+
+        result = zep.update_memory(session_id=sid, memory_id=memory_id)
+        assert result["status"] == "ok"
+
+    # ------------------------------------------------------------------
+    # search_memory min_score tests
+    # ------------------------------------------------------------------
+
+    def test_search_memory_min_score_alias(self, zep: ZepClient) -> None:
+        """search_memory accepts min_score as alias for score_threshold."""
+        sid = _sid("zep-test-min-score")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "The capital of France is Paris"}],
+        )
+
+        results = zep.search_memory(
+            session_id=sid,
+            query="France",
+            limit=5,
+            min_score=0.0,
+        )
+        assert isinstance(results, list)

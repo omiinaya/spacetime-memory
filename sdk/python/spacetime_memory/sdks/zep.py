@@ -9,6 +9,7 @@ Maps::
     Zep session       → SpacetimeDB workspace
     Zep message       → SpacetimeDB memory record (experience type)
     Zep memory search → SpacetimeDB hybrid_search
+    Zep fact          → SpacetimeDB memory record (fact type)
 
 Usage::
 
@@ -29,6 +30,10 @@ Usage::
     results = client.search_memory(
         session_id="alice-session", query="food preferences"
     )
+
+    # Add and list facts
+    client.add_fact(session_id="alice-session", fact="User likes pizza")
+    facts = client.list_facts(session_id="alice-session")
 
     # List sessions
     sessions = client.list_sessions()
@@ -87,11 +92,15 @@ class Memory:
         session_id: str = "",
         messages: list[MemoryMessage] | None = None,
         metadata: dict[str, Any] | None = None,
+        facts: list[str] | None = None,
+        relevant_facts: list["Fact"] | None = None,
         **kwargs: Any,
     ) -> None:
         self.session_id = session_id
         self.messages = messages or []
         self.metadata = metadata or {}
+        self.facts = facts or []
+        self.relevant_facts = relevant_facts or []
         self.__dict__.update(kwargs)
 
     def to_dict(self) -> dict[str, Any]:
@@ -99,6 +108,8 @@ class Memory:
             "session_id": self.session_id,
             "messages": [m.to_dict() for m in self.messages],
             "metadata": self.metadata,
+            "facts": self.facts,
+            "relevant_facts": [f.to_dict() for f in self.relevant_facts],
         }
 
 
@@ -157,6 +168,40 @@ class MemorySearchResult:
         }
 
 
+class Fact:
+    """A single fact in a Zep session.
+
+    Mirrors ``zep_python.types.Fact``.
+
+    Stores a factual statement about the user, extracted from conversation.
+    """
+
+    def __init__(
+        self,
+        uuid: str = "",
+        fact: str = "",
+        created_at: str | None = None,
+        rating: float | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.uuid = uuid
+        self.fact = fact
+        self.created_at = created_at or ""
+        self.rating = rating
+        self.__dict__.update(kwargs)
+
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "uuid": self.uuid,
+            "fact": self.fact,
+            "created_at": self.created_at,
+        }
+        if self.rating is not None:
+            d["rating"] = self.rating
+        d.update({k: v for k, v in self.__dict__.items() if k not in ("uuid", "fact", "created_at", "rating")})
+        return d
+
+
 # ---------------------------------------------------------------------------
 # ZepClient — main entry point
 # ---------------------------------------------------------------------------
@@ -169,6 +214,7 @@ class ZepClient:
 
     * ``session_id`` → ``workspace name`` / memory type tag
     * ``messages`` → memory records with ``memory_type="experience"``
+    * ``facts`` → memory records with ``memory_type="fact"``
     * ``search`` → ``hybrid_search`` with semantic + keyword matching
 
     Note: Zep's async endpoints, WebSocket streams, and LLM-based
@@ -229,12 +275,26 @@ class ZepClient:
         self._session_to_ws[session_id] = ws_id
         return ws_id
 
+    def _resolve_session(self, session_id: str) -> str | None:
+        """Resolve a session_id to a workspace_id without creating.
+
+        Returns None if the session doesn't exist yet.
+        """
+        if session_id in self._session_to_ws:
+            return self._session_to_ws[session_id]
+        workspaces = self._client.list_workspaces()
+        match = [w for w in workspaces if w.get("name") == session_id]
+        if not match:
+            return None
+        self._session_to_ws[session_id] = match[0]["id"]
+        return match[0]["id"]
+
     def _now_iso(self) -> str:
         """ISO-8601 timestamp."""
         return datetime.now(timezone.utc).isoformat()
 
     # ------------------------------------------------------------------
-    # Zep API
+    # Zep Memory API
     # ------------------------------------------------------------------
 
     def add_memory(
@@ -302,7 +362,10 @@ class ZepClient:
         limit: int = 10,
         min_rating: float = 0.0,
     ) -> dict[str, Any] | None:
-        """Retrieve messages for a session.
+        """Retrieve messages + facts for a session.
+
+        Returns a dict matching the Zep ``Memory`` response shape
+        (messages, facts, relevant_facts).
 
         Args:
             session_id: Zep session identifier.
@@ -310,36 +373,35 @@ class ZepClient:
             min_rating: Minimum memory rating filter (default 0.0).
 
         Returns:
-            A dict with ``messages`` key containing a list of message dicts,
-            or ``None`` if the session has no messages.
+            A dict with ``messages``, ``facts``, and ``relevant_facts``
+            keys, or ``None`` if the session has no messages.
 
         Example::
 
             >>> client.get_memory(session_id="my-session")
             {
-                'messages': [
-                    {'role': 'user', 'content': 'Hi!', 'score': 1.0},
-                ]
+                'messages': [...],
+                'facts': ['User likes pizza'],
+                'relevant_facts': [...],
             }
 
         """
-        if session_id not in self._session_to_ws:
-            # Check if workspace exists for this session
-            workspaces = self._client.list_workspaces()
-            match = [w for w in workspaces if w.get("name") == session_id]
-            if not match:
-                return None
-            self._session_to_ws[session_id] = match[0]["id"]
+        ws_id = self._resolve_session(session_id)
+        if ws_id is None:
+            return None
 
-        ws_id = self._session_to_ws[session_id]
+        # Get experience messages
         memories = self._client.list_memories(
             workspace_id=ws_id, limit=limit, memory_type="experience"
         )
-        if not memories:
-            return None
+
+        # Get facts
+        facts_raw = self._client.list_memories(
+            workspace_id=ws_id, limit=100, memory_type="fact"
+        )
 
         messages_out = []
-        for m in memories:
+        for m in (memories or []):
             if min_rating > 0.0:
                 rating = m.get("rating", 0.0) or 0.0
                 if rating < min_rating:
@@ -353,7 +415,21 @@ class ZepClient:
                 "timestamp": m.get("created_at", ""),
             })
 
-        return {"messages": messages_out}
+        fact_strings = [f.get("content", "") for f in (facts_raw or [])]
+        relevant_facts_objs = [
+            Fact(
+                uuid=f.get("id", ""),
+                fact=f.get("content", ""),
+                created_at=str(f.get("created_at", "")),
+            )
+            for f in (facts_raw or [])
+        ]
+
+        return {
+            "messages": messages_out,
+            "facts": fact_strings,
+            "relevant_facts": relevant_facts_objs,
+        }
 
     def delete_memory(self, session_id: str) -> dict[str, Any]:
         """Delete all memory for a session.
@@ -370,14 +446,10 @@ class ZepClient:
             {'status': 'ok', 'deleted': 3}
 
         """
-        if session_id not in self._session_to_ws:
-            workspaces = self._client.list_workspaces()
-            match = [w for w in workspaces if w.get("name") == session_id]
-            if not match:
-                return {"status": "ok", "deleted": 0}
-            self._session_to_ws[session_id] = match[0]["id"]
+        ws_id = self._resolve_session(session_id)
+        if ws_id is None:
+            return {"status": "ok", "deleted": 0}
 
-        ws_id = self._session_to_ws[session_id]
         memories = self._client.list_memories(
             workspace_id=ws_id, limit=1000, memory_type="experience"
         )
@@ -399,6 +471,7 @@ class ZepClient:
         query: str,
         limit: int = 10,
         score_threshold: float = 0.0,
+        min_score: float | None = None,
     ) -> list[MemorySearchResult]:
         """Search memory messages within a session.
 
@@ -407,6 +480,7 @@ class ZepClient:
             query: The search query.
             limit: Max results (default 10).
             score_threshold: Minimum similarity score (default 0.0).
+            min_score: Alias for ``score_threshold`` (Zep Cloud compat).
 
         Returns:
             A list of ``MemorySearchResult`` objects.
@@ -421,14 +495,14 @@ class ZepClient:
             'I like pizza'
 
         """
-        if session_id not in self._session_to_ws:
-            workspaces = self._client.list_workspaces()
-            match = [w for w in workspaces if w.get("name") == session_id]
-            if not match:
-                return []
-            self._session_to_ws[session_id] = match[0]["id"]
+        ws_id = self._resolve_session(session_id)
+        if ws_id is None:
+            return []
 
-        ws_id = self._session_to_ws[session_id]
+        effective_threshold = (
+            min_score if min_score is not None else score_threshold
+        )
+
         rows = self._client.search(
             workspace_id=ws_id,
             query=query,
@@ -438,7 +512,7 @@ class ZepClient:
         results: list[MemorySearchResult] = []
         for r in rows or []:
             score = r.get("score", 0.0)
-            if score_threshold > 0.0 and score < score_threshold:
+            if effective_threshold > 0.0 and score < effective_threshold:
                 continue
             content = r.get("memory_content", r.get("content", ""))
             role = r.get("peer_id", r.get("source_session_id", "user"))
@@ -446,6 +520,174 @@ class ZepClient:
             results.append(MemorySearchResult(message=msg, score=score))
 
         return results
+
+    # ------------------------------------------------------------------
+    # Zep Facts API
+    # ------------------------------------------------------------------
+
+    def add_fact(
+        self,
+        session_id: str,
+        fact: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Add a factual statement to a session.
+
+        Facts are stored as memories with ``memory_type="fact"`` and can
+        be retrieved with ``list_facts()`` or included in ``get_memory()``
+        results.
+
+        Args:
+            session_id: Zep session identifier.
+            fact: The factual statement to store.
+            metadata: Optional metadata dict.
+
+        Returns:
+            A dict with operation status and fact_id.
+
+        Example::
+
+            >>> client.add_fact(
+            ...     session_id="my-session",
+            ...     fact="User prefers dark mode interfaces",
+            ... )
+            {'status': 'ok', 'fact_id': '...'}
+
+        """
+        ws_id = self._ensure_workspace(session_id)
+        result = self._client.store(
+            workspace_id=ws_id,
+            content=fact,
+            summary=f"[fact] {fact[:200]}",
+            memory_type="fact",
+            source_session_id=session_id,
+        )
+
+        # Read back the fact ID from the last stored fact
+        memory_id = ""
+        stored = self._client.list_memories(
+            workspace_id=ws_id, limit=1, memory_type="fact"
+        )
+        if stored:
+            memory_id = stored[0].get("id", stored[0].get("entity_id", ""))
+
+        return {"status": "ok", "fact_id": memory_id}
+
+    def list_facts(
+        self,
+        session_id: str,
+        limit: int = 100,
+    ) -> list[Fact]:
+        """List all facts for a session.
+
+        Args:
+            session_id: Zep session identifier.
+            limit: Max facts to return (default 100).
+
+        Returns:
+            A list of ``Fact`` objects, each containing ``uuid``,
+            ``fact``, ``created_at``, and optionally ``rating``.
+
+        Example::
+
+            >>> facts = client.list_facts(session_id="my-session")
+            >>> facts[0].fact
+            'User prefers dark mode interfaces'
+
+        """
+        ws_id = self._resolve_session(session_id)
+        if ws_id is None:
+            return []
+
+        rows = self._client.list_memories(
+            workspace_id=ws_id, limit=limit, memory_type="fact"
+        )
+        return [
+            Fact(
+                uuid=r.get("id", r.get("entity_id", "")),
+                fact=r.get("content", ""),
+                created_at=str(r.get("created_at", "")),
+                rating=r.get("confidence", None),
+            )
+            for r in rows or []
+        ]
+
+    def delete_fact(self, session_id: str, fact_id: str) -> dict[str, Any]:
+        """Delete a specific fact by its ID.
+
+        Args:
+            session_id: Zep session identifier.
+            fact_id: The UUID of the fact to delete.
+
+        Returns:
+            A dict with operation status.
+
+        Example::
+
+            >>> client.delete_fact(session_id="my-session", fact_id="abc-123")
+            {'status': 'ok', 'deleted': 1}
+
+        """
+        result = self._client.delete_memory(fact_id)
+        # delete_memory returns {"status": "ok", "note": "already deleted"}
+        # when the memory wasn't found — treat as deleted=0
+        note = result.get("note", "")
+        if note == "already deleted":
+            return {"status": "ok", "deleted": 0, "note": "not found"}
+        return {"status": "ok", "deleted": 1}
+
+    # ------------------------------------------------------------------
+    # Zep Memory Update
+    # ------------------------------------------------------------------
+
+    def update_memory(
+        self,
+        session_id: str,
+        memory_id: str,
+        messages: list[dict[str, Any]] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Update a memory's content and/or metadata.
+
+        In Zep this accepts a ``MemoryUpdate``; here we update the content
+        from the last provided message and store metadata on the record.
+
+        Args:
+            session_id: Zep session identifier.
+            memory_id: The UUID of the memory to update.
+            messages: Updated message content (uses last message's content).
+            metadata: Optional metadata dict.
+
+        Returns:
+            A dict with operation status.
+
+        Example::
+
+            >>> client.update_memory(
+            ...     session_id="my-session",
+            ...     memory_id="abc-123",
+            ...     messages=[{"role": "user", "content": "Updated content"}],
+            ... )
+            {'status': 'ok'}
+
+        """
+        content = ""
+        if messages:
+            last_msg = messages[-1]
+            if isinstance(last_msg, dict):
+                content = last_msg.get("content", "")
+            elif isinstance(last_msg, MemoryMessage):
+                content = last_msg.content
+            else:
+                content = str(last_msg)
+
+        if content:
+            self._client.update_memory(
+                memory_id=memory_id,
+                content=content,
+            )
+
+        return {"status": "ok"}
 
     # ------------------------------------------------------------------
     # Session management

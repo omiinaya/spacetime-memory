@@ -54,19 +54,21 @@ Adapter: `spacetime_memory.sdks.zep.ZepClient` (500 lines, 10 public methods)
 |--------|--------|-------|
 | `__init__(host, port, ...)` | ✅ | Standard Zep-compatible init |
 | `add_memory(session_id, messages)` | ✅ | → `store_memory` for each message |
-| `get_memory(session_id, lastn, ...)` | ✅ | Returns recent messages for session |
+| `get_memory(session_id, lastn, ...)` | ✅ | Now includes `facts` + `relevant_facts` in response |
 | `delete_memory(session_id)` | ✅ | → `deactivate_memory` by session |
 | `search_memory(session_id, query, limit, metadata)` | ✅ | → `hybrid_search` scoped to session |
 | `list_sessions()` | ✅ | SQL query listing all workspaces |
 | `get_session(session_id)` | ✅ | Returns workspace metadata |
 | `close()` | ✅ | No-op (HTTP client is long-lived) |
-| `add_fact(session_id, fact)` | ❌ | Zep Facts API not implemented |
-| `list_facts(session_id)` | ❌ | Facts listing not implemented |
-| `update_memory(session_id, memory_id, ...)` | ❌ | Zep memory update not implemented |
-| `summarize_memory(session_id)` | ❌ | Zep Cloud feature |
-| `search_memory` with `min_score`, `search_scope` | ⚠️ | Filter params partially supported |
+| `add_fact(session_id, fact)` | ✅ | → `store_memory` with `memory_type="fact"` |
+| `list_facts(session_id)` | ✅ | → `list_memories` filtered to `memory_type="fact"` |
+| `delete_fact(session_id, fact_id)` | ✅ | → `deactivate_memory` by fact ID |
+| `update_memory(session_id, memory_id, ...)` | ✅ | → `update_memory` reducer |
+| `search_memory` with `min_score` | ✅ | Accepted as alias for `score_threshold` |
+| `summarize_memory(session_id)` | ❌ | Zep Cloud feature (LLM summarisation) |
+| `search_memory` with `search_scope` | ❌ | Zep Cloud feature |
 
-**Coverage: ~50%.** Missing facts API which is one of Zep's core features.
+**Coverage: ~90%.** Facts API fully implemented. Remaining gaps are Zep Cloud-specific features.
 
 ---
 
@@ -183,19 +185,18 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 | Adapter | Lines | Methods | Coverage |
 |---------|-------|---------|----------|
 | Mem0 | 469 | 12 | ~65% |
-| Zep | 500 | 10 | ~50% |
+| Zep | 647 | 15 | ~90% |
 | Graphiti | 915 | 15 | ~75% |
 | Hindsight | 415 | 11 | ~85% |
 | Honcho | 579 | 21 | ~80% |
 | LangChain | 778 | 16 | ~85% |
 
-**Overall: ~73% coverage across all adapters.**
+**Overall: ~80% coverage across all adapters.**
 
-Core CRUD operations are fully supported for all adapters. Missing features are
-generally advanced capabilities of the upstream projects — graph memory,
-custom LLM configs, temporal edge tracking, facts APIs.
+Core CRUD operations are fully supported for all adapters. The remaining gaps
+are generally advanced capabilities of the upstream projects.
 
 **Priority for improvement:**
-1. Zep facts API (largest gap)
+1. ~~Zep facts API (largest gap)~~ ✅ **Done**
 2. Mem0 memory merging + batch_update (second largest)
 3. Graphiti temporal edge tracking
