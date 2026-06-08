@@ -7,5 +7,11 @@ server/embedder/target/
 **/.venv/
 **/__pycache__/
 **/*.pyc
-data/
+data/cache/
+data/control-db/
+data/dbs/
+data/logs/
+data/program-bytes/
+data/database_identity
+data/metadata.toml
 *.onnx

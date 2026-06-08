@@ -10,6 +10,15 @@ import pytest
 import json
 
 from spacetime_memory import Client
+
+pytestmark = [
+    pytest.mark.skipif(
+        not os.environ.get("SPACETIMEDB_HOST"),
+        reason="Integration tests require SPACETIMEDB_HOST env var",
+    ),
+]
+
+
 from spacetime_memory.sdks.langchain import (
     StmemMemoryStore,
     StmemStore,

@@ -1,118 +1,112 @@
-# Spacetime Memory — Configuration Reference
+# Configuration Reference
 
-This document describes all environment variables used by the Spacetime Memory
-system.  Variables are grouped by subsystem.
+All configuration is done via environment variables. There is no configuration
+file — set these in your shell, Docker `--env`, or `.env` file.
 
----
-
-## Environment Variables
-
-### SpacetimeDB Connection
+## Connection
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SPACETIMEDB_HOST` | `localhost` | SpacetimeDB hostname |
+| `SPACETIMEDB_HOST` | `localhost` | SpacetimeDB hostname or IP |
 | `SPACETIMEDB_PORT` | `3001` | SpacetimeDB HTTP port |
-| `SPACETIMEDB_DB` | `spacetime-memory` *(auto)* | Database identity hex string (auto-detected in the SDK if omitted) |
+| `SPACETIMEDB_DB` | `spacetime-memory` | Database name/identity hex |
+| `STMEM_HOST` | `SPACETIMEDB_HOST` fallback | CLI-specific host override |
+| `STMEM_PORT` | `SPACETIMEDB_PORT` fallback | CLI-specific port override |
+| `STMEM_DB` | `SPACETIMEDB_DB` fallback | CLI-specific database override |
 
-### Embedder
+The `STMEM_*` vars take priority over `SPACETIMEDB_*` in the CLI (`stmem`).
+The SDK (`Client()`) only reads `SPACETIMEDB_*` vars.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `EMBEDDER_URL` | `http://localhost:9090` | Embedder sidecar URL (Rust ONNX inference) |
-| `EMBEDDER_TYPE` | `auto` | Embedder mode: `local`, `openai`, or `auto` (try local first, then fall back to OpenAI) |
-| `EMBEDDER_MODEL_PATH` | `/app/model/all-MiniLM-L6-v2.onnx` | Path to ONNX model file (used in Docker) |
-| `MODEL_PATH` | *(none)* | Alternative path to ONNX model file (local / non-Docker) |
-
-### LLM Integration
+## Authentication
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENAI_API_KEY` | *(none)* | OpenAI API key for LLM features and OpenAI embedder fallback |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible API endpoint (use for proxies / local LLMs) |
-| `LLM_MODEL` | `gpt-4o-mini` | Model identifier for LLM synthesis features |
+| `SPACETIMEDB_TOKEN` | *(none)* | JWT Bearer token for authenticated requests. Passed as `Authorization: Bearer <token>` header. Generate with `spacetime_memory.auth.generate_token()`. |
 
-### Authentication
+Without a token, SpacetimeDB assigns ephemeral HTTP identities per request
+— persistent identity requires JWT.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MCP_API_KEY` | *(none)* | API key for MCP server authentication (HTTP / SSE transport).  Not required for stdio transport.  When set, tools require `Authorization: Bearer <key>` on HTTP requests. |
-
-### CLI Overrides
+## Embedder (Semantic Search)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STMEM_HOST` | *(same as `SPACETIMEDB_HOST`)* | CLI-specific host override |
-| `STMEM_PORT` | *(same as `SPACETIMEDB_PORT`)* | CLI-specific port override |
-| `STMEM_DB` | *(same as `SPACETIMEDB_DB`)* | CLI-specific database override |
-| `STMEM_PLUGIN_DIR` | *(see CLI)* | Directory for CLI plugins |
+| `EMBEDDER_URL` | `http://localhost:9090` | URL of the ONNX embedder sidecar |
+| `EMBEDDER_TYPE` | `auto` | Embedder mode: `local` (sidecar only, fail if unreachable), `openai` (API only), `auto` (try sidecar, fall back to OpenAI) |
+| `OPENAI_API_KEY` | *(none)* | OpenAI API key for `openai` or `auto` embedder fallback |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible API endpoint |
 
-### Logging
+The embedder sidecar runs `all-MiniLM-L6-v2` ONNX model on port 9090.
+In `auto` mode, the SDK tries the sidecar first, then OpenAI.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RUST_LOG` | `info` | Rust module log level (SpacetimeDB, embedder sidecar) |
-| `LOG_LEVEL` | `WARNING` | Python SDK log level |
-
-### Frontend (Vite)
+## Retry & Resilience
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VITE_SPACETIMEDB_WS` | `ws://localhost:3001` | WebSocket URL for SpacetimeDB (frontend) |
-| `VITE_SPACETIMEDB_HOST` | `localhost:3001` | HTTP host:port for SpacetimeDB (frontend) |
-| `VITE_SPACETIMEDB_DB` | *(same as `SPACETIMEDB_DB`)* | Database identity hex string (frontend) |
+| `STMEM_MAX_RETRIES` | `3` | Max retry attempts for connection/timeout/5xx errors. Exponential backoff (0.5s, 1s, 2s, …). SpacetimeDB 530 (application error) is NOT retried. |
 
----
+## LLM (Mental Model Synthesis & Context Agent)
 
-## Docker
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | *(none)* | Required for LLM calls (mental model synthesis, context agent). |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible base URL. Set to a local proxy or self-hosted endpoint. |
+| `LLM_MODEL` | `gpt-4o-mini` | Model name for synthesis/agent LLM calls. |
 
-One-command startup:
+## Backup
 
-```bash
-docker compose up --build
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BACKUP_S3_BUCKET` | `my-bucket` | S3 bucket for cloud backup (`scripts/backup.py`). |
+| `BACKUP_S3_PREFIX` | `spacetime-backups` | S3 key prefix for cloud backup. |
+
+## Plugin System
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STMEM_PLUGIN_DIR` | `~/.stmem/plugins/` | Directory for plugin discovery (CLI only). |
+
+## Hermes Integration Plugin
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SPACETIMEDB_HOST` | `localhost` | Same as above — Hermes plugin reads from SDK defaults. |
+| `SPACETIMEDB_PORT` | `3001` | |
+| `SPACETIMEDB_DB` | `spacetime-memory` | |
+| `EMBEDDER_URL` | `http://localhost:9090` | |
+
+## SDK Client Constructor
+
+All env vars can be overridden by passing constructor arguments to `Client()`:
+
+```python
+from spacetime_memory import Client
+
+client = Client(
+    host="127.0.0.1",
+    port=3001,
+    database="my-db",
+    embedder_url="http://127.0.0.1:9090",
+    embedder_type="local",
+    token="eyJ...",
+    verbose=True,
+)
 ```
 
-Services exposed on the host:
-
-| Port | Service |
-|------|---------|
-| `3001` | SpacetimeDB |
-| `9090` | Embedder (ONNX sidecar) |
-| `5173` | Frontend (static HTTP server) |
-
-Environment variables can be set in `docker-compose.yml` under the `environment:`
-key, or via a `.env` file in the project root (see `.env.example`).
-
-### Default Docker overrides
-
-When running inside the Docker image, the following defaults differ from the
-Python SDK defaults:
-
-| Variable | Docker default | SDK default |
-|----------|---------------|-------------|
-| `SPACETIMEDB_HOST` | `0.0.0.0` | `localhost` |
-| `EMBEDDER_MODEL_PATH` | `/app/model/all-MiniLM-L6-v2.onnx` | *(not set)* |
-
----
-
-## Example `.env` file
+## Quick Start
 
 ```bash
-# SpacetimeDB connection
-SPACETIMEDB_HOST=localhost
-SPACETIMEDB_PORT=3001
-SPACETIMEDB_DB=c200f381695ed98be9b3fa689dd298cddff6212d35c46ae2a01999f921b88c82
-EMBEDDER_URL=http://localhost:9090
+# Minimal (local SpacetimeDB, no auth)
+export SPACETIMEDB_HOST=localhost
+export SPACETIMEDB_PORT=3001
 
-# LLM / Embedder
-OPENAI_API_KEY=sk-...
-EMBEDDER_TYPE=auto
+# With JWT auth
+export SPACETIMEDB_TOKEN=$(python -c "
+from spacetime_memory.auth import generate_token
+print(generate_token('data/id_ecdsa_pkcs8.pem'))
+")
 
-# MCP auth (optional — for HTTP transport)
-MCP_API_KEY=my-secret-key
-
-# Frontend
-VITE_SPACETIMEDB_WS=ws://localhost:3001
-VITE_SPACETIMEDB_HOST=localhost:3001
-VITE_SPACETIMEDB_DB=c200f381695ed98be9b3fa689dd298cddff6212d35c46ae2a01999f921b88c82
+# With embedder
+export EMBEDDER_URL=http://localhost:9090
+export EMBEDDER_TYPE=auto
+export OPENAI_API_KEY=sk-...
 ```

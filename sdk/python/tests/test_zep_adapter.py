@@ -16,6 +16,15 @@ import time
 import pytest
 
 from spacetime_memory import Client
+
+pytestmark = [
+    pytest.mark.skipif(
+        not os.environ.get("SPACETIMEDB_HOST"),
+        reason="Integration tests require SPACETIMEDB_HOST env var",
+    ),
+]
+
+
 from spacetime_memory.sdks.zep import (
     ZepClient,
     MemoryMessage,

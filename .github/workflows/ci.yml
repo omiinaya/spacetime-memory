@@ -28,9 +28,10 @@ jobs:
           python-version: "3.11"
       - run: pip install -e "sdk/python[dev]"
       - run: pip install rich feedparser
-      - name: Run Python tests
+      - name: Run Python unit tests
         working-directory: sdk/python
-        run: python -m pytest tests/ -v --ignore=tests/test_integration.py
+        run: |
+          python -m pytest tests/test_client.py tests/test_memory.py tests/test_metrics.py tests/test_connectors.py tests/test_agent_orchestrator.py -v
 
   typescript:
     runs-on: ubuntu-latest
