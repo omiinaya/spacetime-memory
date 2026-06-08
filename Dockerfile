@@ -12,12 +12,12 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/li
 COPY server/embedder/Cargo.toml server/embedder/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 # Pre-fetch dependencies with retry logic
-RUN for i in 1 2 3; do cargo build --release --locked 2>/dev/null && break; sleep 15; done || true
+RUN for i in 1 2 3; do cargo build --release 2>/dev/null && break; sleep 15; done || true
 COPY server/embedder/src/ src/
 # Force rebuild of our actual code with retry for network flakes
 RUN touch src/main.rs && \
     for i in 1 2 3; do \
-        cargo build --release --locked && break; \
+        cargo build --release && break; \
         echo "Embedder build attempt $i failed, retrying in 15s..."; sleep 15; \
     done
 
@@ -33,8 +33,8 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/li
 RUN rustup target add wasm32-unknown-unknown
 COPY server/spacetimedb/ ./
 RUN for i in 1 2 3; do \
-        cargo build --release --target wasm32-unknown-unknown --locked && break; \
-        echo "Attempt $i failed, retrying in 15s..."; sleep 15; \
+        cargo build --release --target wasm32-unknown-unknown && break; \
+        echo "Module build attempt $i failed, retrying in 15s..."; sleep 15; \
     done
 
 # ============================================================================
