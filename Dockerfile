@@ -4,26 +4,38 @@
 # Stage 1: Build the ONNX embedder sidecar (Rust binary, listens :9090)
 # ============================================================================
 FROM rust:1.80-slim AS embedder-builder
+ENV CARGO_NET_RETRY=5 \
+    CARGO_HTTP_TIMEOUT=120 \
+    CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 WORKDIR /build
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 COPY server/embedder/Cargo.toml server/embedder/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-# Cache dependencies with --locked for reproducible builds
-RUN cargo build --release --locked 2>/dev/null || true
+# Pre-fetch dependencies with retry logic
+RUN for i in 1 2 3; do cargo build --release --locked 2>/dev/null && break; sleep 15; done || true
 COPY server/embedder/src/ src/
 # Force rebuild of our actual code with retry for network flakes
 RUN touch src/main.rs && \
-    for i in 1 2 3; do cargo build --release --locked && break; sleep 5; done
+    for i in 1 2 3; do \
+        cargo build --release --locked && break; \
+        echo "Embedder build attempt $i failed, retrying in 15s..."; sleep 15; \
+    done
 
 # ============================================================================
 # Stage 2: Build the SpacetimeDB module (Rust → wasm)
 # ============================================================================
 FROM rust:1.80-slim AS module-builder
+ENV CARGO_NET_RETRY=5 \
+    CARGO_HTTP_TIMEOUT=120 \
+    CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 WORKDIR /build
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 RUN rustup target add wasm32-unknown-unknown
 COPY server/spacetimedb/ ./
-RUN for i in 1 2 3; do cargo build --release --target wasm32-unknown-unknown --locked && break; sleep 5; done
+RUN for i in 1 2 3; do \
+        cargo build --release --target wasm32-unknown-unknown --locked && break; \
+        echo "Attempt $i failed, retrying in 15s..."; sleep 15; \
+    done
 
 # ============================================================================
 # Stage 3: Build the frontend (Vite + React + TypeScript)
