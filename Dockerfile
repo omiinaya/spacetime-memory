@@ -111,6 +111,13 @@ COPY .env.example /app/.env
 #   5173 – Frontend (static HTTP server)
 EXPOSE 3001 9090 5173
 
+# ---- Health check ----
+# SpacetimeDB listens on port 3001 (HTTP). The entrypoint uses TCP connectivity
+# as the readiness probe; we replicate that for the container HEALTHCHECK.
+# curl is already installed in the runtime image.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+  CMD bash -c 'echo > /dev/tcp/localhost/3001' || exit 1
+
 # ---- Entrypoint ----
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

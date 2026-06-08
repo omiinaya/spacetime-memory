@@ -25,6 +25,12 @@ services:
       - SPACETIMEDB_PORT=3001
       - SPACETIMEDB_DB=spacetime-memory
       - EMBEDDER_MODEL_PATH=/app/model/all-MiniLM-L6-v2.onnx
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/3001' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 volumes:
   spacetime-data:

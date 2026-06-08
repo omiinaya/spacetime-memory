@@ -1194,6 +1194,86 @@ class Client:
         return self._call("compute_community_hierarchy", [workspace_id])
 
     # -----------------------------------------------------------------------
+    # API Keys
+    # -----------------------------------------------------------------------
+
+    def create_api_key(
+        self,
+        workspace_id: str,
+        name: str,
+        permissions: str = '["read"]',
+    ) -> dict[str, Any]:
+        """Create a new API key.
+
+        Generates a secure random key secret, hashes it, and stores the
+        hash in the SpacetimeDB ``ApiKey`` table.  The unhashed secret is
+        returned **only once** — save it.
+
+        Args:
+            workspace_id: The workspace to associate the key with.
+            name: A human-readable label for this key.
+            permissions: JSON array of permission strings
+                (default: ``["read"]``).
+
+        Returns:
+            Dict with ``status``, ``api_key`` (the secret), ``id`` (the
+            key's database ID), and a warning note.
+        """
+        import secrets
+        import hashlib
+
+        raw = secrets.token_bytes(32)
+        api_key = "sk-" + raw.hex()
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+
+        self._call("create_api_key", [
+            workspace_id, name, permissions, key_hash,
+        ])
+
+        # Fetch the just-created key to get its ID
+        rows = self._sql(
+            "SELECT id FROM api_key WHERE "
+            f"key_hash = '{_esc(key_hash)}' "
+            "ORDER BY created_at DESC LIMIT 1"
+        )
+        key_id = rows[0]["id"] if rows else ""
+
+        return {
+            "status": "ok",
+            "api_key": api_key,
+            "id": key_id,
+            "note": "Save this key — it will not be shown again.",
+        }
+
+    def deactivate_api_key(self, key_id: str) -> dict[str, Any]:
+        """Deactivate (revoke) an API key so it can no longer be used.
+
+        Args:
+            key_id: The primary-key ``id`` of the ``ApiKey`` row.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("deactivate_api_key", [key_id])
+
+    def list_api_keys(self, workspace_id: str) -> list[dict[str, Any]]:
+        """List all API keys for a workspace.
+
+        Args:
+            workspace_id: The workspace to query.
+
+        Returns:
+            List of ``ApiKey`` table rows (dicts).  Note that the
+            ``key_hash`` column is a one-way hash of the secret — the
+            plaintext secret is never stored server-side.
+        """
+        return self._sql(
+            "SELECT * FROM api_key WHERE "
+            f"workspace_id = '{_esc(workspace_id)}' "
+            "ORDER BY created_at DESC"
+        )
+
+    # -----------------------------------------------------------------------
     # Peer queries
     # -----------------------------------------------------------------------
 

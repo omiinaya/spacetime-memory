@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="spacetime-memory",
-    version="0.5.0",
+    version="1.0.0",
     description="SpacetimeDB-powered memory infrastructure for AI agents",
     long_description=open("README.md").read() if __import__("os").path.exists("README.md") else "",
     long_description_content_type="text/markdown",
@@ -17,6 +17,7 @@ setup(
     extras_require={
         "dev": [
             "pytest>=7",
+            "pytest-asyncio>=0.21",
             "pytest-mock>=3",
             "click>=8",
             "feedparser>=6",
@@ -32,10 +33,14 @@ setup(
         ],
     },
     python_requires=">=3.10",
+    entry_points={
+        "console_scripts": [
+            "spacetime-benchmark = scripts.benchmark:main",
+        ],
+    },
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",

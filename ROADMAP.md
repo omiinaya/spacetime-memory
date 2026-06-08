@@ -191,35 +191,32 @@ Every lane below blocks everything above it.
 **What:** API key auth on the HTTP endpoints so you can expose the MCP server and Python SDK over a network without being wide open.
 **Why:** Currently anyone who can reach the port can call any reducer.
 
-- [ ] Python FastAPI/Starlette middleware that validates `Authorization: Bearer <key>` against `api_key` table
+- [x] **Python SDK + CLI:** `Client.create_api_key()`, `deactivate_api_key()`, `list_api_keys()` + `stmem apikey create|revoke|list`
+- [ ] Python FastAPI/Starlette gateway middleware (follow-up for full gateway proxy)
 - [ ] `stmem serve` or integrate into MCP server
-- [ ] CLI: `stmem auth create-key`, `stmem auth revoke-key`
 
-**Files:** `server/gateway/` (new), `cli/stmem.py`
+**Files:** `server/spacetimedb/src/auth.rs` (ApiKey table + reducers), `sdk/python/spacetime_memory/client.py`, `cli/stmem.py`
 
 ### Lane 12 — Performance benchmarks
 
 **What:** Measure latency and throughput so users know what to expect.
 **Why:** Every call goes Python → HTTP → SpacetimeDB SQL API → WASM. That's heavy. Without benchmarks, users can't evaluate.
 
-- [ ] Benchmark suite: `pytest --benchmark` or standalone script
-- [ ] Measure: single memory store, batch store, search (semantic, BM25, hybrid), graph queries
-- [ ] Compare to: direct Mem0/Zep/Hindsight calls (or publish numbers from other backends)
-- [ ] Document: "100ms per store call under X load"
+- [x] **Benchmark suite**: `sdk/python/scripts/benchmark.py` (standalone script, 13 operations, p50/p90/p99)
+- [x] **Documentation**: `docs/PERFORMANCE.md` (setup, interpretation, expected results)
+- [ ] Run benchmarks and publish results for CI tracking
 
-**Files:** `scripts/benchmark.py`, `docs/PERFORMANCE.md`
+**Files:** `sdk/python/scripts/benchmark.py`, `docs/PERFORMANCE.md`
 
 ### Lane 13 — Documentation site
 
 **What:** Real docs, not just a README.
 **Why:** The README is already 265 lines and growing. Migration guides, API reference, and deployment docs need a proper home.
 
-- [ ] MkDocs site under `docs/`
-- [ ] Quickstart (5-min setup)
-- [ ] Migration guides: from Mem0, from Zep, from Hindsight, from Honcho
-- [ ] API reference (auto-generated from docstrings or hand-written)
-- [ ] Deployment: Docker compose, bare-metal, SpacetimeDB Cloud
-- [ ] Hosted on GitHub Pages via CI
+- [x] **MkDocs site**: `mkdocs.yml` + `docs/` (index, getting-started, usage/adapters, usage/client, usage/cli, usage/self-hosted, api/, development)
+- [ ] MkDocs CI workflow for GitHub Pages
+- [ ] Auto-generated API reference via mkdocstrings
+- [ ] Migration guides (adapter-specific)
 
 **Files:** `docs/`, `mkdocs.yml`, `.github/workflows/docs.yml`
 
@@ -228,21 +225,22 @@ Every lane below blocks everything above it.
 **What:** One `docker compose up` that starts SpacetimeDB + embedder + MCP.
 **Why:** The Docker setup is overly complex (multi-stage builder, separate images for module and embedder) and the startup sequence is fragile.
 
-- [ ] Clean `compose.yaml` with health checks
-- [ ] Health check: wait for SpacetimeDB → publish module → wait for embedder → start MCP
+- [x] **HEALTHCHECK** in Dockerfile (port 3001 TCP probe, 30s startup period)
+- [x] **healthcheck** in docker-compose.yml
 - [ ] `.env` file for config
 - [ ] Remove stale Docker build scripts (consolidate into `docker/`)
 
-**Files:** `compose.yaml`, `Dockerfile` (single if possible)
+**Files:** `compose.yaml`, `Dockerfile`
 
 ### Lane 15 — Consolidated adapter package
 
 **What:** One import path, no split between `sdk/python/` and `sdk/adapters/`.
 **Why:** The standalone Mem0 adapter in `sdk/adapters/mem0/` duplicates the SDK adapter and there's no clear split.
 
+- [x] **PyPI-ready**: `setup.py` v1.0.0, `pyproject.toml` with build-system, `MANIFEST.in`, publish workflow (`.github/workflows/publish.yml`)
 - [ ] Decide: drop standalone adapter, or keep as separate thin wrapper
 - [ ] If keeping standalone, document the distinction
-- [ ] Publish to PyPI as `spacetime-memory` (or `stmem`)
+- [ ] Actually publish to PyPI (`twine upload dist/*`)
 
 ---
 
