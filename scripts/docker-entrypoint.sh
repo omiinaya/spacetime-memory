@@ -2,7 +2,8 @@
 # ============================================================================
 # docker-entrypoint.sh — start all Spacetime Memory services inside the container
 # ============================================================================
-set -e
+set -euo pipefail
+# Note: health check loops use || true to avoid premature exit from set -e
 
 # Directory for SpacetimeDB data
 DATA_DIR="${SPACETIMEDB_DATA_DIR:-/app/data}"
@@ -21,10 +22,10 @@ spacetimedb-standalone start \
     &
 SPACETIME_PID=$!
 
-# Wait until the health endpoint responds
+# Wait until the server is listening on port 3001
 echo "==> Waiting for SpacetimeDB to become ready ..."
 for i in $(seq 1 30); do
-    if curl -sf http://localhost:3001/ > /dev/null 2>&1; then
+    if timeout 1 bash -c 'echo > /dev/tcp/localhost/3001' 2>/dev/null; then
         echo "==> SpacetimeDB is ready."
         break
     fi
@@ -33,7 +34,7 @@ for i in $(seq 1 30); do
         exit 1
     fi
     sleep 1
-done
+done || true  # set -e guard: loop may exit non-zero if no break
 
 # --------------------------------------------------------------------------
 # 2  Publish the module (unless the database already exists)
@@ -42,13 +43,13 @@ done
 #   "spacetime-memory".  The module wasm is at /app/module/spacetime_memory.wasm
 MODULE_NAME="${SPACETIMEDB_DB:-spacetime-memory}"
 
-# Check if the database already exists
-if ! curl -sf "http://localhost:3001/v1/database/$MODULE_NAME" > /dev/null 2>&1; then
+# Check if the database already exists (POST required for SpacetimeDB v2.4)
+if ! curl -sf -X POST "http://localhost:3001/v1/database/$MODULE_NAME" > /dev/null 2>&1; then
     echo "==> Publishing module '$MODULE_NAME' ..."
-    spacetime publish \
-        --bin-path /app/module/spacetime_memory.wasm \
+    spacetimedb-cli publish \
+        -b /app/module/spacetime_memory.wasm \
         "$MODULE_NAME" \
-        --yes \
+        --yes --anonymous \
         2>&1 || echo "==> [WARN] Module publish exited non-zero (may already exist)."
 else
     echo "==> Database '$MODULE_NAME' already published — skipping publish."
@@ -74,7 +75,7 @@ for i in $(seq 1 15); do
         exit 1
     fi
     sleep 1
-done
+done || true  # set -e guard
 
 # --------------------------------------------------------------------------
 # 4  Start a trivial static HTTP server for the frontend
