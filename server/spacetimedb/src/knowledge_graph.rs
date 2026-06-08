@@ -637,6 +637,7 @@ pub fn compute_community_hierarchy(
 
     // Initialise: each community is its own cluster
     #[derive(Clone)]
+    #[allow(dead_code)]
     struct Cluster {
         id: String,
         depth: u32,

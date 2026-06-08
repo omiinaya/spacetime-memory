@@ -4,7 +4,13 @@
 *.tsbuildinfo
 .spacetime/
 __pycache__/
-data/
+data/cache/
+data/control-db/
+data/dbs/
+data/logs/
+data/program-bytes/
+data/database_identity
+data/metadata.toml
 dist/
 model/
 node_modules/
