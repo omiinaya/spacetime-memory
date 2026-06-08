@@ -101,6 +101,7 @@ class Client:
         self.verbose = verbose
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
         self.max_retries = int(os.environ.get("STMEM_MAX_RETRIES", "3"))
+        self._metrics: Any = None  # Set via set_metrics_collector()
 
         base = f"http://{self.host}:{self.port}"
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
@@ -113,6 +114,24 @@ class Client:
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
+
+    # -------------------------------------------------------------------
+    # Metrics integration
+    # -------------------------------------------------------------------
+
+    def set_metrics_collector(self, collector: Any) -> None:
+        """Attach a ``MetricsCollector`` instance to track request metrics.
+
+        The collector must have ``record(endpoint, fn)`` and ``record_latency``
+        methods.  See ``spacetime_memory.metrics.MetricsCollector``.
+        """
+        self._metrics = collector
+
+    def get_metrics(self) -> dict[str, Any] | None:
+        """Export collected metrics as a dict, or None if not configured."""
+        if self._metrics is None:
+            return None
+        return self._metrics.to_dict()
 
     @classmethod
     def from_token_file(
@@ -181,9 +200,17 @@ class Client:
         headers = {"Content-Type": "text/plain"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        resp = self._request_with_retry(
-            "POST", self.sql_url, content=query, headers=headers,
-        )
+
+        def _do_sql() -> httpx.Response:
+            return self._request_with_retry(
+                "POST", self.sql_url, content=query, headers=headers,
+            )
+
+        if self._metrics is not None:
+            resp = self._metrics.record("sql", _do_sql)
+        else:
+            resp = _do_sql()
+
         if resp.status_code >= 400:
             error_text = resp.text[:500]
             if self.verbose:
@@ -213,10 +240,18 @@ class Client:
         headers = {"Content-Type": "application/json"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        resp = self._request_with_retry(
-            "POST", f"{self.reducer_url}/{reducer}",
-            content=json.dumps(args), headers=headers,
-        )
+
+        def _do_call() -> httpx.Response:
+            return self._request_with_retry(
+                "POST", f"{self.reducer_url}/{reducer}",
+                content=json.dumps(args), headers=headers,
+            )
+
+        if self._metrics is not None:
+            resp = self._metrics.record(f"reducer:{reducer}", _do_call)
+        else:
+            resp = _do_call()
+
         if resp.status_code >= 400:
             error_text = resp.text[:500]
             if self.verbose:

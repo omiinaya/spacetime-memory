@@ -1833,7 +1833,282 @@ def org_status(org_dir: str) -> None:
 
 
 # ===================================================================
-# Backup & Restore
+# metrics — request and performance metrics
+# ===================================================================
+
+
+@cli.group()
+def metrics() -> None:
+    """View request metrics and performance statistics."""
+
+
+@metrics.command(name="show")
+@click.option("--json", "as_json", is_flag=True, help="Raw JSON output")
+@click.option("--token", "-t", envvar="SPACETIMEDB_TOKEN", help="JWT token for auth")
+def metrics_show(as_json: bool, token: str | None) -> None:
+    """Show collected request metrics (counts, latency, errors).
+
+    Metrics are collected from the moment the client is created.
+    Use ``stmem metrics reset`` to clear counters.
+    Use ``stmem metrics watch`` for a live updating view.
+    """
+    from spacetime_memory.metrics import MetricsCollector
+
+    client = _sdk_client()
+    if token:
+        client.token = token
+
+    # Attach a one-shot collector and run a few probes
+    mc = MetricsCollector()
+    client.set_metrics_collector(mc)
+
+    with console.status("Gathering metrics..."):
+        # Run health and memory count queries to populate the collector
+        try:
+            client.ping()  # records under "sql" via _sql or reducer
+        except Exception:
+            pass
+        try:
+            rows = client._sql("SELECT COUNT(*) AS c FROM memory")
+            total_memories = rows[0]["c"] if rows else 0
+        except Exception:
+            total_memories = 0
+        try:
+            ws_rows = client.list_workspaces()
+            workspace_count = len(ws_rows) if ws_rows else 0
+        except Exception:
+            workspace_count = 0
+
+        mc.record_memory_stats(total=total_memories)
+        # Add system-level info
+        ping_result = client.ping()
+
+    if as_json:
+        data = mc.to_dict()
+        data["workspace_count"] = workspace_count
+        data["database_latency_ms"] = ping_result.get("latency_ms", 0)
+        console.print_json(json.dumps(data, default=str))
+        return
+
+    d = mc.to_dict()
+
+    # Overview
+    table = Table(title="Metrics Overview", box=box.ROUNDED, header_style="bold cyan")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value")
+    table.add_row("Uptime", d["uptime_human"])
+    table.add_row("Total Calls", str(d["total_calls"]))
+    table.add_row("Total Errors", str(d["total_errors"]))
+    table.add_row("Error Rate", f"{d['overall_error_rate_pct']}%")
+    table.add_row("Embedder Errors", str(d["embedder_errors"]))
+    table.add_row("Workspaces", str(workspace_count))
+    table.add_row("Total Memories", str(total_memories))
+    table.add_row("Database Latency", f"{ping_result.get('latency_ms', 0)}ms")
+    console.print(table)
+
+    # Per-endpoint breakdown
+    if d["endpoints"]:
+        ep_table = Table(title="Per-Endpoint Breakdown", box=box.ROUNDED, header_style="bold cyan")
+        ep_table.add_column("Endpoint")
+        ep_table.add_column("Count")
+        ep_table.add_column("Errors")
+        ep_table.add_column("Error %")
+        ep_table.add_column("Avg (ms)")
+        ep_table.add_column("Min (ms)")
+        ep_table.add_column("Max (ms)")
+        for name, stats in sorted(d["endpoints"].items()):
+            ep_table.add_row(
+                name,
+                str(stats["count"]),
+                str(stats["errors"]),
+                f"{stats['error_rate_pct']}%",
+                str(stats["latency_ms"]["avg"]),
+                str(stats["latency_ms"]["min"]),
+                str(stats["latency_ms"]["max"]),
+            )
+        console.print(ep_table)
+
+
+@metrics.command(name="reset")
+@click.option("--token", "-t", envvar="SPACETIMEDB_TOKEN", help="JWT token for auth")
+def metrics_reset(token: str | None) -> None:
+    """Reset all metrics counters to zero."""
+    from spacetime_memory.metrics import MetricsCollector
+
+    client = _sdk_client()
+    if token:
+        client.token = token
+
+    mc = MetricsCollector()
+    client.set_metrics_collector(mc)
+    console.print("[green]Metrics counters reset.[/green]")
+
+
+@metrics.command(name="watch")
+@click.option("--interval", "-i", default=5, type=int, help="Refresh interval (seconds)")
+@click.option("--token", "-t", envvar="SPACETIMEDB_TOKEN", help="JWT token for auth")
+def metrics_watch(interval: int, token: str | None) -> None:
+    """Live-updating metrics view (refreshes every N seconds)."""
+    from spacetime_memory.metrics import MetricsCollector
+
+    client = _sdk_client()
+    if token:
+        client.token = token
+
+    mc = MetricsCollector()
+    client.set_metrics_collector(mc)
+
+    try:
+        while True:
+            import time as _time
+            console.clear()
+            try:
+                client.ping()
+                rows = client._sql("SELECT COUNT(*) AS c FROM memory")
+                total_memories = rows[0]["c"] if rows else 0
+            except Exception:
+                total_memories = 0
+
+            mc.record_memory_stats(total=total_memories)
+            d = mc.to_dict()
+
+            table = Table(title=f"Live Metrics (refreshing every {interval}s — Ctrl+C to stop)",
+                          box=box.ROUNDED, header_style="bold cyan")
+            table.add_column("Metric", style="bold")
+            table.add_column("Value")
+            table.add_row("Uptime", d["uptime_human"])
+            table.add_row("Total Calls", str(d["total_calls"]))
+            table.add_row("Errors", str(d["total_errors"]))
+            table.add_row("Error Rate", f"{d['overall_error_rate_pct']}%")
+            table.add_row("Memories", str(total_memories))
+            console.print(table)
+
+            _time.sleep(interval)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Stopped.[/yellow]")
+
+
+# ===================================================================
+# diagnostics — full system health and metrics dump
+# ===================================================================
+
+
+@cli.command()
+@click.option("--json", "as_json", is_flag=True, help="Raw JSON output")
+@click.option("--token", "-t", envvar="SPACETIMEDB_TOKEN", help="JWT token for auth")
+def diagnostics(as_json: bool, token: str | None) -> None:
+    """Run comprehensive system diagnostics.
+
+    Checks connectivity, gathers metrics, inspects workspace/memory
+    counts, and reports embedder status in a single snapshot.
+    """
+    from spacetime_memory.metrics import MetricsCollector
+
+    client = _sdk_client()
+    if token:
+        client.token = token
+
+    mc = MetricsCollector()
+    client.set_metrics_collector(mc)
+
+    with console.status("Running diagnostics..."):
+        # 1. Connectivity
+        ping_result = client.ping()
+        health_result = client.health()
+        embedder = health_result.get("embedder", {})
+
+        # 2. Memory counts
+        try:
+            rows = client._sql("SELECT memory_type, COUNT(*) AS c FROM memory GROUP BY memory_type")
+            mem_by_type: dict[str, int] = {}
+            total_memories = 0
+            for r in rows or []:
+                mem_by_type[r["memory_type"]] = r["c"]
+                total_memories += r["c"]
+        except Exception:
+            mem_by_type = {}
+            total_memories = 0
+
+        try:
+            tier_rows = client._sql("SELECT tier, COUNT(*) AS c FROM memory WHERE tier != '' GROUP BY tier")
+            mem_by_tier: dict[str, int] = {}
+            for r in tier_rows or []:
+                mem_by_tier[r["tier"]] = r["c"]
+        except Exception:
+            mem_by_tier = {}
+
+        mc.record_memory_stats(total=total_memories, by_type=mem_by_type, by_tier=mem_by_tier)
+
+        # 3. Workspace count
+        try:
+            workspaces = client.list_workspaces()
+            ws_count = len(workspaces) if workspaces else 0
+        except Exception:
+            workspaces = []
+            ws_count = 0
+
+    metrics_data = mc.to_dict()
+
+    if as_json:
+        data = {
+            **metrics_data,
+            "database": {
+                "host": HOST,
+                "port": PORT,
+                "database": DB,
+                "reachable": ping_result.get("status") == "ok",
+                "latency_ms": ping_result.get("latency_ms", 0),
+            },
+            "embedder": {
+                "reachable": embedder.get("reachable", False),
+                "model_path": embedder.get("model_path", ""),
+            },
+            "workspaces": {
+                "count": ws_count,
+                "names": [w.get("name", "") for w in (workspaces or [])][:50],
+            },
+            "memory_counts": {
+                "total": total_memories,
+                "by_type": mem_by_type,
+                "by_tier": mem_by_tier,
+            },
+        }
+        console.print_json(json.dumps(data, default=str))
+        return
+
+    # Human-readable output
+    console.print("\n[bold cyan]═══ System Diagnostics ═══[/bold cyan]\n")
+
+    # Connectivity
+    db_status = "[green]✔[/green]" if ping_result.get("status") == "ok" else "[red]✘[/red]"
+    emb_status = "[green]✔[/green]" if embedder.get("reachable") else "[red]✘[/red]"
+    auth_status = "[green]JWT[/green]" if health_result.get("token_configured") else "[yellow]anonymous[/yellow]"
+
+    console.print(f"[bold]SpacetimeDB:[/bold] {db_status}  {ping_result.get('latency_ms', '?')}ms  ({HOST}:{PORT})")
+    console.print(f"[bold]Embedder:[/bold]   {emb_status}  {embedder.get('model_path', 'n/a')}")
+    console.print(f"[bold]Auth:[/bold]       {auth_status}")
+    console.print()
+
+    # Metrics
+    console.print(f"[bold]Metrics (uptime: {metrics_data['uptime_human']}):[/bold]")
+    console.print(f"  Calls:  {metrics_data['total_calls']}  |  "
+                  f"Errors: {metrics_data['total_errors']}  |  "
+                  f"Rate: {metrics_data['overall_error_rate_pct']}%")
+    console.print(f"  Embedder errors: {metrics_data['embedder_errors']}")
+    console.print()
+
+    # Memory
+    console.print(f"[bold]Memory:[/bold]  {total_memories} total")
+    if mem_by_type:
+        console.print(f"  By type: {', '.join(f'{k}={v}' for k, v in sorted(mem_by_type.items()))}")
+    if mem_by_tier:
+        console.print(f"  By tier: {', '.join(f'{k}={v}' for k, v in sorted(mem_by_tier.items()))}")
+    console.print(f"[bold]Workspaces:[/bold]  {ws_count}")
+    console.print()
+
+
+# ===================================================================
+# backup / restore / health
 # ===================================================================
 
 
