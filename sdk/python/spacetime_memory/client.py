@@ -200,6 +200,19 @@ class Client:
             # If the handshake fails, proceed without identity
             self._identity_established = True
 
+    def _whoami(self) -> str:
+        """Return the SpacetimeDB identity used by this client."""
+        self._ensure_identity()
+        try:
+            resp = self._http.get(
+                f"http://{self.host}:{self.port}/v1/database/{self.database}",
+                headers=self._headers(),
+                timeout=5.0,
+            )
+            return resp.headers.get("spacetime-identity", "")
+        except Exception:
+            return ""
+
     # -------------------------------------------------------------------
     # Metrics integration
     # -------------------------------------------------------------------
