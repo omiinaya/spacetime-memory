@@ -146,13 +146,14 @@ Adapter: `spacetime_memory.sdks.honcho.Honcho` (579 lines, 21 public methods)
 | `add(user, content, session_id, ...)` | ✅ | → `store_memory` |
 | `search(user, query, limit, ...)` | ✅ | → `hybrid_search` |
 | `get_user_memories(user, limit)` | ✅ | → memory list by user |
+| `User.set_metadata(metadata)` | ✅ | → `update_workspace` (stored as description) |
+| `User.get_metadata()` | ✅ | Returns metadata from workspace description |
 | `Session.create_memory(...)` | ✅ | Session-scoped memory creation |
 | `Session.search(...)` | ✅ | Session-scoped search |
 | `Session.get_memories(limit)` | ✅ | Session memory list |
-| User metadata update | ❌ | Honcho stores user metadata |
 | Session-level memory visibility | ⚠️ | Basic support |
 
-**Coverage: ~80%.** Honcho's workspace model maps naturally to SpacetimeDB workspaces.
+**Coverage: ~86%.** User metadata API implemented. Session metadata support is basic.
 
 ---
 
@@ -192,7 +193,7 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 | Zep | 647 | 15 | ~90% |
 | Graphiti | ~960 | 17 | ~85% |
 | Hindsight | 415 | 11 | ~85% |
-| Honcho | 579 | 21 | ~80% |
+| Honcho | 637 | 23 | ~86% |
 | LangChain | 778 | 16 | ~85% |
 
 **Overall: ~88% coverage across all adapters.**

@@ -473,6 +473,57 @@ class User:
             sessions.append(sess)
         return sessions
 
+    # -------------------------------------------------------------------
+    # User metadata API (Honcho parity)
+    # -------------------------------------------------------------------
+
+    def set_metadata(self, metadata: dict) -> None:
+        """Set metadata for this user (stored as workspace description).
+
+        Args:
+            metadata: A dictionary of metadata to store.
+        """
+        try:
+            ws_id = self._workspace_id
+            # Read current name from workspace
+            ws_list = self._client.list_workspaces()
+            current_name = self.name
+            for ws in ws_list:
+                if ws.get("id") == ws_id:
+                    current_name = ws.get("name", self.name)
+                    break
+            self._client._call(
+                "update_workspace",
+                [ws_id, current_name, json.dumps(metadata)],
+            )
+        except RuntimeError as exc:
+            raise RuntimeError(
+                f"User.set_metadata() failed for '{self.name}': {exc}"
+            ) from exc
+
+    def get_metadata(self) -> dict:
+        """Get metadata for this user.
+
+        Returns:
+            A dictionary of metadata, or an empty dict if none set.
+        """
+        try:
+            ws_list = self._client.list_workspaces()
+            for ws in ws_list:
+                if ws.get("id") == self._workspace_id:
+                    desc = ws.get("description", "{}")
+                    if desc:
+                        try:
+                            return json.loads(desc) if isinstance(desc, str) else desc
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    return {}
+            return {}
+        except RuntimeError as exc:
+            raise RuntimeError(
+                f"User.get_metadata() failed for '{self.name}': {exc}"
+            ) from exc
+
 
 class Session:
     """Honcho Session adapter.
