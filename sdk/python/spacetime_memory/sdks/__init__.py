@@ -11,6 +11,7 @@ from .graphiti import (
 )
 from .honcho import Honcho
 from .hindsight import Hindsight
+from .langchain import StmemMemoryStore, StmemStore
 from .mem0 import Memory as Mem0Memory
 
 __all__ = [
@@ -26,5 +27,7 @@ __all__ = [
     "SearchResults",
     "AddEpisodeResults",
     "AddTripletResults",
+    "StmemStore",
+    "StmemMemoryStore",
 ]
 
