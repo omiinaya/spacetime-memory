@@ -60,7 +60,23 @@ def _make_ws(client: Client) -> str:
 
 @pytest.fixture(scope="module")
 def client():
-    return Client(host=HOST, port=PORT, database=DB)
+    """Create a Client with JWT auth for consistent identity across calls."""
+    token = _generate_test_token()
+    return Client(host=HOST, port=PORT, database=DB, token=token)
+
+
+def _generate_test_token() -> str:
+    """Generate a JWT token for integration tests from the project's key pair."""
+    try:
+        from spacetime_memory.auth import generate_token
+    except ImportError:
+        # If the auth module isn't available, fall back to no token
+        # (will work with public workspaces or ACL bypass)
+        return ""
+    key_path = REPO_ROOT / "data" / "id_ecdsa_pkcs8.pem"
+    if not key_path.exists():
+        return ""
+    return generate_token(str(key_path))
 
 
 @pytest.fixture

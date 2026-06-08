@@ -12,6 +12,7 @@ pub struct Workspace {
     pub description: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub is_public: bool,
 }
 
 /// Permission entry granting a peer access to a workspace (space).
@@ -46,6 +47,7 @@ pub fn create_workspace(ctx: &ReducerContext, name: String, description: String,
         description,
         created_at: now,
         updated_at: now,
+        is_public: false,
     });
 
     // Auto-grant owner access to the workspace creator
@@ -76,6 +78,7 @@ pub fn update_workspace(ctx: &ReducerContext, id: String, name: String, descript
         description,
         created_at: existing.created_at,
         updated_at: now_micros(ctx),
+        is_public: existing.is_public,
     });
     Ok(())
 }
@@ -89,6 +92,27 @@ pub fn delete_workspace(ctx: &ReducerContext, id: String) -> Result<(), String> 
         .ok_or_else(|| format!("Workspace '{}' not found", id))?;
 
     ctx.db.workspace().id().delete(&id);
+    Ok(())
+}
+
+// ── Workspace visibility ───────────────────────────────────────────────
+
+/// Toggle whether a workspace is public (viewable by anyone) or private
+/// (requires explicit permission). Only owners can change visibility.
+#[reducer]
+pub fn set_workspace_visibility(ctx: &ReducerContext, workspace_id: String, is_public: bool) -> Result<(), String> {
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "owner")?;
+
+    let ws = ctx
+        .db
+        .workspace()
+        .id()
+        .find(&workspace_id)
+        .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
+
+    let updated = Workspace { is_public, ..ws };
+    ctx.db.workspace().id().update(updated);
     Ok(())
 }
 
@@ -110,34 +134,7 @@ pub fn check_space_access(
     peer_id: &str,
     required: &str,
 ) -> Result<(), String> {
-    // Check if this peer has any permission record for this workspace
-    let perm = ctx
-        .db
-        .space_permission()
-        .iter()
-        .find(|sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id);
-
-    let perm = match perm {
-        Some(p) => p,
-        None => {
-            // If the caller has no permission records at all (anonymous),
-            // allow access. Once a peer is registered with any workspace,
-            // ACL is enforced across all workspaces.
-            let caller_has_any = ctx
-                .db
-                .space_permission()
-                .iter()
-                .any(|sp: SpacePermission| sp.peer_id == peer_id);
-            if !caller_has_any {
-                return Ok(());
-            }
-            return Err(format!(
-                "Access denied: peer '{}' has no permission for workspace '{}'",
-                peer_id, workspace_id
-            ))
-        }
-    };
-
+    // Permission rank helper
     let rank = |p: &str| -> u8 {
         match p {
             "owner" => 3,
@@ -146,18 +143,37 @@ pub fn check_space_access(
             _ => 0,
         }
     };
-
-    let actual_rank = rank(&perm.permission);
     let required_rank = rank(required);
 
-    if actual_rank >= required_rank {
-        Ok(())
-    } else {
-        Err(format!(
+    // Check if this peer has a direct permission for this workspace
+    let direct = ctx.db.space_permission().iter().find(
+        |sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id,
+    );
+
+    if let Some(p) = direct {
+        if rank(&p.permission) >= required_rank {
+            return Ok(());
+        }
+        return Err(format!(
             "Access denied: peer '{}' has '{}' permission but '{}' is required for workspace '{}'",
-            peer_id, perm.permission, required, workspace_id
-        ))
+            peer_id, p.permission, required, workspace_id
+        ));
     }
+
+    // No direct permission — check if workspace is public and caller just needs view access
+    if required_rank <= 1 {
+        if let Some(ws) = ctx.db.workspace().id().find(workspace_id.to_string()) {
+            if ws.is_public {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(format!(
+        "Access denied: peer '{}' has no permission for workspace '{}'. \
+         This is a private workspace — ask an owner to grant you access.",
+        peer_id, workspace_id
+    ))
 }
 
 // ── Space permission reducers ─────────────────────────────────────────
