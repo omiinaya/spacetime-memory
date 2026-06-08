@@ -9,12 +9,15 @@ DATA_DIR="${SPACETIMEDB_DATA_DIR:-/app/data}"
 mkdir -p "$DATA_DIR"
 
 # --------------------------------------------------------------------------
-# 1  Start SpacetimeDB in the background
+# 1  Start SpacetimeDB standalone in the background
 # --------------------------------------------------------------------------
-echo "==> Starting SpacetimeDB (data-dir: $DATA_DIR) ..."
-spacetime start \
+echo "==> Starting SpacetimeDB standalone (data-dir: $DATA_DIR) ..."
+mkdir -p "$DATA_DIR"
+spacetimedb-standalone start \
     --listen-addr 0.0.0.0:3001 \
     --data-dir "$DATA_DIR" \
+    --jwt-priv-key-path /app/data/id_ecdsa_pkcs8.pem \
+    --jwt-pub-key-path /app/data/id_ecdsa.pub \
     &
 SPACETIME_PID=$!
 

@@ -46,8 +46,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- SpacetimeDB CLI (v2.4.1) ----
+# ---- SpacetimeDB CLI + Standalone (v2.4.1) ----
 RUN curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1/spacetime-linux-x86_64.tgz | \
+    tar xz -C /usr/local/bin/
+RUN curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1/spacetimedb-standalone-linux-x86_64.tgz | \
     tar xz -C /usr/local/bin/
 
 # ---- Python SDK ----
@@ -74,6 +76,9 @@ COPY --from=frontend-builder /build/dist/ /app/frontend/
 
 # ---- Config ----
 COPY data/config.toml /app/data/config.toml
+COPY data/id_ecdsa /app/data/id_ecdsa
+COPY data/id_ecdsa.pub /app/data/id_ecdsa.pub
+COPY data/id_ecdsa_pkcs8.pem /app/data/id_ecdsa_pkcs8.pem
 COPY .env.example /app/.env
 
 # Expose ports:

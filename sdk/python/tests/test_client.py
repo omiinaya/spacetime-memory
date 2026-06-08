@@ -138,18 +138,21 @@ class TestClientEmbed:
         assert result == [0.1, 0.2, 0.3]
 
     def test_embed_error_returns_empty(self, mock_http_client):
-        """_embed() returns [] on connection error (caught by except)."""
-        mock_http_client._http.post.side_effect = Exception("Connection refused")
+        """_embed() raises EmbedderUnavailableError on connection error."""
+        import httpx
+        from spacetime_memory.client import EmbedderUnavailableError
+        mock_http_client._http.post.side_effect = httpx.ConnectError("Connection refused")
 
-        result = mock_http_client._embed("hello")
-        assert result == []  # Known behavioural issue tracked as P0c
+        with pytest.raises(EmbedderUnavailableError):
+            mock_http_client._embed("hello")
 
     def test_embed_http_error_returns_empty(self, mock_http_client):
-        """_embed() returns [] when the embedder returns HTTP >= 400."""
+        """_embed() raises EmbedderUnavailableError when embedder returns HTTP >= 400."""
+        from spacetime_memory.client import EmbedderUnavailableError
         mock_http_client._http.post.return_value = Mock(status_code=503, text="")
 
-        result = mock_http_client._embed("hello")
-        assert result == []
+        with pytest.raises(EmbedderUnavailableError):
+            mock_http_client._embed("hello")
 
 
 class TestClientWorkspace:

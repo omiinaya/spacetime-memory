@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -39,6 +40,10 @@ _REDUCER_ERROR_MAP: dict[str, str] = {
     "validation error": "Invalid input. Check the format of your data.",
     "rate limit": "Too many requests. Please wait before trying again.",
 }
+
+
+class EmbedderUnavailableError(ConnectionError):
+    """Raised when the embedding sidecar is unreachable and no fallback is configured."""
 
 # ---------------------------------------------------------------------------
 # Client
@@ -78,6 +83,7 @@ class Client:
         embedder_type: str | None = None,
         timeout: float = 30.0,
         verbose: bool = False,
+        token: str | None = None,
     ):
         self.host = host or os.environ.get("SPACETIMEDB_HOST", "localhost")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
@@ -93,11 +99,37 @@ class Client:
             or os.environ.get("EMBEDDER_TYPE", "auto")
         )
         self.verbose = verbose
+        self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
 
         base = f"http://{self.host}:{self.port}"
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
         self.reducer_url = f"{base}/v1/database/{self.database}/call"
         self._http = httpx.Client(timeout=timeout)
+
+    def _headers(self) -> dict[str, str]:
+        """Return common HTTP headers, including auth if a token is set."""
+        headers: dict[str, str] = {}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return headers
+
+    @classmethod
+    def from_token_file(
+        cls,
+        token_path: str,
+        host: str | None = None,
+        port: int | str | None = None,
+        database: str | None = None,
+        **kwargs: Any,
+    ) -> "Client":
+        """Create a Client using a JWT token stored in a file.
+
+        The token file can be created with:
+            python -c "from spacetime_memory.auth import generate_token; \\
+                print(generate_token('data/id_ecdsa_pkcs8.pem'))" > /path/to/token.jwt
+        """
+        token = Path(token_path).read_text().strip()
+        return cls(host=host, port=port, database=database, token=token, **kwargs)
 
     # -----------------------------------------------------------------------
     # HTTP helpers
@@ -105,10 +137,13 @@ class Client:
 
     def _sql(self, query: str) -> list[dict[str, Any]]:
         """Run a SELECT query against the SpacetimeDB SQL API."""
+        headers = {"Content-Type": "text/plain"}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
         resp = self._http.post(
             self.sql_url,
             content=query,
-            headers={"Content-Type": "text/plain"},
+            headers=headers,
         )
         if resp.status_code >= 400:
             error_text = resp.text[:500]
@@ -136,10 +171,13 @@ class Client:
 
     def _call(self, reducer: str, args: list[Any]) -> dict[str, Any]:
         """Call a SpacetimeDB reducer with positional JSON args."""
+        headers = {"Content-Type": "application/json"}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
         resp = self._http.post(
             f"{self.reducer_url}/{reducer}",
             content=json.dumps(args),
-            headers={"Content-Type": "application/json"},
+            headers=headers,
         )
         if resp.status_code >= 400:
             error_text = resp.text[:500]
@@ -155,9 +193,10 @@ class Client:
         """Get an embedding vector.
 
         Behaviour depends on ``embedder_type``:
-        - ``"local"``: use the Rust ONNX sidecar (current behaviour)
+        - ``"local"``: use the Rust ONNX sidecar (raises on failure)
         - ``"openai"``: call OpenAI embeddings API
-        - ``"auto"``: try sidecar first, fall back to OpenAI
+        - ``"auto"``: try sidecar first, fall back to OpenAI. If both fail,
+          raises ``EmbedderUnavailableError`` with a combined message.
         """
         if self.embedder_type == "openai":
             return self._embed_openai(text)
@@ -165,11 +204,17 @@ class Client:
             return self._embed_local(text)
 
         # "auto" — try local, fall back to OpenAI
-        result = self._embed_local(text)
-        if result:
-            return result
-        logger.info("Local embedder unavailable, falling back to OpenAI")
-        return self._embed_openai(text)
+        try:
+            return self._embed_local(text)
+        except EmbedderUnavailableError:
+            logger.info("Local embedder unavailable, falling back to OpenAI")
+            result = self._embed_openai(text)
+            if result:
+                return result
+            raise EmbedderUnavailableError(
+                "Embedder unavailable (local sidecar down, OpenAI fallback also failed). "
+                "Check EMBEDDER_URL and OPENAI_API_KEY."
+            )
 
     def _embed_local(self, text: str) -> list[float]:
         """Get an embedding vector via the Rust ONNX sidecar."""
@@ -181,21 +226,19 @@ class Client:
                 timeout=10.0,
             )
             if resp.status_code >= 400:
-                logger.warning(
-                    "Embedder returned HTTP %d for text (len=%d): %s",
-                    resp.status_code, len(text), resp.text[:200],
+                raise EmbedderUnavailableError(
+                    f"Embedder returned HTTP {resp.status_code} for text (len={len(text)})"
                 )
-                return []
             return resp.json().get("embedding", [])
         except httpx.TimeoutException:
-            logger.warning("Embedder timed out for text (len=%d)", len(text))
-            return []
+            raise EmbedderUnavailableError(f"Embedder timed out for text (len={len(text)})")
         except httpx.ConnectError:
-            logger.warning("Embedder connection refused for text (len=%d) — is the sidecar running?", len(text))
-            return []
+            raise EmbedderUnavailableError(
+                f"Embedder connection refused at {self.embedder_url}. Is the sidecar running?"
+            )
         except Exception:
             logger.exception("Unexpected error in _embed for text (len=%d)", len(text))
-            return []
+            raise
 
     def _embed_openai(self, text: str) -> list[float]:
         """Embed via OpenAI API."""
