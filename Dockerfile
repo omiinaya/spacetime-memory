@@ -76,9 +76,16 @@ COPY --from=frontend-builder /build/dist/ /app/frontend/
 
 # ---- Config ----
 COPY data/config.toml /app/data/config.toml
-COPY data/id_ecdsa /app/data/id_ecdsa
-COPY data/id_ecdsa.pub /app/data/id_ecdsa.pub
-COPY data/id_ecdsa_pkcs8.pem /app/data/id_ecdsa_pkcs8.pem
+# Generate JWT keys if not present (they're gitignored)
+RUN mkdir -p /app/data && \
+    if [ ! -f /app/data/id_ecdsa_pkcs8.pem ]; then \
+        apt-get install -y --no-install-recommends openssl && \
+        openssl ecparam -genkey -name prime256v1 -noout -out /app/data/id_ecdsa.pem && \
+        openssl ec -in /app/data/id_ecdsa.pem -pubout -out /app/data/id_ecdsa.pub && \
+        openssl pkcs8 -topk8 -nocrypt -in /app/data/id_ecdsa.pem -out /app/data/id_ecdsa_pkcs8.pem && \
+        rm -f /app/data/id_ecdsa.pem && \
+        apt-get purge -y openssl && apt-get autoremove -y; \
+    fi
 COPY .env.example /app/.env
 
 # Expose ports:
