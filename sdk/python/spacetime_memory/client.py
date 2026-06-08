@@ -348,10 +348,54 @@ class Client:
         try:
             resp = self._http.get(f"{self.embedder_url}/health", timeout=5.0)
             if resp.status_code == 200:
-                return resp.json()
-            return {"status": "error", "code": resp.status_code}
+                embedder_status = resp.json()
+                embedder_status["reachable"] = True
+                return embedder_status
+            return {"status": "error", "code": resp.status_code, "reachable": True}
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            return {"status": "error", "message": str(e), "reachable": False}
+
+    def ping(self) -> dict[str, Any]:
+        """Quick connectivity check against SpacetimeDB.
+
+        Hits the database info endpoint and reports latency.
+        """
+        import time
+        start = time.monotonic()
+        try:
+            resp = self._http.get(
+                f"http://{self.host}:{self.port}/v1/database/{self.database}",
+                headers=self._headers(),
+                timeout=5.0,
+            )
+            elapsed = time.monotonic() - start
+            if resp.status_code < 400:
+                return {"status": "ok", "latency_ms": round(elapsed * 1000, 1)}
+            return {
+                "status": "error",
+                "message": f"HTTP {resp.status_code}",
+                "latency_ms": round(elapsed * 1000, 1),
+            }
+        except Exception as e:
+            elapsed = time.monotonic() - start
+            return {"status": "error", "message": str(e), "latency_ms": round(elapsed * 1000, 1)}
+
+    def health(self) -> dict[str, Any]:
+        """Comprehensive health check: SpacetimeDB + embedder.
+
+        Returns a dict with status for each component.
+        """
+        db_check = self.ping()
+        emb_check = self.check_embedder_health()
+
+        all_ok = db_check.get("status") == "ok" and emb_check.get("reachable", False)
+
+        return {
+            "status": "ok" if all_ok else "degraded",
+            "database": db_check,
+            "embedder": emb_check,
+            "token_configured": bool(self.token),
+        }
 
     # -----------------------------------------------------------------------
     # Workspace

@@ -1859,6 +1859,27 @@ def backup(output_path: str | None, token: str | None) -> None:
 
 
 @cli.command()
+@click.option("--token", "-t", envvar="SPACETIMEDB_TOKEN", help="JWT token for auth")
+def health(token: str | None) -> None:
+    """Check connectivity to SpacetimeDB and the embedder sidecar."""
+    client = _sdk_client()
+    if token:
+        client.token = token
+    result = client.health()
+    if result["status"] == "ok":
+        console.print("[green]All systems healthy[/green]")
+    else:
+        console.print(f"[yellow]System degraded:[/yellow] {result['status']}")
+    console.print(f"  Database: {result['database']['status']} "
+                  f"({result['database'].get('latency_ms', '?')}ms)")
+    emb = result["embedder"]
+    console.print(f"  Embedder: {'reachable' if emb.get('reachable') else 'unreachable'}")
+    if emb.get("reachable") and emb.get("model_path"):
+        console.print(f"    Model: {emb['model_path']}")
+    console.print(f"  Auth: {'JWT configured' if result['token_configured'] else 'anonymous'}")
+
+
+@cli.command()
 @click.argument("input_path", required=True)
 @click.option("--token", "-t", envvar="SPACETIMEDB_TOKEN", help="JWT token for auth")
 def restore(input_path: str, token: str | None) -> None:
