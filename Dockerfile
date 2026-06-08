@@ -29,8 +29,11 @@ ENV CARGO_NET_RETRY=5 \
     CARGO_HTTP_TIMEOUT=120 \
     CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 WORKDIR /build
-RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev curl ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN rustup target add wasm32-unknown-unknown
+# spacetimedb-lib build script needs the spacetime CLI for codegen
+RUN curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1/spacetime-x86_64-unknown-linux-gnu.tar.gz | \
+    tar xz -C /usr/local/bin/
 COPY server/spacetimedb/ ./
 RUN for i in 1 2 3; do \
         cargo build --release --target wasm32-unknown-unknown && break; \
