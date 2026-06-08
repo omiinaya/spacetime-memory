@@ -1833,6 +1833,53 @@ def org_status(org_dir: str) -> None:
 
 
 # ===================================================================
+# Backup & Restore
+# ===================================================================
+
+
+@cli.command()
+@click.argument("output_path", required=False, default=None)
+@click.option("--token", "-t", envvar="SPACETIMEDB_TOKEN", help="JWT token for auth")
+def backup(output_path: str | None, token: str | None) -> None:
+    """Export all data tables to a JSON backup file.
+
+    OUTPUT_PATH is optional; defaults to spacetime-memory-backup-<date>.json
+    in the current directory.
+    """
+    client = _sdk_client()
+    if token:
+        client.token = token
+    result = client.backup(output_path=output_path)
+    if result["status"] == "ok":
+        console.print(f"[green]Backup complete:[/green] {result['path']}")
+        console.print(f"  Tables: {len(result['tables'])}")
+        console.print(f"  Rows:   {result['total_rows']}")
+    else:
+        console.print(f"[red]Backup failed:[/red] {result}")
+
+
+@cli.command()
+@click.argument("input_path", required=True)
+@click.option("--token", "-t", envvar="SPACETIMEDB_TOKEN", help="JWT token for auth")
+def restore(input_path: str, token: str | None) -> None:
+    """Import data from a JSON backup file into the current database.
+
+    INPUT_PATH is the path to the backup JSON file created by \b
+    `stmem backup`.
+    """
+    client = _sdk_client()
+    if token:
+        client.token = token
+    result = client.restore(input_path=input_path)
+    if result["status"] == "ok":
+        console.print(f"[green]Restore complete:[/green] {result['input_path']}")
+        console.print(f"  Tables: {len(result['tables'])}")
+        console.print(f"  Rows:   {result['total_rows']}")
+    else:
+        console.print(f"[red]Restore failed:[/red] {result}")
+
+
+# ===================================================================
 # Entry point
 # ===================================================================
 

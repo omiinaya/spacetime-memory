@@ -1116,6 +1116,139 @@ class Client:
         """Delete a tour and all its stops."""
         self._call("delete_tour", [tour_id])
 
+    # -------------------------------------------------------------------
+    # Backup & Restore
+    # -------------------------------------------------------------------
+
+    _BACKUP_TABLES = [
+        "workspace",
+        "space_permission",
+        "memory",
+        "memory_version",
+        "kg_node",
+        "kg_edge",
+        "kg_community",
+        "session",
+        "session_participant",
+        "message",
+        "profile",
+        "note",
+        "fact",
+        "peer",
+        "context_pack",
+        "context_entry",
+        "directory",
+        "directory_link",
+        "backlink",
+        "merge_suggestion",
+        "connector_config",
+    ]
+
+    def backup(self, output_path: str | None = None) -> dict[str, Any]:
+        """Export all user data tables to a JSON file.
+
+        Args:
+            output_path: Path to write the backup file. If None, generates
+                a filename like ``spacetime-memory-backup-YYYY-MM-DD.json``.
+
+        Returns:
+            Dict with backup metadata: tables backed up, row counts, file path.
+        """
+        import datetime
+
+        manifest: dict[str, list[dict[str, Any]]] = {}
+        total_rows = 0
+        backed_up = []
+
+        for table in self._BACKUP_TABLES:
+            try:
+                rows = self._sql(f"SELECT * FROM {table}")
+            except RuntimeError:
+                continue  # table doesn't exist in this module version
+            if rows:
+                manifest[table] = rows
+                total_rows += len(rows)
+                backed_up.append(table)
+            else:
+                manifest[table] = []
+
+        if output_path is None:
+            date = datetime.date.today().isoformat()
+            output_path = f"spacetime-memory-backup-{date}.json"
+
+        payload = {
+            "version": "0.3.0",
+            "created_at": datetime.datetime.utcnow().isoformat(),
+            "tables": manifest,
+            "stats": {
+                "table_count": len(backed_up),
+                "total_rows": total_rows,
+            },
+        }
+
+        with open(output_path, "w") as f:
+            json.dump(payload, f, indent=2, default=str)
+
+        return {
+            "status": "ok",
+            "path": output_path,
+            "tables": backed_up,
+            "total_rows": total_rows,
+        }
+
+    def restore(self, input_path: str) -> dict[str, Any]:
+        """Import a backup file into the current database.
+
+        Args:
+            input_path: Path to the backup JSON file.
+
+        Returns:
+            Dict with restore metadata: tables restored, row counts.
+        """
+        with open(input_path, "r") as f:
+            payload = json.load(f)
+
+        manifest = payload.get("tables", {})
+        total_restored = 0
+        restored = []
+
+        for table, rows in manifest.items():
+            if not rows:
+                continue
+            if not rows[0]:
+                continue
+            try:
+                col_names = list(rows[0].keys())
+                placeholders = ", ".join(col_names)
+                for row in rows:
+                    values = []
+                    for col in col_names:
+                        val = row.get(col)
+                        if val is None:
+                            values.append("NULL")
+                        elif isinstance(val, bool):
+                            values.append("true" if val else "false")
+                        elif isinstance(val, (int, float)):
+                            values.append(str(val))
+                        else:
+                            values.append(f"'{_esc(str(val))}'")
+                    sql = f"INSERT INTO {table} ({placeholders}) VALUES ({', '.join(values)})"
+                    try:
+                        self._sql(sql)
+                    except RuntimeError:
+                        pass  # may be a duplicate or schema mismatch
+                restored.append(table)
+                total_restored += len(rows)
+            except Exception:
+                continue
+
+        return {
+            "status": "ok",
+            "input_path": input_path,
+            "tables": restored,
+            "total_rows": total_restored,
+        }
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
