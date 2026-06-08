@@ -570,6 +570,7 @@ class Session:
                 content=content,
                 peer_id=self.location or self.id,
                 memory_type="experience",
+                source_session_id=self.id,
             )
         except RuntimeError:
             raise
@@ -601,6 +602,12 @@ class Session:
                 limit=limit,
                 semantic=True,
             )
+            # Filter to session-scoped memories only
+            if results:
+                results = [
+                    r for r in results
+                    if r.get("source_session_id", "") == self.id
+                ]
             return results if results else []
         except RuntimeError:
             raise
@@ -620,9 +627,14 @@ class Session:
 
         """
         try:
-            return self._client.list_memories(
-                workspace_id=self.user.workspace_id, limit=limit,
+            rows = self._client._sql(
+                "SELECT * FROM memory WHERE "
+                f"source_session_id = '{_esc(self.id)}' AND "
+                f"workspace_id = '{_esc(self.user.workspace_id)}' AND "
+                "is_active = true "
+                f"LIMIT {limit}"
             )
+            return rows if rows else []
         except RuntimeError:
             raise
         except Exception as exc:

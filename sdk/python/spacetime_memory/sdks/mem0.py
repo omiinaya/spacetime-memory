@@ -152,8 +152,15 @@ class Memory:
             run_id: Run / session identifier.
             metadata: Optional metadata dict.
             filters: Optional query filters (accepted for compatibility).
-            infer: If True (default), an LLM is used to extract key facts.
-                Stored as-is in the current implementation.
+            infer: If True (default):
+                - For string content: searches for semantically similar
+                  existing memories.  If a close match (score > 0.85) is
+                  found, the new content is appended to the existing memory
+                  (UPDATE) instead of creating a new entry.
+                - For message-list content: concatenates message contents
+                  into a single string (no role prefixes).
+                If False, behaves as a plain store with role-prefixed
+                formatting for message lists.
             prompt: Optional prompt for inference (accepted for compatibility).
             output_format: Output format version (default ``"v1.1"``).
             memory_type: Specifies memory type (``procedural_memory`` or None).
@@ -179,16 +186,50 @@ class Memory:
 
         try:
             if isinstance(messages, list):
-                content = "\n".join(
-                    f"{m.get('role', 'user')}: {m.get('content', '')}"
-                    for m in messages
-                )
-                summary = content[:200]
+                if infer:
+                    # infer=True with list: concatenate message contents only
+                    content = " ".join(
+                        m.get("content", "")
+                        for m in messages
+                        if m.get("content")
+                    )
+                    summary = ""
+                else:
+                    content = "\n".join(
+                        f"{m.get('role', 'user')}: {m.get('content', '')}"
+                        for m in messages
+                    )
+                    summary = content[:200]
             else:
                 content = str(messages)
                 summary = ""
 
             ws_id = self._ws(user_id)
+
+            # When infer=True and content is a string, try to merge with
+            # similar existing memories instead of creating a new one.
+            if infer and isinstance(messages, str) and user_id:
+                search_result = self.search(query=content, user_id=user_id, limit=5)
+                close_matches = [
+                    r for r in search_result.get("results", [])
+                    if r.get("score", 0) > 0.85
+                ]
+                if close_matches:
+                    best_match = close_matches[0]
+                    mem_id = best_match["id"]
+                    existing_content = best_match.get("memory", "")
+                    merged = f"{existing_content}\n{content}"
+                    self.update(memory_id=mem_id, data=merged)
+                    return {
+                        "results": [{
+                            "id": mem_id,
+                            "memory": merged,
+                            "event": "UPDATE",
+                            "user_id": user_id or "",
+                            "agent_id": agent_id or "",
+                        }],
+                        "relation_events": [],
+                    }
 
             self._call(
                 "store",

@@ -38,6 +38,7 @@ Usage::
 
 from __future__ import annotations
 
+import difflib
 import json
 import time
 import uuid as _uuid
@@ -389,6 +390,40 @@ class Graphiti:
         except RuntimeError:
             return []
 
+    def _filter_by_valid_at(
+        self,
+        edges: list[EntityEdge],
+        valid_at_after: datetime | None = None,
+        valid_at_before: datetime | None = None,
+    ) -> list[EntityEdge]:
+        """Filter a list of edges by ``valid_at`` timestamp.
+
+        Args:
+            edges: List of :class:`EntityEdge` objects to filter.
+            valid_at_after: If set, only return edges whose ``valid_at``
+                is greater than or equal to this datetime.
+            valid_at_before: If set, only return edges whose ``valid_at``
+                is less than or equal to this datetime.
+
+        Returns:
+            Filtered list of edges.  Edges without a ``valid_at`` are
+            excluded when any filter is active.
+        """
+        if valid_at_after is None and valid_at_before is None:
+            return edges
+
+        filtered: list[EntityEdge] = []
+        for edge in edges:
+            if edge.valid_at is None:
+                continue  # no timestamp to compare against
+            if valid_at_after is not None and edge.valid_at < valid_at_after:
+                continue
+            if valid_at_before is not None and edge.valid_at > valid_at_before:
+                continue
+            filtered.append(edge)
+
+        return filtered
+
     # -------------------------------------------------------------------
     # Triplet operations (primary API for direct KG manipulation)
     # -------------------------------------------------------------------
@@ -418,17 +453,47 @@ class Graphiti:
         ws_id = self._resolve_workspace(gid)
 
         # Helper: get or create a node by label within a workspace.
-        # Returns the actual DB-assigned UUID.
+        # Returns (DB-assigned UUID, dedup_score) where dedup_score is:
+        #   1.0  = exact match
+        #   0.95 = case-insensitive match
+        #   >0.85 .. <1.0 = fuzzy difflib match
+        #   0.0  = new node created
         def _get_or_create_node(
             node: EntityNode, workspace_uuid: str
-        ) -> str:
+        ) -> tuple[str, float]:
             all_nodes = self._sql_query(
                 "SELECT id, label FROM kg_node WHERE "
                 f"workspace_id = '{_esc(workspace_uuid)}' "
             )
+
+            # Pass 1: exact match (current behavior)
             for n in all_nodes:
                 if n.get("label") == node.name:
-                    return n["id"]
+                    return n["id"], 1.0
+
+            name_lower = node.name.lower()
+
+            # Pass 2: case-insensitive matching
+            for n in all_nodes:
+                if n.get("label", "").lower() == name_lower:
+                    return n["id"], 0.95
+
+            # Pass 3: fuzzy matching via difflib.SequenceMatcher
+            fuzzy_matches: list[tuple[dict[str, Any], float]] = []
+            for n in all_nodes:
+                label = n.get("label", "")
+                ratio = difflib.SequenceMatcher(
+                    None, name_lower, label.lower()
+                ).ratio()
+                if ratio > 0.85:
+                    fuzzy_matches.append((n, ratio))
+
+            if fuzzy_matches:
+                # Prefer the closest match
+                fuzzy_matches.sort(key=lambda x: x[1], reverse=True)
+                best_node, best_ratio = fuzzy_matches[0]
+                return best_node["id"], best_ratio
+
             # Node doesn't exist — create it
             try:
                 self._client.create_node(
@@ -447,11 +512,11 @@ class Graphiti:
             )
             for n in all_nodes:
                 if n.get("label") == node.name:
-                    return n["id"]
-            return node.uuid  # fallback
+                    return n["id"], 0.0
+            return node.uuid, 0.0  # fallback
 
-        actual_source_id = _get_or_create_node(source_node, ws_id)
-        actual_target_id = _get_or_create_node(target_node, ws_id)
+        actual_source_id, source_dedup_score = _get_or_create_node(source_node, ws_id)
+        actual_target_id, target_dedup_score = _get_or_create_node(target_node, ws_id)
 
         # Create the edge
         try:
@@ -492,14 +557,20 @@ class Graphiti:
             name=source_node.name,
             summary=source_node.summary,
             group_id=gid,
-            attributes=source_node.attributes,
+            attributes={
+                **source_node.attributes,
+                "_dedup_score": source_dedup_score,
+            },
         )
         resolved_target = EntityNode(
             uuid=actual_target_id,
             name=target_node.name,
             summary=target_node.summary,
             group_id=gid,
-            attributes=target_node.attributes,
+            attributes={
+                **target_node.attributes,
+                "_dedup_score": target_dedup_score,
+            },
         )
         resolved_edge = EntityEdge(
             uuid=actual_edge_id,
@@ -608,7 +679,12 @@ class Graphiti:
             center_node_uuid: Not supported (accepted for compat).
             group_ids: List of workspace names to search.
             num_results: Max results to return (default 10).
-            **kwargs: Additional parameters (accepted for compat).
+            **kwargs: Additional parameters:
+                valid_at_after (datetime | None): If set, only return
+                    edges whose ``valid_at`` is >= this datetime.
+                valid_at_before (datetime | None): If set, only return
+                    edges whose ``valid_at`` is <= this datetime.
+                Other kwargs are accepted for compat and ignored.
 
         Returns:
             List of :class:`EntityEdge` objects sorted by relevance.
@@ -680,6 +756,14 @@ class Graphiti:
                                 edges.append(EntityEdge.from_stmem(row))
             except RuntimeError:
                 pass
+
+        # Apply time-range filter on valid_at (if provided)
+        valid_at_after = kwargs.get("valid_at_after")
+        valid_at_before = kwargs.get("valid_at_before")
+        if valid_at_after is not None or valid_at_before is not None:
+            edges = self._filter_by_valid_at(
+                edges, valid_at_after, valid_at_before
+            )
 
         # Sort by score if available, then by name
         def _sort_key(e: EntityEdge) -> tuple[float, str]:
@@ -765,6 +849,14 @@ class Graphiti:
                         nodes.append(EntityNode.from_stmem(n))
             except RuntimeError:
                 pass
+
+        # Apply time-range filter on edges (if provided)
+        valid_at_after = kwargs.get("valid_at_after")
+        valid_at_before = kwargs.get("valid_at_before")
+        if valid_at_after is not None or valid_at_before is not None:
+            edges = self._filter_by_valid_at(
+                edges, valid_at_after, valid_at_before
+            )
 
         return SearchResults(edges=edges, nodes=nodes)
 

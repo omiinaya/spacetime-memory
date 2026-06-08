@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import hashlib
 from typing import Any, Callable
 
 from ..client import Client
@@ -300,6 +301,7 @@ class Hindsight:
         """
         results = []
         errors = []
+        seen_hashes: set[str] = set()
         for i, item in enumerate(items):
             try:
                 content = item.get("content", "")
@@ -308,6 +310,12 @@ class Hindsight:
                     continue
                 source = item.get("source", "")
                 metadata = item.get("metadata")
+                # Content-hash dedup within the batch
+                content_hash = hashlib.sha256(content.encode()).hexdigest()
+                if content_hash in seen_hashes:
+                    results.append({"status": "skipped", "reason": "duplicate_content"})
+                    continue
+                seen_hashes.add(content_hash)
                 result = self.retain(content, source=source, metadata=metadata)
                 results.append(result)
             except Exception as exc:

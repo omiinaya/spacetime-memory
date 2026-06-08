@@ -37,12 +37,12 @@ Adapter: `spacetime_memory.sdks.mem0.Memory` (604 lines, 16 public methods)
 | `close()` | ✅ | No-op (HTTP client is long-lived) |
 | `batch_update(memories)` | ❌ | Removed from Mem0 v2 API; not applicable |
 | `create_memory_tool()` | ❌ | Removed from Mem0 v2 API; not applicable |
-| Memory merging (v1.1+) | ⚠️ | `infer=True` accepted but stored as-is (no LLM) |
+| Memory merging (v1.1+) | ✅ | `infer=True` merges with similar existing memories (append) or concatenates message lists (no LLM) |
 | Graph memory | ❌ | Mem0's knowledge graph integration |
 | Custom LLM per user | ❌ | Mem0 allows per-user model config |
 | `chat()` | ❌ | Mem0 v2 agent chat feature |
 
-**Coverage: ~85%.** Covers all core CRUD + v2 API shape. Missing advanced features (graph, LLM-based merging, per-user models).
+**Coverage: ~87%.** Covers all core CRUD + v2 API shape + basic merge when `infer=True`.
 
 ---
 
@@ -96,11 +96,11 @@ Adapter: `spacetime_memory.sdks.graphiti.Graphiti` (915 lines, 15 public methods
 | `update_edge(edge_id, relation, ...)` | ✅ | → `update_edge` reducer (temporal versioning) |
 | `get_edge_history(edge_id)` | ✅ | Returns all temporal versions of an edge |
 | Temporal edge diff tracking | ✅ | Edge versions linked by `edge_group_id` with `valid_at`/`invalid_at` |
-| Entity dedup during `add_triplet` | ❌ | Graphiti deduplicates entities |
+| Entity dedup during `add_triplet` | ⚠️ | Fuzzy name matching (case-insensitive + difflib >0.85) without LLM |
 | Community summary text | ❌ | LLM-generated summary per community |
-| Time-range-filtered search | ⚠️ | Basic temporal support |
+| Time-range-filtered search | ✅ | `valid_at_after`/`valid_at_before` kwargs in search()/search_() |
 
-**Coverage: ~85%.** Temporal edge tracking fully implemented. `get_entity_edge_summary()` covers the node expansion use case. Remaining gaps are community summary (LLM-dependent) and entity dedup.
+**Coverage: ~88%.** Temporal edge tracking + time-range filters + fuzzy entity dedup. Remaining gaps are community summary (LLM-dependent).
 
 ---
 
@@ -128,9 +128,9 @@ Adapter: `spacetime_memory.sdks.hindsight.Hindsight` (415 lines, 11 public metho
 | `reflect()` with `response_schema` param | ✅ | Structured JSON output |
 | `export_template(workspace_id)` | ✅ | Serializes reflect config |
 | `import_template(data)` | ✅ | Loads reflect config from dict |
-| `batch_retain` dedup | ❌ | No automatic dedup within batch |
+|| `batch_retain` dedup | ✅ | Content-hash dedup within batch |
 
-**Coverage: ~88%.** Template-based reflect fully implemented with all upstream parameters.
+**Coverage: ~90%.** Template-based reflect + batch dedup fully implemented.
 
 ---
 
@@ -156,7 +156,7 @@ Adapter: `spacetime_memory.sdks.honcho.Honcho` (579 lines, 21 public methods)
 | `Session.create_memory(...)` | ✅ | Session-scoped memory creation |
 | `Session.search(...)` | ✅ | Session-scoped search |
 | `Session.get_memories(limit)` | ✅ | Session memory list |
-| Session-level memory visibility | ⚠️ | Basic support |
+| Session-level memory visibility | ✅ | Memory store/search/list scoped by `source_session_id` |
 | `Session.get_metadata()` | ✅ | Returns locally-cached session metadata |
 | `Session.set_metadata(metadata)` | ✅ | Persists session metadata via memory record |
 | `Session.refresh()` | ✅ | Re-fetches session metadata from backend |
@@ -188,9 +188,9 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 | `batch(ops)` | ✅ | Batch operations |
 | **Additional** | | |
 | `StmemChatMessageHistory` | ✅ | `BaseChatMessageHistory` implementation — stores messages as memory records |
-| `AIMessage` content dedup | ❌ | Edge case, not critical |
+| `AIMessage` content dedup | ✅ | Dedup by type + content in `add_messages` |
 
-**Coverage: ~87%.** Core stores fully implemented. Chat message history added.
+**Coverage: ~88%.** Core stores fully implemented. Chat message history with dedup.
 
 ---
 
@@ -198,14 +198,14 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 
 | Adapter | Lines | Methods | Coverage |
 |---------|-------|---------|----------|
-| Mem0 | 604 | 16 | ~85% |
+| Mem0 | 604 | 16 | ~87% |
 | Zep | 647 | 15 | ~90% |
-| Graphiti | ~960 | 17 | ~85% |
-| Hindsight | 415 | 11 | ~88% |
-| Honcho | 637 | 23 | ~88% |
-| LangChain | 778 | 16 | ~87% |
+| Graphiti | ~960 | 17 | ~88% |
+| Hindsight | 415 | 11 | ~90% |
+| Honcho | 637 | 23 | ~90% |
+| LangChain | 778 | 16 | ~88% |
 
-**Overall: ~88% coverage across all adapters.**
+**Overall: ~89% coverage across all adapters.**
 
 Core CRUD operations are fully supported for all adapters. The remaining gaps
 are generally advanced capabilities of the upstream projects.

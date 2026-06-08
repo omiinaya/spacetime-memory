@@ -940,6 +940,20 @@ class StmemChatMessageHistory:
         from langchain_core.messages import message_to_dict
 
         for msg in messages:
+            # Dedup: skip if identical message (same type + content) already stored
+            msg_type = getattr(msg, "type", "human")
+            msg_content = getattr(msg, "content", "")
+            ws_id = self._resolve_workspace()
+            dedup_rows = self._client._sql(
+                f"SELECT id FROM memory WHERE "
+                f"source_session_id = '{_esc(self.session_id)}' AND "
+                f"workspace_id = '{_esc(ws_id)}' AND "
+                f"memory_type = 'chat_message' AND "
+                f"content LIKE '%\"type\": \"{_esc(msg_type)}\"%' AND "
+                f"content LIKE '%\"content\": \"{_esc(msg_content[:50])}%'"
+            )
+            if dedup_rows:
+                continue
             try:
                 msg_dict = message_to_dict(msg)
             except Exception:
