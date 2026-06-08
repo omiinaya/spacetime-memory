@@ -740,3 +740,51 @@ class ZepClient:
     def close(self) -> None:
         """Close the underlying HTTP client (idempotent)."""
         self._session_to_ws.clear()
+
+    def summarize_memory(self, session_id: str) -> str | None:
+        """Generate an LLM summary of all memories in a session.
+
+        Uses the shared :class:`LLMClient` — requires ``OPENAI_API_KEY``
+        env var.  Gracefully returns ``None`` when the LLM is not configured.
+
+        Args:
+            session_id: Zep session identifier.
+
+        Returns:
+            Summary string, or ``None`` if LLM not configured or no
+            memories available.
+        """
+        try:
+            memory = self.get_memory(session_id)
+        except RuntimeError:
+            memory = None
+        if not memory:
+            return None
+
+        messages = memory.get("messages", [])
+        if not messages:
+            return None
+
+        text_parts = []
+        for msg in messages:
+            if isinstance(msg, dict):
+                role = msg.get("role", msg.get("message_type", "unknown"))
+                content = msg.get("content", msg.get("message", ""))
+                if content:
+                    text_parts.append(f"[{role}] {content}")
+            elif hasattr(msg, "role") and hasattr(msg, "content"):
+                text_parts.append(f"[{msg.role}] {msg.content}")
+
+        if not text_parts:
+            return None
+
+        from ..llm import LLMClient
+        llm = LLMClient()
+        if not llm.available:
+            return None
+
+        text = "\n".join(text_parts)
+        return llm.summarize(
+            text,
+            instruction="Summarize this conversation, highlighting key topics, decisions, and action items.",
+        )

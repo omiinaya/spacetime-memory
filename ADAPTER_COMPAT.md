@@ -37,12 +37,12 @@ Adapter: `spacetime_memory.sdks.mem0.Memory` (604 lines, 16 public methods)
 | `close()` | ✅ | No-op (HTTP client is long-lived) |
 | `batch_update(memories)` | ❌ | Removed from Mem0 v2 API; not applicable |
 | `create_memory_tool()` | ❌ | Removed from Mem0 v2 API; not applicable |
-| Memory merging (v1.1+) | ✅ | `infer=True` merges with similar existing memories (append) or concatenates message lists (no LLM) |
+| Memory merging (v1.1+) | ✅ | `infer=True` uses LLM for fact extraction (via `LLMClient`) + basic merge fallback |
 | Graph memory | ❌ | Mem0's knowledge graph integration |
 | Custom LLM per user | ❌ | Mem0 allows per-user model config |
 | `chat()` | ❌ | Mem0 v2 agent chat feature |
 
-**Coverage: ~87%.** Covers all core CRUD + v2 API shape + basic merge when `infer=True`.
+**Coverage: ~87%.** Covers all core CRUD + v2 API shape + LLM-powered fact extraction when `infer=True`.
 
 ---
 
@@ -67,10 +67,10 @@ Adapter: `spacetime_memory.sdks.zep.ZepClient` (500 lines, 10 public methods)
 | `delete_fact(session_id, fact_id)` | ✅ | → `deactivate_memory` by fact ID |
 | `update_memory(session_id, memory_id, ...)` | ✅ | → `update_memory` reducer |
 | `search_memory` with `min_score` | ✅ | Accepted as alias for `score_threshold` |
-| `summarize_memory(session_id)` | ❌ | Zep Cloud feature (LLM summarisation) |
+| `summarize_memory(session_id)` | ✅ | LLM-powered via `LLMClient` (requires OPENAI_API_KEY) |
 | `search_memory` with `search_scope` | ❌ | Zep Cloud feature |
 
-**Coverage: ~90%.** Facts API fully implemented. Remaining gaps are Zep Cloud-specific features.
+**Coverage: ~93%.** Facts API + LLM summarization implemented. Remaining gap is Cloud-only.
 
 ---
 
@@ -97,10 +97,10 @@ Adapter: `spacetime_memory.sdks.graphiti.Graphiti` (915 lines, 15 public methods
 | `get_edge_history(edge_id)` | ✅ | Returns all temporal versions of an edge |
 | Temporal edge diff tracking | ✅ | Edge versions linked by `edge_group_id` with `valid_at`/`invalid_at` |
 | Entity dedup during `add_triplet` | ⚠️ | Fuzzy name matching (case-insensitive + difflib >0.85) without LLM |
-| Community summary text | ❌ | LLM-generated summary per community |
+| Community summary text | ✅ | LLM-generated via `LLMClient` when OPENAI_API_KEY set |
 | Time-range-filtered search | ✅ | `valid_at_after`/`valid_at_before` kwargs in search()/search_() |
 
-**Coverage: ~88%.** Temporal edge tracking + time-range filters + fuzzy entity dedup. Remaining gaps are community summary (LLM-dependent).
+**Coverage: ~90%.** Temporal edge tracking + time-range filters + fuzzy entity dedup + LLM community summaries.
 
 ---
 
@@ -199,13 +199,13 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 | Adapter | Lines | Methods | Coverage |
 |---------|-------|---------|----------|
 | Mem0 | 604 | 16 | ~87% |
-| Zep | 647 | 15 | ~90% |
-| Graphiti | ~960 | 17 | ~88% |
+| Zep | 647 | 15 | ~93% |
+| Graphiti | ~960 | 17 | ~90% |
 | Hindsight | 415 | 11 | ~90% |
 | Honcho | 637 | 23 | ~90% |
 | LangChain | 778 | 16 | ~88% |
 
-**Overall: ~89% coverage across all adapters.**
+**Overall: ~90% coverage across all adapters.**
 
 Core CRUD operations are fully supported for all adapters. The remaining gaps
 are generally advanced capabilities of the upstream projects.

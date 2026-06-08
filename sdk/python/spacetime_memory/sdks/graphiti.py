@@ -47,6 +47,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..client import Client
+from ..llm import LLMClient
 
 
 # ---------------------------------------------------------------------------
@@ -945,12 +946,58 @@ class Graphiti:
 
         communities = []
         for row in community_nodes:
-            communities.append(CommunityNode(
+            community = CommunityNode(
                 uuid=row.get("id", ""),
                 name=row.get("label", ""),
                 group_id=gid,
                 summary=row.get("summary", ""),
-            ))
+            )
+            # Generate LLM summary if one isn't already set
+            if not community.summary:
+                try:
+                    llm = LLMClient()
+                    if llm.available:
+                        # Fetch member nodes and edges for this community
+                        member_rows = self._sql_query(
+                            "SELECT n.* FROM community_edge ce "
+                            "JOIN kg_node n ON ce.target_node_uuid = n.id "
+                            f"WHERE ce.source_node_uuid = '{_esc(community.uuid)}'"
+                        )
+                        edge_rows = self._sql_query(
+                            "SELECT e.* FROM community_edge ce "
+                            "JOIN kg_edge e ON ce.target_node_uuid = e.id "
+                            f"WHERE ce.source_node_uuid = '{_esc(community.uuid)}'"
+                        )
+                        nodes_for_llm = [
+                            {"name": r.get("label", r.get("id", "")[:12]),
+                             "summary": r.get("summary", "")}
+                            for r in member_rows
+                        ]
+                        edges_for_llm = [
+                            {"source_node": r.get("source_node_id", "")[:12],
+                             "target_node": r.get("target_node_id", "")[:12],
+                             "relation": r.get("relation", ""),
+                             "fact": r.get("fact", "")}
+                            for r in edge_rows
+                        ]
+                        summary_text = llm.summarize_community(
+                            community.name or community.uuid[:12],
+                            nodes_for_llm,
+                            edges_for_llm,
+                        )
+                        if summary_text:
+                            community.summary = summary_text
+                            try:
+                                self._client._call(
+                                    "update_node",
+                                    [community.uuid, community.name, "community",
+                                     summary_text, "{}"],
+                                )
+                            except RuntimeError:
+                                pass
+                except Exception:
+                    pass
+            communities.append(community)
 
         return communities
 

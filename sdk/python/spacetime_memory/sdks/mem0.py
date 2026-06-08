@@ -21,11 +21,13 @@ Usage::
 
 from __future__ import annotations
 
+import json
 import logging
 from copy import deepcopy
 from typing import Any, Callable
 
 from ..client import Client
+from ..llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +222,15 @@ class Memory:
                     existing_content = best_match.get("memory", "")
                     merged = f"{existing_content}\n{content}"
                     self.update(memory_id=mem_id, data=merged)
+                    # LLM fact extraction on merged content
+                    try:
+                        llm = LLMClient()
+                        if llm.available:
+                            facts = llm.extract_facts(merged)
+                            if facts:
+                                self._call("update_memory", mem_id, json.dumps({"extracted_facts": facts}))
+                    except Exception:
+                        pass
                     return {
                         "results": [{
                             "id": mem_id,
@@ -231,6 +242,20 @@ class Memory:
                         "relation_events": [],
                     }
 
+            # LLM fact extraction when infer=True
+            extracted_facts = None
+            if infer:
+                try:
+                    llm = LLMClient()
+                    if llm.available:
+                        extracted_facts = llm.extract_facts(content)
+                except Exception:
+                    pass
+
+            meta = {}
+            if extracted_facts:
+                meta["extracted_facts"] = extracted_facts
+
             self._call(
                 "store",
                 workspace_id=ws_id,
@@ -239,6 +264,7 @@ class Memory:
                 memory_type="experience",
                 peer_id=agent_id or "",
                 source_session_id=run_id or "",
+                entities_json=json.dumps(meta) if meta else "{}",
             )
 
             # If user_id is provided, scope the stored memory to that user
