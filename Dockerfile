@@ -47,9 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ---- SpacetimeDB CLI + Standalone (v2.4.1) ----
-RUN curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1/spacetime-linux-x86_64.tgz | \
-    tar xz -C /usr/local/bin/
-RUN curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1/spacetimedb-standalone-linux-x86_64.tgz | \
+RUN curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1/spacetime-x86_64-unknown-linux-gnu.tar.gz | \
     tar xz -C /usr/local/bin/
 
 # ---- Python SDK ----
