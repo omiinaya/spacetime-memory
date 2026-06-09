@@ -13,9 +13,33 @@
 
 **Spacetime Memory** is a unified memory layer for AI agents with **drop-in adapters** for the most popular memory library APIs.
 
+## Quick Start
+
+```bash
+pip install spacetime-memory[local-embed]
+
+from spacetime_memory import Client
+
+c = Client(host="localhost", port="3001", database="your-db")
+c.store("AI agents need persistent memory", "memory")
+results = c.search("AI agents", limit=5)
+```
+
+Or drop in as any supported adapter:
+
+```python
+from spacetime_memory.sdks.mem0 import Memory
+m = Memory(config={"host": "localhost", "port": "3001"})
+m.add("I like pizza", user_id="alice")
+```
+
+See [Getting Started](docs/getting-started.md) for setup, or jump to the [Adapter Authoring Guide](docs/adapter-authoring-guide.md) to write your own.
+
+## Adapters
+
 | Project | Adapter | API Surface |
 |---------|---------|------------|
-| [Mem0](https://github.com/mem0ai/mem0) | `sdks.mem0.Memory` | `add()`, `search()`, `get()`, `get_all()`, `update()`, `delete()`, `delete_all()`, `history()` |
+| [Mem0](https://github.com/mem0ai/mem0) | `sdks.mem0.Memory` | `add()`, `search()`, `get()`, `get_all()`, `update()`, `delete()`, `delete_all()`, `history()`, `chat()`, `graph.add/search/get_all/delete` |
 | [Graphiti](https://github.com/getzep/graphiti) | `sdks.graphiti.Graphiti` | `add_triplet()`, `add_episode()`, `search()`, `search_()`, `get_entity_edge_summary()`, `remove_episode()`, `build_communities()` |
 | [LangGraph](https://langchain-ai.github.io/langgraph/) / [LangChain](https://python.langchain.com/) | `sdks.langchain.StmemStore` / `StmemMemoryStore` | `get/put/delete/search/list_namespaces/batch` (LangGraph BaseStore), `mget/mset/mdelete/yield_keys` (LangChain BaseStore) |
 | [Zep](https://www.getzep.com/) | `sdks.zep.Zep` | `add()`, `get()`, `delete()`, sessions CRUD, search, messages, facts |

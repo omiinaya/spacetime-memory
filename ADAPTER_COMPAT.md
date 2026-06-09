@@ -38,11 +38,11 @@ Adapter: `spacetime_memory.sdks.mem0.Memory` (604 lines, 16 public methods)
 | `batch_update(memories)` | ❌ | Removed from Mem0 v2 API; not applicable |
 | `create_memory_tool()` | ❌ | Removed from Mem0 v2 API; not applicable |
 | Memory merging (v1.1+) | ✅ | `infer=True` uses LLM for fact extraction (via `LLMClient`) + basic merge fallback |
-| Graph memory | ❌ | Mem0's knowledge graph integration |
-| Custom LLM per user | ❌ | Mem0 allows per-user model config |
-| `chat()` | ❌ | Mem0 v2 agent chat feature |
+| Graph memory | ✅ | Entity persistence via `kg_node` table. Access via `m.graph.add/search/get_all/delete`. `add()` with `infer=True` creates KG nodes from LLM-extracted facts |
+| Custom LLM per user | ✅ | `m.set_llm_config(user_id, {"model": ..., "api_key": ...})` — per-user model overrides |
+| `chat()` | ✅ | RAG + LLM response pipeline. Stores queries, searches memories, generates via LLMClient. Gracefully degrades without OPENAI_API_KEY |
 
-**Coverage: ~87%.** Covers all core CRUD + v2 API shape + LLM-powered fact extraction when `infer=True`.
+**Coverage: ~95%.** Graph memory, custom LLM per user, and chat now implemented. Remaining gap: `create_memory_tool()` (removed from Mem0 v2 API).
 
 ---
 
@@ -198,14 +198,14 @@ Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
 
 | Adapter | Lines | Methods | Coverage |
 |---------|-------|---------|----------|
-| Mem0 | 604 | 16 | ~87% |
+| Mem0 | ~700 | 17 | ~95% |
 | Zep | 647 | 15 | ~93% |
 | Graphiti | ~960 | 17 | ~90% |
 | Hindsight | 415 | 11 | ~90% |
 | Honcho | 637 | 23 | ~90% |
 | LangChain | 778 | 16 | ~88% |
 
-**Overall: ~90% coverage across all adapters.**
+**Overall: ~91% coverage across all adapters.**
 
 Core CRUD operations are fully supported for all adapters. The remaining gaps
 are generally advanced capabilities of the upstream projects.

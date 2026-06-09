@@ -315,11 +315,15 @@ class TestCLI:
     """End-to-end CLI tests using subprocess."""
 
     def _env(self, stdb_session) -> dict:
-        """Return env with correct SpacetimeDB target."""
+        """Return env with correct SpacetimeDB target and PYTHONPATH."""
         env = os.environ.copy()
         env["SPACETIMEDB_HOST"] = stdb_session["host"]
         env["SPACETIMEDB_PORT"] = stdb_session["port"]
         env["SPACETIMEDB_DB"] = stdb_session["database"]
+        # Ensure spacetime_memory is importable by the subprocess
+        sdk_path = str(Path(__file__).resolve().parent.parent.parent / "python")
+        env.setdefault("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{sdk_path}:{env['PYTHONPATH']}"
         return env
 
     def test_cli_workspace_create(self, stdb_session):
@@ -332,9 +336,14 @@ class TestCLI:
         assert result.returncode == 0, f"CLI failed: {result.stdout}{result.stderr}"
 
     def test_cli_help(self):
+        sdk_path = str(Path(__file__).resolve().parent.parent.parent / "python")
+        env = os.environ.copy()
+        env.setdefault("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{sdk_path}:{env['PYTHONPATH']}"
         result = subprocess.run(
             [sys.executable, CLI_PATH, "--help"],
             capture_output=True, text=True, timeout=10,
+            env=env,
         )
         assert result.returncode == 0
         assert "Usage:" in result.stdout

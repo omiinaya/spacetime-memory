@@ -32,6 +32,173 @@ from ..llm import LLMClient
 logger = logging.getLogger(__name__)
 
 
+class _GraphStore:
+    """Mem0-compatible graph / entity store.
+
+    Real Mem0 stores entities in a separate vector-store collection.
+    We back it with SpacetimeDB's ``kg_node`` table — a real knowledge
+    graph with typed nodes, edges, and community detection.
+
+    The API shape matches Mem0's ``Memory.graph`` attribute so callers
+    can use the same patterns::
+
+        >>> m = Memory()
+        >>> m.graph.add("Alice", entity_type="person", user_id="alice")
+        >>> results = m.graph.search("Alice", user_id="alice")
+        >>> all_nodes = m.graph.get_all(user_id="alice")
+    """
+
+    def __init__(self, memory: Memory):
+        self._memory = memory
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _ws(self, user_id: str | None = None) -> str:
+        return self._memory._ws(user_id)
+
+    def _call(self, method: str, *args: Any, **kwargs: Any) -> Any:
+        return self._memory._call(method, *args, **kwargs)
+
+    def _tag(self, user_id: str | None = None) -> str:
+        """Build a tag suffix used to scope entities to a user."""
+        return f"mem0_user:{user_id}" if user_id else "mem0_global"
+
+    # ------------------------------------------------------------------
+    # Mem0 graph API
+    # ------------------------------------------------------------------
+
+    def add(
+        self,
+        text: str,
+        entity_type: str = "concept",
+        user_id: str | None = None,
+        agent_id: str | None = None,
+        metadata: dict | None = None,
+    ) -> dict[str, Any]:
+        """Add an entity to the graph.
+
+        Args:
+            text: Entity label / name (e.g. ``"Alice"``, ``"Python"``).
+            entity_type: Semantic type (e.g. ``"person"``, ``"language"``,
+                ``"concept"``).  Default ``"concept"``.
+            user_id: Owner user (scopes the node to a workspace).
+            agent_id: Optional agent scope.
+            metadata: Optional extra properties stored in the node's
+                ``metadata_json``.
+
+        Returns:
+            Dict with the created node info, or an error dict on failure.
+        """
+        try:
+            ws_id = self._ws(user_id)
+            meta = dict(metadata or {})
+            if agent_id:
+                meta["agent_id"] = agent_id
+            meta["tag"] = self._tag(user_id)
+            result = self._call(
+                "create_node",
+                workspace_id=ws_id,
+                label=text.strip(),
+                node_type=entity_type,
+                summary=text.strip(),
+                metadata_json=json.dumps(meta),
+            )
+            return result if isinstance(result, dict) else {"status": "ok", "id": str(result)}
+        except Exception as exc:
+            logger.warning("graph.add(%r) failed: %s", text, exc)
+            return {"status": "error", "detail": str(exc)}
+
+    def search(
+        self,
+        query: str,
+        user_id: str | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Search graph entities by label.
+
+        Args:
+            query: Text to search for (label substring match).
+            user_id: Scope results to this user's workspace.
+            limit: Max results (default 10).
+
+        Returns:
+            List of matching ``kg_node`` records.
+        """
+        try:
+            ws_id = self._ws(user_id)
+            rows = self._call("query_graph", workspace_id=ws_id, query=query)
+            tag = self._tag(user_id)
+            filtered = [r for r in rows if r.get("metadata_json", "").endswith(f'"tag": "{tag}"') or r.get("metadata_json", "") == ""]
+            return filtered[:limit]
+        except Exception as exc:
+            logger.warning("graph.search(%r) failed: %s", query, exc)
+            return []
+
+    def get_all(
+        self,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """List all graph entities for a user.
+
+        Args:
+            user_id: Owner user.
+            limit: Max results (default 100).
+
+        Returns:
+            List of node records.
+        """
+        try:
+            ws_id = self._ws(user_id)
+            rows = self._call("query_graph", workspace_id=ws_id, query="")
+            tag = self._tag(user_id)
+            filtered = [r for r in rows if r.get("metadata_json", "").endswith(f'"tag": "{tag}"') or r.get("metadata_json", "") == ""]
+            return filtered[:limit]
+        except Exception as exc:
+            logger.warning("graph.get_all() failed: %s", exc)
+            return []
+
+    def delete(self, entity_id: str) -> dict[str, Any]:
+        """Delete a graph entity by node ID.
+
+        Args:
+            entity_id: The ``kg_node`` UUID to remove.
+
+        Returns:
+            Operation status dict.
+        """
+        try:
+            # Soft-delete: set is_active=False via the delete_node reducer
+            self._call("delete_node", entity_id)
+            return {"status": "ok", "deleted": entity_id}
+        except Exception as exc:
+            logger.warning("graph.delete(%s) failed: %s", entity_id, exc)
+            return {"status": "error", "detail": str(exc)}
+
+
+def _resolve_llm(
+    llm_config: dict[str, Any] | None = None,
+) -> LLMClient | None:
+    """Resolve an ``LLMClient``, optionally with custom per-user config.
+
+    ``llm_config`` can contain:
+        - ``model`` (default ``"gpt-4o-mini"``)
+        - ``api_key`` (per-user override)
+        - ``base_url`` (custom endpoint)
+
+    Returns ``None`` if no ``OPENAI_API_KEY`` is available.
+    """
+    if not llm_config:
+        return LLMClient()
+    return LLMClient(
+        model=llm_config.get("model", "gpt-4o-mini"),
+        api_key=llm_config.get("api_key"),
+        base_url=llm_config.get("base_url"),
+    )
+
+
 class Memory:
     """Drop-in replacement for ``mem0.Memory``.
 
@@ -68,6 +235,16 @@ class Memory:
         )
         self._user_id_to_ws: dict[str, str] = {}
         self._token_refresh_callback = token_refresh_callback
+        self._graph_store: _GraphStore | None = None
+
+        # Per-user LLM config overrides: {user_id: {provider, model, api_key, base_url}}
+        self._llm_overrides: dict[str, dict[str, Any]] = {}
+        # Process any llm_config entries from the top-level config
+        llm_config = config.get("llm_config", {})
+        if isinstance(llm_config, dict):
+            for uid, cfg in llm_config.items():
+                if isinstance(cfg, dict):
+                    self._llm_overrides[uid] = cfg
 
     @classmethod
     def from_config(cls, config_dict: dict[str, Any]) -> Memory:
@@ -80,6 +257,51 @@ class Memory:
             A new Memory instance.
         """
         return cls(config=config_dict)
+
+    # -------------------------------------------------------------------
+    # Graph (entity store) — Mem0 v2+ compat
+    # -------------------------------------------------------------------
+
+    @property
+    def graph(self) -> _GraphStore:
+        """Access the entity / graph store.
+
+        Example::
+
+            >>> m.graph.add("Alice", entity_type="person", user_id="alice")
+            >>> for node in m.graph.search("Alice", user_id="alice"):
+            ...     print(node["label"])
+        """
+        if self._graph_store is None:
+            self._graph_store = _GraphStore(self)
+        return self._graph_store
+
+    # -------------------------------------------------------------------
+    # Per-user LLM config
+    # -------------------------------------------------------------------
+
+    def set_llm_config(
+        self,
+        user_id: str,
+        llm_config: dict[str, Any],
+    ) -> None:
+        """Set a per-user LLM config override.
+
+        Args:
+            user_id: The user to configure for.
+            llm_config: Dict with optional keys ``provider``, ``model``,
+                ``api_key``, ``base_url``.
+        """
+        self._llm_overrides[user_id] = llm_config
+
+    def _resolve_llm_for(
+        self,
+        user_id: str | None = None,
+    ) -> LLMClient | None:
+        """Resolve an ``LLMClient`` respecting any per-user override."""
+        if user_id and user_id in self._llm_overrides:
+            return _resolve_llm(self._llm_overrides[user_id])
+        return LLMClient()
 
     # -------------------------------------------------------------------
     # Internal helpers
@@ -126,6 +348,62 @@ class Memory:
             filters.get("run_id"),
         )
 
+    def _store_facts_as_kg_nodes(
+        self,
+        facts: list[str],
+        user_id: str | None = None,
+        agent_id: str | None = None,
+    ) -> list[str]:
+        """Create ``kg_node`` entries from extracted-fact strings.
+
+        Args:
+            facts: List of fact strings from ``LLMClient.extract_facts()``.
+            user_id: Owner user for workspace scoping.
+            agent_id: Optional agent scope.
+
+        Returns a list of node IDs that were created (empty on failure).
+        """
+        ws_id = self._ws(user_id)
+        if not ws_id or not facts:
+            return []
+        node_ids: list[str] = []
+        for fact in facts:
+            if len(fact.strip()) < 4:
+                continue
+            try:
+                meta: dict[str, Any] = {"tag": f"mem0_user:{user_id}" if user_id else "mem0_global"}
+                if agent_id:
+                    meta["agent_id"] = agent_id
+                result = self._call(
+                    "create_node",
+                    workspace_id=ws_id,
+                    label=fact,
+                    node_type="fact",
+                    summary=fact,
+                    metadata_json=json.dumps(meta),
+                )
+                if isinstance(result, dict):
+                    nid = result.get("id", "")
+                    if nid:
+                        node_ids.append(nid)
+            except Exception:
+                logger.debug("Failed to create KG node for fact: %s", fact)
+        return node_ids
+
+    def _get_graph_context(
+        self,
+        query: str,
+        user_id: str | None = None,
+        limit: int = 5,
+    ) -> list[str]:
+        """Search the KG for entities relevant to *query* and return labels."""
+        try:
+            ws_id = self._ws(user_id)
+            rows = self._call("query_graph", workspace_id=ws_id, query=query)
+            return [r.get("label", "") for r in rows[:limit] if r.get("label")]
+        except Exception:
+            return []
+
     # -------------------------------------------------------------------
     # Mem0 API
     # -------------------------------------------------------------------
@@ -163,6 +441,9 @@ class Memory:
                   into a single string (no role prefixes).
                 If False, behaves as a plain store with role-prefixed
                 formatting for message lists.
+                When *infer* is True and an LLM is available, entity facts
+                are extracted and stored as ``kg_node`` entries in the
+                knowledge graph (Mem0 graph-memory equivalent).
             prompt: Optional prompt for inference (accepted for compatibility).
             output_format: Output format version (default ``"v1.1"``).
             memory_type: Specifies memory type (``procedural_memory`` or None).
@@ -224,11 +505,17 @@ class Memory:
                     self.update(memory_id=mem_id, data=merged)
                     # LLM fact extraction on merged content
                     try:
-                        llm = LLMClient()
-                        if llm.available:
+                        llm = self._resolve_llm_for(user_id)
+                        if llm and llm.available:
                             facts = llm.extract_facts(merged)
                             if facts:
-                                self._call("update_memory", mem_id, json.dumps({"extracted_facts": facts}))
+                                self._store_facts_as_kg_nodes(
+                                    facts, user_id, agent_id,
+                                )
+                                self._call(
+                                    "update_memory", mem_id,
+                                    json.dumps({"extracted_facts": facts}),
+                                )
                     except Exception:
                         pass
                     return {
@@ -246,8 +533,8 @@ class Memory:
             extracted_facts = None
             if infer:
                 try:
-                    llm = LLMClient()
-                    if llm.available:
+                    llm = self._resolve_llm_for(user_id)
+                    if llm and llm.available:
                         extracted_facts = llm.extract_facts(content)
                 except Exception:
                     pass
@@ -266,6 +553,10 @@ class Memory:
                 source_session_id=run_id or "",
                 entities_json=json.dumps(meta) if meta else "{}",
             )
+
+            # If fact extraction yielded results, persist as KG nodes
+            if extracted_facts:
+                self._store_facts_as_kg_nodes(extracted_facts, user_id, agent_id)
 
             # If user_id is provided, scope the stored memory to that user
             if user_id:
@@ -350,11 +641,17 @@ class Memory:
         top_k: int | None = None,
         filters: dict[str, Any] | None = None,
         rerank: bool = False,
+        graph_context: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Search memories by semantic similarity to *query*.
 
         Supports both Mem0 v1.x keyword signatures and v2.x ``filters`` dict.
+
+        When *graph_context* is True (default), the knowledge graph is
+        queried for entities matching the search terms, and matching KG
+        node labels are included in each result's ``metadata.graph_context``.
+        This mirrors Mem0's entity-based search boosting behaviour.
 
         Args:
             query: The search query text.
@@ -366,6 +663,8 @@ class Memory:
             top_k: Mem0 v2+ alias for ``limit``.
             filters: Mem0 v2+ filters dict (e.g. ``{"user_id": "u1"}``).
             rerank: If True, apply reranking (accepted for compatibility).
+            graph_context: If True, enrich results with KG entity context
+                (default True).
             **kwargs: Additional Mem0 keyword arguments (accepted for
                 compatibility but ignored).
 
@@ -395,6 +694,11 @@ class Memory:
 
         ws_id = self._ws(user_id)
 
+        # Gather graph context for the search query
+        graph_entities = []
+        if graph_context:
+            graph_entities = self._get_graph_context(query, user_id)
+
         try:
             rows = self._call(
                 "search",
@@ -417,13 +721,18 @@ class Memory:
                         mem_user_scope = mem_records[0].get("user_scope", "")
                         if mem_user_scope != "" and mem_user_scope != user_id:
                             continue  # Skip: scoped to a different user
+
+                meta: dict[str, Any] = {}
+                if graph_entities:
+                    meta["graph_context"] = graph_entities
+
                 results.append({
                     "id": mem_id,
                     "memory": r.get("memory_content", r.get("content", "")),
                     "score": score,
                     "user_id": user_id or "",
                     "agent_id": agent_id or "",
-                    "metadata": {},
+                    "metadata": meta,
                 })
             return {"results": results}
         except RuntimeError:
@@ -498,7 +807,7 @@ class Memory:
                         "metadata": {},
                     }
                     for r in rows
-                ]
+                ],
             }
         except RuntimeError:
             raise
@@ -649,3 +958,138 @@ class Memory:
         Mem0 v2+ compat.
         """
         self._user_id_to_ws.clear()
+
+    # -------------------------------------------------------------------
+    # chat() — RAG + LLM response (Mem0 v2 forward-looking)
+    # -------------------------------------------------------------------
+
+    def chat(
+        self,
+        query: str,
+        *,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+        run_id: str | None = None,
+        messages: list[dict[str, str]] | None = None,
+        memory_type: str | None = None,
+        llm_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Generate a chat response augmented by stored memories.
+
+        This implements an augmented-generation workflow:
+          1. Store the user's message as a memory (via ``add()``).
+          2. Search for relevant past memories (via ``search()``).
+          3. Build a prompt with the search results as context.
+          4. Generate a response via ``LLMClient``.
+          5. Store the assistant's response as a memory.
+
+        Args:
+            query: The user's current message text.
+            user_id: User / session scope.
+            agent_id: Agent scope (default ``"assistant"``).
+            run_id: Optional run ID.
+            messages: Optional conversation history (list of
+                ``{"role": ..., "content": ...}`` dicts).  If provided,
+                the history is used to augment the prompt.
+            memory_type: Optional memory type (default None).
+            llm_config: Optional per-invocation LLM config overrides
+                (provider, model, api_key, base_url).
+
+        Returns:
+            A dict with ``"response"`` (the generated text),
+            ``"context"`` (list of relevant memory texts), and
+            ``"memories"`` (list of memory records).
+
+        Example::
+
+            >>> result = m.chat("What do I like?", user_id="alice")
+            >>> result["response"]
+            'Based on your memories, you like pizza.'
+            >>> result["context"]
+            ['I like pizza']
+
+        Notes:
+            The real Mem0 ``chat()`` is still ``NotImplementedError``
+            as of v2.x.  This implementation is forward-looking and
+            will gracefully degrade (return the query alone) if no
+            ``OPENAI_API_KEY`` is configured.
+        """
+        agent_id = agent_id or "assistant"
+
+        # 1. Store the query
+        self.add(
+            query,
+            user_id=user_id,
+            agent_id=agent_id,
+            run_id=run_id,
+            memory_type=memory_type,
+        )
+
+        # 2. Search for relevant past memories
+        search_results = self.search(
+            query,
+            user_id=user_id,
+            agent_id=agent_id,
+            run_id=run_id,
+            limit=10,
+        )
+        context_texts = [
+            r.get("memory", "") for r in search_results.get("results", [])
+            if r.get("memory")
+        ]
+
+        # 3. Build the prompt
+        system_prompt = (
+            "You are a helpful assistant with access to the user's stored memories. "
+            "Use the following relevant memories to answer the user's question. "
+            "If the memories are not relevant, answer normally."
+        )
+
+        context_block = ""
+        if context_texts:
+            context_block = "\nRelevant memories:\n" + "\n".join(
+                f"- {t}" for t in context_texts
+            )
+
+        history_block = ""
+        if messages:
+            history_block = "\nConversation history:\n" + "\n".join(
+                f"{m.get('role', 'user')}: {m.get('content', '')}"
+                for m in messages
+            )
+
+        user_prompt = (
+            f"{context_block}"
+            f"{history_block}"
+            f"\nUser: {query}\nAssistant:"
+        )
+
+        # 4. Generate response via LLM
+        llm = _resolve_llm(llm_config)
+        response_text = query  # fallback
+        if llm and llm.available:
+            try:
+                response_text = llm.chat(
+                    [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                ) or query
+            except Exception as exc:
+                logger.warning("mem0.chat() LLM call failed: %s", exc)
+                response_text = query
+
+        # 5. Store the assistant response
+        self.add(
+            response_text,
+            user_id=user_id,
+            agent_id=agent_id,
+            run_id=run_id,
+            memory_type=memory_type,
+        )
+
+        return {
+            "response": response_text,
+            "context": context_texts,
+            "memories": search_results.get("results", []),
+        }

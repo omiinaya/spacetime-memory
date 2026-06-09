@@ -11,7 +11,7 @@ sys.path.insert(0, str(REPO_ROOT / "sdk" / "python"))
 
 from spacetime_memory import Client
 
-DB = os.environ.get("SPACETIMEDB_DB", "c200e409f602c06527d0aa66dc2d05718a6b62c4c3317b5498951cea41782713")
+DB = os.environ.get("SPACETIMEDB_DB", None)
 HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 
@@ -26,7 +26,7 @@ def _make_token() -> str:
 
 @pytest.fixture(scope="module")
 def client() -> Client:
-    return Client(host=HOST, port=PORT, database=DB, token=_make_token())
+    return Client(host=HOST, port=PORT, database=DB)
 
 
 def test_backup_structure(client):

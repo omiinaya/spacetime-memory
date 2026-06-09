@@ -66,12 +66,11 @@ def token() -> str:
 
 
 @pytest.fixture
-def zep(host: str, port: int, db: str | None, token: str):
+def zep(host: str, port: int, db: str | None):
     client = ZepClient(
         host=host,
         port=port,
         config={"db": db} if db else None,
-        token=token or None,
     )
     yield client
     client.close()

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -166,13 +165,15 @@ def _running_stdb() -> bool:
 
 
 def _publish_module(delete_data: str = "on-conflict") -> str:
-    """Run ``spacetime publish`` and return the database identity hex string.
+    """Publish the WASM module via HTTP API and return the database identity.
 
-    Assumes the Cargo project is at ``server/spacetimedb/`` relative to
-    the repo root.  Uses ``--delete-data=on-conflict`` so CI cleans don't
-    pile up but local dev doesn't nuke data unnecessarily.
+    Uses the SpacetimeDB HTTP API directly (``POST /v1/database``) with
+    anonymous identity establishment, bypassing the ``spacetime`` CLI which
+    requires a valid JWT token.
 
-    Returns the identity hex of the published database.
+    Assumes the WASM artifact is at ``server/spacetimedb/target/…/release/``.
+
+    Returns the identity hex of the published (or existing) database.
     """
     module_dir = _repo_root / "server" / "spacetimedb"
     if not module_dir.exists():
@@ -181,33 +182,61 @@ def _publish_module(delete_data: str = "on-conflict") -> str:
             "Run pytest from the repo root or set SPACETIMEDB_DB manually."
         )
 
-    result = subprocess.run(
-        [
-            "spacetime", "publish",
-            "--server", "http://127.0.0.1:3001",
-            "--yes=all",
-            f"--delete-data={delete_data}",
-            "spacetime-memory",
-        ],
-        cwd=str(module_dir),
-        capture_output=True,
-        text=True,
-        timeout=120,
+    wasm_path = (
+        module_dir / "target" / "wasm32-unknown-unknown" / "release"
+        / "spacetime_memory.opt.wasm"
     )
-    if result.returncode != 0:
+    if not wasm_path.exists():
+        wasm_path = (
+            module_dir / "target" / "wasm32-unknown-unknown" / "release"
+            / "spacetime_memory.wasm"
+        )
+    if not wasm_path.exists():
+        raise RuntimeError(f"WASM module not found at {wasm_path}. Build first.")
+
+    wasm_data = wasm_path.read_bytes()
+
+    import httpx
+
+    # Establish anonymous identity
+    anon = httpx.get(
+        "http://127.0.0.1:3001/v1/database/anon-probe",
+        timeout=5.0,
+    )
+    token = anon.headers.get("spacetime-identity-token", "")
+
+    headers = {"Content-Type": "application/octet-stream"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    # Set delete-data parameter if requested
+    url = "http://127.0.0.1:3001/v1/database?host_type=Wasm"
+    if delete_data == "always":
+        url += "&delete_data=true"
+
+    resp = httpx.post(
+        url,
+        headers=headers,
+        content=wasm_data,
+        timeout=60.0,
+    )
+    if resp.status_code >= 400:
         raise RuntimeError(
-            f"spacetime publish failed (exit={result.returncode}):\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}"
+            f"Publish via HTTP API failed (HTTP {resp.status_code}):\n{resp.text[:500]}"
         )
 
-    # Parse the identity from output: "Updated database with name: spacetime-memory, identity: <hex>"
-    for line in result.stdout.splitlines():
-        if "identity:" in line:
-            return line.split("identity:")[-1].strip()
-    raise RuntimeError(
-        f"Could not parse identity from publish output:\n{result.stdout}"
-    )
+    data = resp.json()
+    if "Success" in data:
+        return data["Success"].get("database_identity", "unknown")
+    if "Database" in data:
+        # "Updated database …" response shape
+        return data["Database"].get("database_identity", "unknown")
+    # Fallback: try to parse any identity field
+    if isinstance(data, dict):
+        for key in ("database_identity", "identity"):
+            if key in data:
+                return data[key]
+    raise RuntimeError(f"Could not parse identity from publish response:\n{data}")
 
 
 @pytest.fixture(scope="session")
@@ -226,15 +255,14 @@ def stdb_session() -> dict:
                      "Set SPACETIMEDB_HOST to force-enable integration tests.")
 
     # Always publish the module with --delete-data=always so each test run
-    # starts with a clean database.  The CLI build is fast (0.1s when the
-    # WASM is current); the deletion takes negligible time.
-    _publish_module(delete_data="always")
-    _database = "spacetime-memory"
+    # starts with a clean database.  The WASM build is fast (0.1s when the
+    # artifact is current); the HTTP publish takes ~1s.
+    db_identity = _publish_module(delete_data="always")
 
     return {
         "host": os.environ.get("SPACETIMEDB_HOST", "localhost"),
         "port": os.environ.get("SPACETIMEDB_PORT", "3001"),
-        "database": _database,
+        "database": db_identity,
     }
 
 
@@ -242,15 +270,13 @@ def stdb_session() -> dict:
 def stdb_client(stdb_session) -> Client:
     """Create a Client connected to the published database.
 
-    Uses the token file from the repo's JWT key pair for consistent
-    identity across test runs.
+    Uses anonymous identity (no JWT) — the SpacetimeDB standalone server
+    issues an ephemeral identity token automatically.
     """
-    token = _generate_test_token()
     return Client(
         host=stdb_session["host"],
         port=stdb_session["port"],
         database=stdb_session["database"],
-        token=token,
     )
 
 
