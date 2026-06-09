@@ -89,26 +89,27 @@ class _GraphStore:
                 ``metadata_json``.
 
         Returns:
-            Dict with the created node info, or an error dict on failure.
+            Dict with the created node info.
+
+        Raises:
+            ValueError: If ``text`` is empty.
         """
-        try:
-            ws_id = self._ws(user_id)
-            meta = dict(metadata or {})
-            if agent_id:
-                meta["agent_id"] = agent_id
-            meta["tag"] = self._tag(user_id)
-            result = self._call(
-                "create_node",
-                workspace_id=ws_id,
-                label=text.strip(),
-                node_type=entity_type,
-                summary=text.strip(),
-                metadata_json=json.dumps(meta),
-            )
-            return result if isinstance(result, dict) else {"status": "ok", "id": str(result)}
-        except Exception as exc:
-            logger.warning("graph.add(%r) failed: %s", text, exc)
-            return {"status": "error", "detail": str(exc)}
+        if not text or not text.strip():
+            raise ValueError("graph.add() requires non-empty text")
+        ws_id = self._ws(user_id)
+        meta = dict(metadata or {})
+        if agent_id:
+            meta["agent_id"] = agent_id
+        meta["tag"] = self._tag(user_id)
+        result = self._call(
+            "create_node",
+            workspace_id=ws_id,
+            label=text.strip(),
+            node_type=entity_type,
+            summary=text.strip(),
+            metadata_json=json.dumps(meta),
+        )
+        return result if isinstance(result, dict) else {"status": "ok", "id": str(result)}
 
     def search(
         self,
@@ -126,15 +127,11 @@ class _GraphStore:
         Returns:
             List of matching ``kg_node`` records.
         """
-        try:
-            ws_id = self._ws(user_id)
-            rows = self._call("query_graph", workspace_id=ws_id, query=query)
-            tag = self._tag(user_id)
-            filtered = [r for r in rows if r.get("metadata_json", "").endswith(f'"tag": "{tag}"') or r.get("metadata_json", "") == ""]
-            return filtered[:limit]
-        except Exception as exc:
-            logger.warning("graph.search(%r) failed: %s", query, exc)
-            return []
+        ws_id = self._ws(user_id)
+        rows = self._call("query_graph", workspace_id=ws_id, query=query)
+        tag = self._tag(user_id)
+        filtered = [r for r in rows if r.get("metadata_json", "").endswith(f'"tag": "{tag}"') or r.get("metadata_json", "") == ""]
+        return filtered[:limit]
 
     def get_all(
         self,
@@ -150,15 +147,11 @@ class _GraphStore:
         Returns:
             List of node records.
         """
-        try:
-            ws_id = self._ws(user_id)
-            rows = self._call("query_graph", workspace_id=ws_id, query="")
-            tag = self._tag(user_id)
-            filtered = [r for r in rows if r.get("metadata_json", "").endswith(f'"tag": "{tag}"') or r.get("metadata_json", "") == ""]
-            return filtered[:limit]
-        except Exception as exc:
-            logger.warning("graph.get_all() failed: %s", exc)
-            return []
+        ws_id = self._ws(user_id)
+        rows = self._call("query_graph", workspace_id=ws_id, query="")
+        tag = self._tag(user_id)
+        filtered = [r for r in rows if r.get("metadata_json", "").endswith(f'"tag": "{tag}"') or r.get("metadata_json", "") == ""]
+        return filtered[:limit]
 
     def delete(self, entity_id: str) -> dict[str, Any]:
         """Delete a graph entity by node ID.
@@ -169,13 +162,9 @@ class _GraphStore:
         Returns:
             Operation status dict.
         """
-        try:
-            # Soft-delete: set is_active=False via the delete_node reducer
-            self._call("delete_node", entity_id)
-            return {"status": "ok", "deleted": entity_id}
-        except Exception as exc:
-            logger.warning("graph.delete(%s) failed: %s", entity_id, exc)
-            return {"status": "error", "detail": str(exc)}
+        # Soft-delete: set is_active=False via the delete_node reducer
+        self._call("delete_node", entity_id)
+        return {"status": "ok", "deleted": entity_id}
 
 
 def _resolve_llm(
@@ -322,6 +311,10 @@ class Memory:
                 match = [w for w in ws_list if w.get("name") == user_id]
                 if match:
                     self._user_id_to_ws[user_id] = match[0]["id"]
+                else:
+                    raise ValueError(
+                        f"Could not resolve or create workspace for user_id='{user_id}'"
+                    )
         return self._user_id_to_ws.get(user_id, "")
 
     def _call(self, method: str, *args: Any, **kwargs: Any) -> Any:
@@ -589,8 +582,10 @@ class Memory:
             }
         except RuntimeError:
             raise
+        except ValueError:
+            raise
         except Exception as exc:
-            raise RuntimeError(f"mem0.add('{messages!r}') failed: {exc}") from exc
+            raise RuntimeError(f"mem0.add() failed: {exc}") from exc
 
     def get(self, memory_id: str) -> dict[str, Any]:
         """Retrieve a single memory by its ID.
@@ -625,6 +620,8 @@ class Memory:
                 result = {}
             return {"results": [result] if result else []}
         except RuntimeError:
+            raise
+        except ValueError:
             raise
         except Exception as exc:
             raise RuntimeError(f"mem0.get('{memory_id}') failed: {exc}") from exc
@@ -737,6 +734,8 @@ class Memory:
             return {"results": results}
         except RuntimeError:
             raise
+        except ValueError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.search('{query}') failed: {exc}") from exc
 
@@ -811,6 +810,8 @@ class Memory:
             }
         except RuntimeError:
             raise
+        except ValueError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.get_all(user_id='{user_id}') failed: {exc}") from exc
 
@@ -849,6 +850,8 @@ class Memory:
             return {"message": "Memory updated successfully!"}
         except RuntimeError:
             raise
+        except ValueError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.update('{memory_id}') failed: {exc}") from exc
 
@@ -871,6 +874,8 @@ class Memory:
             self._call("delete_memory", memory_id)
             return {"message": "Memory deleted successfully!"}
         except RuntimeError:
+            raise
+        except ValueError:
             raise
         except Exception as exc:
             raise RuntimeError(f"mem0.delete('{memory_id}') failed: {exc}") from exc
@@ -912,6 +917,8 @@ class Memory:
             return {"status": "ok", "deleted": len(memories)}
         except RuntimeError:
             raise
+        except ValueError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.delete_all(user_id='{user_id}') failed: {exc}") from exc
 
@@ -936,6 +943,8 @@ class Memory:
         try:
             return self._call("get_memory_history", memory_id)
         except RuntimeError:
+            raise
+        except ValueError:
             raise
         except Exception as exc:
             raise RuntimeError(f"mem0.history('{memory_id}') failed: {exc}") from exc

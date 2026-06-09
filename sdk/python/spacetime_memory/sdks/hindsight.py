@@ -220,6 +220,8 @@ class Hindsight:
             return result
         except RuntimeError:
             raise
+        except ValueError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"hindsight.retain(content='{content[:50]}...') failed: {exc}") from exc
 
@@ -271,6 +273,8 @@ class Hindsight:
                 })
             return {"results": results}
         except RuntimeError:
+            raise
+        except ValueError:
             raise
         except Exception as exc:
             raise RuntimeError(f"hindsight.recall('{query}') failed: {exc}") from exc
@@ -401,6 +405,8 @@ class Hindsight:
                 "search",
                 workspace_id=ws_id, query=search_query, limit=20, semantic=True,
             )
+        except ValueError:
+            raise
         except Exception as exc:
             recent = []
 
@@ -546,6 +552,8 @@ class Hindsight:
             return self._call("delete_memory", memory_id)
         except RuntimeError:
             raise
+        except ValueError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"hindsight.forget('{memory_id}') failed: {exc}") from exc
 
@@ -562,6 +570,8 @@ class Hindsight:
         try:
             return self._call("list_memories", workspace_id=self._ws(), limit=limit)
         except RuntimeError:
+            raise
+        except ValueError:
             raise
         except Exception as exc:
             raise RuntimeError(f"hindsight.list_all() failed: {exc}") from exc
@@ -595,6 +605,8 @@ class Hindsight:
                 "kg_nodes": nodes[0]["cnt"] if nodes else 0,
             }
         except RuntimeError:
+            raise
+        except ValueError:
             raise
         except Exception as exc:
             raise RuntimeError(f"hindsight.stats() failed: {exc}") from exc

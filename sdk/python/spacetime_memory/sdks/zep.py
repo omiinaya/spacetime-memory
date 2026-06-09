@@ -460,6 +460,8 @@ class ZepClient:
                 try:
                     self._client.delete_memory(mem_id)
                     deleted += 1
+                except ValueError:
+                    raise
                 except RuntimeError:
                     pass
 
@@ -756,6 +758,8 @@ class ZepClient:
         """
         try:
             memory = self.get_memory(session_id)
+        except ValueError:
+            raise
         except RuntimeError:
             memory = None
         if not memory:

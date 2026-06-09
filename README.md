@@ -244,7 +244,8 @@ stmem --help
 ### 6. Start MCP Server
 
 ```bash
-python server/mcp/main.py  # stdio transport for LLM agents
+stmem serve                  # stdio transport (local LLM integration)
+stmem serve --transport sse  # HTTP SSE transport
 ```
 
 ### 7. Start Frontend

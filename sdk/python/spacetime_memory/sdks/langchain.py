@@ -44,6 +44,16 @@ from typing import Any
 
 from ..client import Client
 
+# LangGraph BaseStore types — imported early so StmemStore can inherit
+try:
+    from langgraph.store.base import BaseStore, Op, Result, GetOp, PutOp, SearchOp, ListNamespacesOp
+except ImportError:
+    # Stubs defined at module bottom for fallback
+    BaseStore = object  # type: ignore[assignment]
+    Op = object  # type: ignore[assignment]
+    GetOp = PutOp = SearchOp = ListNamespacesOp = object  # type: ignore[assignment]
+    Result = object  # type: ignore[assignment]
+
 
 # ---------------------------------------------------------------------------
 # LangChain BaseStore interface
@@ -241,7 +251,7 @@ class StmemMemoryStore:
 # ---------------------------------------------------------------------------
 
 
-class StmemStore:
+class StmemStore(BaseStore):
     """LangGraph ``BaseStore`` implementation backed by Spacetime-Memory.
 
     Maps::
@@ -277,10 +287,6 @@ class StmemStore:
         # List namespaces
         namespaces = store.list_namespaces()
         # [("users",), ("users", "alice"), ("users", "bob")]
-
-    **Note:** All methods are synchronous wrappers.  ``LangGraph``
-    ``BaseStore`` defines async variants (``aget``, ``aput``, etc.)
-    which are not implemented here for simplicity.
     """
 
     def __init__(
@@ -634,40 +640,84 @@ class StmemStore:
     def batch(self, ops: Sequence[Any]) -> list[Any]:
         """Execute multiple operations in a single batch.
 
+        Supports both LangGraph ``Op`` namedtuples (``GetOp``, ``PutOp``,
+        ``SearchOp``, ``ListNamespacesOp``) and legacy dict-based ops
+        with a ``type`` field.
+
         Args:
-            ops: Sequence of operations, each with a ``type`` field
-                (``"get"``, ``"put"``, ``"delete"``, ``"search"``).
+            ops: Iterable of operations.
 
         Returns:
             List of results, one per operation.
         """
         results: list[Any] = []
         for op in ops:
-            op_type = getattr(op, "type", None) if hasattr(op, "type") else None
-            if not op_type and isinstance(op, dict):
-                op_type = op.get("type")
-            if op_type == "get":
-                ns = getattr(op, "namespace", ())
-                key = getattr(op, "key", "")
-                results.append(self.get(tuple(ns), key))
-            elif op_type == "put":
-                ns = getattr(op, "namespace", ())
-                key = getattr(op, "key", "")
-                value = getattr(op, "value", {})
-                self.put(tuple(ns), key, value)
+            if isinstance(op, GetOp):
+                results.append(self.get(op.namespace, op.key, refresh_ttl=op.refresh_ttl))
+            elif isinstance(op, PutOp):
+                if op.value is None:
+                    self.delete(op.namespace, op.key)
+                else:
+                    self.put(op.namespace, op.key, op.value, index=op.index)
                 results.append(None)
-            elif op_type == "delete":
-                ns = getattr(op, "namespace", ())
-                key = getattr(op, "key", "")
-                self.delete(tuple(ns), key)
-                results.append(None)
-            elif op_type == "search":
-                ns = getattr(op, "namespace_prefix", ())
-                kw = getattr(op, "kwargs", {})
-                results.append(self.search(tuple(ns), **kw))
+            elif isinstance(op, SearchOp):
+                results.append(self.search(
+                    op.namespace_prefix,
+                    query=op.query,
+                    filter=op.filter,
+                    limit=op.limit,
+                    offset=op.offset,
+                ))
+            elif isinstance(op, ListNamespacesOp):
+                prefix = None
+                suffix = None
+                if op.match_conditions:
+                    for m in op.match_conditions:
+                        if m.match_type == "prefix":
+                            prefix = m.path
+                        elif m.match_type == "suffix":
+                            suffix = m.path
+                results.append(self.list_namespaces(
+                    prefix=prefix,
+                    suffix=suffix,
+                    max_depth=op.max_depth,
+                    limit=op.limit,
+                    offset=op.offset,
+                ))
             else:
-                results.append(None)
+                # Legacy: ops with a "type" field (namedtuple or dict)
+                if isinstance(op, dict):
+                    op_type = op.get("type")
+                else:
+                    op_type = getattr(op, "type", None)
+                if not op_type:
+                    results.append(None)
+                elif op_type == "get":
+                    ns = tuple(op["namespace"] if isinstance(op, dict) else op.namespace)
+                    key = op.get("key", "") if isinstance(op, dict) else getattr(op, "key", "")
+                    results.append(self.get(ns, key))
+                elif op_type == "put":
+                    ns = tuple(op["namespace"] if isinstance(op, dict) else op.namespace)
+                    key = op.get("key", "") if isinstance(op, dict) else getattr(op, "key", "")
+                    value = op.get("value", {}) if isinstance(op, dict) else getattr(op, "value", {})
+                    self.put(ns, key, value)
+                    results.append(None)
+                elif op_type == "delete":
+                    ns = tuple(op["namespace"] if isinstance(op, dict) else op.namespace)
+                    key = op.get("key", "") if isinstance(op, dict) else getattr(op, "key", "")
+                    self.delete(ns, key)
+                    results.append(None)
+                elif op_type == "search":
+                    ns = tuple(op["namespace_prefix"] if isinstance(op, dict) else getattr(op, "namespace_prefix", ()))
+                    kw = op.get("kwargs", {}) if isinstance(op, dict) else getattr(op, "kwargs", {})
+                    results.append(self.search(ns, **kw))
+                else:
+                    results.append(None)
         return results
+
+    async def abatch(self, ops: Sequence[Any]) -> list[Any]:
+        """Async batch — delegates to sync batch."""
+        return self.batch(ops)
 
 
 # ---------------------------------------------------------------------------
