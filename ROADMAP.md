@@ -1,309 +1,291 @@
 # Spacetime Memory — Roadmap
 
 **Goal:** production-grade unified memory backend with genuine drop-in adapter parity.
+**Last updated:** June 9, 2026 — revised after upstream source comparison against all 6 real libraries.
 
-**Completed recently (June 8, 2026):**
-- ✅ Hermes plugin `is_available()` fixed (socket connect, was broken HTTP HEAD)
-- ✅ Hermes plugin e2e verified — store→search→retrieve round-trips work against live STDB
-- ✅ Roadmaps synced across spacetime-llm and spacetime-memory repos
+---
 
-**Prioritized next:**
+## Drop-in Fidelity Scorecard
 
-| # | Task | Effort |
-|---|------|--------|
-| 1 | Docker build verification | 2 hr |
-| 2 | Hermes deep integration (sync_turn, prefetch, workspace isolation) | 3 hr |
-| 3 | Spaces/ACL UI | 1 day |
-| 4 | Adapter source consolidation (langchain/graphiti/zep tests exist, sources scattered) | 1 hr |
-| 5 | Integration tests against real STDB | 1 day |
+| Adapter | Current Score | Target | Verdict |
+|---------|:------------:|:------:|---------|
+| LangGraph | 100% | 100% | ✅ Already a true drop-in (inherits `BaseStore`) |
+| Mem0 | 95% | 100% | ✅ API-compatible, init pattern differs trivially |
+| Zep | 80% | 100% | ⚠️ Exception types, missing methods |
+| Graphiti | 75% | 100% | ⚠️ EntityNode/Edge missing fields, Pydantic gap |
+| Hindsight | 20% | 100% | ❌ **Complete API mismatch** — real is REST client |
+| Honcho | 10% | 100% | ❌ **Complete API mismatch** — real is workspace/peer SDK |
+
+---
+
+## Roadmap
 
 | Phase | Theme | Lanes | Effort |
 |-------|-------|-------|--------|
-| I | Ship It Properly | 1–4 | 2 weeks |
-| II | Adapter Parity | 5–10 | 3 weeks |
-| III | Production Polish | 11–15 | 2 weeks |
-| IV | Ecosystem | 16–19 | ongoing |
+| I | Fix Wrong Adapters | 1–3 | 2–3 weeks |
+| II | Polish Close Adapters | 4–6 | 1–2 weeks |
+| III | Ship It | 7–10 | 1 week |
+| IV | Ecosystem | 11–14 | ongoing |
 
 ---
 
-## Phase I — Ship It Properly (foundations)
+## Phase I — Fix Wrong Adapters
 
-Every lane below blocks everything above it.
+### Lane 1 — Hindsight: rewrite to match `hindsight_client`
 
-### Lane 1 — Test infrastructure that actually works
+**Why:** Our adapter claims to match `hindsight.Hindsight` but that doesn't exist on PyPI. The real library is `hindsight_client.Hindsight` (v0.8.1) from `vectorize-io/hindsight`. It's an HTTP client to a REST API, not an embedded SDK. We need to either:
+  (a) Wrap it as an HTTP client that talks to our SpacetimeDB backend via a REST API, or
+  (b) Create a compatible API surface that matches the real client's method signatures exactly
 
-**What:** The module must be auto-published in CI before integration tests run.
-**Why:** Right now tests fail with "No such database" because the published module is stale. This makes CI and local dev unreliable.
+**Real API reference (from source at `hindsight-clients/python/hindsight_client/hindsight_client.py`):**
 
-- [ ] `pytest` fixture that calls `spacetime publish` against the standalone before integration tests
-- [ ] Skip integration tests (require standalone) vs unit tests (mock-only) cleanly with markers
-- [ ] Clean data dir per test run to prevent cross-test contamination
-- [ ] CI pipeline (GitHub Actions): Rust build + publish + pytest integration + pytest adapter tests
-- [ ] CI runs on every push to main + PRs
+```
+Hindsight(base_url, api_key=None, timeout=300.0, user_agent=None)
+    retain(bank_id, content, *, timestamp, context, document_id, metadata,
+           entities, tags, update_mode, retain_async) → RetainResponse
+    retain_batch(bank_id, items, *, document_id, document_tags, retain_async) → RetainResponse
+    recall(bank_id, query, *, types, max_tokens=4096, budget="mid", trace=False,
+           query_timestamp, include_entities, max_entity_tokens, include_chunks,
+           max_chunk_tokens, include_source_facts, max_source_facts_tokens,
+           tags, tags_match, tag_groups) → RecallResponse
+    reflect(bank_id, query, *, budget="low", context, max_tokens, response_schema,
+            tags, tags_match, include_facts, include_tool_calls,
+            include_tool_call_output, tag_groups, fact_types,
+            exclude_mental_models, exclude_mental_model_ids) → ReflectResponse
+    retain_files(bank_id, files, *, context, files_metadata) → FileRetainResponse
+    close() / aclose()
+    __enter__ / __exit__     # context manager
+```
 
-**Files:** `sdk/python/tests/conftest.py`, `.github/workflows/test.yml`
+**Also async variants for all:** `aretain`, `arecall`, `areflect`, `aretain_batch`, `aretain_files`, `aclose`.
 
-### Lane 2 — Version pinning & dependency hardening
+**No `forget()` method at the high level.** The low-level `memory_api.delete_memory()` "resets" observations, it doesn't delete.
 
-**What:** Pin exact versions of SpacetimeDB CLI, Rust toolchain, Python deps. Auto-detect mismatch.
-**Why:** The CLI says v2.4.0 but standalone server is v2.4.1. These drift silently and break everything.
+**Return types are typed Pydantic models:** `RetainResponse`, `RecallResponse`, `RecallResult`, `ReflectResponse`, `ReflectFact`, `BankProfileResponse`, `FileRetainResponse`, `ListMemoryUnitsResponse`.
 
-- [ ] `.spacetime-version` file with expected SpacetimeDB CLI + standalone version
-- [ ] `scripts/check-version.py` that verifies CLI, standalone, and Rust deps at startup
-- [ ] Rust `rust-toolchain.toml` with pinned channel
-- [ ] Python `requirements.txt` with pinned + hashed deps
-- [ ] Docker images that match pinned versions exactly
+**Breakdown of work:**
 
-**Files:** `server/spacetimedb/rust-toolchain.toml`, `sdk/python/requirements.txt`, `.spacetime-version`
+| Item | Effort | Notes |
+|------|--------|-------|
+| Read and model real return types | 1 hr | Copy Pydantic models from `hindsight_client_api.models` |
+| Rewrite `__init__` to match `Hindsight(base_url, api_key, ...)` | 1 hr | Accept base_url pointing to our SpacetimeDB gateway |
+| Implement `retain(bank_id, content, ...)` | 1 hr | Map bank_id → workspace, content → store_memory |
+| Implement `retain_batch(bank_id, items, ...)` | 1 hr | Bulk store via existing batch reducer |
+| Implement `recall(bank_id, query, ...)` with full param set | 2 hr | Map to search with all filters (tags, types, budget, etc.) |
+| Implement `reflect(bank_id, query, ...)` with full param set | 2 hr | Map to create_insight/LLM pathway |
+| Implement `retain_files(bank_id, files, ...)` | 1 hr | File content → text → retain |
+| Async variants (`aretain`, `arecall`, etc.) | 1 hr | async wrapper pattern |
+| Context manager (`__enter__`/`__exit__`) | 30 min | |
+| Remove `forget()` or map to low-level memory reset | 30 min | |
+| Return typed Pydantic models instead of dicts | 2 hr | Model all 7 response types |
+| Update comparison harness | 30 min | Re-run 5/6 comparison with accurate sigs |
+| Write integration tests | 2 hr | Test against mock or real SpacetimeDB |
 
-### Lane 3 — Compatibility matrix
+**Total:** ~14 hours
 
-**What:** Document, per adapter method, what's Supported / Mapped / Not Supported.
-**Why:** Users need to decide upfront if this project fits their use case instead of discovering gaps mid-migration.
+### Lane 2 — Honcho: rewrite to match `plastic-labs/honcho`
 
-- [ ] Create `ADAPTER_COMPAT.md` with a table per adapter:
+**Why:** Our adapter claims to match `honcho.Honcho` but the PyPI `honcho` is a Procfile manager. The real library is `honcho.Honcho` from `plastic-labs/honcho` (SDK at `sdks/python/src/honcho/client.py`). It's a workspace/peer/session-oriented API, not user/session.
 
-| Method | Status | Notes |
-|--------|--------|-------|
-| `add()` | ✅ Mapped | → `store_memory` |
-| `search()` | ✅ Mapped | → `hybrid_search` |
-| `get()` | ✅ Mapped | → SQL query by id |
-| `batch_update()` | ❌ Missing | Not yet implemented |
+**Real API reference (from source on GitHub):**
 
+```
+Honcho(workspace_id, base_url=None, *, environment="local" or "production",
+       http_config=...) — workspace-scoped
+    peer(id) → Peer                    # get or create peer by ID
+    peers() → SyncPage[Peer]           # list peers in workspace
+    session(id) → Session              # get or create session by ID
+    sessions() → SyncPage[Session]     # list sessions
+    workspaces() → SyncPage[str]       # list workspace IDs
+    delete_workspace()                 # delete current workspace
+    search(query) → SyncPage[SessionSearchResult]
+    queue_status() → QueueStatusResponse
+    schedule_dream(config)
+
+    # Async via .aio accessor:
+    .aio.peer(id) → PeerAio
+    .aio.search(query) → AsyncPage
+
+    # Metadata config:
+    metadata, configuration, get_configuration(), set_configuration(...)
+
+Peer:
+    metadata, messages(), chat(query, session, ...), sessions()
+
+Session:
+    metadata, peers(), add_peers([Peer]), messages(), 
+    chat(query, ...), context() → SessionContext,
+    configuration, get/set_configuration()
+```
+
+**Key differences from our adapter:**
+- No `create_user(name)` — use `peer(id)` to get or create
+- No `create_session(user_id, location)` — use `session(id)` to get or create
+- No `add(session_id, content)` — add messages via `peer.message()` or `session.add_messages()`
+- Return types are typed Pydantic models
+- `.aio` accessor for async operations
+- Workspace-scoped with metadata/config management
+- Real Honcho is a cloud service — our adapter would need to emulate the API
+
+| Item | Effort | Notes |
+|------|--------|-------|
+| Model all real types (Peer, Session, Message, SessionContext, etc.) | 2 hr | From `honcho.api_types` |
+| Rewrite `__init__` to match `Honcho(workspace_id, ...)` | 1 hr | workspace_id maps to our database identity |
+| Implement `peer(id)` → Peer | 1 hr | get-or-create pattern |
+| Implement `peers()` → SyncPage[Peer] | 1 hr | Paginated list |
+| Implement `session(id)` → Session | 1 hr | get-or-create pattern |
+| Implement `sessions()` → SyncPage[Session] | 1 hr | Paginated list |
+| Implement Peer.message(), Peer.chat() | 2 hr | Message storage + LLM query |
+| Implement Session.add_peers(), Session.messages(), Session.chat() | 2 hr | |
+| Implement `search(query)` | 1 hr | Cross-session search |
+| Implement `.aio` async accessor | 2 hr | Async wrappers for all methods |
+| Workspace metadata/config management | 1 hr | |
+| Return typed Pydantic models | 2 hr | |
+| Remove existing API methods (create_user, create_session, add) | 30 min | |
+| Update comparison harness | 30 min | |
+| Write integration tests | 2 hr | |
+
+**Total:** ~20 hours
+
+### Lane 3 — Quick wins before Phase II (common to all adapters)
+
+| Item | Effort |
+|------|--------|
+| Fix adapter docstrings that incorrectly claim "Matches the real XYZ SDK API" | 30 min |
+| Audit and fix all 6 adapter `__init__` signatures for upstream compat | 1 hr |
+| Standardise error handling pattern across all adapters (typed exceptions where upstream has them) | 2 hr |
+| Standardise return types — use dataclasses/Pydantic where upstream does | 3 hr |
+| Update comparison harness (`scripts/compare-upstream.py`) to test the RIGHT upstream APIs | 1 hr |
+| Run full comparison suite and document remaining gaps | 1 hr |
+
+**Total:** ~8 hours
+
+---
+
+## Phase II — Polish Close Adapters
+
+### Lane 4 — Mem0: 95% → 100%
+
+**Checking against real `mem0.Memory` (from `mem0ai` v2.0.4):**
+
+Already shared 7 keyword params on `add()`, return dict matches. Remaining gaps:
+
+| Item | Effort | Notes |
+|------|--------|-------|
+| Accept `MemoryConfig` in constructor alongside dict | 1 hr | Both `MemoryConfig` object and `dict` should work |
+| Verify `graph.add/search/get_all/delete` match upstream mem0 graph API | 1 hr | Graph API might differ from real mem0 |
+| Add `create_memory_tool()` for LangChain integration | 1 hr | Real mem0 has this |
+| Metadata dedup across adds (mem0 re-uses existing memories) | 2 hr | Complex — requires content hashing |
+| Fix return types to match upstream exactly | 1 hr | Compare field names/structures |
+| Update comparison harness | 30 min | |
+
+**Total:** ~7 hours
+
+### Lane 5 — Zep: 80% → 100%
+
+**Checking against real `zep_python.client.MemoryClient` (from `zep-python` v2.0.2):**
+
+| Item | Effort | Notes |
+|------|--------|-------|
+| Import and raise typed Zep exceptions (`NotFoundError`, `BadRequestError`, `ApiError`) | 1 hr | Our adapter currently uses generic RuntimeError/ValueError |
+| Add `add_session()` / `get_session()` methods | 2 hr | Real Zep has full session lifecycle |
+| Add fact support (`add_fact`, `list_facts`, `delete_fact`) | 2 hr | Required for feature parity |
+| Fix `search_memory()` to accept real Zep params | 1 hr | Real uses `min_score`, `lastn`, etc. |
+| Fix `get_memory()` to return typed `Memory` model | 1 hr | Pydantic model from real Zep |
+| Add `update_session()` / `list_sessions()` | 1 hr | |
+| Async variants where needed | 1 hr | |
+| Write integration tests | 2 hr | |
+
+**Total:** ~11 hours
+
+### Lane 6 — Graphiti: 75% → 100%
+
+**Checking against real `graphiti_core.Graphiti` (from `graphiti-core` v0.29.2):**
+
+| Item | Effort | Notes |
+|------|--------|-------|
+| Convert `EntityNode` to Pydantic model matching `graphiti_core.nodes.EntityNode` | 2 hr | Adding `uuid`, `labels`, `created_at`, `attributes` |
+| Convert `EntityEdge` to Pydantic model matching `graphiti_core.edges.EntityEdge` | 2 hr | Adding `uuid`, `episodes`, `reference_time` |
+| Remove extra `group_id` from `add_triplet` (make optional kwarg if kept) | 30 min | |
+| Add `search_filter` and `driver` params to `search()` | 30 min | |
+| Convert `AddTripletResults` to Pydantic model | 1 hr | |
+| Convert `AddEpisodeResults` to Pydantic model | 1 hr | |
+| Map `add_episode` LLM entity extraction (optional — real does it internally) | 4 hr | Complex LLM pipeline |
+| Write integration tests | 2 hr | |
+
+**Total:** ~13 hours
+
+---
+
+### LangGraph
+
+No further work needed — already a true drop-in at 100%. Type hint cosmetics (`Sequence[Any]` → `Iterable[Op]`) are optional.
+
+---
+
+## Phase III — Ship It
+
+### Lane 7 — Test infrastructure
+
+From old roadmap Lane 1 (unchanged, still valid):
+- [ ] `pytest` fixture that calls `spacetime publish` before integration tests
+- [ ] Clean data dir per test run
+- [ ] CI pipeline: Rust build + publish + pytest
+- [ ] CI on push to main + PRs
+
+### Lane 8 — Version pinning & dependency hardening
+
+From old roadmap Lane 2:
+- [ ] `.spacetime-version` file
+- [ ] `scripts/check-version.py`
+- [ ] Rust `rust-toolchain.toml`
+- [ ] Python lockfile
+
+### Lane 9 — Adapter compatibility matrix
+
+From old roadmap Lane 3 (update with accurate data):
+- [ ] Create `ADAPTER_COMPAT.md` with real per-method status per adapter
 - [ ] Add status badges per adapter to README
-- [ ] Add automated tests that enforce the matrix (each "Supported" method has a test)
+- [ ] Enforce via tests
 
-**Files:** `ADAPTER_COMPAT.md`, `sdk/python/tests/test_compat_matrix.py`
+### Lane 10 — Performance & benchmarks
 
-### Lane 4 — Kill silent failures
-
-**What:** Every operation that fails should surface clearly, not silently no-op.
-**Why:** The embedder and some reducer paths can fail silently or with confusing messages.
-
-- [ ] Audit all adapter methods for hidden no-ops (methods that accept args but never use them)
-- [ ] Add structured error wrapping so Python errors trace back to the exact reducer call
-- [ ] Logging should be on by default for unexpected failures, off for normal operation
-- [ ] Every adapter method documents which SpacetimeDB error it surfaces
-
-**Files:** `sdk/python/spacetime_memory/sdks/*.py`
-
----
-
-## Phase II — Adapter Parity
-
-### Lane 5 — Mem0 parity
-
-**Current:** 10 methods. Missing modern Mem0 features.
-
-**Gaps to fill (by severity):**
-
-| Method | Priority | Why |
-|--------|----------|-----|
-| `batch_update()` | High | Mem0 callers batch frequently |
-| `create_memory_tool()` | Medium | LangChain tool integration |
-| Memory `metadata` dedup across adds | Medium | Mem0 re-uses existing memories |
-| `get_history()` more complete | Low | Already have `history()` |
-| Custom LLM config support | Low | Mem0 allows per-user model config |
-
-**Also:** The standalone adapter at `sdk/adapters/mem0/` duplicates the SDK adapter at `sdk/python/spacetime_memory/sdks/mem0.py`. Pick one, delete the other, or document the difference.
-
-**Files:** `sdk/python/spacetime_memory/sdks/mem0.py`, `sdk/adapters/mem0/`, `sdk/python/tests/test_mem0_adapter.py`
-
-### Lane 6 — Zep parity
-
-**Current:** 12 methods. Missing facts and Cloud-specific features.
-
-**Gaps to fill:**
-
-| Method | Priority | Why |
-|--------|----------|-----|
-| `add_fact()` / `list_facts()` | High | Zep's core value prop |
-| `update_memory()` in Zep | Medium | Zep supports memory update |
-| `search_memory()` with `min_score` | Medium | Missing filter param |
-| `summarize_memory()` | Low | Zep Cloud feature |
-| Session classification | Low | Zep classifies sessions |
-
-**Files:** `sdk/python/spacetime_memory/sdks/zep.py`, `sdk/python/tests/test_zep_adapter.py`
-
-### Lane 7 — Graphiti parity
-
-**Current:** 15 methods. Best adapter but still missing features.
-
-**Gaps to fill:**
-
-| Method | Priority | Why |
-|--------|----------|-----|
-| Temporal edge diff tracking | High | Graphiti's unique feature |
-| `node_expansion()` | Medium | Returns expanded nodes |
-| `search()` with time range filter | Medium | Important for temporal queries |
-| Entity dedup during add_triplet | Medium | Graphiti dedups entities |
-| Community summary text | Low | LLM-generated summary per community |
-
-**Files:** `sdk/python/spacetime_memory/sdks/graphiti.py`, `sdk/python/tests/test_graphiti_adapter.py`
-
-### Lane 8 — Hindsight parity
-
-**Current:** 11 methods. Most complete adapter.
-
-**Gaps to fill:**
-
-| Method | Priority | Why |
-|--------|----------|-----|
-| `reflect()` with custom prompt templates | Medium | Hindsight supports template-based reflection |
-| `batch_retain()` dedup | Low | Minor optimization |
-| `stats()` more detailed | Low | Show tier distribution, etc. |
-
-**Files:** `sdk/python/spacetime_memory/sdks/hindsight.py`, `sdk/python/tests/test_hindsight_adapter.py` (new)
-
-### Lane 9 — Honcho parity
-
-**Current:** 21 methods. Good coverage.
-
-**Gaps to fill:**
-
-| Method | Priority | Why |
-|--------|----------|-----|
-| Session-level memory visibility | Medium | Honcho's `session.memories` |
-| User metadata API | Low | Honcho stores user metadata |
-| Memory update timestamp | Low | Already covered by backend |
-
-**Files:** `sdk/python/spacetime_memory/sdks/honcho.py`, `sdk/python/tests/test_honcho_adapter.py` (new)
-
-### Lane 10 — LangChain parity
-
-**Current:** 16 methods. Good coverage of BaseStore + BaseVectorStore.
-
-**Gaps to fill:**
-
-| Method | Priority | Why |
-|--------|----------|-----|
-| `BaseChatMemory` wrapper | Medium | Facilitates chat history use with LangChain |
-| `AIMessage` content dedup | Low | Edge case in chat history |
-
-**Files:** `sdk/python/spacetime_memory/sdks/langchain.py`, `sdk/python/tests/test_langchain_adapter.py`
-
----
-
-## Phase III — Production Polish
-
-### Lane 11 — HTTP gateway auth
-
-**What:** API key auth on the HTTP endpoints so you can expose the MCP server and Python SDK over a network without being wide open.
-**Why:** Currently anyone who can reach the port can call any reducer.
-
-- [x] **Python SDK + CLI:** `Client.create_api_key()`, `deactivate_api_key()`, `list_api_keys()` + `stmem apikey create|revoke|list`
-- [ ] Python FastAPI/Starlette gateway middleware (follow-up for full gateway proxy)
-- [ ] `stmem serve` or integrate into MCP server
-
-**Files:** `server/spacetimedb/src/auth.rs` (ApiKey table + reducers), `sdk/python/spacetime_memory/client.py`, `cli/stmem.py`
-
-### Lane 12 — Performance benchmarks
-
-**What:** Measure latency and throughput so users know what to expect.
-**Why:** Every call goes Python → HTTP → SpacetimeDB SQL API → WASM. That's heavy. Without benchmarks, users can't evaluate.
-
-- [x] **Benchmark suite**: `sdk/python/scripts/benchmark.py` (standalone script, 13 operations, p50/p90/p99)
-- [x] **Documentation**: `docs/PERFORMANCE.md` (setup, interpretation, expected results)
-- [ ] Run benchmarks and publish results for CI tracking
-
-**Files:** `sdk/python/scripts/benchmark.py`, `docs/PERFORMANCE.md`
-
-### Lane 13 — Documentation site
-
-**What:** Real docs, not just a README.
-**Why:** The README is already 265 lines and growing. Migration guides, API reference, and deployment docs need a proper home.
-
-- [x] **MkDocs site**: `mkdocs.yml` + `docs/` (index, getting-started, usage/adapters, usage/client, usage/cli, usage/self-hosted, api/, development)
-- [ ] MkDocs CI workflow for GitHub Pages
-- [ ] Auto-generated API reference via mkdocstrings
-- [ ] Migration guides (adapter-specific)
-
-**Files:** `docs/`, `mkdocs.yml`, `.github/workflows/docs.yml`
-
-### Lane 14 — Docker deployment
-
-**What:** One `docker compose up` that starts SpacetimeDB + embedder + MCP.
-**Why:** The Docker setup is overly complex (multi-stage builder, separate images for module and embedder) and the startup sequence is fragile.
-
-- [x] **HEALTHCHECK** in Dockerfile (port 3001 TCP probe, 30s startup period)
-- [x] **healthcheck** in docker-compose.yml
-- [ ] `.env` file for config
-- [ ] Remove stale Docker build scripts (consolidate into `docker/`)
-
-**Files:** `compose.yaml`, `Dockerfile`
-
-### Lane 15 — Consolidated adapter package
-
-**What:** One import path, no split between `sdk/python/` and `sdk/adapters/`.
-**Why:** The standalone Mem0 adapter in `sdk/adapters/mem0/` duplicates the SDK adapter and there's no clear split.
-
-- [x] **PyPI-ready**: `setup.py` v1.0.0, `pyproject.toml` with build-system, `MANIFEST.in`, publish workflow (`.github/workflows/publish.yml`)
-- [ ] Decide: drop standalone adapter, or keep as separate thin wrapper
-- [ ] If keeping standalone, document the distinction
-- [ ] Actually publish to PyPI (`twine upload dist/*`)
+From old roadmap Lane 12 (update with adapter-specific benchmarks):
+- [ ] Benchmark each adapter's core methods
+- [ ] Publish results for CI tracking
 
 ---
 
 ## Phase IV — Ecosystem
 
-### Lane 16 — Connector polish
-
-**What:** The connector framework exists (RSS, GitHub, Twitter, Webhook, Slack, Discord) but needs production hardening.
-**Why:** Connectors are the main data ingestion path.
-
-- [x] **Retry with backoff**: `Connector._retry_client_call()` — exponential backoff + jitter for all HTTP-based connectors
-- [x] **Rate-limit handling**: Slack (Retry-After), Discord (retry_after in body), GitHub (X-RateLimit-Remaining), Notion (existing)
-- [x] **Persistent cursors**: `Connector._cursor` with JSON file store at `~/.spacetime-memory/connectors/<ClassName>_cursor.json`
-- [x] **Logging**: `self._log` logger per connector class, replacing all `print()` calls
-- [x] **Health reporting**: `Connector.last_status()` + `ConnectorRegistry.get_health()`
-- [x] **Tests**: 23 connector tests pass (all 8 connector types + registry + base)
-
-### Lane 17 — In-process embedder
-
-**What:** An optional pure-Python or ONNX-Runtime embedder to remove the Rust sidecar dependency.
-**Why:** The sidecar is a massive dependency (tract, all-MiniLM-L6-v2, must compile). Many users will want to skip it entirely.
-
-- [x] `LocalEmbedder` class in `sdk/python/spacetime_memory/local_embedder.py`
-- [x] Integrated into `Client._embed()` with `embedder_type='python'`
-- [x] Optional dep: `pip install spacetime-memory[local-embed]`
-- [x] Lazy init, ~10MB model download on first use via huggingface-hub
-
-### Lane 18 — Replication & HA
-
-**What:** Multi-node SpacetimeDB is experimental. Document the story and add support for the replication table.
-**Why:** The `replication_peer` and `replication_log` tables exist already but have no Python-level support and no docs.
-
-- [x] `stmem replication add-peer`, `stmem replication list`, `stmem replication status` CLI commands
-- [x] `docs/replication.md` with setup guide
-
-### Lane 19 — Community & contributions
-
-**What:** CONTRIBUTING.md, issue templates, RFC process for new adapters.
-
-- [x] Issue templates: `bug_report.md`, `feature_request.md`, `adapter_request.md`
-- [x] `docs/development.md` enriched with contributor guide
-- [x] `docs/adapter-authoring-guide.md` — how to write a new drop-in adapter
+From old roadmap:
+- Lane 16 — Connector polish (✅ done)
+- Lane 17 — In-process embedder (✅ done)
+- Lane 18 — Replication & HA (✅ done)
+- Lane 19 — Community docs (✅ done)
+- PyPI publishing (deferred by user)
 
 ---
 
 ## Effort Estimate
 
-| Phase | Lanes | Estimated time | Parallelizable |
-|-------|-------|----------------|----------------|
-| I | 1–4 | 1–2 weeks | Partially (1→2→3→4 sequential) |
-| II | 5–10 | 2–3 weeks | Yes — each adapter is independent |
-| III | 11–15 | 1–2 weeks | Mostly parallel |
-| IV | 16–19 | Ongoing | Independent |
+| Phase | Lanes | Effort | Parallelizable |
+|-------|-------|--------|----------------|
+| I — Fix Wrong Adapters | 1–3 | 42 hours | Partially (hindsight + honcho in parallel) |
+| II — Polish Close Adapters | 4–6 | 31 hours | Yes — each adapter is independent |
+| III — Ship It | 7–10 | 1 week | Mostly parallel |
+| IV — Ecosystem | — | Ongoing | Independent |
 
-**Total to "production-ready drop-in replacement": ~6–8 weeks focused.**
+**Total to true 100% drop-in across all 6 adapters:** ~73 hours of work.
 
 ---
 
-## Quick wins (can do today)
+## Priority Order (recommended execution)
 
-| Task | Time |
-|------|------|
-| Publish module before integration tests | 30 min |
-| Add `ADAPTER_COMPAT.md` | 1 hour |
-| Kill the duplicate standalone adapter | 15 min |
-| Pin SpacetimeDB version in docs | 10 min |
+1. **Lane 3 (quick wins)** — fix docstrings, standardise error handling/return types across all adapters. Gets us credibility fast.
+2. **Lane 1 (hindsight rewrite)** — biggest gap, highest visibility. The real library is a REST client — once we accept that, rewrite is straightforward.
+3. **Lane 2 (honcho rewrite)** — second biggest gap. Same pattern: accept the real API shape and build it.
+4. **Lane 5 (zep)** — exception types first (quick win), then facts + session methods.
+5. **Lane 6 (graphiti)** — Pydantic models for EntityNode/Edge, add missing fields.
+6. **Lane 4 (mem0)** — MemoryConfig acceptance, graph API verification.
+7. **Lanes 7–10** — infrastructure, CI, benchmarks.
