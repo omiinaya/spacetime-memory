@@ -48,14 +48,17 @@ class Honcho:
 
     """
 
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: dict | None = None, client: Client | None = None):
         config = config or {}
-        self._client = Client(
-            host=config.get("host"),
-            port=config.get("port"),
-            database=config.get("db", config.get("database")),
-            embedder_url=config.get("embedder_url"),
-        )
+        if client is not None:
+            self._client = client
+        else:
+            self._client = Client(
+                host=config.get("host"),
+                port=config.get("port"),
+                database=config.get("db", config.get("database")),
+                embedder_url=config.get("embedder_url"),
+            )
         self._user_cache: dict[str, User] = {}
         self._session_cache: dict[str, Session] = {}
         self._auto_cache_users()

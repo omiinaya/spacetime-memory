@@ -62,6 +62,65 @@ pub struct Memory {
     pub user_scope: String,
 }
 
+/// Input struct for store_memory_batch
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StoreMemoryItem {
+    pub workspace_id: String,
+    pub peer_id: String,
+    pub observer_id: String,
+    pub memory_type: String,
+    pub content: String,
+    pub summary: String,
+    pub entities_json: String,
+    pub confidence: f64,
+    pub source_session_id: String,
+    pub source_message_id: String,
+}
+
+#[reducer]
+pub fn store_memory_batch(
+    ctx: &ReducerContext,
+    items_json: String,
+) -> Result<(), String> {
+    let items: Vec<StoreMemoryItem> = serde_json::from_str(&items_json)
+        .map_err(|e| format!("Invalid batch items JSON: {}", e))?;
+    let caller = ctx.sender().to_hex();
+    let now = now_micros(ctx);
+    for item in items {
+        check_space_access(ctx, &item.workspace_id, &caller, "editor")?;
+        let id = uuid_v4(ctx);
+        let mem = Memory {
+            id,
+            workspace_id: item.workspace_id,
+            peer_id: item.peer_id,
+            observer_id: item.observer_id,
+            memory_type: item.memory_type,
+            content: item.content,
+            summary: item.summary,
+            entities_json: item.entities_json,
+            confidence: item.confidence,
+            source_session_id: item.source_session_id,
+            source_message_id: item.source_message_id,
+            is_active: true,
+            created_at: now,
+            expires_at: 0,
+            updated_at: now,
+            tier: String::from("L1"),
+            access_count: 0,
+            strength: 0.5,
+            version: 1,
+            valid_from: 0,
+            parent_directory_id: String::new(),
+            consolidated_to: String::new(),
+            trust_score: 0.5,
+            feedback_count: 0,
+            user_scope: String::new(),
+        };
+        ctx.db.memory().insert(mem);
+    }
+    Ok(())
+}
+
 #[reducer]
 pub fn store_memory(
     ctx: &ReducerContext,

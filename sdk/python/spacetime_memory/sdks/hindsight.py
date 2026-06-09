@@ -64,9 +64,13 @@ class Hindsight:
         self,
         config: dict | None = None,
         token_refresh_callback: Callable[[], str] | None = None,
+        client: Client | None = None,
     ):
         config = config or {}
-        self._client = Client(
+        if client is not None:
+            self._client = client
+        else:
+            self._client = Client(
             host=config.get("host"),
             port=config.get("port"),
             database=config.get("db", config.get("database")),
@@ -438,9 +442,9 @@ class Hindsight:
             # No memories — return a graceful empty insight
             llm_response = "[No memories available to reflect on.]"
             try:
-                self._call(
-                    "_call", "create_insight",
-                    [ws_id, "hindsight_reflection", prompt, "synthesized", "{}"],
+                self._client._call(
+                    "create_insight",
+                    [ws_id, "hindsight_reflection", prompt, "synthesized", "{}", 0.5],
                 )
             except Exception:
                 pass
@@ -513,9 +517,9 @@ class Hindsight:
             except Exception as exc:
                 llm_response = f"[Reflection LLM call failed: {exc}]"
 
-        result = self._call(
-            "_call", "create_insight",
-            [ws_id, "hindsight_reflection", prompt, "synthesized", "{}"],
+        result = self._client._call(
+            "create_insight",
+            [ws_id, "hindsight_reflection", prompt, "synthesized", "{}", 0.5],
         )
         ret: dict[str, Any] = {
             "status": "ok",

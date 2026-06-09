@@ -712,6 +712,99 @@ class Client:
 
         return result
 
+    def store_batch(
+        self,
+        workspace_id: str,
+        items: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Store multiple memories in a single reducer call.
+
+        Embeds all items in one batch call to the embedder, then sends a
+        single ``store_memory_batch`` reducer with all items.  Much faster
+        than N sequential ``store()`` calls when the embedder sidecar is
+        the bottleneck.
+
+        Args:
+            workspace_id: Target workspace UUID.
+            items: List of dicts, each with:
+                - ``content`` (str, required)
+                - ``summary`` (str, optional)
+                - ``memory_type`` (str, default ``"experience"``)
+                - ``peer_id`` (str, optional)
+                - ``observer_id`` (str, optional)
+                - ``entities_json`` (str, optional)
+                - ``confidence`` (float, default 0.8)
+                - ``source_session_id`` (str, optional)
+                - ``source_message_id`` (str, optional)
+
+        Returns:
+            List of reducer result dicts.
+        """
+        # Extract contents for batch embedding
+        contents = []
+        clean_items = []
+        for item in items:
+            content = item.get("content", "")
+            if not content:
+                continue
+            contents.append(content)
+            clean_items.append({
+                "workspace_id": workspace_id,
+                "peer_id": item.get("peer_id", ""),
+                "observer_id": item.get("observer_id", ""),
+                "memory_type": item.get("memory_type", "experience"),
+                "content": content,
+                "summary": item.get("summary", content[:200]),
+                "entities_json": item.get("entities_json", "[]"),
+                "confidence": item.get("confidence", 0.8),
+                "source_session_id": item.get("source_session_id", ""),
+                "source_message_id": item.get("source_message_id", ""),
+            })
+
+        if not clean_items:
+            return []
+
+        # Batch-embed
+        try:
+            import json
+            resp = self._http.post(
+                f"{self.embedder_url}/embed",
+                content=json.dumps({"texts": contents}),
+                headers={"Content-Type": "application/json"},
+                timeout=max(10.0 * len(contents), 30.0),
+            )
+            if resp.status_code < 400:
+                emb_list = resp.json().get("embeddings", [])
+                if not emb_list and resp.json().get("embedding"):
+                    emb_list = [resp.json().get("embedding", [])]
+            else:
+                emb_list = []
+        except Exception:
+            emb_list = []
+
+        # Call batch reducer — pass items as JSON string
+        import json as _j
+        self._call("store_memory_batch", [_j.dumps(clean_items)])
+
+        # Index each item with its embedding
+        for i, item in enumerate(clean_items):
+            emb = emb_list[i] if i < len(emb_list) else None
+            if emb:
+                mems = self._sql(
+                    "SELECT id FROM memory WHERE "
+                    f"workspace_id = '{_esc(workspace_id)}' AND "
+                    f"content = '{_esc(item['content'][:100])}' "
+                    "ORDER BY created_at DESC LIMIT 1"
+                )
+                if mems:
+                    import json as _json
+                    self._call("index_entity", [
+                        workspace_id, "memory", mems[0]["id"],
+                        item["content"], _json.dumps(emb),
+                    ])
+
+        return [{"status": "ok"} for _ in clean_items]
+
     def search(
         self,
         workspace_id: str,
@@ -941,12 +1034,25 @@ class Client:
         ])
 
     def get_memory_history(self, memory_id: str) -> list[dict[str, Any]]:
-        """Get version history for a memory. Mem0 parity."""
-        return self._sql(
-            "SELECT * FROM memory_version WHERE "
-            f"memory_id = '{_esc(memory_id)}' "
-            "ORDER BY version DESC"
+        """Get version history for a memory. Mem0 parity.
+
+        Returns the current state as a single-version history entry
+        (SpacetimeDB doesn't store version snapshots).
+        """
+        rows = self._sql(
+            "SELECT id, content, summary, version, updated_at, confidence "
+            f"FROM memory WHERE id = '{_esc(memory_id)}'"
         )
+        if rows:
+            r = rows[0]
+            return [{
+                "version": r.get("version", 1),
+                "content": r.get("content", ""),
+                "summary": r.get("summary", ""),
+                "confidence": r.get("confidence", 1.0),
+                "updated_at": r.get("updated_at", 0),
+            }]
+        return []
 
     # -----------------------------------------------------------------------
     # Search with metadata/location filters (Honcho parity)
