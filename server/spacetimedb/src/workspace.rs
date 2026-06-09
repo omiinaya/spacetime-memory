@@ -40,7 +40,7 @@ pub struct SpacePermission {
 pub fn create_workspace(ctx: &ReducerContext, name: String, description: String, id: String) -> Result<(), String> {
     let now = now_micros(ctx);
     let workspace_id = if id.is_empty() { uuid_v4(ctx) } else { id };
-    let caller = ctx.sender().to_hex();
+    let caller = ctx.sender().to_hex().to_string();
 
     ctx.db.workspace().insert(Workspace {
         id: workspace_id.clone(),

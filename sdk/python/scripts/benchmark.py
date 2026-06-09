@@ -56,9 +56,9 @@ def _running_stdb() -> bool:
 
 
 def _publish_module(delete_data: str = "on-conflict") -> str:
-    """Run ``spacetime publish`` and return the database name.
+    """Publish the WASM module via HTTP API and return the database identity.
 
-    Uses workspace identity or the default token for consistent auth.
+    Uses anonymous HTTP API publish (same approach as updated conftest.py).
     """
     module_dir = _repo_root / "server" / "spacetimedb"
     if not module_dir.exists():
@@ -67,37 +67,57 @@ def _publish_module(delete_data: str = "on-conflict") -> str:
             "Run this script from the repo root or check the path."
         )
 
-    result = subprocess.run(
-        [
-            "spacetime", "publish",
-            "--server", "http://127.0.0.1:3001",
-            "--yes=all",
-            f"--delete-data={delete_data}",
-            "spacetime-memory",
-        ],
-        cwd=str(module_dir),
-        capture_output=True,
-        text=True,
-        timeout=120,
+    wasm_path = (
+        module_dir / "target" / "wasm32-unknown-unknown" / "release"
+        / "spacetime_memory.opt.wasm"
     )
-    if result.returncode != 0:
+    if not wasm_path.exists():
+        wasm_path = (
+            module_dir / "target" / "wasm32-unknown-unknown" / "release"
+            / "spacetime_memory.wasm"
+        )
+    if not wasm_path.exists():
+        raise RuntimeError(f"WASM module not found at {wasm_path}. Build first.")
+
+    wasm_data = wasm_path.read_bytes()
+    import httpx
+
+    # Establish anonymous identity
+    anon = httpx.get(
+        "http://127.0.0.1:3001/v1/database/anon-probe", timeout=5.0,
+    )
+    token = anon.headers.get("spacetime-identity-token", "")
+
+    headers = {"Content-Type": "application/octet-stream"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    url = "http://127.0.0.1:3001/v1/database?host_type=Wasm"
+    if delete_data == "always":
+        url += "&delete_data=true"
+
+    resp = httpx.post(url, headers=headers, content=wasm_data, timeout=60.0)
+    if resp.status_code >= 400:
         raise RuntimeError(
-            f"spacetime publish failed (exit={result.returncode}):\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}"
+            f"Publish via HTTP API failed (HTTP {resp.status_code}):\n{resp.text[:500]}"
         )
 
-    for line in result.stdout.splitlines():
-        if "identity:" in line:
-            return line.split("identity:")[-1].strip()
-    # Fall back to the database name if identity parsing fails
+    data = resp.json()
+    if "Success" in data:
+        return data["Success"].get("database_identity", "spacetime-memory")
+    if "Database" in data:
+        return data["Database"].get("database_identity", "spacetime-memory")
+    if isinstance(data, dict):
+        for key in ("database_identity", "identity"):
+            if key in data:
+                return data[key]
     return "spacetime-memory"
 
 
 def _get_client() -> Client:
     """Create a connected Client to a freshly published database.
 
-    Mirrors the ``stdb_client`` fixture from conftest.py.
+    Uses anonymous identity (no JWT) — same approach as updated conftest.py.
     """
     force = os.environ.get("SPACETIMEDB_HOST", "")
     if not force and not _running_stdb():
@@ -108,16 +128,12 @@ def _get_client() -> Client:
         )
         sys.exit(1)
 
-    _publish_module(delete_data="always")
-
-    # Generate a token from the project's key pair, if available
-    token = _generate_test_token()
+    db_identity = _publish_module(delete_data="always")
 
     return Client(
         host=os.environ.get("SPACETIMEDB_HOST", "localhost"),
         port=os.environ.get("SPACETIMEDB_PORT", "3001"),
-        database="spacetime-memory",
-        token=token,
+        database=db_identity,
     )
 
 
