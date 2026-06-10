@@ -9,7 +9,7 @@ from .graphiti import (
     Graphiti,
     SearchResults,
 )
-from .honcho import Honcho
+from .honcho import Honcho, Peer, Session, Message, SyncPage
 from .hindsight import (
     Hindsight,
     RetainResponse,
@@ -30,6 +30,10 @@ from .zep import ZepClient, MemoryMessage, Memory, MemorySearchResult, Session
 __all__ = [
     "Mem0Memory",
     "Honcho",
+    "Peer",
+    "Session",
+    "Message",
+    "SyncPage",
     "Hindsight",
     "RetainResponse",
     "RecallResponse",

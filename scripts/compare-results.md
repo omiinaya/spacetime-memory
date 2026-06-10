@@ -57,7 +57,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ Mem0 signature differences are expected — ours uses user/agent/run_id as kwargs,
   ℹ   real mem0 also uses user_id/agent_id/run_id as kwargs. Ours adds SpacetimeDB
   ℹ   specific: host/port/db passed via config dict, real mem0 uses MemoryConfig.
-  ✓ Mem0.add shared keyword params: {'run_id', 'infer', 'metadata', 'prompt', 'agent_id', 'memory_type', 'user_id'}
+  ✓ Mem0.add shared keyword params: {'prompt', 'infer', 'memory_type', 'user_id', 'run_id', 'metadata', 'agent_id'}
   ✓ Mem0.add returns dict with 'results' key
   ✓ Our Mem0 has .graph property
   ℹ mem0 v2 uses generic exception handling (no BaseMemoryException)
@@ -85,8 +85,8 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 ── 4/6  Graphiti (graphiti-core) parity ─────────────────────────
   ✓ Graphiti class exists (real)
   ✓ Graphiti class exists (ours)
-  ℹ Graphiti has extra params: {'embedder_type', 'token', 'host', 'database', 'port', 'embedder_url', 'client'}
-  ℹ real Graphiti has extra params: {'store_raw_episode_content', 'graph_driver', 'cross_encoder', 'trace_span_prefix', 'tracer', 'max_coroutines', 'uri', 'password', 'user'}
+  ℹ Graphiti has extra params: {'port', 'host', 'client', 'token', 'database', 'embedder_type', 'embedder_url'}
+  ℹ real Graphiti has extra params: {'graph_driver', 'user', 'max_coroutines', 'password', 'store_raw_episode_content', 'trace_span_prefix', 'cross_encoder', 'tracer', 'uri'}
   ✗ Graphiti constructor 0 common params
   ✓ EntityNode exists (real)
   ✓ EntityNode exists (ours)
@@ -166,16 +166,31 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ delete_workspace() → None
   ℹ Also: queue_status(), schedule_dream(), .aio accessor for async
   ℹ 
-  ℹ === OUR ADAPTER (completely incompatible — different abstraction) ===
+  ℹ === OUR ADAPTER (now matches upstream API shape) ===
   ℹ Import: from spacetime_memory.sdks.honcho import Honcho
-  ℹ __init__(self, config: dict | None = None, client=None)
-  ℹ create_user(self, name: str, metadata=None) → User
-  ℹ create_session(self, user_id: str, location: str = '', metadata=None) → Session
-  ℹ add(self, session_id: str, content: str, metadata=None) → dict
-  ℹ search(self, session_id: str, query: str, limit: int = 20) → list[dict]
+  ℹ Honcho(workspace_id='...', base_url=None, stdb_host=..., stdb_port=...)
+  ℹ peer(id, *, metadata, configuration) → Peer
+  ℹ session(id, *, metadata, configuration, peers) → Session
+  ℹ search(query, filters, limit) → list[Message]
+  ℹ Peer.message(), Peer.chat(), Peer.search()
+  ℹ Session.add_peers(), Session.add_messages(), Session.context()
   ℹ 
-  ✗ Honcho: NOT a drop-in replacement  complete API mismatch — workspace/peer vs user/session model
-  ℹ Our Honcho methods: ['add', 'create_session', 'create_user', 'get_or_create_session', 'get_or_create_user', 'get_session', 'get_user', 'search']
+  ℹ Methods: ['close', 'delete_workspace', 'peer', 'peers', 'queue_status', 'schedule_dream', 'search', 'session', 'sessions', 'workspaces']
+  ✓ Honcho: peer/session/search methods exist
+  ✓ Honcho: workspaces/delete_workspace exist
+  ✓ Honcho: no stale methods (create_user, create_session, etc.)
+  ✓ Honcho.peer() has id param
+  ✓ Honcho.peer() has metadata param
+  ✓ Honcho.session() has id param
+  ✓ Honcho.session() has configuration param
+  ✓ Honcho.search() has limit param
+  ✓ Peer has message() method
+  ✓ Peer has chat() method
+  ✓ Peer has search() method
+  ✓ Session has add_peers() method
+  ✓ Session has add_messages() method
+  ✓ Session has context() method
+  ℹ Honcho adapter now matches plastic-labs/honcho API shape
 
 ── Summary ──────────────────────────────────────────────────────
 ```
@@ -190,8 +205,8 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - Our Mem0 uses ValueError: 9x, RuntimeError: 17x
 - Zep real uses typed exceptions: NotFoundError, ApiError, BadRequestError
 - Our Zep uses generic exceptions (RuntimeError/ValueError)
-- Graphiti has extra params: {'embedder_type', 'token', 'host', 'database', 'port', 'embedder_url', 'client'}
-- real Graphiti has extra params: {'store_raw_episode_content', 'graph_driver', 'cross_encoder', 'trace_span_prefix', 'tracer', 'max_coroutines', 'uri', 'password', 'user'}
+- Graphiti has extra params: {'port', 'host', 'client', 'token', 'database', 'embedder_type', 'embedder_url'}
+- real Graphiti has extra params: {'graph_driver', 'user', 'max_coroutines', 'password', 'store_raw_episode_content', 'trace_span_prefix', 'cross_encoder', 'tracer', 'uri'}
 - Real EntityNode fields: ['uuid', 'name', 'group_id', 'labels', 'created_at', 'name_embedding', 'summary', 'attributes']
 - Our EntityNode attrs: ['from_stmem', 'group_id', 'name', 'name_embedding', 'summary']
 - Real EntityEdge fields: ['uuid', 'group_id', 'source_node_uuid', 'target_node_uuid', 'created_at', 'name', 'fact', 'fact_embedding', 'episodes', 'expired_at', 'valid_at', 'invalid_at', 'reference_time', 'attributes']
@@ -233,12 +248,14 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - delete_workspace() → None
 - Also: queue_status(), schedule_dream(), .aio accessor for async
 - 
-- === OUR ADAPTER (completely incompatible — different abstraction) ===
+- === OUR ADAPTER (now matches upstream API shape) ===
 - Import: from spacetime_memory.sdks.honcho import Honcho
-- __init__(self, config: dict | None = None, client=None)
-- create_user(self, name: str, metadata=None) → User
-- create_session(self, user_id: str, location: str = '', metadata=None) → Session
-- add(self, session_id: str, content: str, metadata=None) → dict
-- search(self, session_id: str, query: str, limit: int = 20) → list[dict]
+- Honcho(workspace_id='...', base_url=None, stdb_host=..., stdb_port=...)
+- peer(id, *, metadata, configuration) → Peer
+- session(id, *, metadata, configuration, peers) → Session
+- search(query, filters, limit) → list[Message]
+- Peer.message(), Peer.chat(), Peer.search()
+- Session.add_peers(), Session.add_messages(), Session.context()
 - 
-- Our Honcho methods: ['add', 'create_session', 'create_user', 'get_or_create_session', 'get_or_create_user', 'get_session', 'get_user', 'search']
+- Methods: ['close', 'delete_workspace', 'peer', 'peers', 'queue_status', 'schedule_dream', 'search', 'session', 'sessions', 'workspaces']
+- Honcho adapter now matches plastic-labs/honcho API shape

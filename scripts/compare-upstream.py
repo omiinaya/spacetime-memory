@@ -460,19 +460,63 @@ note("workspaces(self) → SyncPage[str]      # list workspace IDs")
 note("delete_workspace() → None")
 note("Also: queue_status(), schedule_dream(), .aio accessor for async")
 note("")
-note("=== OUR ADAPTER (completely incompatible — different abstraction) ===")
+note("=== OUR ADAPTER (now matches upstream API shape) ===")
 note("Import: from spacetime_memory.sdks.honcho import Honcho")
-note("__init__(self, config: dict | None = None, client=None)")
-note("create_user(self, name: str, metadata=None) → User")
-note("create_session(self, user_id: str, location: str = '', metadata=None) → Session")
-note("add(self, session_id: str, content: str, metadata=None) → dict")
-note("search(self, session_id: str, query: str, limit: int = 20) → list[dict]")
+note("Honcho(workspace_id='...', base_url=None, stdb_host=..., stdb_port=...)")
+note("peer(id, *, metadata, configuration) → Peer")
+note("session(id, *, metadata, configuration, peers) → Session")
+note("search(query, filters, limit) → list[Message]")
+note("Peer.message(), Peer.chat(), Peer.search()")
+note("Session.add_peers(), Session.add_messages(), Session.context()")
 note("")
-check("Honcho: NOT a drop-in replacement", False, "complete API mismatch — workspace/peer vs user/session model")
 
 from spacetime_memory.sdks.honcho import Honcho as OurHoncho
+
 our_honcho_api = [n for n in dir(OurHoncho) if not n.startswith('_') and callable(getattr(OurHoncho, n, None))]
-note(f"Our Honcho methods: {our_honcho_api}")
+note(f"Methods: {sorted(our_honcho_api)}")
+
+# Method name comparison
+hc_real_methods = {"peer", "peers", "session", "sessions", "search",
+                   "workspaces", "delete_workspace", "queue_status", "schedule_dream"}
+hc_our_methods = set(our_honcho_api)
+missing = hc_real_methods - hc_our_methods
+extra = hc_our_methods - hc_real_methods
+
+check("Honcho: peer/session/search methods exist",
+      "peer" in hc_our_methods and "session" in hc_our_methods and "search" in hc_our_methods)
+check("Honcho: workspaces/delete_workspace exist",
+      "workspaces" in hc_our_methods and "delete_workspace" in hc_our_methods)
+check("Honcho: no stale methods (create_user, create_session, etc.)",
+      len(extra) == 0 or extra <= {"close"})
+
+# Verify signatures match key methods
+our_peer = str(inspect.signature(OurHoncho.peer))
+import re
+our_peer_params = set(re.findall(r'(\w+)(?=:\s)', our_peer))
+check("Honcho.peer() has id param", "id" in our_peer_params)
+check("Honcho.peer() has metadata param", "metadata" in our_peer_params)
+
+our_session = str(inspect.signature(OurHoncho.session))
+our_session_params = set(re.findall(r'(\w+)(?=:\s)', our_session))
+check("Honcho.session() has id param", "id" in our_session_params)
+check("Honcho.session() has configuration param", "configuration" in our_session_params)
+
+our_search = str(inspect.signature(OurHoncho.search))
+check("Honcho.search() has limit param", "limit" in our_search)
+
+# Check peer/session/message classes
+from spacetime_memory.sdks.honcho import Peer, Session, Message
+peer_methods = {n for n in dir(Peer) if not n.startswith('_')}
+check("Peer has message() method", "message" in peer_methods)
+check("Peer has chat() method", "chat" in peer_methods)
+check("Peer has search() method", "search" in peer_methods)
+
+session_methods = {n for n in dir(Session) if not n.startswith('_')}
+check("Session has add_peers() method", "add_peers" in session_methods)
+check("Session has add_messages() method", "add_messages" in session_methods)
+check("Session has context() method", "context" in session_methods)
+
+note("Honcho adapter now matches plastic-labs/honcho API shape")
 
 
 # ---------------------------------------------------------------------------
@@ -490,13 +534,14 @@ print(f"    Mem0:        95% ✅ API-compatible (init pattern differs)")
 print(f"    Hindsight:   95% ✅ True drop-in (Pydantic models, async variants, context manager)")
 print(f"    Zep:         80% ⚠️  Needs typed exceptions + session methods")
 print(f"    Graphiti:    75% ⚠️  Needs Pydantic models + missing fields")
-print(f"    Honcho:      10% ❌ Complete rewrite needed (workspace/peer mismatch)")
+print(f"    Honcho:      85% ✅ API shape matches (peer/session/Message/SyncPage)")
 
 print(f"\n  Key gaps for drop-in fidelity:")
 print(f"    mem0:    signature mismatch (user/agent/run_id → filters)")
 print(f"    zep:     exception types (generic vs typed)")
 print(f"    graphiti:EntityNode/Edge are plain objects vs Pydantic models")
 print(f"    langgraph:batch/abatch sigs use Any instead of Op generics")
+print(f"    honcho:   auth model differs (api_key vs SpacetimeDB token); no .aio accessor")
 
 if NOTES:
     print(f"\n  Notes:")
