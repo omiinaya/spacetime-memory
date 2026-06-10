@@ -404,11 +404,12 @@ class Memory:
         limit: int = 5,
     ) -> list[str]:
         """Search the KG for entities relevant to *query* and return labels."""
+        ws_id = self._ws(user_id)
         try:
-            ws_id = self._ws(user_id)
             rows = self._call("query_graph", workspace_id=ws_id, query=query)
             return [r.get("label", "") for r in rows[:limit] if r.get("label")]
-        except Exception:
+        except Exception as exc:
+            logger.warning("_GraphStore.search() failed: %s", exc)
             return []
 
     # -------------------------------------------------------------------
@@ -523,8 +524,8 @@ class Memory:
                                     "update_memory", mem_id,
                                     json.dumps({"extracted_facts": facts}),
                                 )
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning("Failed to update memory with KG facts: %s", exc)
                     return {
                         "results": [{
                             "id": mem_id,
@@ -543,8 +544,8 @@ class Memory:
                     llm = self._resolve_llm_for(user_id)
                     if llm and llm.available:
                         extracted_facts = llm.extract_facts(content)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("LLM fact extraction failed: %s", exc)
 
             meta = {}
             if extracted_facts:

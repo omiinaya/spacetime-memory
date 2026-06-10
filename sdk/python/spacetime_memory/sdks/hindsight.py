@@ -26,12 +26,15 @@ from __future__ import annotations
 import asyncio
 import datetime
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 from ..client import Client
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Response types — exact match to hindsight_client_api.models (v0.8.1)
@@ -202,13 +205,22 @@ class ListMemoryUnitsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _run_async(coro):
-    """Run an async coroutine synchronously."""
+    """Run an async coroutine synchronously.
+
+    Uses ``asyncio.run()`` when no event loop is running (safe in threads,
+    sync scripts, REPL).  If an event loop IS running (Jupyter, FastAPI,
+    async test), raises ``RuntimeError`` — use ``await`` on the async
+    variant directly instead.
+    """
     try:
-        loop = asyncio.get_event_loop()
+        asyncio.get_running_loop()
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
+        # No loop running — safe to use asyncio.run()
+        return asyncio.run(coro)
+    raise RuntimeError(
+        "Cannot call sync wrapper from async context. "
+        "Use the async variant directly: await client.aretain(...)"
+    )
 
 
 def _make_op_id() -> str:
@@ -362,8 +374,8 @@ class Hindsight:
             ws_id = self._ensure_bank(bank_id)
             try:
                 self._client.store(ws_id, content=text, summary=merged.get("context", ""))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("retain_files() failed to store %s: %s", file_path, exc)
 
         return FileRetainResponse(operation_ids=operation_ids)
 
@@ -507,8 +519,8 @@ class Hindsight:
                 self._client.store(ws_id, content=content, summary=summary,
                                    entities_json=entities_json)
                 count += 1
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("aretain_batch() failed to store item: %s", exc)
 
         return RetainResponse(
             success=True, bank_id=bank_id, items_count=count,
@@ -546,18 +558,19 @@ class Hindsight:
             rows = self._client.search(
                 ws_id, query=query, limit=limit, semantic=True,
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("arecall() search failed: %s", exc)
             rows = []
 
         results: list[RecallResult] = []
-        for i, r in enumerate(rows):
-            content = r.get("memory_content", r.get("content", ""))
+        for i, row in enumerate(rows[:10]):
+            content = row.get("memory_content", row.get("content", ""))
             results.append(RecallResult(
-                id=r.get("id", r.get("entity_id", str(i))),
+                id=row.get("id", row.get("entity_id", str(i))),
                 text=content,
-                type=r.get("entity_type", "experience"),
-                score=r.get("score", 0.0),
-                context=r.get("context"),
+                type=row.get("entity_type", "experience"),
+                score=row.get("score", 0.0),
+                context=row.get("context"),
             ))
 
         return RecallResponse(results=results)
@@ -594,7 +607,8 @@ class Hindsight:
         # Retrieve relevant context
         try:
             memories = self._client.search(ws_id, query=query, limit=20, semantic=True)
-        except Exception:
+        except Exception as exc:
+            logger.warning("areflect() search failed: %s", exc)
             memories = []
 
         memory_snippets = "\n".join(
@@ -614,7 +628,8 @@ class Hindsight:
                 ws_id, prompt, "", "reflect",
             ])
             answer_text = insight_result.get("insight", insight_result.get("content", str(insight_result)))
-        except Exception:
+        except Exception as exc:
+            logger.warning("areflect() LLM insight failed: %s", exc)
             answer_text = (
                 "I don't have enough information to answer that based on "
                 f"the stored memories for '{bank_id}'."

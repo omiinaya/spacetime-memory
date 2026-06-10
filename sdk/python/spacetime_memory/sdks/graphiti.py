@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import logging
 import time
 import uuid as _uuid
 from dataclasses import dataclass, field
@@ -54,6 +55,8 @@ from typing import Any
 
 from ..client import Client
 from ..llm import LLMClient
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -1007,7 +1010,8 @@ class Graphiti:
                                 )
                             except RuntimeError:
                                 pass
-                except Exception:
+                except Exception as exc:
+                    logger.warning("build_communities() failed to process community: %s", exc)
                     pass
             communities.append(community)
 

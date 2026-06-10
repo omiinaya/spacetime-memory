@@ -22,7 +22,7 @@ pytestmark = [
     ),
 ]
 
-from spacetime_memory.sdks.honcho import Honcho, User
+from spacetime_memory.sdks.honcho import Honcho
 
 
 @pytest.fixture(scope="module")

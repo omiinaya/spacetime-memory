@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 import os
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any, Generic, Literal, Optional, TypeVar
@@ -30,6 +31,8 @@ from typing import Any, Generic, Literal, Optional, TypeVar
 from pydantic import BaseModel, Field
 
 from ..client import Client
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Configuration models
@@ -360,7 +363,8 @@ class Peer:
         # Search relevant memories
         try:
             memories = self._honcho._client.search(self._ws_id, query=query, limit=10, semantic=True)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Peer.chat() search failed: %s", exc)
             memories = []
 
         mem_text = "\n".join(
@@ -380,7 +384,8 @@ class Peer:
         """Search messages from this peer."""
         try:
             results = self._honcho._client.search(self._ws_id, query=query, limit=limit, semantic=True)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Peer.search() failed: %s", exc)
             results = []
 
         messages = []
@@ -490,8 +495,13 @@ class Session:
                     summary="",
                     entities_json=json.dumps(msg.metadata or {}),
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    "Session.add_messages() failed to store message "
+                    "(peer=%s, session=%s): %s",
+                    msg.peer_id, self._id, exc,
+                )
+                continue
 
             result.append(Message(
                 id=hash(msg.content + msg.peer_id + str(datetime.datetime.utcnow())) % (2**32),
@@ -542,7 +552,8 @@ class Session:
         """Search messages within this session."""
         try:
             results = self._honcho._client.search(self._ws_id, query=query, limit=limit, semantic=True)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Session.search() failed: %s", exc)
             results = []
 
         messages = []
@@ -746,7 +757,8 @@ class Honcho:
         """Search across all sessions in the workspace."""
         try:
             results = self._client.search(self._ws_id, query=query, limit=limit, semantic=True)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Honcho.search() failed: %s", exc)
             results = []
 
         messages = []

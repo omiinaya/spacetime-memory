@@ -1,291 +1,173 @@
 # Spacetime Memory — Roadmap
 
-**Goal:** production-grade unified memory backend with genuine drop-in adapter parity.
-**Last updated:** June 9, 2026 — revised after upstream source comparison against all 6 real libraries.
+**Goal:** production-grade unified memory backend with *genuine* drop-in adapter parity.
+**Last updated:** June 9, 2026 (revised — honest assessment, runtime quality focus)
 
 ---
 
-## Drop-in Fidelity Scorecard
+## Current Reality v1.13.0
 
-| Adapter | Current Score | Target | Verdict |
-|---------|:------------:|:------:|---------|
-| LangGraph | 100% | 100% | ✅ Already a true drop-in (inherits `BaseStore`) |
-| Mem0 | 95% | 100% | ✅ API-compatible, init pattern differs trivially |
-| Zep | 80% | 100% | ⚠️ Exception types, missing methods |
-| Graphiti | 75% | 100% | ⚠️ EntityNode/Edge missing fields, Pydantic gap |
-| Hindsight | 20% | 100% | ❌ **Complete API mismatch** — real is REST client |
-| Honcho | 10% | 100% | ❌ **Complete API mismatch** — real is workspace/peer SDK |
+The adapters have **shape parity** — method names, parameter lists, return types mostly match upstream. But shape ≠ behavior. The runtime quality isn't there yet for production drop-in use.
 
----
+### Drop-in Readiness
 
-## Roadmap
-
-| Phase | Theme | Lanes | Effort |
-|-------|-------|-------|--------|
-| I | Fix Wrong Adapters | 1–3 | 2–3 weeks |
-| II | Polish Close Adapters | 4–6 | 1–2 weeks |
-| III | Ship It | 7–10 | 1 week |
-| IV | Ecosystem | 11–14 | ongoing |
+| Adapter | Shape Match | Runtime Quality | Prod Ready? | Blockers |
+|---------|:-----------:|:---------------:|:-----------:|----------|
+| LangGraph | 100% | ✅ Full `BaseStore` inheritance | **Yes** | None |
+| Graphiti | 85% | ⚠️ Best quality of the "rewritten" 5, minor sig diffs | **No** | extra `group_id` in `add_triplet`, `**kwargs` in `search` |
+| Zep | 90% | ⚠️ OK, missing async support | **No** | stub `search_sessions`, limited `update_session` |
+| Mem0 | 98% | ⚠️ Silent error swallowing in graph API | **No** | `except Exception: pass` in 3 graph methods |
+| Hindsight | 95% | ❌ `_run_async()` broken in async envs, silent errors | **No** | bug in sync wrapper, error swallowing |
+| Honcho | 85% | ❌ Heavy `except Exception: pass` (6+ sites), tests fail on import | **No** | broken test discovery, silent None/[] returns |
 
 ---
 
-## Phase I — Fix Wrong Adapters
+## Phase I — Fix Runtime Quality (urgency: immediate)
 
-### Lane 1 — Hindsight: rewrite to match `hindsight_client`
+### Lane 1 — Fix stale test imports
+**Time:** 5 minutes
+**Why:** Tests can't even be discovered. `test_honcho_adapter.py` imports `User` which doesn't exist post-rewrite.
 
-**Why:** Our adapter claims to match `hindsight.Hindsight` but that doesn't exist on PyPI. The real library is `hindsight_client.Hindsight` (v0.8.1) from `vectorize-io/hindsight`. It's an HTTP client to a REST API, not an embedded SDK. We need to either:
-  (a) Wrap it as an HTTP client that talks to our SpacetimeDB backend via a REST API, or
-  (b) Create a compatible API surface that matches the real client's method signatures exactly
+- [ ] Remove `User` import from honcho test
+- [ ] Run test suite, verify discovery works
+- [ ] Fix any other import issues
 
-**Real API reference (from source at `hindsight-clients/python/hindsight_client/hindsight_client.py`):**
+### Lane 2 — Fix `except Exception: pass` everywhere
+**Time:** 2 hours
+**Why:** Silent swallowing is the #1 production blocker. Multiple adapters return `None`, `[]`, or empty responses instead of propagating errors.
 
-```
-Hindsight(base_url, api_key=None, timeout=300.0, user_agent=None)
-    retain(bank_id, content, *, timestamp, context, document_id, metadata,
-           entities, tags, update_mode, retain_async) → RetainResponse
-    retain_batch(bank_id, items, *, document_id, document_tags, retain_async) → RetainResponse
-    recall(bank_id, query, *, types, max_tokens=4096, budget="mid", trace=False,
-           query_timestamp, include_entities, max_entity_tokens, include_chunks,
-           max_chunk_tokens, include_source_facts, max_source_facts_tokens,
-           tags, tags_match, tag_groups) → RecallResponse
-    reflect(bank_id, query, *, budget="low", context, max_tokens, response_schema,
-            tags, tags_match, include_facts, include_tool_calls,
-            include_tool_call_output, tag_groups, fact_types,
-            exclude_mental_models, exclude_mental_model_ids) → ReflectResponse
-    retain_files(bank_id, files, *, context, files_metadata) → FileRetainResponse
-    close() / aclose()
-    __enter__ / __exit__     # context manager
-```
+Files to audit:
+- `honcho.py` — `Peer.chat()`, `Peer.search()`, `Peer.sessions()`, `Session.add_messages()`, `Session.messages()`, `Honcho.search()` (6+ sites)
+- `hindsight.py` — `retain_files()` (swallows on line 366)
+- `mem0.py` — `_GraphStore.search()`, `_GraphStore.get_all()`, `search()` method
 
-**Also async variants for all:** `aretain`, `arecall`, `areflect`, `aretain_batch`, `aretain_files`, `aclose`.
+**Fix pattern:** At minimum log the error. Ideally wrap in typed adapter exceptions.
 
-**No `forget()` method at the high level.** The low-level `memory_api.delete_memory()` "resets" observations, it doesn't delete.
+- [ ] Add `logging` to each module (some don't have it)
+- [ ] Replace `except Exception: pass` with `logger.warning()` or re-raise as typed exceptions
+- [ ] Files: `sdks/honcho.py`, `sdks/hindsight.py`, `sdks/mem0.py`
 
-**Return types are typed Pydantic models:** `RetainResponse`, `RecallResponse`, `RecallResult`, `ReflectResponse`, `ReflectFact`, `BankProfileResponse`, `FileRetainResponse`, `ListMemoryUnitsResponse`.
+### Lane 3 — Fix `_run_async()` in hindsight
+**Time:** 30 minutes
+**Why:** Crashes in Jupyter, FastAPI, async frameworks. Uses `asyncio.get_event_loop()` which is deprecated and raises in Python 3.12+ when no loop is set. When it does set a new loop, it can trample running loops.
 
-**Breakdown of work:**
+Fix: Use `asyncio.get_running_loop()` detection. If no loop running, create new + run. If loop running, raise clear error or offer native async path.
+
+- [ ] Rewrite `_run_async()` to detect running loop
+- [ ] Add runtime check for async context
+- [ ] Prefer `asyncio.run()` pattern when safe
+- [ ] Add docstring explaining the sync/async split
+
+### Lane 4 — Tag missing releases
+**Time:** 5 minutes
+**Why:** v1.9.0 through v1.13.0 exist only in commit messages. No tags. Version pinning doesn't work.
+
+- [ ] git tag v1.9.0 (hindsight rewrite commit)
+- [ ] git tag v1.10.0 (honcho rewrite)
+- [ ] git tag v1.11.0 (zep polish)
+- [ ] git tag v1.12.0 (graphiti polish)
+- [ ] git tag v1.13.0 (mem0 polish)
+
+**Total Phase I:** ~3 hours
+
+---
+
+## Phase II — Documentation & Verification (urgency: 1 week)
+
+### Lane 5 — Rewrite ADAPTER_COMPAT.md
+**Time:** 1 hour
+**Why:** Currently documents methods that don't exist anymore (`create_user`, `get_user`, `forget`, `list_all`, `stats`, `reset`, `export_template`, `import_template`). Coverage numbers are wrong.
+
+- [ ] Audit each adapter's actual method list
+- [ ] Remove stale entries
+- [ ] Update coverage percentages to match compare-results.md
+- [ ] Add row for "runtime quality" alongside "method coverage"
+
+### Lane 6 — True behavioral tests (replace comparison harness)
+**Time:** 8 hours
+**Why:** The comparison harness tests shape (method names, param lists). It doesn't test behavior (write → read → verify, error paths, edge cases). Real drop-in replacement requires behavioral parity.
+
+- [ ] For each adapter: write → read back → verify content matches
+- [ ] Test error paths: SpacetimeDB down, invalid inputs, missing IDs
+- [ ] Test that exceptions match upstream types (where applicable)
+- [ ] Test concurrent access patterns
+- [ ] Replace `scripts/comparison-harness.py` with real `pytest` tests
+
+**Total Phase II:** ~9 hours
+
+---
+
+## Phase III — Reliability Infrastructure (urgency: 2 weeks)
+
+### Lane 7 — Client retry + circuit breaker
+**Time:** 3 hours
+**Why:** The `Client` class has `max_retries=3` but it's a simple counter — no exponential backoff, no jitter, no circuit breaker. SpacetimeDB transient failures cause silent data loss (compounded by Lane 2 issues).
+
+- [ ] Add `httpx.Transport(retries=...)` or manual retry with exponential backoff + jitter
+- [ ] Add circuit breaker: if N consecutive failures, stop trying and raise clearly
+- [ ] Add connection timeout configuration (currently hardcoded in `__init__`)
+- [ ] Add pool limits (httpx defaults to 10 connections, document it)
+
+### Lane 8 — Consistent error contracts
+**Time:** 2 hours
+**Why:** Each adapter handles errors differently. Some raise `ValueError`, some raise `RuntimeError`, some return `None`, some return `[]`. No documented contract for what happens when SpacetimeDB fails.
+
+- [ ] Define per-adapter error contract (what exceptions, when)
+- [ ] All "not found" cases raise `NotFoundError` (or equivalent)
+- [ ] All "SpacetimeDB unavailable" cases raise `ApiError` (or equivalent)
+- [ ] No silent `None`/`[]`/empty returns on real errors
+- [ ] Document contracts in each adapter's module docstring
+
+### Lane 9 — CI pipeline
+**Time:** 4 hours
+**Why:** Zero CI. No automated test runs, no linting, no type checking.
+
+- [ ] GitHub Actions workflow: build Rust module
+- [ ] Start SpacetimeDB standalone
+- [ ] Run pytest suite
+- [ ] Run comparison harness
+- [ ] Run type checker (pyright/mypy) on adapters
+- [ ] Lint check (ruff)
+
+**Total Phase III:** ~9 hours
+
+---
+
+## Phase IV — Advanced Gaps
 
 | Item | Effort | Notes |
 |------|--------|-------|
-| Read and model real return types | 1 hr | Copy Pydantic models from `hindsight_client_api.models` |
-| Rewrite `__init__` to match `Hindsight(base_url, api_key, ...)` | 1 hr | Accept base_url pointing to our SpacetimeDB gateway |
-| Implement `retain(bank_id, content, ...)` | 1 hr | Map bank_id → workspace, content → store_memory |
-| Implement `retain_batch(bank_id, items, ...)` | 1 hr | Bulk store via existing batch reducer |
-| Implement `recall(bank_id, query, ...)` with full param set | 2 hr | Map to search with all filters (tags, types, budget, etc.) |
-| Implement `reflect(bank_id, query, ...)` with full param set | 2 hr | Map to create_insight/LLM pathway |
-| Implement `retain_files(bank_id, files, ...)` | 1 hr | File content → text → retain |
-| Async variants (`aretain`, `arecall`, etc.) | 1 hr | async wrapper pattern |
-| Context manager (`__enter__`/`__exit__`) | 30 min | |
-| Remove `forget()` or map to low-level memory reset | 30 min | |
-| Return typed Pydantic models instead of dicts | 2 hr | Model all 7 response types |
-| Update comparison harness | 30 min | Re-run 5/6 comparison with accurate sigs |
-| Write integration tests | 2 hr | Test against mock or real SpacetimeDB |
-
-**Total:** ~14 hours
-
-### Lane 2 — Honcho: rewrite to match `plastic-labs/honcho`
-
-**Why:** Our adapter claims to match `honcho.Honcho` but the PyPI `honcho` is a Procfile manager. The real library is `honcho.Honcho` from `plastic-labs/honcho` (SDK at `sdks/python/src/honcho/client.py`). It's a workspace/peer/session-oriented API, not user/session.
-
-**Real API reference (from source on GitHub):**
-
-```
-Honcho(workspace_id, base_url=None, *, environment="local" or "production",
-       http_config=...) — workspace-scoped
-    peer(id) → Peer                    # get or create peer by ID
-    peers() → SyncPage[Peer]           # list peers in workspace
-    session(id) → Session              # get or create session by ID
-    sessions() → SyncPage[Session]     # list sessions
-    workspaces() → SyncPage[str]       # list workspace IDs
-    delete_workspace()                 # delete current workspace
-    search(query) → SyncPage[SessionSearchResult]
-    queue_status() → QueueStatusResponse
-    schedule_dream(config)
-
-    # Async via .aio accessor:
-    .aio.peer(id) → PeerAio
-    .aio.search(query) → AsyncPage
-
-    # Metadata config:
-    metadata, configuration, get_configuration(), set_configuration(...)
-
-Peer:
-    metadata, messages(), chat(query, session, ...), sessions()
-
-Session:
-    metadata, peers(), add_peers([Peer]), messages(), 
-    chat(query, ...), context() → SessionContext,
-    configuration, get/set_configuration()
-```
-
-**Key differences from our adapter:**
-- No `create_user(name)` — use `peer(id)` to get or create
-- No `create_session(user_id, location)` — use `session(id)` to get or create
-- No `add(session_id, content)` — add messages via `peer.message()` or `session.add_messages()`
-- Return types are typed Pydantic models
-- `.aio` accessor for async operations
-- Workspace-scoped with metadata/config management
-- Real Honcho is a cloud service — our adapter would need to emulate the API
-
-| Item | Effort | Notes |
-|------|--------|-------|
-| Model all real types (Peer, Session, Message, SessionContext, etc.) | 2 hr | From `honcho.api_types` |
-| Rewrite `__init__` to match `Honcho(workspace_id, ...)` | 1 hr | workspace_id maps to our database identity |
-| Implement `peer(id)` → Peer | 1 hr | get-or-create pattern |
-| Implement `peers()` → SyncPage[Peer] | 1 hr | Paginated list |
-| Implement `session(id)` → Session | 1 hr | get-or-create pattern |
-| Implement `sessions()` → SyncPage[Session] | 1 hr | Paginated list |
-| Implement Peer.message(), Peer.chat() | 2 hr | Message storage + LLM query |
-| Implement Session.add_peers(), Session.messages(), Session.chat() | 2 hr | |
-| Implement `search(query)` | 1 hr | Cross-session search |
-| Implement `.aio` async accessor | 2 hr | Async wrappers for all methods |
-| Workspace metadata/config management | 1 hr | |
-| Return typed Pydantic models | 2 hr | |
-| Remove existing API methods (create_user, create_session, add) | 30 min | |
-| Update comparison harness | 30 min | |
-| Write integration tests | 2 hr | |
-
-**Total:** ~20 hours
-
-### Lane 3 — Quick wins before Phase II (common to all adapters)
-
-| Item | Effort |
-|------|--------|
-| Fix adapter docstrings that incorrectly claim "Matches the real XYZ SDK API" | 30 min |
-| Audit and fix all 6 adapter `__init__` signatures for upstream compat | 1 hr |
-| Standardise error handling pattern across all adapters (typed exceptions where upstream has them) | 2 hr |
-| Standardise return types — use dataclasses/Pydantic where upstream does | 3 hr |
-| Update comparison harness (`scripts/compare-upstream.py`) to test the RIGHT upstream APIs | 1 hr |
-| Run full comparison suite and document remaining gaps | 1 hr |
-
-**Total:** ~8 hours
+| Hindsight async variants actually work (not wrappers around sync) | 2h | `aretain`, `arecall`, `areflect` currently use `_run_async()` too? Check |
+| Honcho `.aio` async accessor | 3h | Upstream has `.aio.peer()`, `.aio.search()` |
+| Zep async support (real Zep has async endpoints) | 3h | Currently sync-only for methods that are async upstream |
+| Graphiti LLM extraction in `add_episode` | 4h | Real Graphiti extracts entities from raw text |
+| Mem0 `create_memory_tool()` for LangChain | 1h | Real mem0 has this |
+| PyPI publishing | 2h | User deferred |
 
 ---
 
-## Phase II — Polish Close Adapters
+## Effort Summary
 
-### Lane 4 — Mem0: 95% → 100%
+| Phase | Focus | Effort | Ship |
+|-------|-------|--------|------|
+| I | Runtime quality | 3 hours | 1 day |
+| II | Docs & verification | 9 hours | 1 week |
+| III | Reliability infra | 9 hours | 2 weeks |
+| IV | Advanced gaps | 15 hours | ongoing |
 
-**Checking against real `mem0.Memory` (from `mem0ai` v2.0.4):**
-
-Already shared 7 keyword params on `add()`, return dict matches. Remaining gaps:
-
-| Item | Effort | Notes |
-|------|--------|-------|
-| Accept `MemoryConfig` in constructor alongside dict | 1 hr | Both `MemoryConfig` object and `dict` should work |
-| Verify `graph.add/search/get_all/delete` match upstream mem0 graph API | 1 hr | Graph API might differ from real mem0 |
-| Add `create_memory_tool()` for LangChain integration | 1 hr | Real mem0 has this |
-| Metadata dedup across adds (mem0 re-uses existing memories) | 2 hr | Complex — requires content hashing |
-| Fix return types to match upstream exactly | 1 hr | Compare field names/structures |
-| Update comparison harness | 30 min | |
-
-**Total:** ~7 hours
-
-### Lane 5 — Zep: 80% → 100%
-
-**Checking against real `zep_python.client.MemoryClient` (from `zep-python` v2.0.2):**
-
-| Item | Effort | Notes |
-|------|--------|-------|
-| Import and raise typed Zep exceptions (`NotFoundError`, `BadRequestError`, `ApiError`) | 1 hr | Our adapter currently uses generic RuntimeError/ValueError |
-| Add `add_session()` / `get_session()` methods | 2 hr | Real Zep has full session lifecycle |
-| Add fact support (`add_fact`, `list_facts`, `delete_fact`) | 2 hr | Required for feature parity |
-| Fix `search_memory()` to accept real Zep params | 1 hr | Real uses `min_score`, `lastn`, etc. |
-| Fix `get_memory()` to return typed `Memory` model | 1 hr | Pydantic model from real Zep |
-| Add `update_session()` / `list_sessions()` | 1 hr | |
-| Async variants where needed | 1 hr | |
-| Write integration tests | 2 hr | |
-
-**Total:** ~11 hours
-
-### Lane 6 — Graphiti: 75% → 100%
-
-**Checking against real `graphiti_core.Graphiti` (from `graphiti-core` v0.29.2):**
-
-| Item | Effort | Notes |
-|------|--------|-------|
-| Convert `EntityNode` to Pydantic model matching `graphiti_core.nodes.EntityNode` | 2 hr | Adding `uuid`, `labels`, `created_at`, `attributes` |
-| Convert `EntityEdge` to Pydantic model matching `graphiti_core.edges.EntityEdge` | 2 hr | Adding `uuid`, `episodes`, `reference_time` |
-| Remove extra `group_id` from `add_triplet` (make optional kwarg if kept) | 30 min | |
-| Add `search_filter` and `driver` params to `search()` | 30 min | |
-| Convert `AddTripletResults` to Pydantic model | 1 hr | |
-| Convert `AddEpisodeResults` to Pydantic model | 1 hr | |
-| Map `add_episode` LLM entity extraction (optional — real does it internally) | 4 hr | Complex LLM pipeline |
-| Write integration tests | 2 hr | |
-
-**Total:** ~13 hours
+**To actually call these production drop-in replacements: ~21 hours of real work.**
+Phase I alone (3h) removes the blockers that make them *dangerous* to use today.
 
 ---
 
-### LangGraph
+## Priority Order
 
-No further work needed — already a true drop-in at 100%. Type hint cosmetics (`Sequence[Any]` → `Iterable[Op]`) are optional.
-
----
-
-## Phase III — Ship It
-
-### Lane 7 — Test infrastructure
-
-From old roadmap Lane 1 (unchanged, still valid):
-- [ ] `pytest` fixture that calls `spacetime publish` before integration tests
-- [ ] Clean data dir per test run
-- [ ] CI pipeline: Rust build + publish + pytest
-- [ ] CI on push to main + PRs
-
-### Lane 8 — Version pinning & dependency hardening
-
-From old roadmap Lane 2:
-- [ ] `.spacetime-version` file
-- [ ] `scripts/check-version.py`
-- [ ] Rust `rust-toolchain.toml`
-- [ ] Python lockfile
-
-### Lane 9 — Adapter compatibility matrix
-
-From old roadmap Lane 3 (update with accurate data):
-- [ ] Create `ADAPTER_COMPAT.md` with real per-method status per adapter
-- [ ] Add status badges per adapter to README
-- [ ] Enforce via tests
-
-### Lane 10 — Performance & benchmarks
-
-From old roadmap Lane 12 (update with adapter-specific benchmarks):
-- [ ] Benchmark each adapter's core methods
-- [ ] Publish results for CI tracking
-
----
-
-## Phase IV — Ecosystem
-
-From old roadmap:
-- Lane 16 — Connector polish (✅ done)
-- Lane 17 — In-process embedder (✅ done)
-- Lane 18 — Replication & HA (✅ done)
-- Lane 19 — Community docs (✅ done)
-- PyPI publishing (deferred by user)
-
----
-
-## Effort Estimate
-
-| Phase | Lanes | Effort | Parallelizable |
-|-------|-------|--------|----------------|
-| I — Fix Wrong Adapters | 1–3 | 42 hours | Partially (hindsight + honcho in parallel) |
-| II — Polish Close Adapters | 4–6 | 31 hours | Yes — each adapter is independent |
-| III — Ship It | 7–10 | 1 week | Mostly parallel |
-| IV — Ecosystem | — | Ongoing | Independent |
-
-**Total to true 100% drop-in across all 6 adapters:** ~73 hours of work.
-
----
-
-## Priority Order (recommended execution)
-
-1. **Lane 3 (quick wins)** — fix docstrings, standardise error handling/return types across all adapters. Gets us credibility fast.
-2. **Lane 1 (hindsight rewrite)** — biggest gap, highest visibility. The real library is a REST client — once we accept that, rewrite is straightforward.
-3. **Lane 2 (honcho rewrite)** — second biggest gap. Same pattern: accept the real API shape and build it.
-4. **Lane 5 (zep)** — exception types first (quick win), then facts + session methods.
-5. **Lane 6 (graphiti)** — Pydantic models for EntityNode/Edge, add missing fields.
-6. **Lane 4 (mem0)** — MemoryConfig acceptance, graph API verification.
-7. **Lanes 7–10** — infrastructure, CI, benchmarks.
+1. **Lane 1** — fix test discovery (5min, unblocks everything else)
+2. **Lane 2** — fix error swallowing (2h, #1 prod blocker)
+3. **Lane 3** — fix `_run_async()` (30min, real bug)
+4. **Lane 4** — tag releases (5min, version sanity)
+5. **Lane 5** — fix ADAPTER_COMPAT.md (1h, docs truth)
+6. **Lane 6** — behavioral tests (8h, verification)
+7. **Lane 7** — client retry (3h, reliability)
+8. **Lane 8** — error contracts (2h, consistency)
+9. **Lane 9** — CI pipeline (4h, automation)

@@ -17,4 +17,5 @@ node_modules/
 target/
 venv/
 .venv/
+.upstream-venv/
 build/
