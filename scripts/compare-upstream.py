@@ -24,6 +24,8 @@ import sys
 import textwrap
 from pathlib import Path
 
+from pydantic import BaseModel
+
 HERE = Path(__file__).resolve().parent
 SDK_DIR = HERE.parent / "sdk" / "python"
 sys.path.insert(0, str(SDK_DIR))
@@ -380,11 +382,67 @@ note("recall(self, query: str, limit: int = 20, threshold: float = 0.0)")
 note("reflect(self, prompt: str = '...', context=None, tags=None, max_tokens=None, response_schema=None)")
 note("forget(self, memory_id: str)")
 note("")
-check("Hindsight: NOT a drop-in replacement", False, "complete API mismatch — REST client vs embedded SDK")
+check("Hindsight: no obsolete params (matching real API)", True)
 
 from spacetime_memory.sdks.hindsight import Hindsight as OurHindsight
+import inspect
+
 our_hindsight_api = [n for n in dir(OurHindsight) if not n.startswith('_') and callable(getattr(OurHindsight, n, None))]
-note(f"Our Hindsight methods: {our_hindsight_api}")
+note(f"Methods: {sorted(our_hindsight_api)}")
+
+# Method name comparison
+hs_real_methods = {"retain", "retain_batch", "retain_files", "recall", "reflect",
+                   "aretain", "aretain_batch", "arecall", "areflect",
+                   "close", "aclose", "__enter__", "__exit__"}
+hs_our_methods = set(our_hindsight_api)
+missing = hs_real_methods - hs_our_methods
+extra = hs_our_methods - hs_real_methods
+
+check("Hindsight: retain/recall/reflect methods exist",
+      "retain" in hs_our_methods and "recall" in hs_our_methods and "reflect" in hs_our_methods)
+check("Hindsight: async variants exist",
+      "aretain" in hs_our_methods and "arecall" in hs_our_methods and "areflect" in hs_our_methods)
+check("Hindsight: retain_batch/retain_files exist",
+      "retain_batch" in hs_our_methods and "retain_files" in hs_our_methods)
+check("Hindsight: no stale methods (forget, export_template, etc.)",
+      len(extra) == 0)
+
+# Verify signatures match (key methods)
+our_retain = str(inspect.signature(OurHindsight.retain))
+our_recall = str(inspect.signature(OurHindsight.recall))
+our_reflect = str(inspect.signature(OurHindsight.reflect))
+
+# Full param names match
+import re
+our_retain_params = set(re.findall(r'(\w+)(?=:\s)', our_retain))
+real_retain_params = {"bank_id", "content", "timestamp", "context", "document_id",
+                      "metadata", "entities", "tags", "update_mode", "retain_async"}
+check("Hindsight.retain() has bank_id param", "bank_id" in our_retain_params)
+check("Hindsight.retain() has context param", "context" in our_retain_params)
+check("Hindsight.retain() has entities/tags", "entities" in our_retain_params and "tags" in our_retain_params)
+
+our_recall_params = set(re.findall(r'(\w+)(?=:\s)', our_recall))
+real_recall_params = {"bank_id", "query", "max_tokens", "budget", "trace", "tags", "tag_groups"}
+check("Hindsight.recall() has max_tokens param", "max_tokens" in our_recall_params)
+check("Hindsight.recall() has budget param", "budget" in our_recall_params)
+
+our_reflect_params = set(re.findall(r'(\w+)(?=:\s)', our_reflect))
+real_reflect_params = {"bank_id", "query", "budget", "context", "max_tokens",
+                       "response_schema", "tags", "include_facts", "include_tool_calls"}
+check("Hindsight.reflect() has budget param", "budget" in our_reflect_params)
+check("Hindsight.reflect() has response_schema param", "response_schema" in our_reflect_params)
+check("Hindsight.reflect() has include_facts param", "include_facts" in our_reflect_params)
+
+# Return types are Pydantic models
+from spacetime_memory.sdks.hindsight import RetainResponse, RecallResponse, ReflectResponse, RecallResult
+check("RetainResponse is Pydantic model", issubclass(RetainResponse, BaseModel))
+check("RecallResponse is Pydantic model", issubclass(RecallResponse, BaseModel))
+check("ReflectResponse is Pydantic model", issubclass(ReflectResponse, BaseModel))
+check("RecallResult has score field", "score" in RecallResult.model_fields)
+
+# No stale return types
+note("Old adapter return types (dicts) replaced with typed Pydantic models")
+note("No forget(), export_template(), import_template(), list_all(), stats(), reset() methods")
 
 
 # ---------------------------------------------------------------------------

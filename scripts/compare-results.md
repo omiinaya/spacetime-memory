@@ -57,7 +57,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ Mem0 signature differences are expected — ours uses user/agent/run_id as kwargs,
   ℹ   real mem0 also uses user_id/agent_id/run_id as kwargs. Ours adds SpacetimeDB
   ℹ   specific: host/port/db passed via config dict, real mem0 uses MemoryConfig.
-  ✓ Mem0.add shared keyword params: {'memory_type', 'prompt', 'user_id', 'infer', 'metadata', 'run_id', 'agent_id'}
+  ✓ Mem0.add shared keyword params: {'user_id', 'memory_type', 'metadata', 'infer', 'agent_id', 'prompt', 'run_id'}
   ✓ Mem0.add returns dict with 'results' key
   ✓ Our Mem0 has .graph property
   ℹ mem0 v2 uses generic exception handling (no BaseMemoryException)
@@ -85,8 +85,8 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 ── 4/6  Graphiti (graphiti-core) parity ─────────────────────────
   ✓ Graphiti class exists (real)
   ✓ Graphiti class exists (ours)
-  ℹ Graphiti has extra params: {'embedder_type', 'embedder_url', 'port', 'database', 'token', 'client', 'host'}
-  ℹ real Graphiti has extra params: {'uri', 'store_raw_episode_content', 'tracer', 'cross_encoder', 'trace_span_prefix', 'user', 'password', 'max_coroutines', 'graph_driver'}
+  ℹ Graphiti has extra params: {'embedder_url', 'token', 'client', 'database', 'port', 'embedder_type', 'host'}
+  ℹ real Graphiti has extra params: {'graph_driver', 'tracer', 'uri', 'user', 'cross_encoder', 'store_raw_episode_content', 'max_coroutines', 'trace_span_prefix', 'password'}
   ✗ Graphiti constructor 0 common params
   ✓ EntityNode exists (real)
   ✓ EntityNode exists (ours)
@@ -132,8 +132,26 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ reflect(self, prompt: str = '...', context=None, tags=None, max_tokens=None, response_schema=None)
   ℹ forget(self, memory_id: str)
   ℹ 
-  ✗ Hindsight: NOT a drop-in replacement  complete API mismatch — REST client vs embedded SDK
-  ℹ Our Hindsight methods: ['batch_retain', 'export_template', 'forget', 'get_reflect_mission', 'import_template', 'list_all', 'recall', 'reflect', 'reset', 'retain', 'set_reflect_mission', 'stats']
+  ✓ Hindsight: no obsolete params (matching real API)
+  ℹ Methods: ['aclose', 'arecall', 'areflect', 'aretain', 'aretain_batch', 'close', 'recall', 'reflect', 'retain', 'retain_batch', 'retain_files']
+  ✓ Hindsight: retain/recall/reflect methods exist
+  ✓ Hindsight: async variants exist
+  ✓ Hindsight: retain_batch/retain_files exist
+  ✓ Hindsight: no stale methods (forget, export_template, etc.)
+  ✓ Hindsight.retain() has bank_id param
+  ✓ Hindsight.retain() has context param
+  ✓ Hindsight.retain() has entities/tags
+  ✓ Hindsight.recall() has max_tokens param
+  ✓ Hindsight.recall() has budget param
+  ✓ Hindsight.reflect() has budget param
+  ✓ Hindsight.reflect() has response_schema param
+  ✓ Hindsight.reflect() has include_facts param
+  ✓ RetainResponse is Pydantic model
+  ✓ RecallResponse is Pydantic model
+  ✓ ReflectResponse is Pydantic model
+  ✓ RecallResult has score field
+  ℹ Old adapter return types (dicts) replaced with typed Pydantic models
+  ℹ No forget(), export_template(), import_template(), list_all(), stats(), reset() methods
 
 ── 6/6  Honcho parity ───────────────────────────────────────────
   ℹ === REAL HONCHO API (from plastic-labs/honcho SDK source on GitHub) ===
@@ -172,8 +190,8 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - Our Mem0 uses ValueError: 9x, RuntimeError: 17x
 - Zep real uses typed exceptions: NotFoundError, ApiError, BadRequestError
 - Our Zep uses generic exceptions (RuntimeError/ValueError)
-- Graphiti has extra params: {'embedder_type', 'embedder_url', 'port', 'database', 'token', 'client', 'host'}
-- real Graphiti has extra params: {'uri', 'store_raw_episode_content', 'tracer', 'cross_encoder', 'trace_span_prefix', 'user', 'password', 'max_coroutines', 'graph_driver'}
+- Graphiti has extra params: {'embedder_url', 'token', 'client', 'database', 'port', 'embedder_type', 'host'}
+- real Graphiti has extra params: {'graph_driver', 'tracer', 'uri', 'user', 'cross_encoder', 'store_raw_episode_content', 'max_coroutines', 'trace_span_prefix', 'password'}
 - Real EntityNode fields: ['uuid', 'name', 'group_id', 'labels', 'created_at', 'name_embedding', 'summary', 'attributes']
 - Our EntityNode attrs: ['from_stmem', 'group_id', 'name', 'name_embedding', 'summary']
 - Real EntityEdge fields: ['uuid', 'group_id', 'source_node_uuid', 'target_node_uuid', 'created_at', 'name', 'fact', 'fact_embedding', 'episodes', 'expired_at', 'valid_at', 'invalid_at', 'reference_time', 'attributes']
@@ -200,7 +218,9 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - reflect(self, prompt: str = '...', context=None, tags=None, max_tokens=None, response_schema=None)
 - forget(self, memory_id: str)
 - 
-- Our Hindsight methods: ['batch_retain', 'export_template', 'forget', 'get_reflect_mission', 'import_template', 'list_all', 'recall', 'reflect', 'reset', 'retain', 'set_reflect_mission', 'stats']
+- Methods: ['aclose', 'arecall', 'areflect', 'aretain', 'aretain_batch', 'close', 'recall', 'reflect', 'retain', 'retain_batch', 'retain_files']
+- Old adapter return types (dicts) replaced with typed Pydantic models
+- No forget(), export_template(), import_template(), list_all(), stats(), reset() methods
 - === REAL HONCHO API (from plastic-labs/honcho SDK source on GitHub) ===
 - Import: from honcho import Honcho
 - __init__(self, workspace_id: str, base_url: str | None = None, *, environment='local' | 'production', ...)

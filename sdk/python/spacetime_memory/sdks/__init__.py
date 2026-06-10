@@ -10,7 +10,19 @@ from .graphiti import (
     SearchResults,
 )
 from .honcho import Honcho
-from .hindsight import Hindsight
+from .hindsight import (
+    Hindsight,
+    RetainResponse,
+    RecallResponse,
+    RecallResult,
+    ReflectResponse,
+    ReflectFact,
+    FileRetainResponse,
+    BankProfileResponse,
+    ListMemoryUnitsResponse,
+    DispositionTraits,
+    TokenUsage,
+)
 from .langchain import StmemMemoryStore, StmemStore
 from .mem0 import Memory as Mem0Memory
 from .zep import ZepClient, MemoryMessage, Memory, MemorySearchResult, Session
@@ -19,6 +31,16 @@ __all__ = [
     "Mem0Memory",
     "Honcho",
     "Hindsight",
+    "RetainResponse",
+    "RecallResponse",
+    "RecallResult",
+    "ReflectResponse",
+    "ReflectFact",
+    "FileRetainResponse",
+    "BankProfileResponse",
+    "ListMemoryUnitsResponse",
+    "DispositionTraits",
+    "TokenUsage",
     "Graphiti",
     "EntityNode",
     "EntityEdge",
