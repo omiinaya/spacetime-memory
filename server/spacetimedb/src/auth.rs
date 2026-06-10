@@ -456,3 +456,90 @@ pub struct AdminListResult {
     pub created_at: i64,
     pub queried_at: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hash_password_deterministic() {
+        let salt = b"test-salt-16bytes";
+        let h1 = hash_password("hello", salt);
+        let h2 = hash_password("hello", salt);
+        assert_eq!(h1.len(), 32);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_password_different_salts() {
+        let h1 = hash_password("hello", b"salt-one-1234567");
+        let h2 = hash_password("hello", b"salt-two-7654321");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_password_different_passwords() {
+        let salt = b"fixed-salt-123456";
+        let h1 = hash_password("alice", salt);
+        let h2 = hash_password("bob", salt);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_password_empty_password() {
+        let salt = b"some-salt-value-00";
+        let h = hash_password("", salt);
+        assert_eq!(h.len(), 32);
+    }
+
+    #[test]
+    fn test_hash_password_long_password() {
+        let salt = b"another-salt-1234";
+        let long = "a".repeat(1000);
+        let h = hash_password(&long, salt);
+        assert_eq!(h.len(), 32);
+    }
+
+    #[test]
+    fn test_hash_password_output_length_always_32() {
+        let test_cases: Vec<&[u8]> = vec![b"a", b"ab", b"abc", b"abcd", b"long-salt-value-for-test"];
+        for salt in &test_cases {
+            let h = hash_password("test", salt);
+            assert_eq!(h.len(), 32, "PBKDF2 output should always be 32 bytes");
+        }
+    }
+
+    #[test]
+    fn test_derive_salt_deterministic() {
+        let s1 = derive_salt("identity1", 1000);
+        let s2 = derive_salt("identity1", 1000);
+        assert_eq!(s1, s2);
+        assert_eq!(s1.len(), 32);
+    }
+
+    #[test]
+    fn test_derive_salt_different_identities() {
+        let s1 = derive_salt("alice", 1000);
+        let s2 = derive_salt("bob", 1000);
+        assert_ne!(s1, s2);
+    }
+
+    #[test]
+    fn test_derive_salt_different_timestamps() {
+        let s1 = derive_salt("alice", 1000);
+        let s2 = derive_salt("alice", 2000);
+        assert_ne!(s1, s2);
+    }
+
+    #[test]
+    fn test_derive_salt_output_length() {
+        let s = derive_salt("test", 42);
+        assert_eq!(s.len(), 32);
+    }
+
+    #[test]
+    fn test_derive_salt_empty_identity() {
+        let s = derive_salt("", 0);
+        assert_eq!(s.len(), 32);
+    }
+}

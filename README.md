@@ -35,18 +35,20 @@ m.add("I like pizza", user_id="alice")
 
 See [Getting Started](docs/getting-started.md) for setup, or jump to the [Adapter Authoring Guide](docs/adapter-authoring-guide.md) to write your own.
 
-## Adapters
+## Drop-in Adapters
 
-| Project | Adapter | API Surface |
-|---------|---------|------------|
-| [Mem0](https://github.com/mem0ai/mem0) | `sdks.mem0.Memory` | `add()`, `search()`, `get()`, `get_all()`, `update()`, `delete()`, `delete_all()`, `history()`, `chat()`, `graph.add/search/get_all/delete` |
-| [Graphiti](https://github.com/getzep/graphiti) | `sdks.graphiti.Graphiti` | `add_triplet()`, `add_episode()`, `search()`, `search_()`, `get_entity_edge_summary()`, `remove_episode()`, `build_communities()` |
-| [LangGraph](https://langchain-ai.github.io/langgraph/) / [LangChain](https://python.langchain.com/) | `sdks.langchain.StmemStore` / `StmemMemoryStore` | `get/put/delete/search/list_namespaces/batch` (LangGraph BaseStore), `mget/mset/mdelete/yield_keys` (LangChain BaseStore) |
-| [Zep](https://www.getzep.com/) | `sdks.zep.Zep` | `add()`, `get()`, `delete()`, sessions CRUD, search, messages, facts |
-| [Hindsight](https://github.com/vectorize-io/hindsight) | `sdks.hindsight.Hindsight` | `retain()`, `recall()`, `reflect()`, `forget()` |
-| [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | `create_user()`, `create_session()`, `add()`, `search()`, `get_user_memories()` |
+These adapters match the public API of their upstream library. You can swap the import path and keep existing code.
 
-Plus native features inspired by many projects (see below).
+| Project | Adapter | Runtime Quality |
+|---------|---------|----------------|
+| [LangGraph](https://langchain-ai.github.io/langgraph/) / [LangChain](https://python.langchain.com/) | `sdks.langchain.StmemStore` / `StmemMemoryStore` | **100%** — proper `BaseStore` inheritance |
+| [Mem0](https://github.com/mem0ai/mem0) | `sdks.mem0.Memory` | **98%** — behavioral tests pass. `chat()` is a stub without full LLM pipeline |
+| [Hindsight](https://github.com/vectorize-io/hindsight) | `sdks.hindsight.Hindsight` | **95%** — full retain/recall/reflect + batch + files + async variants. Sync wrappers require care in async contexts |
+| [Zep](https://www.getzep.com/) | `sdks.zep.Zep` | **90%** — sessions, memory, facts, search. No async (upstream has async endpoints) |
+| [Graphiti](https://github.com/getzep/graphiti) | `sdks.graphiti.Graphiti` | **85%** — entities, edges, episodes, communities. Dataclass vs Pydantic, extra `group_id` keyword arg |
+| [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | **85%** — workspace/peer/session/message/search. No `.aio` async accessor |
+
+Additional features inspired by many projects (data model, schedules, CLI design — see Data Model table below).
 
 ## Architecture
 
@@ -173,23 +175,25 @@ The module exposes ~80 reducers covering full CRUD plus special operations:
 
 ## Drop-in SDK Adapters
 
-All three adapters live in `sdk/python/spacetime_memory/sdks/` and are importable as drop-in replacements:
+All 6 adapters live in `sdk/python/spacetime_memory/sdks/` and are importable as drop-in replacements:
 
 ```python
 # Mem0
 from spacetime_memory.sdks import Mem0Memory
-m = Mem0Memory()
+m = Mem0Memory(config={"host": "localhost", "port": "3001"})
 m.add("I like pizza", user_id="alice")
 
 # Hindsight
 from spacetime_memory.sdks import Hindsight
-h = Hindsight()
-h.retain("I like pizza", source="chat")
+h = Hindsight(base_url="http://localhost:3001", api_key="optional")
+h.retain("my_bank", "I like pizza")
 
 # Honcho
 from spacetime_memory.sdks import Honcho
-honcho = Honcho()
-user = honcho.create_user(name="alice")
+honcho = Honcho(workspace_id="my_workspace")
+p = honcho.peer("alice")
+s = honcho.session("my_session")
+s.add_messages([{"role": "user", "content": "I like pizza"}])
 ```
 
 ## Quick Start

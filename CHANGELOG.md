@@ -100,4 +100,5 @@
 
 ### Acknowledgments
 
-Inspired by: Mem0, Hindsight (Vectorize), Honcho, Graphify, Understand Anything, Supermemory, CLI-Anything, OpenViking, RetainDB, Holographic, ByteRover, Litellm, and Orgy.
+Drop-in adapter targets: Mem0, Hindsight (Vectorize), Honcho, LangGraph, Zep, Graphiti.
+Concept inspiration: Graphify, Understand Anything, Supermemory, CLI-Anything, OpenViking, RetainDB, Holographic, ByteRover, LiteLLM, Orgy.
