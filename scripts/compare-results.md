@@ -57,7 +57,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ Mem0 signature differences are expected — ours uses user/agent/run_id as kwargs,
   ℹ   real mem0 also uses user_id/agent_id/run_id as kwargs. Ours adds SpacetimeDB
   ℹ   specific: host/port/db passed via config dict, real mem0 uses MemoryConfig.
-  ✓ Mem0.add shared keyword params: {'user_id', 'infer', 'run_id', 'memory_type', 'prompt', 'metadata', 'agent_id'}
+  ✓ Mem0.add shared keyword params: {'metadata', 'infer', 'prompt', 'agent_id', 'run_id', 'memory_type', 'user_id'}
   ✓ Mem0.add returns dict with 'results' key
   ✓ Our Mem0 has .graph property
   ℹ mem0 v2 uses generic exception handling (no BaseMemoryException)
@@ -89,17 +89,20 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 ── 4/6  Graphiti (graphiti-core) parity ─────────────────────────
   ✓ Graphiti class exists (real)
   ✓ Graphiti class exists (ours)
-  ℹ Graphiti has extra params: {'host', 'port', 'database', 'embedder_url', 'token', 'embedder_type', 'client'}
-  ℹ real Graphiti has extra params: {'cross_encoder', 'user', 'tracer', 'uri', 'max_coroutines', 'password', 'graph_driver', 'trace_span_prefix', 'store_raw_episode_content'}
+  ℹ Graphiti has extra params: {'port', 'token', 'host', 'embedder_url', 'database', 'embedder_type', 'client'}
+  ℹ real Graphiti has extra params: {'password', 'tracer', 'cross_encoder', 'uri', 'user', 'graph_driver', 'trace_span_prefix', 'max_coroutines', 'store_raw_episode_content'}
   ✗ Graphiti constructor 0 common params
   ✓ EntityNode exists (real)
   ✓ EntityNode exists (ours)
   ℹ Real EntityNode fields: ['uuid', 'name', 'group_id', 'labels', 'created_at', 'name_embedding', 'summary', 'attributes']
-  ℹ Our EntityNode attrs: ['from_stmem', 'group_id', 'name', 'name_embedding', 'summary']
+  ℹ Our EntityNode dataclass fields: ['group_id', 'name', 'name_embedding', 'summary']
+  ℹ Our EntityNode __dataclass_fields__: ['uuid', 'name', 'name_embedding', 'summary', 'group_id', 'labels', 'attributes', 'created_at']
+  ✓ EntityNode fields match upstream (8/8)
   ✓ EntityEdge exists (real)
   ✓ EntityEdge exists (ours)
   ℹ Real EntityEdge fields: ['uuid', 'group_id', 'source_node_uuid', 'target_node_uuid', 'created_at', 'name', 'fact', 'fact_embedding', 'episodes', 'expired_at', 'valid_at', 'invalid_at', 'reference_time', 'attributes']
-  ℹ Our EntityEdge attrs: ['edge_group_id', 'expired_at', 'fact', 'fact_embedding', 'from_stmem', 'group_id', 'invalid_at', 'name', 'source_node_uuid', 'target_node_uuid', 'valid_at', 'version']
+  ℹ Our EntityEdge __dataclass_fields__: ['uuid', 'name', 'fact', 'fact_embedding', 'source_node_uuid', 'target_node_uuid', 'group_id', 'episodes', 'valid_at', 'invalid_at', 'expired_at', 'attributes', 'created_at', 'version', 'edge_group_id', 'reference_time']
+  ✓ EntityEdge fields match upstream (14/14)
   ✓ Graphiti.add_triplet exists (real)
   ✓ Graphiti.add_triplet exists (ours)
   ✓ Graphiti.search exists (real)
@@ -109,7 +112,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ✓ Graphiti.build_communities exists (real)
   ✓ Graphiti.build_communities exists (ours)
   ✗ Graphiti.add_triplet params differ  ours=['source_node', 'edge', 'target_node', 'group_id'] vs real=['source_node', 'edge', 'target_node']
-  ✗ Graphiti.search params differ  ours=['query', 'center_node_uuid', 'group_ids', 'num_results', 'kwargs'] vs real=['query', 'center_node_uuid', 'group_ids', 'num_results', 'search_filter', 'driver']
+  ✗ Graphiti.search params differ  ours=['query', 'center_node_uuid', 'group_ids', 'num_results', 'search_filter', 'driver', 'kwargs'] vs real=['query', 'center_node_uuid', 'group_ids', 'num_results', 'search_filter', 'driver']
   ✓ Real Graphiti AddTripletResults annotates nodes/edges
   ✓ Our Graphiti AddTripletResults annotates nodes/edges
   ℹ Real Graphiti return types are Pydantic models; ours are plain classes
@@ -208,12 +211,13 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - mem0 v2 uses generic exception handling (no BaseMemoryException)
 - Our Mem0 uses ValueError: 9x, RuntimeError: 17x
 - Our Zep imports: NotFoundError
-- Graphiti has extra params: {'host', 'port', 'database', 'embedder_url', 'token', 'embedder_type', 'client'}
-- real Graphiti has extra params: {'cross_encoder', 'user', 'tracer', 'uri', 'max_coroutines', 'password', 'graph_driver', 'trace_span_prefix', 'store_raw_episode_content'}
+- Graphiti has extra params: {'port', 'token', 'host', 'embedder_url', 'database', 'embedder_type', 'client'}
+- real Graphiti has extra params: {'password', 'tracer', 'cross_encoder', 'uri', 'user', 'graph_driver', 'trace_span_prefix', 'max_coroutines', 'store_raw_episode_content'}
 - Real EntityNode fields: ['uuid', 'name', 'group_id', 'labels', 'created_at', 'name_embedding', 'summary', 'attributes']
-- Our EntityNode attrs: ['from_stmem', 'group_id', 'name', 'name_embedding', 'summary']
+- Our EntityNode dataclass fields: ['group_id', 'name', 'name_embedding', 'summary']
+- Our EntityNode __dataclass_fields__: ['uuid', 'name', 'name_embedding', 'summary', 'group_id', 'labels', 'attributes', 'created_at']
 - Real EntityEdge fields: ['uuid', 'group_id', 'source_node_uuid', 'target_node_uuid', 'created_at', 'name', 'fact', 'fact_embedding', 'episodes', 'expired_at', 'valid_at', 'invalid_at', 'reference_time', 'attributes']
-- Our EntityEdge attrs: ['edge_group_id', 'expired_at', 'fact', 'fact_embedding', 'from_stmem', 'group_id', 'invalid_at', 'name', 'source_node_uuid', 'target_node_uuid', 'valid_at', 'version']
+- Our EntityEdge __dataclass_fields__: ['uuid', 'name', 'fact', 'fact_embedding', 'source_node_uuid', 'target_node_uuid', 'group_id', 'episodes', 'valid_at', 'invalid_at', 'expired_at', 'attributes', 'created_at', 'version', 'edge_group_id', 'reference_time']
 - Real Graphiti return types are Pydantic models; ours are plain classes
 - Real EntityNode: Pydantic model; Our EntityNode: plain object
 - This affects serialization, validation, and type inference

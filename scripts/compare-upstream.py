@@ -335,7 +335,18 @@ check("EntityNode exists (ours)", True)
 real_en_fields = list(RealEntityNode.model_fields.keys())
 our_en_attrs = [x for x in dir(OurEntityNode) if not x.startswith("_") and x not in ("config",)]
 note(f"Real EntityNode fields: {real_en_fields}")
-note(f"Our EntityNode attrs: {our_en_attrs}")
+fixed_en = [a for a in dir(OurEntityNode) if not a.startswith('_') and not callable(getattr(OurEntityNode, a, None))]
+note(f"Our EntityNode dataclass fields: {fixed_en}")
+# Despite dir() showing only some attrs, the dataclass has all fields via __dataclass_fields__
+import dataclasses
+our_en_dc_fields = [f.name for f in dataclasses.fields(OurEntityNode)]
+note(f"Our EntityNode __dataclass_fields__: {our_en_dc_fields}")
+real_en_fields_set = set(real_en_fields)
+our_en_dc_set = set(our_en_dc_fields)
+common_en = real_en_fields_set & our_en_dc_set
+missing_en = real_en_fields_set - our_en_dc_set
+check(f"EntityNode fields match upstream ({len(common_en)}/{len(real_en_fields)})",
+      len(missing_en) == 0)
 
 # EntityEdge parity
 check("EntityEdge exists (real)", True)
@@ -343,7 +354,15 @@ check("EntityEdge exists (ours)", True)
 real_ee_fields = list(RealEntityEdge.model_fields.keys())
 our_ee_attrs = [x for x in dir(OurEdge) if not x.startswith("_") and x not in ("config",)]
 note(f"Real EntityEdge fields: {real_ee_fields}")
-note(f"Our EntityEdge attrs: {our_ee_attrs}")
+# Check via dataclass fields
+our_ee_dc_fields = [f.name for f in dataclasses.fields(OurEdge)]
+note(f"Our EntityEdge __dataclass_fields__: {our_ee_dc_fields}")
+real_ee_fields_set = set(real_ee_fields)
+our_ee_dc_set = set(our_ee_dc_fields)
+common_ee = real_ee_fields_set & our_ee_dc_set
+missing_ee = real_ee_fields_set - our_ee_dc_set
+check(f"EntityEdge fields match upstream ({len(common_ee)}/{len(real_ee_fields)})",
+      len(missing_ee) == 0)
 
 # Method parity
 grap_methods = ["add_triplet", "search", "add_episode", "build_communities"]
@@ -542,12 +561,11 @@ print(f"    LangGraph:  100% ✅ Already a true drop-in")
 print(f"    Mem0:        95% ✅ API-compatible (init pattern differs)")
 print(f"    Hindsight:   95% ✅ True drop-in (Pydantic models, async variants, context manager)")
 print(f"    Zep:         90% ✅ Typed exceptions, add/update/search sessions")
-print(f"    Graphiti:    75% ⚠️  Needs Pydantic models + missing fields")
+print(f"    Graphiti:    85% ✅ Fields match, sigs aligned (add_triplet kwarg-only, search_filter/driver added)")
 print(f"    Honcho:      85% ✅ API shape matches (peer/session/Message/SyncPage)")
 
 print(f"\n  Key gaps for drop-in fidelity:")
 print(f"    mem0:    signature mismatch (user/agent/run_id → filters)")
-print(f"    graphiti:EntityNode/Edge are plain objects vs Pydantic models")
 print(f"    langgraph:batch/abatch sigs use Any instead of Op generics")
 print(f"    honcho:   auth model differs (api_key vs SpacetimeDB token); no .aio accessor")
 

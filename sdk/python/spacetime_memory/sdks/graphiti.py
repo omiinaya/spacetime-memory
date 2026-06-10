@@ -135,6 +135,7 @@ class EntityEdge:
     # Temporal versioning (Graphiti parity)
     version: int = 1
     edge_group_id: str = ""
+    reference_time: datetime | None = None
 
     @classmethod
     def from_stmem(cls, row: dict[str, Any]) -> "EntityEdge":
@@ -440,6 +441,7 @@ class Graphiti:
         source_node: EntityNode,
         edge: EntityEdge,
         target_node: EntityNode,
+        *,
         group_id: str | None = None,
     ) -> AddTripletResults:
         """Add a source -[edge]-> target triplet to the knowledge graph.
@@ -674,6 +676,8 @@ class Graphiti:
         center_node_uuid: str | None = None,
         group_ids: list[str] | None = None,
         num_results: int = DEFAULT_SEARCH_LIMIT,
+        search_filter: Any | None = None,
+        driver: Any | None = None,
         **kwargs: Any,
     ) -> list[EntityEdge]:
         """Perform hybrid search over the knowledge graph.
@@ -686,6 +690,8 @@ class Graphiti:
             center_node_uuid: Not supported (accepted for compat).
             group_ids: List of workspace names to search.
             num_results: Max results to return (default 10).
+            search_filter: Not supported (accepted for compat with graphiti-core).
+            driver: Not supported (accepted for compat with graphiti-core).
             **kwargs: Additional parameters:
                 valid_at_after (datetime | None): If set, only return
                     edges whose ``valid_at`` is >= this datetime.
