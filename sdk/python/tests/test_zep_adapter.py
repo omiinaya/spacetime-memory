@@ -31,6 +31,7 @@ from spacetime_memory.sdks.zep import (
     MemorySearchResult,
     Session,
     Fact,
+    NotFoundError,
 )
 
 
@@ -66,11 +67,11 @@ def token() -> str:
 
 
 @pytest.fixture
-def zep(host: str, port: int, db: str | None):
+def zep(host: str, port: int, stdb_session: dict):
     client = ZepClient(
         host=host,
         port=port,
-        config={"db": db} if db else None,
+        config={"db": stdb_session["database"]},
     )
     yield client
     client.close()
@@ -274,9 +275,10 @@ class TestZepClient:
         assert s.session_id == sid
 
     def test_get_session_nonexistent(self, zep: ZepClient) -> None:
-        """get_session on nonexistent returns None."""
-        s = zep.get_session(_sid("zep-test-no-such-session"))
-        assert s is None
+        """get_session on nonexistent raises NotFoundError."""
+        import pytest
+        with pytest.raises(NotFoundError):
+            zep.get_session(_sid("zep-test-no-such-session"))
 
     def test_close_is_idempotent(self, zep: ZepClient) -> None:
         """close is idempotent and clears the cache but calls still work."""

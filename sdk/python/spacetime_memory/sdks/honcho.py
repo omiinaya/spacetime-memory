@@ -652,6 +652,7 @@ class Honcho:
             port=stdb_port or os.environ.get("SPACETIMEDB_PORT", "3001"),
             database=db,
             timeout=self._timeout,
+            token=api_key,
         )
         self._peer_cache: dict[str, Peer] = {}
         self._session_cache: dict[str, Session] = {}

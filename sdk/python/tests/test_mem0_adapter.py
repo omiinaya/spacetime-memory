@@ -39,9 +39,12 @@ def port() -> int:
 
 
 @pytest.fixture
-def mem(host: str, port: int) -> Memory:
+def mem(host: str, port: int, stdb_session: dict) -> Memory:
     """Fresh Memory instance per test with unique workspace."""
-    m = Memory(config={"host": host, "port": port})
+    m = Memory(config={
+        "host": host, "port": port,
+        "db": stdb_session["database"],
+    })
     yield m
     m.reset()
 

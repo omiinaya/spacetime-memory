@@ -46,10 +46,9 @@ def token() -> str:
 
 
 @pytest.fixture(scope="module")
-def client() -> Client:
-    kwargs = {"host": HOST, "port": PORT}
-    if DB:
-        kwargs["database"] = DB
+def client(stdb_session: dict) -> Client:
+    kwargs = {"host": stdb_session["host"], "port": stdb_session["port"],
+              "database": stdb_session["database"]}
     return Client(**kwargs)
 
 
