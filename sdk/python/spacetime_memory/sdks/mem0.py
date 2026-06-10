@@ -220,16 +220,21 @@ class Memory:
 
     def __init__(
         self,
-        config: dict | None = None,
+        config: Any | None = None,
         token_refresh_callback: Callable[[], str] | None = None,
     ):
-        # Config dict is per Mem0's API — we extract our own settings
-        config = config or {}
+        # Accept either dict or mem0's MemoryConfig Pydantic model
+        if isinstance(config, dict):
+            cfg = config
+        elif hasattr(config, "model_dump"):
+            cfg = config.model_dump()
+        else:
+            cfg = config or {}
         self._client = Client(
-            host=config.get("host"),
-            port=config.get("port"),
-            database=config.get("db", config.get("database")),
-            embedder_url=config.get("embedder_url"),
+            host=cfg.get("host"),
+            port=cfg.get("port"),
+            database=cfg.get("db", cfg.get("database")),
+            embedder_url=cfg.get("embedder_url"),
         )
         self._user_id_to_ws: dict[str, str] = {}
         self._token_refresh_callback = token_refresh_callback
@@ -238,7 +243,7 @@ class Memory:
         # Per-user LLM config overrides: {user_id: {provider, model, api_key, base_url}}
         self._llm_overrides: dict[str, dict[str, Any]] = {}
         # Process any llm_config entries from the top-level config
-        llm_config = config.get("llm_config", {})
+        llm_config = cfg.get("llm_config", {})
         if isinstance(llm_config, dict):
             for uid, cfg in llm_config.items():
                 if isinstance(cfg, dict):

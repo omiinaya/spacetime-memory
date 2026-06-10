@@ -45,8 +45,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 
 ── 2/6  Mem0 (mem0ai) parity ────────────────────────────────────
   ✓ Mem0.Memory class exists
-  ℹ Mem0.Memory has extra params: {'token_refresh_callback'}
-  ✗ Mem0.Memory constructor 0 common params
+  ✓ Mem0.Memory constructor 1 common params
   ✓ Mem0.add exists
   ✓ Mem0.search exists
   ✓ Mem0.get_all exists
@@ -57,7 +56,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ Mem0 signature differences are expected — ours uses user/agent/run_id as kwargs,
   ℹ   real mem0 also uses user_id/agent_id/run_id as kwargs. Ours adds SpacetimeDB
   ℹ   specific: host/port/db passed via config dict, real mem0 uses MemoryConfig.
-  ✓ Mem0.add shared keyword params: {'metadata', 'infer', 'prompt', 'agent_id', 'run_id', 'memory_type', 'user_id'}
+  ✓ Mem0.add shared keyword params: {'infer', 'memory_type', 'user_id', 'run_id', 'agent_id', 'metadata', 'prompt'}
   ✓ Mem0.add returns dict with 'results' key
   ✓ Our Mem0 has .graph property
   ℹ mem0 v2 uses generic exception handling (no BaseMemoryException)
@@ -89,8 +88,8 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 ── 4/6  Graphiti (graphiti-core) parity ─────────────────────────
   ✓ Graphiti class exists (real)
   ✓ Graphiti class exists (ours)
-  ℹ Graphiti has extra params: {'port', 'token', 'host', 'embedder_url', 'database', 'embedder_type', 'client'}
-  ℹ real Graphiti has extra params: {'password', 'tracer', 'cross_encoder', 'uri', 'user', 'graph_driver', 'trace_span_prefix', 'max_coroutines', 'store_raw_episode_content'}
+  ℹ Graphiti has extra params: {'port', 'embedder_url', 'token', 'client', 'database', 'host', 'embedder_type'}
+  ℹ real Graphiti has extra params: {'uri', 'max_coroutines', 'cross_encoder', 'store_raw_episode_content', 'password', 'graph_driver', 'tracer', 'trace_span_prefix', 'user'}
   ✗ Graphiti constructor 0 common params
   ✓ EntityNode exists (real)
   ✓ EntityNode exists (ours)
@@ -204,15 +203,14 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 
 ## Notes
 
-- Mem0.Memory has extra params: {'token_refresh_callback'}
 - Mem0 signature differences are expected — ours uses user/agent/run_id as kwargs,
 -   real mem0 also uses user_id/agent_id/run_id as kwargs. Ours adds SpacetimeDB
 -   specific: host/port/db passed via config dict, real mem0 uses MemoryConfig.
 - mem0 v2 uses generic exception handling (no BaseMemoryException)
 - Our Mem0 uses ValueError: 9x, RuntimeError: 17x
 - Our Zep imports: NotFoundError
-- Graphiti has extra params: {'port', 'token', 'host', 'embedder_url', 'database', 'embedder_type', 'client'}
-- real Graphiti has extra params: {'password', 'tracer', 'cross_encoder', 'uri', 'user', 'graph_driver', 'trace_span_prefix', 'max_coroutines', 'store_raw_episode_content'}
+- Graphiti has extra params: {'port', 'embedder_url', 'token', 'client', 'database', 'host', 'embedder_type'}
+- real Graphiti has extra params: {'uri', 'max_coroutines', 'cross_encoder', 'store_raw_episode_content', 'password', 'graph_driver', 'tracer', 'trace_span_prefix', 'user'}
 - Real EntityNode fields: ['uuid', 'name', 'group_id', 'labels', 'created_at', 'name_embedding', 'summary', 'attributes']
 - Our EntityNode dataclass fields: ['group_id', 'name', 'name_embedding', 'summary']
 - Our EntityNode __dataclass_fields__: ['uuid', 'name', 'name_embedding', 'summary', 'group_id', 'labels', 'attributes', 'created_at']

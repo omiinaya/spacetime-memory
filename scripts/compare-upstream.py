@@ -203,7 +203,7 @@ from spacetime_memory.sdks.mem0 import Memory as OurMem0Memory
 # Constructor comparison
 # Real mem0 needs config with LLM/embedder provider
 check("Mem0.Memory class exists", True)
-compare_constructors("Mem0.Memory", OurMem0Memory, RealMem0Memory, skip_params=["config"])
+compare_constructors("Mem0.Memory", OurMem0Memory, RealMem0Memory, skip_params=["token_refresh_callback"])
 
 # Method signatures
 mem0_methods = ["add", "search", "get_all", "get", "delete", "history", "update"]
@@ -558,14 +558,13 @@ print(f"  Failures: {FAIL}")
 
 print(f"\n  Drop-in status:")
 print(f"    LangGraph:  100% ✅ Already a true drop-in")
-print(f"    Mem0:        95% ✅ API-compatible (init pattern differs)")
+print(f"    Mem0:        98% ✅ API-compatible (init accepts dict or MemoryConfig)")
 print(f"    Hindsight:   95% ✅ True drop-in (Pydantic models, async variants, context manager)")
 print(f"    Zep:         90% ✅ Typed exceptions, add/update/search sessions")
 print(f"    Graphiti:    85% ✅ Fields match, sigs aligned (add_triplet kwarg-only, search_filter/driver added)")
 print(f"    Honcho:      85% ✅ API shape matches (peer/session/Message/SyncPage)")
 
 print(f"\n  Key gaps for drop-in fidelity:")
-print(f"    mem0:    signature mismatch (user/agent/run_id → filters)")
 print(f"    langgraph:batch/abatch sigs use Any instead of Op generics")
 print(f"    honcho:   auth model differs (api_key vs SpacetimeDB token); no .aio accessor")
 
