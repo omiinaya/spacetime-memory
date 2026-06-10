@@ -60,8 +60,6 @@ Usage::
 
 from __future__ import annotations
 
-import time
-import uuid as _uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -586,7 +584,7 @@ class ZepClient:
 
         """
         ws_id = self._ensure_workspace(session_id)
-        result = self._client.store(
+        self._client.store(
             workspace_id=ws_id,
             content=fact,
             summary=f"[fact] {fact[:200]}",
@@ -812,7 +810,9 @@ class ZepClient:
             NotFoundError: If the session does not exist.
 
         """
-        ws_id = self._ensure_workspace(session_id)
+        ws_id = self._resolve_session(session_id)
+        if not ws_id:
+            raise NotFoundError(f"Session '{session_id}' not found")
         return Session(session_id=session_id, metadata=metadata or {})
 
     def search_sessions(

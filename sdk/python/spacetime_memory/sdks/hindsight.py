@@ -28,7 +28,7 @@ import datetime
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -225,7 +225,8 @@ def _run_async(coro):
 
 def _make_op_id() -> str:
     """Generate a short unique operation ID."""
-    import hashlib, os
+    import hashlib
+    import os
     return hashlib.md5(os.urandom(16)).hexdigest()[:12]
 
 
@@ -500,7 +501,7 @@ class Hindsight:
                 success=True, bank_id=bank_id, items_count=1,
                 async_=retain_async,
             )
-        except Exception as exc:
+        except Exception:
             return RetainResponse(
                 success=False, bank_id=bank_id, items_count=0,
                 async_=retain_async,

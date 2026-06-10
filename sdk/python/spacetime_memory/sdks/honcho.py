@@ -36,8 +36,8 @@ import datetime
 import json
 import logging
 import os
-from collections.abc import Awaitable, Callable, Mapping
-from typing import Any, Generic, Literal, Optional, TypeVar
+from collections.abc import Mapping
+from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -368,8 +368,6 @@ class Peer:
         reasoning_level: Literal["minimal", "low", "medium", "high", "max"] | None = None,
     ) -> str | None:
         """Chat with context from memories."""
-        target_id = target.id if isinstance(target, Peer) else (target or "")
-        ses = session.id if isinstance(session, Session) else (session or "")
 
         # Search relevant memories
         try:
@@ -801,7 +799,6 @@ class Honcho:
 
     def delete_workspace(self, workspace_id: str | None = None) -> None:
         """Delete a workspace."""
-        ws_id = workspace_id or self._ws_id
         self._session_cache.clear()
         self._peer_cache.clear()
 

@@ -20,7 +20,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "sdk" / "python"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "sdk" / "python"))
 from spacetime_memory import Client
 from spacetime_memory.sdks.mem0 import Memory as StmemMem0
 from spacetime_memory.sdks.graphiti import Graphiti as StmemGraphiti, EntityNode, EntityEdge

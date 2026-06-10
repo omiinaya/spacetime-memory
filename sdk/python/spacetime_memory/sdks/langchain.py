@@ -38,7 +38,6 @@ Also provides a ``StmemMemoryStore`` that implements LangChain's
 from __future__ import annotations
 
 import json
-import uuid as _uuid
 from collections.abc import Iterator, Sequence
 from typing import Any
 

@@ -25,7 +25,7 @@ from .hindsight import (
 )
 from .langchain import StmemMemoryStore, StmemStore
 from .mem0 import Memory as Mem0Memory
-from .zep import ZepClient, MemoryMessage, Memory, MemorySearchResult, Session
+from .zep import ZepClient, MemoryMessage, Memory, MemorySearchResult
 
 __all__ = [
     "Mem0Memory",

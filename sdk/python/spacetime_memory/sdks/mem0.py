@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import json
 import logging
-from copy import deepcopy
 from typing import Any, Callable
 
 from ..client import Client
