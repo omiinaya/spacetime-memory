@@ -1,22 +1,25 @@
-"""Hindsight-compatible drop-in adapter.
+"""Hindsight-inspired memory adapter.
 
-Matches the real Hindsight Python SDK API:
+INSPIRED BY the Hindsight memory system at:
 https://github.com/vectorize-io/hindsight
+
+NOTE: This is NOT a drop-in replacement for the upstream Python SDK.
+The real ``hindsight_client.Hindsight`` (v0.8.1) is an HTTP REST client
+with a fundamentally different API (``bank_id``-oriented, typed Pydantic
+response models, no ``forget()`` method). This adapter provides a
+SpacetimeDB-backed memory store with a simpler API that shares the
+same conceptual model (retain/recall/reflect) but is NOT signature-compatible.
+See https://github.com/vectorize-io/hindsight/tree/main/hindsight-clients/python
 
 Usage::
 
     from spacetime_memory.sdks.hindsight import Hindsight
 
-    h = Hindsight(config={"api_key": "..."})  # api_key accepted for compat
+    h = Hindsight(config={"host": "localhost", "port": 3001})
     h.retain("I like pizza", source="chat", metadata={"key": "val"})
     results = h.recall("food preferences", limit=20)
     insights = h.reflect("What themes emerge?")
     h.forget(memory_id="abc123")
-
-    # Template-based configuration
-    h.reflect_mission = "You are a dietitian analyzing food preferences."
-    tmpl = h.export_template()
-    h2.import_template(tmpl)
 
 """
 

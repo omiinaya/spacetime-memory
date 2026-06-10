@@ -361,44 +361,60 @@ note("This affects serialization, validation, and type inference")
 # ---------------------------------------------------------------------------
 section("5/6  Hindsight parity")
 
-try:
-    from hindsight import Hindsight as RealHindsight
-    REAL_HINDSIGHT_AVAILABLE = True
-except (ImportError, AttributeError):
-    REAL_HINDSIGHT_AVAILABLE = False
-    RealHindsight = None
+note("=== REAL HINDSIGHT API (from vectorize-io/hindsight v0.8.1 source) ===")
+note("Import: from hindsight_client import Hindsight")
+note("__init__(self, base_url: str, api_key: str | None = None, timeout: float = 300.0, user_agent: str | None = None)")
+note("retain(self, bank_id: str, content: str, *, timestamp, context, document_id,")
+note("       metadata, entities, tags, update_mode, retain_async=False) → RetainResponse")
+note("recall(self, bank_id: str, query: str, *, types, max_tokens=4096, budget='mid',")
+note("       trace, query_timestamp, include_entities, include_chunks, tags, ...) → RecallResponse")
+note("reflect(self, bank_id: str, query: str, *, budget='low', context, max_tokens,")
+note("        response_schema, tags, include_facts, include_tool_calls, ...) → ReflectResponse")
+note("No forget() method. Also: retain_batch(), retain_files(), a* async variants")
+note("")
+note("=== OUR ADAPTER (hugely incompatible — different API entirely) ===")
+note("Import: from spacetime_memory.sdks.hindsight import Hindsight")
+note("__init__(self, config: dict | None = None, ...)")
+note("retain(self, content: str, source: str = '', metadata=None)")
+note("recall(self, query: str, limit: int = 20, threshold: float = 0.0)")
+note("reflect(self, prompt: str = '...', context=None, tags=None, max_tokens=None, response_schema=None)")
+note("forget(self, memory_id: str)")
+note("")
+check("Hindsight: NOT a drop-in replacement", False, "complete API mismatch — REST client vs embedded SDK")
 
 from spacetime_memory.sdks.hindsight import Hindsight as OurHindsight
-
-# Real hindsight (vectorize-io/hindsight) - check if PyPI version is correct
-if REAL_HINDSIGHT_AVAILABLE:
-    real_hindsight_api = [x for x in dir(RealHindsight) if not x.startswith("_")]
-    check("Hindsight class exists (real)", len(real_hindsight_api) > 0)
-    if len(real_hindsight_api) > 0:
-        compare_signatures("Hindsight", OurHindsight, RealHindsight, ["retain", "recall", "reflect", "forget"])
-    else:
-        note("PyPI 'hindsight' package exports no classes — not the vectorize-io/hindsight library")
-else:
-    note("PyPI 'hindsight' package does not export Hindsight class — unrelated library")
-    check("Hindsight real API not testable via PyPI", True)
-    note("Our adapter IS the only Python SDK for vectorize-io/hindsight")
-    note("Real hindsight is at: https://github.com/vectorize-io/hindsight")
+our_hindsight_api = [n for n in dir(OurHindsight) if not n.startswith('_') and callable(getattr(OurHindsight, n, None))]
+note(f"Our Hindsight methods: {our_hindsight_api}")
 
 
 # ---------------------------------------------------------------------------
 section("6/6  Honcho parity")
 
-# Honcho on PyPI is a Procfile manager, not plastic-labs/honcho AI memory
-from honcho import __version__ as honcho_version
-note(f"PyPI 'honcho' v{honcho_version} is Procfile manager, NOT plastic-labs/honcho")
-check("Honcho AI library not on PyPI", True)
-note("Our adapter IS the only Python SDK for plastic-labs/honcho")
-note("Real honcho is at: https://github.com/plastic-labs/honcho")
+note("=== REAL HONCHO API (from plastic-labs/honcho SDK source on GitHub) ===")
+note("Import: from honcho import Honcho")
+note("__init__(self, workspace_id: str, base_url: str | None = None, *, environment='local' | 'production', ...)")
+note("peer(self, id: str) → Peer            # get or create by ID")
+note("peers(self) → SyncPage[Peer]          # list peers in workspace")
+note("session(self, id: str) → Session      # get or create by ID")
+note("sessions(self) → SyncPage[Session]    # list sessions")
+note("search(self, query: str) → SyncPage[SessionSearchResult]")
+note("workspaces(self) → SyncPage[str]      # list workspace IDs")
+note("delete_workspace() → None")
+note("Also: queue_status(), schedule_dream(), .aio accessor for async")
+note("")
+note("=== OUR ADAPTER (completely incompatible — different abstraction) ===")
+note("Import: from spacetime_memory.sdks.honcho import Honcho")
+note("__init__(self, config: dict | None = None, client=None)")
+note("create_user(self, name: str, metadata=None) → User")
+note("create_session(self, user_id: str, location: str = '', metadata=None) → Session")
+note("add(self, session_id: str, content: str, metadata=None) → dict")
+note("search(self, session_id: str, query: str, limit: int = 20) → list[dict]")
+note("")
+check("Honcho: NOT a drop-in replacement", False, "complete API mismatch — workspace/peer vs user/session model")
 
-# Show our API surface
 from spacetime_memory.sdks.honcho import Honcho as OurHoncho
-our_honcho_api = [x for x in dir(OurHoncho) if not x.startswith("_") and x not in ('config',)]
-note(f"Our Honcho API: {our_honcho_api}")
+our_honcho_api = [n for n in dir(OurHoncho) if not n.startswith('_') and callable(getattr(OurHoncho, n, None))]
+note(f"Our Honcho methods: {our_honcho_api}")
 
 
 # ---------------------------------------------------------------------------
@@ -410,13 +426,13 @@ total = PASS + FAIL
 print(f"\n  Results: {PASS}/{total} passed, {SKIP} skipped")
 print(f"  Failures: {FAIL}")
 
-print(f"\n  Library availability for side-by-side comparison:")
-print(f"    mem0ai:       ✓ PyPI (needs OpenAI key + qdrant)")
-print(f"    zep-python:   ✓ PyPI (needs Zep server)")
-print(f"    graphiti-core:✓ PyPI (needs Neo4j)")
-print(f"    langgraph:    ✓ PyPI (InMemoryStore testable)")
-print(f"    hindsight:    ✗ Not on PyPI — adapter IS the SDK")
-print(f"    honcho:       ✗ Not on PyPI — adapter IS the SDK")
+print(f"\n  Drop-in status:")
+print(f"    LangGraph:  100% ✅ Already a true drop-in")
+print(f"    Mem0:        95% ✅ API-compatible (init pattern differs)")
+print(f"    Zep:         80% ⚠️  Needs typed exceptions + session methods")
+print(f"    Graphiti:    75% ⚠️  Needs Pydantic models + missing fields")
+print(f"    Hindsight:   20% ❌ Complete rewrite needed (REST client mismatch)")
+print(f"    Honcho:      10% ❌ Complete rewrite needed (workspace/peer mismatch)")
 
 print(f"\n  Key gaps for drop-in fidelity:")
 print(f"    mem0:    signature mismatch (user/agent/run_id → filters)")

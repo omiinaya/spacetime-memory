@@ -1,8 +1,17 @@
 """
 Mem0-compatible drop-in adapter.
 
-Matches the real Mem0 Python SDK API exactly:
+Matches the real Mem0 Python SDK API (https://github.com/mem0ai/mem0):
 https://github.com/mem0ai/mem0
+
+All public method signatures (``add``, ``search``, ``get_all``, ``get``,
+``delete``, ``history``, ``update``) accept the same keyword arguments
+as upstream ``mem0.Memory``. Return shapes match (``{"results": [...]}``).
+The ``graph`` property provides entity store access.
+
+NOTE: Constructor differs from upstream — accepts a plain ``config`` dict
+instead of a typed ``MemoryConfig`` object. The upstream also requires
+an LLM provider config which our adapter doesn't need.
 
 Usage::
 

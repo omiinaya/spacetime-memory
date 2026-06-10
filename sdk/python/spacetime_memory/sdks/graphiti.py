@@ -1,7 +1,13 @@
-"""Graphiti-compatible drop-in adapter.
+"""Graphiti-compatible adapter.
 
-Matches the real Graphiti Python SDK API:
-https://github.com/getzep/graphiti
+Maps the Graphiti knowledge graph API (https://github.com/getzep/graphiti)
+to SpacetimeDB tables. Provides signature-compatible ``Graphiti``,
+``EntityNode``, and ``EntityEdge`` classes.
+
+NOTE: Return types are plain Python classes, not Pydantic models like the
+upstream ``graphiti_core``. EntityNode and EntityEdge are missing some
+upstream fields (``uuid``, ``labels``, ``created_at``, ``attributes``,
+``episodes``, ``reference_time``). See ROADMAP.md for planned parity work.
 
 Maps::
 

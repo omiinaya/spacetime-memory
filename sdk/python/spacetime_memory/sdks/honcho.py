@@ -1,7 +1,15 @@
-"""Honcho-compatible drop-in adapter.
+"""Honcho-inspired memory adapter.
 
-Matches the real Honcho Python SDK API:
+INSPIRED BY the Honcho conversational memory platform at:
 https://github.com/plastic-labs/honcho
+
+NOTE: This is NOT a drop-in replacement for the upstream Python SDK.
+The real ``honcho.Honcho`` is a workspace/peer/session-oriented REST client
+with a fundamentally different API (``peer(id)``/``session(id)`` abstractions,
+no ``create_user()``/``create_session()``, no ``add()`` method). This adapter
+provides a SpacetimeDB-backed store with a simpler user/session API that
+shares the same conceptual domain but is NOT signature-compatible.
+See https://github.com/plastic-labs/honcho/tree/main/sdks/python
 
 Usage::
 

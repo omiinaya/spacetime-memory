@@ -1,8 +1,15 @@
 """
-Zep-compatible drop-in adapter.
+Zep-compatible memory adapter.
 
-Matches the real Zep Python SDK (zep-python / zep-cloud) API:
-https://github.com/getzep/zep-python
+Maps the Zep long-term memory API (https://github.com/getzep/zep-python)
+to SpacetimeDB. Provides signature-compatible ``ZepClient`` with
+memory CRUD, search, and fact management.
+
+NOTE: Uses generic Python exceptions (``RuntimeError``, ``ValueError``)
+rather than upstream's typed exceptions (``NotFoundError``,
+``BadRequestError``, ``ApiError``). Missing some upstream session
+lifecycle methods (``add_session()``, ``list_sessions()``).
+See ROADMAP.md for planned parity work.
 
 Maps::
 
