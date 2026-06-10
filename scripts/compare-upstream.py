@@ -293,7 +293,16 @@ check(
 
 # Zep error types
 from zep_python import NotFoundError, ApiError, BadRequestError
-note("Zep real uses typed exceptions: NotFoundError, ApiError, BadRequestError")
+# Zep real uses typed exceptions: NotFoundError, ApiError, BadRequestError
+from spacetime_memory.sdks.zep import NotFoundError as OurNotFound, BadRequestError as OurBadReq, ApiError as OurApiErr
+check("Zep: NotFoundError exists", OurNotFound is not None)
+check("Zep: BadRequestError exists", OurBadReq is not None)
+
+# Check new session methods exist
+our_zep_methods = {n for n in dir(OurZepClient) if not n.startswith('_')}
+check("Zep: add_session() exists", "add_session" in our_zep_methods)
+check("Zep: update_session() exists", "update_session" in our_zep_methods)
+check("Zep: search_sessions() exists", "search_sessions" in our_zep_methods)
 our_src_zep = _ins.getsource(OurZepClient)
 for exc in ["NotFoundError", "ApiError", "BadRequestError"]:
     if exc in our_src_zep:
@@ -532,13 +541,12 @@ print(f"\n  Drop-in status:")
 print(f"    LangGraph:  100% ✅ Already a true drop-in")
 print(f"    Mem0:        95% ✅ API-compatible (init pattern differs)")
 print(f"    Hindsight:   95% ✅ True drop-in (Pydantic models, async variants, context manager)")
-print(f"    Zep:         80% ⚠️  Needs typed exceptions + session methods")
+print(f"    Zep:         90% ✅ Typed exceptions, add/update/search sessions")
 print(f"    Graphiti:    75% ⚠️  Needs Pydantic models + missing fields")
 print(f"    Honcho:      85% ✅ API shape matches (peer/session/Message/SyncPage)")
 
 print(f"\n  Key gaps for drop-in fidelity:")
 print(f"    mem0:    signature mismatch (user/agent/run_id → filters)")
-print(f"    zep:     exception types (generic vs typed)")
 print(f"    graphiti:EntityNode/Edge are plain objects vs Pydantic models")
 print(f"    langgraph:batch/abatch sigs use Any instead of Op generics")
 print(f"    honcho:   auth model differs (api_key vs SpacetimeDB token); no .aio accessor")

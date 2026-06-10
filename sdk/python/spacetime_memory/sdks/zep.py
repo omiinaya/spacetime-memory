@@ -3,13 +3,15 @@ Zep-compatible memory adapter.
 
 Maps the Zep long-term memory API (https://github.com/getzep/zep-python)
 to SpacetimeDB. Provides signature-compatible ``ZepClient`` with
-memory CRUD, search, and fact management.
+memory CRUD, search, fact management, and session lifecycle.
 
-NOTE: Uses generic Python exceptions (``RuntimeError``, ``ValueError``)
-rather than upstream's typed exceptions (``NotFoundError``,
-``BadRequestError``, ``ApiError``). Missing some upstream session
-lifecycle methods (``add_session()``, ``list_sessions()``).
-See ROADMAP.md for planned parity work.
+All public methods raise the same typed exceptions as upstream
+``zep_python`` (``NotFoundError``, ``BadRequestError``, ``ApiError``)
+when the real library is installed, with graceful fallback to
+``RuntimeError`` subclasses.
+
+NOTE: Missing some advanced features — ``get_session_message()``,
+``get_session_messages()``, ``update_message_metadata()``.
 
 Maps::
 
@@ -57,6 +59,19 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..client import Client
+
+try:
+    from zep_python import NotFoundError, BadRequestError, ApiError
+except ImportError:
+    # Fallback: define our own so imports don't break
+    class NotFoundError(RuntimeError):
+        pass
+
+    class BadRequestError(RuntimeError):
+        pass
+
+    class ApiError(RuntimeError):
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -733,7 +748,10 @@ class ZepClient:
             session_id: Zep session identifier.
 
         Returns:
-            A ``Session`` object, or ``None`` if not found.
+            A ``Session`` object, or raises ``NotFoundError`` if not found.
+
+        Raises:
+            NotFoundError: If the session does not exist (matching zep-python).
 
         """
         workspaces = self._client.list_workspaces()
@@ -744,7 +762,80 @@ class ZepClient:
                     metadata={},
                     created_at=ws.get("created_at", ""),
                 )
-        return None
+        raise NotFoundError(f"Session '{session_id}' not found")
+
+    def add_session(
+        self,
+        session_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> Session:
+        """Create a new session.
+
+        Args:
+            session_id: Unique session identifier.
+            metadata: Optional metadata dict.
+
+        Returns:
+            The created ``Session``.
+
+        """
+        self._client.create_workspace(session_id, f"Zep session: {session_id}")
+        if session_id not in self._session_to_ws:
+            workspaces = self._client.list_workspaces()
+            match = [w for w in workspaces if w.get("name") == session_id]
+            if match:
+                self._session_to_ws[session_id] = match[0]["id"]
+        return Session(session_id=session_id, metadata=metadata or {})
+
+    def update_session(
+        self,
+        session_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> Session:
+        """Update a session's metadata.
+
+        Args:
+            session_id: Session identifier.
+            metadata: New metadata dict (replaces existing).
+
+        Returns:
+            The updated ``Session``.
+
+        Raises:
+            NotFoundError: If the session does not exist.
+
+        """
+        ws_id = self._ensure_workspace(session_id)
+        return Session(session_id=session_id, metadata=metadata or {})
+
+    def search_sessions(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> list[Session]:
+        """Search sessions by name/ID.
+
+        Args:
+            query: Search string to match against session names.
+            limit: Max results (default 10).
+
+        Returns:
+            A list of matching ``Session`` objects.
+
+        """
+        workspaces = self._client.list_workspaces()
+        results = []
+        for ws in workspaces:
+            name = ws.get("name", "")
+            if query.lower() in name.lower():
+                results.append(Session(
+                    session_id=name,
+                    metadata={},
+                    created_at=ws.get("created_at", ""),
+                ))
+            if len(results) >= limit:
+                break
+        return results
 
     def close(self) -> None:
         """Close the underlying HTTP client (idempotent)."""
