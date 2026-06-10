@@ -57,7 +57,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ Mem0 signature differences are expected — ours uses user/agent/run_id as kwargs,
   ℹ   real mem0 also uses user_id/agent_id/run_id as kwargs. Ours adds SpacetimeDB
   ℹ   specific: host/port/db passed via config dict, real mem0 uses MemoryConfig.
-  ✓ Mem0.add shared keyword params: {'user_id', 'memory_type', 'metadata', 'infer', 'agent_id', 'prompt', 'run_id'}
+  ✓ Mem0.add shared keyword params: {'run_id', 'infer', 'metadata', 'prompt', 'agent_id', 'memory_type', 'user_id'}
   ✓ Mem0.add returns dict with 'results' key
   ✓ Our Mem0 has .graph property
   ℹ mem0 v2 uses generic exception handling (no BaseMemoryException)
@@ -85,8 +85,8 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 ── 4/6  Graphiti (graphiti-core) parity ─────────────────────────
   ✓ Graphiti class exists (real)
   ✓ Graphiti class exists (ours)
-  ℹ Graphiti has extra params: {'embedder_url', 'token', 'client', 'database', 'port', 'embedder_type', 'host'}
-  ℹ real Graphiti has extra params: {'graph_driver', 'tracer', 'uri', 'user', 'cross_encoder', 'store_raw_episode_content', 'max_coroutines', 'trace_span_prefix', 'password'}
+  ℹ Graphiti has extra params: {'embedder_type', 'token', 'host', 'database', 'port', 'embedder_url', 'client'}
+  ℹ real Graphiti has extra params: {'store_raw_episode_content', 'graph_driver', 'cross_encoder', 'trace_span_prefix', 'tracer', 'max_coroutines', 'uri', 'password', 'user'}
   ✗ Graphiti constructor 0 common params
   ✓ EntityNode exists (real)
   ✓ EntityNode exists (ours)
@@ -190,8 +190,8 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - Our Mem0 uses ValueError: 9x, RuntimeError: 17x
 - Zep real uses typed exceptions: NotFoundError, ApiError, BadRequestError
 - Our Zep uses generic exceptions (RuntimeError/ValueError)
-- Graphiti has extra params: {'embedder_url', 'token', 'client', 'database', 'port', 'embedder_type', 'host'}
-- real Graphiti has extra params: {'graph_driver', 'tracer', 'uri', 'user', 'cross_encoder', 'store_raw_episode_content', 'max_coroutines', 'trace_span_prefix', 'password'}
+- Graphiti has extra params: {'embedder_type', 'token', 'host', 'database', 'port', 'embedder_url', 'client'}
+- real Graphiti has extra params: {'store_raw_episode_content', 'graph_driver', 'cross_encoder', 'trace_span_prefix', 'tracer', 'max_coroutines', 'uri', 'password', 'user'}
 - Real EntityNode fields: ['uuid', 'name', 'group_id', 'labels', 'created_at', 'name_embedding', 'summary', 'attributes']
 - Our EntityNode attrs: ['from_stmem', 'group_id', 'name', 'name_embedding', 'summary']
 - Real EntityEdge fields: ['uuid', 'group_id', 'source_node_uuid', 'target_node_uuid', 'created_at', 'name', 'fact', 'fact_embedding', 'episodes', 'expired_at', 'valid_at', 'invalid_at', 'reference_time', 'attributes']
