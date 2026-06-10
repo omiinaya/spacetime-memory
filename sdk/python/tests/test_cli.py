@@ -61,9 +61,10 @@ class TestCliHelp:
         assert "spacetime-memory" in result.output.lower()
 
     def test_no_args_shows_help(self, runner):
-        """Invoking without arguments shows help (exit code 0 with no_args_is_help)."""
+        """Invoking without arguments shows help (exit code depends on Click version)."""
         result = runner.invoke(cli, [])
-        assert result.exit_code == 0
+        # Click 8.x+ exit code 2 for no_args_is_help; older Click 0
+        assert result.exit_code in (0, 2), f"Expected 0 or 2, got {result.exit_code}"
         assert "Usage:" in result.output
 
     def test_workspace_help(self, runner):

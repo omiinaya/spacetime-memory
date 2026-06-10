@@ -1,13 +1,21 @@
 """Graphiti-compatible adapter.
 
-Maps the Graphiti knowledge graph API (https://github.com/getzep/graphiti)
-to SpacetimeDB tables. Provides signature-compatible ``Graphiti``,
-``EntityNode``, and ``EntityEdge`` classes.
+Maps the SpacetimeDB knowledge graph behind Graphiti's API.  Provides
+signature-compatible ``Graphiti``, ``EntityNode``, ``EntityEdge`` and
+associated result types.
 
-NOTE: Return types are plain Python classes, not Pydantic models like the
-upstream ``graphiti_core``. EntityNode and EntityEdge are missing some
-upstream fields (``uuid``, ``labels``, ``created_at``, ``attributes``,
-``episodes``, ``reference_time``). See ROADMAP.md for planned parity work.
+NOTE: Return types are plain Python dataclasses, not Pydantic models like the
+upstream ``graphiti_core``.  EntityNode and EntityEdge have full field parity
+(8/8, 14/14) but lack upstream's automatic serialisation/validation.
+
+**Error contract:**
+- ``RuntimeError`` / ``SpacetimeDBError`` for backend failures — these
+  propagate from ``Client._sql()`` / ``Client._call()``.
+- ``logger.warning`` logged for transient errors (community building,
+  LLM summarisation) — operations degrade gracefully.
+- ``search()`` returns ``[]`` on failure (logged).
+- ``get_entity_edge_summary()`` returns ``[]`` when no edges exist (no
+  exception — empty is a valid result).
 
 Maps::
 

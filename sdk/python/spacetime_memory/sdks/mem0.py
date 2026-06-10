@@ -13,6 +13,16 @@ NOTE: Constructor differs from upstream — accepts a plain ``config`` dict
 instead of a typed ``MemoryConfig`` object. The upstream also requires
 an LLM provider config which our adapter doesn't need.
 
+**Error contract:**
+- ``ValueError`` for invalid inputs (empty ``text``, missing required args)
+- ``RuntimeError`` / ``SpacetimeDBError`` for backend failures (DB down,
+  connection errors).  These propagate from the underlying ``Client``.
+- ``logger.warning`` logged for transient issues (LLM extraction, KG
+  node creation failures) — the operation degrades gracefully rather
+  than crashing.
+- Graph search returns ``[]`` on failure (logged), consistent with
+  mem0's ``get_all`` returning empty for missing data.
+
 Usage::
 
     from spacetime_memory.sdks.mem0 import Memory

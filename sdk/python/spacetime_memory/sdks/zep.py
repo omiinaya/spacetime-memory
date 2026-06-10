@@ -10,6 +10,13 @@ All public methods raise the same typed exceptions as upstream
 when the real library is installed, with graceful fallback to
 ``RuntimeError`` subclasses.
 
+**Error contract:**
+- ``NotFoundError`` — requested session, memory, or fact doesn't exist
+- ``BadRequestError`` — invalid input parameters
+- ``ApiError`` — SpacetimeDB backend failure (connection, server error)
+- Fallback: when ``zep_python`` is not installed, the same exception
+  names are defined as ``RuntimeError`` subclasses in this module.
+
 NOTE: Missing some advanced features — ``get_session_message()``,
 ``get_session_messages()``, ``update_message_metadata()``.
 

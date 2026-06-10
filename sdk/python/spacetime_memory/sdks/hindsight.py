@@ -241,6 +241,18 @@ class Hindsight:
 
     When ``stdb_database`` is omitted, it's derived from ``base_url`` or
     ``stdb_host:stdb_port`` to provide a stable default.
+
+    **Error contract:**
+    - Return types are typed Pydantic models with ``success`` flags
+      (e.g. ``RetainResponse(success=True/False)``).  This matches the
+      upstream ``hindsight_client`` design — errors are in the response,
+      not raised as exceptions.
+    - ``RuntimeError`` raised for network-level failures (connection
+      refused, timeout after retries) via the underlying ``Client``.
+    - ``RuntimeError`` raised when calling sync wrappers (``retain``,
+      ``recall``, ``reflect``) in an async context — use ``await``
+      variants instead.
+    - ``RuntimeError`` raised when using a closed client.
     """
 
     def __init__(

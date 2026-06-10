@@ -165,7 +165,7 @@ def _esc(val: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-@click.group()
+@click.group(invoke_without_command=True, no_args_is_help=True)
 @click.version_option(version="0.1.0", prog_name="stmem")
 @click.option("--output", "-o", type=click.Choice(["table", "json", "csv"]),
               default="table", help="Output format: table, json, or csv")

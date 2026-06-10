@@ -4,6 +4,17 @@ Drop-in replacement for ``honcho.Honcho`` (plastic-labs/honcho SDK).
 Maps the Honcho conversational memory platform API
 (https://github.com/plastic-labs/honcho) to SpacetimeDB storage.
 
+**Error contract:**
+- ``RuntimeError`` / ``SpacetimeDBError`` for backend failures — these
+  propagate from the underlying ``Client``.
+- ``logger.warning`` logged for transient failures (search, chat).
+- ``Peer.chat()`` returns ``None`` when no relevant memories are found
+  (matches upstream behaviour — not an error).
+- ``Peer.sessions()`` returns an empty ``SyncPage`` — SpacetimeDB has
+  no direct peer→session index.
+- ``Session.add_messages()`` silently skips messages that fail to store
+  (logged), continues processing the rest.
+
 Usage::
 
     from spacetime_memory.sdks.honcho import Honcho

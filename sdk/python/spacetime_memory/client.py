@@ -49,6 +49,24 @@ class EmbedderUnavailableError(ConnectionError):
     """Raised when the embedding sidecar is unreachable and no fallback is configured."""
 
 
+class SpacetimeDBError(RuntimeError):
+    """Base exception for SpacetimeDB backend failures.
+
+    Raised when a request to SpacetimeDB fails after retries are exhausted,
+    the circuit breaker is open, or the backend returns a non-recoverable
+    error.  All adapter code should catch and propagate this (or a more
+    specific subclass) rather than returning ``None`` / ``[]`` silently.
+    """
+
+
+class NotFoundError(SpacetimeDBError):
+    """Raised when a requested resource (session, memory, workspace) is not found."""
+
+
+class ApiError(SpacetimeDBError):
+    """Raised when SpacetimeDB returns an unexpected API error."""
+
+
 # ---------------------------------------------------------------------------
 # Logging configuration
 # ---------------------------------------------------------------------------
@@ -165,6 +183,10 @@ class Client:
         self.verbose = verbose
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
         self.max_retries = int(os.environ.get("STMEM_MAX_RETRIES", "3"))
+        self._circuit_breaker_threshold = int(os.environ.get("STMEM_CIRCUIT_THRESHOLD", "5"))
+        self._circuit_breaker_reset_secs = float(os.environ.get("STMEM_CIRCUIT_RESET_SECS", "30.0"))
+        self._consecutive_failures: int = 0
+        self._circuit_open_until: float = 0.0
         self._metrics: Any = None  # Set via set_metrics_collector()
         self.request_id: str = os.urandom(4).hex()  # Unique per-client instance
         self._identity_token: str | None = None
@@ -265,10 +287,25 @@ class Client:
     ) -> httpx.Response:
         """Make an HTTP request with retry on connection/timeout errors.
 
-        Retries up to ``self.max_retries`` times with exponential backoff.
+        Retries up to ``self.max_retries`` times with exponential backoff + jitter.
         Does NOT retry on 4xx responses (client errors).
+
+        Includes circuit breaker: after ``_circuit_breaker_threshold`` consecutive
+        failures, further requests fail fast (without attempting) for
+        ``_circuit_breaker_reset_secs`` seconds.
         """
+        import random as _random
         import time as _time
+
+        # Circuit breaker check
+        now = _time.time()
+        if self._circuit_open_until > now:
+            raise RuntimeError(
+                f"SpacetimeDB circuit breaker is open "
+                f"(retry in {self._circuit_open_until - now:.0f}s). "
+                f"Circuit resets at STMEM_CIRCUIT_RESET_SECS="
+                f"{self._circuit_breaker_reset_secs}."
+            )
 
         last_exc: Exception | None = None
         for attempt in range(self.max_retries + 1):
@@ -282,6 +319,9 @@ class Client:
                 # Don't retry client errors (4xx) or application errors (530)
                 code = int(getattr(resp, "status_code", 500))
                 if code < 500 or code >= 600 or code == 530:
+                    # Success or client error — reset circuit breaker
+                    self._consecutive_failures = 0
+                    self._circuit_open_until = 0.0
                     return resp
                 # Server error — retry (502/503/504)
                 last_exc = RuntimeError(f"Server error (HTTP {code}) on {url}")
@@ -290,12 +330,21 @@ class Client:
             except httpx.RemoteProtocolError as e:
                 last_exc = e
             if attempt < self.max_retries:
-                delay = 0.5 * (2 ** attempt)
+                delay = 0.5 * (2 ** attempt) * (1 + _random.random())
                 logger.warning(
                     "Request failed (attempt %d/%d): %s. Retrying in %.1fs...",
                     attempt + 1, self.max_retries + 1, last_exc, delay,
                 )
                 _time.sleep(delay)
+
+        # All retries exhausted — trip circuit breaker
+        self._consecutive_failures += 1
+        if self._consecutive_failures >= self._circuit_breaker_threshold:
+            self._circuit_open_until = _time.time() + self._circuit_breaker_reset_secs
+            logger.warning(
+                "Circuit breaker opened for %.0fs after %d consecutive failures",
+                self._circuit_breaker_reset_secs, self._consecutive_failures,
+            )
         raise RuntimeError(
             f"Request failed after {self.max_retries + 1} attempts: {last_exc}"
         ) from last_exc
