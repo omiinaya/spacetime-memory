@@ -4,6 +4,9 @@ Each adapter aims to be a **drop-in replacement** for the upstream library's pub
 This document tracks which methods are supported, which are mapped to SpacetimeDB
 equivalents, and which are explicitly not supported.
 
+**WARNING:** These adapters share a single SpacetimeDB backend. Shape parity is high
+but runtime quality varies — see the "Runtime Notes" section for each adapter.
+
 ## Key
 
 | Icon | Meaning |
@@ -15,197 +18,227 @@ equivalents, and which are explicitly not supported.
 
 ---
 
-## Mem0
+## LangGraph
 
-Reference: [github.com/mem0ai/mem0](https://github.com/mem0ai/mem0) — `Memory` class.
+Reference: [langchain-ai/langgraph](https://github.com/langchain-ai/langgraph) — `BaseStore`.
 
-Adapter: `spacetime_memory.sdks.mem0.Memory` (604 lines, 16 public methods)
-
-| Method | Status | Notes |
-|--------|--------|-------|
-| `__init__(config, token_refresh_callback)` | ✅ | Accepts standard Mem0 config dict |
-| `add(data, user_id, agent_id, run_id, metadata)` | ✅ | `data` → `store_memory`, maps `user_id` → workspace |
-| `get(memory_id)` | ✅ | SQL lookup by ID |
-| `search(query, user_id, agent_id, limit, ...)` | ✅ | → `hybrid_search`, supports Mem0 filter shape + v2 `filters` dict |
-| `get_all(user_id, agent_id, limit)` | ✅ | SQL query with workspace filter, supports v2 `filters` + `top_k` |
-| `update(memory_id, data)` | ✅ | → `update_memory`, accepts `metadata` param |
-| `delete(memory_id)` | ✅ | → `deactivate_memory` |
-| `delete_all(user_id, agent_id)` | ✅ | Workspace-scoped deletion, supports v2 `filters` dict |
-| `history(memory_id)` | ✅ | Returns memory version history |
-| `reset()` | ✅ | Clear all cached workspace mappings |
-| `from_config(config_dict)` | ✅ | Classmethod (Mem0 v2+ compat) |
-| `close()` | ✅ | No-op (HTTP client is long-lived) |
-| `batch_update(memories)` | ❌ | Removed from Mem0 v2 API; not applicable |
-| `create_memory_tool()` | ❌ | Removed from Mem0 v2 API; not applicable |
-| Memory merging (v1.1+) | ✅ | `infer=True` uses LLM for fact extraction (via `LLMClient`) + basic merge fallback |
-| Graph memory | ✅ | Entity persistence via `kg_node` table. Access via `m.graph.add/search/get_all/delete`. `add()` with `infer=True` creates KG nodes from LLM-extracted facts |
-| Custom LLM per user | ✅ | `m.set_llm_config(user_id, {"model": ..., "api_key": ...})` — per-user model overrides |
-| `chat()` | ✅ | RAG + LLM response pipeline. Stores queries, searches memories, generates via LLMClient. Gracefully degrades without OPENAI_API_KEY |
-
-**Coverage: ~95%.** Graph memory, custom LLM per user, and chat now implemented. Remaining gap: `create_memory_tool()` (removed from Mem0 v2 API).
-
----
-
-## Zep
-
-Reference: [github.com/getzep/zep-python](https://github.com/getzep/zep-python) — `ZepClient`.
-
-Adapter: `spacetime_memory.sdks.zep.ZepClient` (500 lines, 10 public methods)
-
-| Method | Status | Notes |
-|--------|--------|-------|
-| `__init__(host, port, ...)` | ✅ | Standard Zep-compatible init |
-| `add_memory(session_id, messages)` | ✅ | → `store_memory` for each message |
-| `get_memory(session_id, lastn, ...)` | ✅ | Now includes `facts` + `relevant_facts` in response |
-| `delete_memory(session_id)` | ✅ | → `deactivate_memory` by session |
-| `search_memory(session_id, query, limit, metadata)` | ✅ | → `hybrid_search` scoped to session |
-| `list_sessions()` | ✅ | SQL query listing all workspaces |
-| `get_session(session_id)` | ✅ | Returns workspace metadata |
-| `close()` | ✅ | No-op (HTTP client is long-lived) |
-| `add_fact(session_id, fact)` | ✅ | → `store_memory` with `memory_type="fact"` |
-| `list_facts(session_id)` | ✅ | → `list_memories` filtered to `memory_type="fact"` |
-| `delete_fact(session_id, fact_id)` | ✅ | → `deactivate_memory` by fact ID |
-| `update_memory(session_id, memory_id, ...)` | ✅ | → `update_memory` reducer |
-| `search_memory` with `min_score` | ✅ | Accepted as alias for `score_threshold` |
-| `summarize_memory(session_id)` | ✅ | LLM-powered via `LLMClient` (requires OPENAI_API_KEY) |
-| `search_memory` with `search_scope` | ❌ | Zep Cloud feature |
-
-**Coverage: ~93%.** Facts API + LLM summarization implemented. Remaining gap is Cloud-only.
-
----
-
-## Graphiti
-
-Reference: [github.com/getzep/graphiti](https://github.com/getzep/graphiti) — `Graphiti` class.
-
-Adapter: `spacetime_memory.sdks.graphiti.Graphiti` (915 lines, 15 public methods)
+Adapter: `spacetime_memory.sdks.langchain.StmemStore` / `StmemMemoryStore`
 
 | Method | Status | Notes |
 |--------|--------|-------|
 | `__init__(...)` | ✅ | Standard init |
-| `close()` | ✅ | No-op |
-| `add_triplet(group_id, triplet, ...)` | ✅ | → KG node/edge creation |
-| `add_episode(group_id, episode_body, ...)` | ✅ | → memory + KG with time context |
-| `search(group_id, query, limit, ...)` | ✅ | → `hybrid_search` |
-| `search_(group_id, query, ...)` | ✅ | Alternative search interface |
-| `get_entity_edge_summary(group_id, entity_name)` | ✅ | Returns edge summary for entity |
-| `build_communities(group_id)` | ✅ | → `detect_communities` |
-| `remove_episode(episode_uuid)` | ✅ | → memory deactivation |
-| `build_indices_and_constraints(...)` | ✅ | Ensures DB state |
-| `get_nodes_and_edges_by_episode(uuid)` | ✅ | Returns KG subgraph for episode |
-| `update_edge(edge_id, relation, ...)` | ✅ | → `update_edge` reducer (temporal versioning) |
-| `get_edge_history(edge_id)` | ✅ | Returns all temporal versions of an edge |
-| Temporal edge diff tracking | ✅ | Edge versions linked by `edge_group_id` with `valid_at`/`invalid_at` |
-| Entity dedup during `add_triplet` | ⚠️ | Fuzzy name matching (case-insensitive + difflib >0.85) without LLM |
-| Community summary text | ✅ | LLM-generated via `LLMClient` when OPENAI_API_KEY set |
-| Time-range-filtered search | ✅ | `valid_at_after`/`valid_at_before` kwargs in search()/search_() |
-
-**Coverage: ~90%.** Temporal edge tracking + time-range filters + fuzzy entity dedup + LLM community summaries.
-
----
-
-## Hindsight
-
-Reference: [github.com/vectorize-io/hindsight](https://github.com/vectorize-io/hindsight) — `Hindsight` class.
-
-Adapter: `spacetime_memory.sdks.hindsight.Hindsight` (415 lines, 11 public methods)
-
-| Method | Status | Notes |
-|--------|--------|-------|
-| `__init__(config, ...)` | ✅ | Standard init |
-| `retain(content, source, metadata, ...)` | ✅ | → `store_memory` |
-| `recall(query, limit, ...)` | ✅ | → `hybrid_search` |
-| `reflect(prompt)` | ✅ | → `create_insight`, LLM-powered |
-| `forget(memory_id)` | ✅ | → `deactivate_memory` |
-| `batch_retain(items)` | ✅ | Batch memory storage |
-| `list_all(limit)` | ✅ | Lists all memories |
-| `stats()` | ✅ | Returns aggregate stats |
-| `reset()` | ✅ | Clears cached state |
-| Custom prompt templates for `reflect` | ✅ | Template-based with `reflect_mission` config + `export_template()`/`import_template()` |
-| `reflect()` with `context` param | ✅ | Extra context alongside the prompt |
-| `reflect()` with `tags` param | ✅ | Client-side memory filter |
-| `reflect()` with `max_tokens` param | ✅ | Overrides default LLM token limit |
-| `reflect()` with `response_schema` param | ✅ | Structured JSON output |
-| `export_template(workspace_id)` | ✅ | Serializes reflect config |
-| `import_template(data)` | ✅ | Loads reflect config from dict |
-|| `batch_retain` dedup | ✅ | Content-hash dedup within batch |
-
-**Coverage: ~90%.** Template-based reflect + batch dedup fully implemented.
-
----
-
-## Honcho
-
-Reference: [github.com/plastic-labs/honcho](https://github.com/plastic-labs/honcho) — `Honcho` class.
-
-Adapter: `spacetime_memory.sdks.honcho.Honcho` (579 lines, 21 public methods)
-
-| Method | Status | Notes |
-|--------|--------|-------|
-| `create_user(name, metadata)` | ✅ | → `create_peer` |
-| `get_user(name)` | ✅ | Peer lookup |
-| `get_or_create_user(name)` | ✅ | Compound operation |
-| `create_session(user, location, ...)` | ✅ | → `create_session` |
-| `get_session(session_id)` | ✅ | Session lookup |
-| `get_or_create_session(user, session_id, ...)` | ✅ | Compound operation |
-| `add(user, content, session_id, ...)` | ✅ | → `store_memory` |
-| `search(user, query, limit, ...)` | ✅ | → `hybrid_search` |
-| `get_user_memories(user, limit)` | ✅ | → memory list by user |
-| `User.set_metadata(metadata)` | ✅ | → `update_workspace` (stored as description) |
-| `User.get_metadata()` | ✅ | Returns metadata from workspace description |
-| `Session.create_memory(...)` | ✅ | Session-scoped memory creation |
-| `Session.search(...)` | ✅ | Session-scoped search |
-| `Session.get_memories(limit)` | ✅ | Session memory list |
-| Session-level memory visibility | ✅ | Memory store/search/list scoped by `source_session_id` |
-| `Session.get_metadata()` | ✅ | Returns locally-cached session metadata |
-| `Session.set_metadata(metadata)` | ✅ | Persists session metadata via memory record |
-| `Session.refresh()` | ✅ | Re-fetches session metadata from backend |
-| `metadata` param in `create_session` | ✅ | Now actually forwarded to Session constructor |
-
-**Coverage: ~88%.** Session metadata API fully implemented.
-
----
-
-## LangChain
-
-Reference: [python.langchain.com](https://python.langchain.com/) — `BaseStore`, `BaseVectorStore`.
-
-Adapter: `spacetime_memory.sdks.langchain` (778 lines, 16 public methods)
-
-| Method | Status | Notes |
-|--------|--------|-------|
-| **StmemStore (BaseStore)** | | |
 | `mget(keys)` | ✅ | Multi-get by key |
 | `mset(key_value_pairs)` | ✅ | Multi-set |
 | `mdelete(keys)` | ✅ | Multi-delete |
 | `yield_keys(prefix)` | ✅ | Key iteration |
-| **StmemMemoryStore (BaseMemoryStore)** | | |
 | `get(namespace, key)` | ✅ | Get by namespace + key |
 | `put(namespace, key_value_pairs)` | ✅ | Put by namespace |
 | `delete(namespace, key)` | ✅ | Delete by namespace + key |
 | `search(namespace, query, limit, ...)` | ✅ | → `hybrid_search` with embedding |
 | `list_namespaces()` | ✅ | Namespace listing |
 | `batch(ops)` | ✅ | Batch operations |
-| **Additional** | | |
-| `StmemChatMessageHistory` | ✅ | `BaseChatMessageHistory` implementation — stores messages as memory records |
-| `AIMessage` content dedup | ✅ | Dedup by type + content in `add_messages` |
+| `abatch(ops)` | ✅ | Async batch |
+| `aput` / `aget` / `adelete` / `asearch` | ✅ | All async variants |
+| `GetOp` / `PutOp` / `SearchOp` / `ListNamespacesOp` | ✅ | Op type parity |
+| `supports_ttl` | ✅ |  |
 
-**Coverage: ~88%.** Core stores fully implemented. Chat message history with dedup.
+**Runtime quality:** ✅ True drop-in. Inherits `BaseStore` from upstream.
+**Coverage: 100%**
+
+---
+
+## Mem0
+
+Reference: [mem0ai/mem0](https://github.com/mem0ai/mem0) — `Memory` class.
+
+Adapter: `spacetime_memory.sdks.mem0.Memory` (1119 lines, 16 public methods)
+
+| Method | Status | Notes |
+|--------|--------|-------|
+| `__init__(config, ...)` | ✅ | Accepts dict or `MemoryConfig` |
+| `add(data, user_id, agent_id, ...)` | ✅ | → `store_memory`, accepts all shared keyword params (`infer`, `memory_type`, `run_id`, `metadata`, `prompt`) |
+| `get(memory_id)` | ✅ | SQL lookup by ID |
+| `search(query, user_id, ...)` | ✅ | → `hybrid_search`, supports v2 `filters` dict |
+| `get_all(user_id, ...)` | ✅ | Workspace-scoped |
+| `update(memory_id, data)` | ✅ | → `update_memory` |
+| `delete(memory_id)` | ✅ | → `deactivate_memory` |
+| `delete_all(user_id, ...)` | ✅ | Workspace-scoped |
+| `history(memory_id)` | ✅ | Memory version history |
+| `reset()` | ✅ | Clear caches |
+| `from_config(config_dict)` | ✅ | Classmethod |
+| `close()` | ✅ | No-op |
+| `.graph.add/search/get_all/delete` | ✅ | Entity persistence via `kg_node` table |
+| `chat()` | ✅ | RAG + LLM pipeline |
+| `create_memory_tool()` | ❌ | Removed from Mem0 v2 API |
+
+**Runtime notes:**
+- Constructor accepts both `dict` and `MemoryConfig` Pydantic model
+- Error swallowing was fixed in v1.14.0 (3 sites now log warnings instead of `pass`)
+- LLM extraction gracefully degrades without `OPENAI_API_KEY`
+- Graph API search returns empty list on failure (logged)
+- `ValueError` used for validation (9 sites), `RuntimeError` for backend errors (17 sites)
+
+**Coverage: ~98%**
+
+---
+
+## Zep
+
+Reference: [getzep/zep-python](https://github.com/getzep/zep-python) — `ZepClient`.
+
+Adapter: `spacetime_memory.sdks.zep.ZepClient` (892 lines, 15 public methods)
+
+| Method | Status | Notes |
+|--------|--------|-------|
+| `__init__(host, port, ...)` | ✅ | Standard Zep-compatible init |
+| `add_memory(session_id, messages)` | ✅ | → `store_memory` per message |
+| `get_memory(session_id, ...)` | ✅ | Returns messages + facts + relevant_facts |
+| `delete_memory(session_id)` | ✅ | → `deactivate_memory` by session |
+| `search_memory(session_id, query, ...)` | ✅ | → `hybrid_search` with `min_score` alias |
+| `list_sessions()` | ✅ | Workspace listing |
+| `get_session(session_id)` | ✅ | Returns workspace metadata |
+| `add_session(session_id, ...)` | ✅ | Creates workspace |
+| `update_session(session_id, ...)` | ✅ | Updates workspace metadata |
+| `search_sessions(query, ...)` | ✅ | Search across sessions |
+| `add_fact(session_id, fact)` | ✅ | → `store_memory` with `memory_type="fact"` |
+| `list_facts(session_id)` | ✅ | → `list_memories` filtered to facts |
+| `delete_fact(session_id, fact_id)` | ✅ | → `deactivate_memory` |
+| `update_memory(session_id, ...)` | ✅ | → `update_memory` reducer |
+| `summarize_memory(session_id)` | ✅ | LLM-powered via `LLMClient` |
+| `close()` | ✅ | No-op |
+
+**Runtime notes:**
+- Typed exceptions: `NotFoundError`, `BadRequestError`, `ApiError` (from imported `zep_python` or local fallback)
+- Missing: async support (upstream Zep has async endpoints)
+- `search_sessions()` results are limited — SpacetimeDB doesn't have a cross-workspace search index
+- Error paths: `NotFoundError` raised for missing sessions, `RuntimeError` for DB failures
+
+**Coverage: ~90%**
+
+---
+
+## Graphiti
+
+Reference: [getzep/graphiti](https://github.com/getzep/graphiti) — `Graphiti` class.
+
+Adapter: `spacetime_memory.sdks.graphiti.Graphiti` (1190 lines, 17 public methods)
+
+| Method | Status | Notes |
+|--------|--------|-------|
+| `__init__(...)` | ✅ | Standard init |
+| `close()` | ✅ | No-op |
+| `add_triplet(source_node, edge, target_node, *, group_id)` | ✅ | → KG node/edge creation |
+| `add_episode(episode_body, ...)` | ✅ | → memory + KG with time context |
+| `search(query, center_node_uuid, ...)` | ✅ | → `hybrid_search` with `search_filter`/`driver` params |
+| `search_(...)` | ✅ | → `SearchResults` with nodes + edges |
+| `get_entity_edge_summary(entity_uuid)` | ✅ | Returns edge summary |
+| `build_communities(group_id)` | ✅ | → `detect_communities` |
+| `remove_episode(episode_uuid)` | ✅ | → memory deactivation |
+| `build_indices_and_constraints(...)` | ✅ | Ensures DB state |
+| `get_nodes_and_edges_by_episode(uuid)` | ✅ | KG subgraph for episode |
+| `update_edge(edge_id, relation, ...)` | ✅ | Temporal versioning |
+| `get_edge_history(edge_id)` | ✅ | All temporal versions |
+| Temporal edge diff tracking | ✅ | Edge versions linked by `edge_group_id` |
+| Entity dedup | ⚠️ | Fuzzy name matching (case-insensitive + difflib >0.85) without LLM |
+| Community summary text | ✅ | LLM-generated when `OPENAI_API_KEY` set |
+| Time-range-filtered search | ✅ | `valid_at_after`/`valid_at_before` kwargs |
+
+**Runtime notes:**
+- `EntityNode` and `EntityEdge` are dataclasses, not Pydantic models (upstream uses Pydantic)
+- All upstream fields present: `EntityNode` 8/8, `EntityEdge` 14/14 (plus extras: `version`, `edge_group_id`)
+- Constructor params differ upstream (`uri`, `password`, `graph_driver` → Neo4j) vs ours (`host`, `port`, `database` → SpacetimeDB) — unavoidable
+- `group_id` is keyword-only in `add_triplet` (extra vs upstream)
+- `search()` accepts `**kwargs` for forward compat
+- Error paths: warnings logged, empty results on failure
+
+**Coverage: ~85%** (shape match). Runtime quality: best of the rewritten adapters.
+
+---
+
+## Hindsight
+
+Reference: [vectorize-io/hindsight](https://github.com/vectorize-io/hindsight) — `Hindsight` class (v0.8.1).
+
+Adapter: `spacetime_memory.sdks.hindsight.Hindsight` (670 lines, 13 public methods)
+
+| Method | Status | Notes |
+|--------|--------|-------|
+| `__init__(base_url, api_key, timeout, user_agent, *stdb_*)` | ✅ | Accepts Hindsight-standard args + SpacetimeDB extras |
+| `retain(bank_id, content, *, timestamp, context, ...)` | ✅ | Full param set including `entities`, `tags`, `update_mode`, `retain_async` |
+| `retain_batch(bank_id, items, ...)` | ✅ | Batch store |
+| `retain_files(bank_id, files, ...)` | ✅ | File content ingest |
+| `recall(bank_id, query, *, types, max_tokens, budget, ...)` | ✅ | Full param set |
+| `reflect(bank_id, query, *, budget, context, max_tokens, ...)` | ✅ | Full param set (`response_schema`, `include_facts`, `include_tool_calls`, etc.) |
+| `aretain()` / `arecall()` / `areflect()` / `aretain_batch()` | ✅ | All async variants |
+| `close()` / `aclose()` | ✅ | |
+| Context manager (`__enter__` / `__exit__`) | ✅ | |
+
+**Runtime notes:**
+- **All response types are Pydantic models** matching upstream (`RetainResponse`, `RecallResponse`, `ReflectResponse`, `FileRetainResponse`, etc.)
+- **No stale methods:** no `forget()`, `export_template()`, `import_template()`, `list_all()`, `stats()`, `reset()`
+- Sync wrappers (`retain`, `recall`, `reflect`) use `_run_async()` which raises `RuntimeError` in running event loops — use the async variants directly in async contexts
+- Error swallowing was fixed in v1.14.0 (5 sites now log warnings)
+- The real `hindsight_client` is not on PyPI — this adapter is the only Python SDK for Hindsight
+
+**Coverage: ~95%**
+
+---
+
+## Honcho
+
+Reference: [plastic-labs/honcho](https://github.com/plastic-labs/honcho) — `Honcho` class.
+
+Adapter: `spacetime_memory.sdks.honcho.Honcho` (833 lines, 21 public methods)
+
+| Method | Status | Notes |
+|--------|--------|-------|
+| `__init__(workspace_id, base_url, ...)` | ✅ | Standard Honcho init + SpacetimeDB extras |
+| `peer(id, *, metadata, configuration)` | ✅ | Get or create by ID |
+| `peers(filters, *, page, size, reverse)` | ✅ | `SyncPage[PeerResponse, Peer]` |
+| `session(id, *, metadata, configuration, peers)` | ✅ | Get or create by ID |
+| `sessions(filters, *, page, size, reverse)` | ✅ | `SyncPage[SessionResponse, Session]` |
+| `search(query, filters, limit)` | ✅ | Cross-session search → `list[Message]` |
+| `workspaces(filters, *, page, size, reverse)` | ✅ | `SyncPage[WorkspaceResponse, str]` |
+| `delete_workspace(workspace_id)` | ✅ | |
+| `queue_status(observer, sender, session)` | ✅ | Returns `QueueStatusResponse` |
+| `schedule_dream(observer, ...)` | ✅ | Stub (matches API shape) |
+| `close()` | ✅ | |
+| `Peer.message(content, ...)` | ✅ | Returns `MessageCreateParams` |
+| `Peer.chat(query, *)` | ✅ | Memory-context chat |
+| `Peer.search(query, ...)` | ✅ | Peer-scoped search |
+| `Peer.sessions(...)` | ✅ | `SyncPage[SessionResponse, Session]` |
+| `Session.add_peers(peers)` | ✅ | |
+| `Session.add_messages(messages)` | ✅ | Bulk store |
+| `Session.messages(filters, ...)` | ✅ | `SyncPage[MessageResponse, Message]` |
+| `Session.search(query, ...)` | ✅ | Session-scoped search |
+| `Session.context(*, summary, tokens)` | ✅ | Returns `SessionContext` |
+| `Session.summaries()` | ✅ | Returns `SessionSummaries` |
+| `Session.delete()` | ✅ | |
+| `Peer.sessions()` | ⚠️ | Returns empty page — no peer→session mapping in SpacetimeDB |
+
+**Runtime notes:**
+- 30+ Pydantic models matching upstream (`WorkspaceResponse`, `PeerResponse`, `SessionResponse`, `MessageResponse`, `SyncPage`, etc.)
+- `Peer.sessions()` returns empty — SpacetimeDB has no direct peer→session index
+- Error swallowing was fixed in v1.14.0 (prev: 5 sites returned `None`/`[]` silently, now logged)
+- `Session.add_messages()` skips items that fail to store (logged), continues with rest
+- No `.aio` async accessor (upstream has this — planned)
+- The real `honcho` is not on PyPI (the PyPI `honcho` is a Procfile manager)
+
+**Coverage: ~85%** (shape match). Runtime: improved in v1.14.0.
 
 ---
 
 ## Summary
 
-| Adapter | Lines | Methods | Coverage |
-|---------|-------|---------|----------|
-| Mem0 | ~700 | 17 | ~95% |
-| Zep | 647 | 15 | ~93% |
-| Graphiti | ~960 | 17 | ~90% |
-| Hindsight | 415 | 11 | ~90% |
-| Honcho | 637 | 23 | ~90% |
-| LangChain | 778 | 16 | ~88% |
+| Adapter | Lines | Methods | Shape Match | Runtime Quality | Prod Ready? |
+|---------|------:|--------:|:-----------:|:---------------:|:-----------:|
+| **LangGraph** | 778 | 16 | **100%** | ✅ True inheritance | **Yes** |
+| **Mem0** | 1119 | 17 | **98%** | ⚠️ Good — warnings on errors | **No** |
+| **Hindsight** | 670 | 13 | **95%** | ⚠️ Good — `_run_async()` requires care in async ctx | **No** |
+| **Zep** | 892 | 15 | **90%** | ⚠️ OK — missing async support | **No** |
+| **Graphiti** | 1190 | 17 | **85%** | ⚠️ Best of rewritten — dataclass vs Pydantic, extra `group_id` | **No** |
+| **Honcho** | 833 | 21 | **85%** | ⚠️ Improved — `Peer.sessions()` empty, no `.aio` | **No** |
 
-**Overall: ~91% coverage across all adapters.**
+**Overall shape match: ~92%.** Runtime quality: improving but not production-ready for 5/6 adapters.
 
-Core CRUD operations are fully supported for all adapters. The remaining gaps
-are generally advanced capabilities of the upstream projects.
+LangGraph is the only one you should consider production today. The rest need Phase II (behavioral tests) and Phase III (reliability infrastructure) from ROADMAP.md before they're safe to use in production.
