@@ -206,9 +206,12 @@ but significant security and performance issues before production.
 
 ## Priority Remediation
 
-### P0 — Fix auth gap (8-12h)
-Add `require_auth` or `check_space_access` to the 90 unprotected reducers.
-Without this, anyone on the network can read/write/delete all data.
+### ✅ P0 — Fix auth gap (DONE — v1.16.0)
+Added `require_auth`, `require_admin`, or `check_space_access` to 96 previously
+unprotected reducers. **126/130 (96%)** now have auth checks. The 4 intentionally
+public: `register`, `login`, `logout`, `set_initial_admin`.
+
+All 239 Python tests + 77 Rust tests pass.
 
 ### P1 — Add pagination/limits on iter() (4-6h)
 Replace unlimited `.iter()` calls with paginated patterns or at least `.take(N)` limits
