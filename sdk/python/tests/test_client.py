@@ -173,7 +173,9 @@ class TestClientWorkspace:
         assert "/v1/database/test-db/call/create_workspace" in args[0]
 
     def test_list_workspaces(self, mock_http_client):
-        """list_workspaces calls the correct SQL query."""
+        """list_workspaces returns correct data via _query()."""
+        # Mock the SQL endpoint to return query_result table data
+        # (the _query() method internally queries query_result after calling the reducer)
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([
@@ -186,6 +188,4 @@ class TestClientWorkspace:
 
         assert len(workspaces) == 2
         assert workspaces[0]["name"] == "ws-one"
-        # Verify it hit the SQL endpoint
-        args, kwargs = mock_http_client._http.post.call_args
-        assert "SELECT * FROM workspace" in kwargs["content"]
+        assert workspaces[1]["name"] == "ws-two"

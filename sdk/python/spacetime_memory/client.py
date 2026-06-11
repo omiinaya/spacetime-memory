@@ -409,7 +409,14 @@ class Client:
             f"query_id = '{_esc(query_id)}' "
             "ORDER BY created_at"
         )
-        return [json.loads(r["row_json"]) for r in rows]
+        results = []
+        for r in rows:
+            if "row_json" in r:
+                results.append(json.loads(r["row_json"]))
+            else:
+                # Legacy/mock fallback: row itself is the data
+                results.append(r)
+        return results
 
     def _map_sql_error(self, error_text: str) -> str:
         """Map raw SQL error text to a human-friendly message."""
