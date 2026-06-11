@@ -775,11 +775,9 @@ class Client:
         # Auto-index
         emb = self._embed(content)
         if emb:
-            mems = self._sql(
-                "SELECT id FROM memory WHERE "
-                f"workspace_id = '{_esc(workspace_id)}' AND "
-                f"peer_id = '{_esc(peer_id)}' "
-            )
+            mems = self._query("memory", workspace_id=workspace_id,
+                              filter_dict={"peer_id": peer_id},
+                              columns=["id"])
             if mems:
                 self._call("index_entity", [
                     workspace_id, "memory", mems[-1]["id"],
@@ -787,11 +785,9 @@ class Client:
                 ])
 
         if tier and tier in ("L0", "L1", "L2"):
-            mems = self._sql(
-                "SELECT id FROM memory WHERE "
-                f"workspace_id = '{_esc(workspace_id)}' AND "
-                f"peer_id = '{_esc(peer_id)}' "
-            )
+            mems = self._query("memory", workspace_id=workspace_id,
+                              filter_dict={"peer_id": peer_id},
+                              columns=["id"])
             if mems:
                 self._call("update_memory_tier", [mems[-1]["id"], tier])
 
@@ -875,13 +871,12 @@ class Client:
         for i, item in enumerate(clean_items):
             emb = emb_list[i] if i < len(emb_list) else None
             if emb:
-                mems = self._sql(
-                    "SELECT id FROM memory WHERE "
-                    f"workspace_id = '{_esc(workspace_id)}' AND "
-                    f"content = '{_esc(item['content'][:100])}' "
-                    "ORDER BY created_at DESC LIMIT 1"
-                )
+                mems = self._query("memory", workspace_id=workspace_id,
+                                  filter_dict={"content": item['content'][:100]},
+                                  columns=["id"])
                 if mems:
+                    # Take most recent (server returns unsorted; sort client-side)
+                    mems.sort(key=lambda m: m.get("created_at", 0), reverse=True)
                     import json as _json
                     self._call("index_entity", [
                         workspace_id, "memory", mems[0]["id"],
@@ -921,11 +916,11 @@ class Client:
             mem_map = {}
             node_map = {}
             for mid in mem_ids:
-                mems = self._sql(f"SELECT id, content FROM memory WHERE id = '{_esc(mid)}'")
+                mems = self._query("memory", filter_dict={"id": mid}, columns=["id", "content"])
                 if mems:
                     mem_map[mid] = mems[0].get("content", "")
             for nid in node_ids:
-                nodes = self._sql(f"SELECT id, label FROM kg_node WHERE id = '{_esc(nid)}'")
+                nodes = self._query("kg_node", filter_dict={"id": nid}, columns=["id", "label"])
                 if nodes:
                     node_map[nid] = nodes[0].get("label", "")
             for r in rows:
@@ -945,16 +940,14 @@ class Client:
             clauses.append(f"memory_type = '{_esc(memory_type)}'")
         if tier:
             clauses.append(f"tier = '{_esc(tier)}'")
-        where = " AND ".join(clauses)
-        try:
-            rows = self._sql(
-                f"SELECT * FROM memory WHERE {where}"
-            )
-        except RuntimeError as e:
-            if "unsupported" in str(e).lower() or "like" in str(e).lower():
-                rows = self._sql(f"SELECT * FROM memory WHERE {clauses[0]}")
-            else:
-                raise
+        filt = {}
+        for clause in clauses:
+            parts = clause.split(" = ", 1)
+            if len(parts) == 2:
+                key = parts[0].strip()
+                val = parts[1].strip().strip("'")
+                filt[key] = val
+        rows = self._query("memory", workspace_id=workspace_id, filter_dict=filt)
 
         # Client-side keyword filter (SpacetimeDB doesn't support LIKE)
         if query:
@@ -970,9 +963,7 @@ class Client:
 
     def get_memory(self, memory_id: str) -> list[dict[str, Any]]:
         """Get a single memory by ID.  Auto-reinforces on read."""
-        results = self._sql(
-            f"SELECT * FROM memory WHERE id = '{_esc(memory_id)}'"
-        )
+        results = self._query("memory", filter_dict={"id": memory_id})
         if results:
             try:
                 self._call("reinforce_memory", [memory_id])
@@ -1032,10 +1023,14 @@ class Client:
         ]
         if memory_type:
             clauses.append(f"memory_type = '{_esc(memory_type)}'")
-        where = " AND ".join(clauses)
-        rows = self._sql(
-            f"SELECT * FROM memory WHERE {where}"
-        )
+        filt = {}
+        for clause in clauses:
+            parts = clause.split(" = ", 1)
+            if len(parts) == 2:
+                key = parts[0].strip()
+                val = parts[1].strip().strip("'")
+                filt[key] = val
+        rows = self._query("memory", workspace_id=workspace_id, filter_dict=filt)
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         return rows[:limit]
 
@@ -1124,10 +1119,8 @@ class Client:
         Returns the current state as a single-version history entry
         (SpacetimeDB doesn't store version snapshots).
         """
-        rows = self._sql(
-            "SELECT id, content, summary, version, updated_at, confidence "
-            f"FROM memory WHERE id = '{_esc(memory_id)}'"
-        )
+        rows = self._query("memory", filter_dict={"id": memory_id},
+                          columns=["id", "content", "summary", "version", "updated_at", "confidence"])
         if rows:
             r = rows[0]
             return [{
@@ -1190,11 +1183,9 @@ class Client:
         content = f"{label}: {summary}" if summary else label
         emb = self._embed(content)
         if emb:
-            nodes = self._sql(
-                "SELECT id FROM kg_node WHERE "
-                f"workspace_id = '{_esc(workspace_id)}' AND "
-                f"label = '{_esc(label)}' "
-            )
+            nodes = self._query("kg_node", workspace_id=workspace_id,
+                               filter_dict={"label": label},
+                               columns=["id"])
             if nodes:
                 self._call("index_entity", [
                     workspace_id, "node", nodes[-1]["id"],
@@ -1222,10 +1213,7 @@ class Client:
         self, workspace_id: str, query: str = ""
     ) -> list[dict[str, Any]]:
         """Search KG nodes by label within a workspace."""
-        rows = self._sql(
-            "SELECT * FROM kg_node WHERE "
-            f"workspace_id = '{_esc(workspace_id)}'"
-        )
+        rows = self._query("kg_node", workspace_id=workspace_id)
         if query:
             # Client-side filter (SpacetimeDB doesn't support LIKE)
             q = query.lower()
@@ -1238,11 +1226,15 @@ class Client:
 
     def get_neighbors(self, node_id: str) -> list[dict[str, Any]]:
         """Get edges connected to a node."""
-        edges = self._sql(
-            f"SELECT * FROM kg_edge WHERE "
-            f"source_node_id = '{_esc(node_id)}' "
-            f"OR target_node_id = '{_esc(node_id)}' "
-        )
+        # Query both directions since _query doesn't support OR
+        edges_src = self._query("kg_edge", filter_dict={"source_node_id": node_id})
+        edges_tgt = self._query("kg_edge", filter_dict={"target_node_id": node_id})
+        seen = set()
+        edges = []
+        for e in edges_src + edges_tgt:
+            if e["id"] not in seen:
+                seen.add(e["id"])
+                edges.append(e)
         # Enrich with labels
         node_ids = set()
         for e in edges:
@@ -1251,7 +1243,7 @@ class Client:
         node_ids.discard("")
         label_map = {}
         for nid in node_ids:
-            rows = self._sql(f"SELECT id, label FROM kg_node WHERE id = '{_esc(nid)}'")
+            rows = self._query("kg_node", filter_dict={"id": nid}, columns=["id", "label"])
             if rows:
                 label_map[nid] = rows[0].get("label", "")
 
@@ -1327,21 +1319,21 @@ class Client:
 
     def get_peer_sessions(self, peer_id: str) -> list[dict[str, Any]]:
         """List sessions a peer has participated in."""
-        rows = self._sql(
-            "SELECT s.*, sp.role, sp.joined_at "
-            "FROM session s "
-            "INNER JOIN session_participant sp ON s.id = sp.session_id "
-            f"WHERE sp.peer_id = '{_esc(peer_id)}'"
-        )
+        # Query session_participant to find session IDs, then fetch each session
+        parts = self._query("session_participant", filter_dict={"peer_id": peer_id})
+        rows = []
+        for sp in parts:
+            sessions = self._query("session", filter_dict={"id": sp.get("session_id", "")})
+            for s in sessions:
+                s["role"] = sp.get("role", "")
+                s["joined_at"] = sp.get("joined_at", 0)
+                rows.append(s)
         rows.sort(key=lambda r: r.get("joined_at", 0), reverse=True)
         return rows
 
     def get_session_messages(self, session_id: str) -> list[dict[str, Any]]:
         """Retrieve messages for a session."""
-        rows = self._sql(
-            "SELECT * FROM message WHERE "
-            f"session_id = '{_esc(session_id)}'"
-        )
+        rows = self._query("message", filter_dict={"session_id": session_id})
         rows.sort(key=lambda r: r.get("created_at", 0))
         return rows
 
@@ -1351,9 +1343,7 @@ class Client:
 
     def get_profile(self, peer_id: str) -> list[dict[str, Any]]:
         """Get a peer's profile."""
-        return self._sql(
-            f"SELECT * FROM profile WHERE peer_id = '{_esc(peer_id)}'"
-        )
+        return self._query("profile", filter_dict={"peer_id": peer_id})
 
     def upsert_profile(
         self,
@@ -1375,18 +1365,12 @@ class Client:
 
     def get_node(self, node_id: str) -> list[dict[str, Any]]:
         """Get a KG node by ID."""
-        return self._sql(
-            f"SELECT * FROM kg_node WHERE id = '{_esc(node_id)}'"
-        )
+        return self._query("kg_node", filter_dict={"id": node_id})
 
     def get_community(self, community_id: int) -> dict[str, Any]:
         """Get community details and its nodes."""
-        community = self._sql(
-            f"SELECT * FROM kg_community WHERE id = {int(community_id)}"
-        )
-        nodes = self._sql(
-            f"SELECT * FROM kg_node WHERE community_id = {int(community_id)}"
-        )
+        community = self._query("kg_community", filter_dict={"id": str(community_id)})
+        nodes = self._query("kg_node", filter_dict={"community_id": str(community_id)})
         return {
             "community": community[0] if community else None,
             "nodes": nodes,
@@ -1517,21 +1501,15 @@ class Client:
 
     def list_context_packs(self, workspace_id: str) -> list[dict[str, Any]]:
         """List context packs for a workspace."""
-        return self._sql(
-            f"SELECT * FROM context_pack WHERE workspace_id = '{_esc(workspace_id)}'"
-        )
+        return self._query("context_pack", filter_dict={"workspace_id": workspace_id})
 
     def list_context_entries(self, pack_id: str) -> list[dict[str, Any]]:
         """List entries in a context pack."""
-        return self._sql(
-            f"SELECT * FROM context_entry WHERE pack_id = '{_esc(pack_id)}'"
-        )
+        return self._query("context_entry", filter_dict={"pack_id": pack_id})
 
     def list_context_deltas(self, previous_pack_id: str) -> list[dict[str, Any]]:
         """List delta entries for a pack."""
-        return self._sql(
-            f"SELECT * FROM context_delta WHERE previous_pack_id = '{_esc(previous_pack_id)}'"
-        )
+        return self._query("context_delta", filter_dict={"previous_pack_id": previous_pack_id})
 
     # -----------------------------------------------------------------------
     # Notes (markdown documents with wikilink backlinking)
@@ -1578,47 +1556,40 @@ class Client:
         self, workspace_id: str = "default", include_inactive: bool = False
     ) -> list[dict[str, Any]]:
         """List notes in a workspace."""
-        clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
+        filt = {"workspace_id": workspace_id}
         if not include_inactive:
-            clauses.append("is_active = true")
-        where = " AND ".join(clauses)
-        rows = self._sql(f"SELECT * FROM note WHERE {where}")
+            filt["is_active"] = "true"
+        rows = self._query("note", workspace_id=workspace_id, filter_dict=filt)
         rows.sort(key=lambda r: r.get("updated_at", 0), reverse=True)
         return rows
 
     def get_note(self, note_id: str) -> list[dict[str, Any]]:
         """Get a note by ID."""
-        return self._sql(f"SELECT * FROM note WHERE id = '{_esc(note_id)}'")
+        return self._query("note", filter_dict={"id": note_id})
 
     def get_note_by_date(self, note_date: str) -> list[dict[str, Any]]:
         """Get a note by its date string (YYYY-MM-DD)."""
-        return self._sql(
-            f"SELECT * FROM note WHERE note_date = '{_esc(note_date)}' AND is_active = true"
-        )
+        return self._query("note", filter_dict={"note_date": note_date, "is_active": "true"})
 
     def get_note_by_title(self, title: str) -> list[dict[str, Any]]:
         """Find a note by exact title."""
-        return self._sql(
-            f"SELECT * FROM note WHERE title = '{_esc(title)}' AND is_active = true"
-        )
+        return self._query("note", filter_dict={"title": title, "is_active": "true"})
 
     def get_backlinks(self, note_id: str) -> list[dict[str, Any]]:
         """Get all notes that link *to* the given note."""
-        return self._sql(
-            "SELECT nb.*, n.title AS source_title "
-            "FROM note_backlink nb "
-            "LEFT JOIN note n ON nb.source_note_id = n.id "
-            f"WHERE nb.target_note_id = '{_esc(note_id)}'"
-        )
+        rows = self._query("note_backlink", filter_dict={"target_note_id": note_id})
+        for r in rows:
+            src = self._query("note", filter_dict={"id": r.get("source_note_id", "")})
+            r["source_title"] = src[0].get("title", "") if src else ""
+        return rows
 
     def get_outgoing_links(self, note_id: str) -> list[dict[str, Any]]:
         """Get all notes that the given note links *to*."""
-        return self._sql(
-            "SELECT nb.*, n.title AS target_title "
-            "FROM note_backlink nb "
-            "LEFT JOIN note n ON nb.target_note_id = n.id "
-            f"WHERE nb.source_note_id = '{_esc(note_id)}'"
-        )
+        rows = self._query("note_backlink", filter_dict={"source_note_id": note_id})
+        for r in rows:
+            tgt = self._query("note", filter_dict={"id": r.get("target_note_id", "")})
+            r["target_title"] = tgt[0].get("title", "") if tgt else ""
+        return rows
 
     # -------------------------------------------------------------------
     # KG Graph Traversal

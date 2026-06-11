@@ -527,9 +527,7 @@ class StmemStore(BaseStore):
                 for r in results:
                     eid = r.get("entity_id", "")
                     if eid:
-                        mems = self._sql(
-                            f"SELECT * FROM memory WHERE id = '{_esc(eid)}'"
-                        )
+                        mems = self._query("memory", filter_dict={"id": eid})
                         if mems:
                             all_rows.append(mems[0])
             except RuntimeError:

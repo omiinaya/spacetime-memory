@@ -754,9 +754,7 @@ class Graphiti:
         for eid in edge_ids_to_lookup:
             if eid not in seen_edge_ids:
                 seen_edge_ids.add(eid)
-                edge_rows = self._sql_query(
-                    f"SELECT * FROM kg_edge WHERE id = '{_esc(eid)}'"
-                )
+                edge_rows = self._query("kg_edge", filter_dict={"id": eid})
                 if edge_rows:
                     edges.append(EntityEdge.from_stmem(edge_rows[0]))
 
@@ -847,17 +845,13 @@ class Graphiti:
 
             if entity_type == "node" and entity_id and entity_id not in seen_node_ids:
                 seen_node_ids.add(entity_id)
-                node_rows = self._sql_query(
-                    f"SELECT * FROM kg_node WHERE id = '{_esc(entity_id)}'"
-                )
+                node_rows = self._query("kg_node", filter_dict={"id": entity_id})
                 if node_rows:
                     nodes.append(EntityNode.from_stmem(node_rows[0]))
 
             elif entity_type == "edge" and entity_id and entity_id not in seen_edge_ids:
                 seen_edge_ids.add(entity_id)
-                edge_rows = self._sql_query(
-                    f"SELECT * FROM kg_edge WHERE id = '{_esc(entity_id)}'"
-                )
+                edge_rows = self._query("kg_edge", filter_dict={"id": entity_id})
                 if edge_rows:
                     edges.append(EntityEdge.from_stmem(edge_rows[0]))
 
@@ -921,9 +915,7 @@ class Graphiti:
 
         nodes: list[EntityNode] = []
         for nid in node_ids:
-            nrows = self._sql_query(
-                f"SELECT * FROM kg_node WHERE id = '{_esc(nid)}'"
-            )
+            nrows = self._query("kg_node", filter_dict={"id": nid})
             if nrows:
                 nodes.append(EntityNode.from_stmem(nrows[0]))
 
@@ -1126,9 +1118,7 @@ class Graphiti:
             List of :class:`EntityEdge` objects, one per version.
         """
         # First find the edge_group_id from this edge
-        edge_rows = self._sql_query(
-            f"SELECT edge_group_id FROM kg_edge WHERE id = '{_esc(edge_id)}'"
-        )
+        edge_rows = self._query("kg_edge", filter_dict={"id": edge_id}, columns=["edge_group_id"])
         if not edge_rows:
             return []
         edge_group_id = edge_rows[0].get("edge_group_id", "")
