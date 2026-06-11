@@ -2201,10 +2201,10 @@ class ConnectorDaemon:
 
     def _load_configs(self):
         """Fetch active connector configs from the database."""
-        rows = self.client._sql(
-            "SELECT id, name, connector_type, config_json, "
-            "workspace_id, schedule_secs FROM connector_config "
-            "WHERE is_active = true"
+        rows = self.client._query(
+            "connector_config",
+            filter_dict={"is_active": "true"},
+            columns=["id", "name", "connector_type", "config_json", "workspace_id", "schedule_secs"]
         )
         return rows
 

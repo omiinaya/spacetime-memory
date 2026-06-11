@@ -51,7 +51,7 @@ class TestAgentOrchestrator:
         session_id = orch.start_session(agent_name="test", user_id="user1")
 
         # Provide a real SQL response so the step discovery works
-        mock_client._sql.return_value = [{"id": "step-uuid-123"}]
+        mock_client._query.return_value = [{"id": "step-uuid-123"}]
         step_id = orch.add_step(
             session_id,
             thought="I should check the data",
@@ -83,7 +83,7 @@ class TestAgentOrchestrator:
         orch = AgentOrchestrator(mock_client, workspace_id="ws1")
         session_id = orch.start_session(agent_name="test", user_id="user1")
 
-        mock_client._sql.return_value = [{"id": "call-step-456"}]
+        mock_client._query.return_value = [{"id": "call-step-456"}]
         result = orch.add_tool_call(
             session_id,
             tool="search_web",
@@ -127,7 +127,7 @@ class TestAgentOrchestrator:
         session_id = orch.start_session(agent_name="test", user_id="user1")
 
         # Provide a SQL result for session steps
-        mock_client._sql.return_value = [
+        mock_client._query.return_value = [
             {"step_type": "thought", "id": "step-1", "content": "thinking...",
              "summary": "think"},
         ]
@@ -146,7 +146,7 @@ class TestAgentOrchestrator:
         session_id = orch.start_session(agent_name="test", user_id="user1")
 
         # Make _sql return a memory entry so memory_id gets populated
-        mock_client._sql.return_value = [{"id": "mem-999"}]
+        mock_client._query.return_value = [{"id": "mem-999"}]
         mock_client.store.return_value = {"status": "ok"}
 
         summary = orch.end_session(
@@ -222,7 +222,7 @@ class TestAgentOrchestrator:
 
         # Make the session steps call raise an error; the code should
         # log a warning and continue instead of crashing or silently passing.
-        mock_client._sql.side_effect = RuntimeError("db connection lost")
+        mock_client._query.side_effect = RuntimeError("db connection lost")
 
         # Should not raise — error is now logged as a warning
         context = orch.get_context("query", session_id=session_id)
@@ -233,7 +233,7 @@ class TestAgentOrchestrator:
         orch = AgentOrchestrator(mock_client, workspace_id="ws1")
         session_id = orch.start_session(agent_name="test", user_id="user1")
 
-        mock_client._sql.return_value = [{"id": "tool-call-789"}]
+        mock_client._query.return_value = [{"id": "tool-call-789"}]
         result = orch.add_tool_call(
             session_id,
             tool="search",

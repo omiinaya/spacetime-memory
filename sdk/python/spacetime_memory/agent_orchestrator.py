@@ -117,12 +117,13 @@ class AgentOrchestrator:
         )
 
         # Discover the session we just created via SQL
-        rows = self._client._sql(
-            "SELECT id FROM session WHERE "
-            f"workspace_id = '{_esc(self._workspace_id)}' AND "
-            f"name = '{_esc(session_name)}' "
-            "ORDER BY created_at DESC LIMIT 1"
+        rows = self._client._query(
+            "session", workspace_id=self._workspace_id,
+            filter_dict={"name": session_name},
+            columns=["id"]
         )
+        rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        rows = rows[:1]
         if not rows:
             # Fallback: generate a deterministic ID
             session_id = str(uuid.uuid4())
@@ -185,11 +186,12 @@ class AgentOrchestrator:
             )
             if result and result.get("status") == "ok":
                 # Try to find the stored memory
-                mems = self._client._sql(
-                    "SELECT id FROM memory WHERE "
-                    f"workspace_id = '{_esc(self._workspace_id)}' "
-                    "ORDER BY created_at DESC LIMIT 1"
+                mems = self._client._query(
+                    "memory", workspace_id=self._workspace_id,
+                    columns=["id"]
                 )
+                mems.sort(key=lambda m: m.get("created_at", 0), reverse=True)
+                mems = mems[:1]
                 if mems:
                     memory_id = mems[0]["id"]
 
@@ -265,11 +267,12 @@ class AgentOrchestrator:
 
         # Discover the step ID
         step_id = ""
-        rows = self._client._sql(
-            "SELECT id FROM agent_step WHERE "
-            f"session_id = '{_esc(session_id)}' "
-            "ORDER BY created_at DESC LIMIT 1"
+        rows = self._client._query(
+            "agent_step", filter_dict={"session_id": session_id},
+            columns=["id"]
         )
+        rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        rows = rows[:1]
         if rows:
             step_id = rows[0]["id"]
 
@@ -314,12 +317,12 @@ class AgentOrchestrator:
         )
 
         call_step_id = ""
-        rows = self._client._sql(
-            "SELECT id FROM agent_step WHERE "
-            f"session_id = '{_esc(session_id)}' AND "
-            f"step_type = 'tool_call' "
-            "ORDER BY created_at DESC LIMIT 1"
+        rows = self._client._query(
+            "agent_step", filter_dict={"session_id": session_id, "step_type": "tool_call"},
+            columns=["id"]
         )
+        rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        rows = rows[:1]
         if rows:
             call_step_id = rows[0]["id"]
 

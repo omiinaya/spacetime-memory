@@ -150,12 +150,11 @@ class StmemMemoryStore:
         ws_id = self._ws()
         for key in keys:
             try:
-                rows = self._client._sql(
-                    f"SELECT id, content, summary, memory_type, "
-                    f"entities_json, created_at, updated_at "
-                    f"FROM memory WHERE source_session_id = '{_esc(key)}' "
-                    f"AND workspace_id = '{_esc(ws_id)}' "
-                    f"AND is_active = true "
+                rows = self._client._query(
+                    "memory", workspace_id=ws_id,
+                    filter_dict={"source_session_id": key, "is_active": "true"},
+                    columns=["id", "content", "summary", "memory_type",
+                             "entities_json", "created_at", "updated_at"]
                 )
             except RuntimeError:
                 rows = []
@@ -228,9 +227,10 @@ class StmemMemoryStore:
         """
         ws_id = self._ws()
         try:
-            rows = self._client._sql(
-                "SELECT id, content FROM memory WHERE "
-                f"workspace_id = '{_esc(ws_id)}' AND is_active = true"
+            rows = self._client._query(
+                "memory", workspace_id=ws_id,
+                filter_dict={"is_active": "true"},
+                columns=["id", "content"]
             )
         except RuntimeError:
             return
@@ -393,10 +393,9 @@ class StmemStore(BaseStore):
         ws_name = self._ns_to_ws(namespace)
         ws_id = self._resolve_workspace(ws_name)
 
-        rows = self._sql(
-            "SELECT * FROM memory WHERE "
-            f"source_session_id = '{_esc(key)}' AND "
-            f"workspace_id = '{_esc(ws_id)}' "
+        rows = self._query(
+            "memory", workspace_id=ws_id,
+            filter_dict={"source_session_id": key}
         )
         if not rows:
             return None
@@ -471,9 +470,10 @@ class StmemStore(BaseStore):
         """
         ws_name = self._ns_to_ws(namespace)
         ws_id = self._resolve_workspace(ws_name)
-        rows = self._sql(
-            f"SELECT id FROM memory WHERE source_session_id = '{_esc(key)}' "
-            f"AND workspace_id = '{_esc(ws_id)}'"
+        rows = self._query(
+            "memory", workspace_id=ws_id,
+            filter_dict={"source_session_id": key},
+            columns=["id"]
         )
         if rows:
             try:
@@ -536,10 +536,9 @@ class StmemStore(BaseStore):
         # If no semantic results or no query, fall back to listing
         if not all_rows:
             try:
-                rows = self._sql(
-                    "SELECT * FROM memory WHERE "
-                    f"workspace_id = '{_esc(ws_id)}' "
-                    "AND is_active = true"
+                rows = self._query(
+                    "memory", workspace_id=ws_id,
+                    filter_dict={"is_active": "true"}
                 )
             except RuntimeError:
                 rows = []
@@ -932,15 +931,13 @@ class StmemChatMessageHistory:
         from langchain_core.messages import messages_from_dict
 
         try:
-            rows = self._client._sql(
-                "SELECT id, content, memory_type, entities_json, created_at "
-                "FROM memory WHERE "
-                f"source_session_id = '{_esc(self.session_id)}' "
-                f"AND workspace_id = '{_esc(ws_id)}' "
-                "AND memory_type = 'chat_message' "
-                "AND is_active = true "
-                "ORDER BY created_at ASC"
+            rows = self._client._query(
+                "memory", workspace_id=ws_id,
+                filter_dict={"source_session_id": self.session_id,
+                             "memory_type": "chat_message", "is_active": "true"},
+                columns=["id", "content", "memory_type", "entities_json", "created_at"]
             )
+            rows.sort(key=lambda r: r.get("created_at", 0))
         except RuntimeError:
             return []
 
@@ -991,14 +988,17 @@ class StmemChatMessageHistory:
             msg_type = getattr(msg, "type", "human")
             msg_content = getattr(msg, "content", "")
             ws_id = self._resolve_workspace()
-            dedup_rows = self._client._sql(
-                f"SELECT id FROM memory WHERE "
-                f"source_session_id = '{_esc(self.session_id)}' AND "
-                f"workspace_id = '{_esc(ws_id)}' AND "
-                f"memory_type = 'chat_message' AND "
-                f"content LIKE '%\"type\": \"{_esc(msg_type)}\"%' AND "
-                f"content LIKE '%\"content\": \"{_esc(msg_content[:50])}%'"
+            # Fetch matching memories and filter client-side (LIKE not in reducer)
+            dedup_rows = self._client._query(
+                "memory", workspace_id=ws_id,
+                filter_dict={"source_session_id": self.session_id, "memory_type": "chat_message"},
+                columns=["id", "content"]
             )
+            dedup_rows = [
+                r for r in dedup_rows
+                if f'"type": "{msg_type}"' in r.get("content", "")
+                and f'"content": "{msg_content[:50]}' in r.get("content", "")
+            ]
             if dedup_rows:
                 continue
             try:
@@ -1042,12 +1042,11 @@ class StmemChatMessageHistory:
         """
         ws_id = self._resolve_workspace()
         try:
-            rows = self._client._sql(
-                f"SELECT id FROM memory WHERE "
-                f"source_session_id = '{_esc(self.session_id)}' "
-                f"AND workspace_id = '{_esc(ws_id)}' "
-                "AND memory_type = 'chat_message' "
-                "AND is_active = true"
+            rows = self._client._query(
+                "memory", workspace_id=ws_id,
+                filter_dict={"source_session_id": self.session_id,
+                             "memory_type": "chat_message", "is_active": "true"},
+                columns=["id"]
             )
         except RuntimeError:
             rows = []
@@ -1074,13 +1073,13 @@ class StmemChatMessageHistory:
         """Quick count of stored messages (best-effort, no deserialisation)."""
         ws_id = self._resolve_workspace()
         try:
-            rows = self._client._sql(
-                "SELECT COUNT(*) as cnt FROM memory WHERE "
-                f"source_session_id = '{_esc(self.session_id)}' "
-                f"AND workspace_id = '{_esc(ws_id)}' "
-                "AND memory_type = 'chat_message' "
-                "AND is_active = true"
+            all_rows = self._client._query(
+                "memory", workspace_id=ws_id,
+                filter_dict={"source_session_id": self.session_id,
+                             "memory_type": "chat_message", "is_active": "true"},
+                columns=["id"]
             )
+            rows = [{"cnt": len(all_rows)}]
             if rows:
                 return [rows[0].get("cnt", 0)]
         except RuntimeError:

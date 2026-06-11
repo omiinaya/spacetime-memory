@@ -139,6 +139,7 @@ def mock_client():
     client = MagicMock()
     client._call.return_value = {"status": "ok"}
     client._sql.return_value = []
+    client._query.return_value = []
     client.search.return_value = []
     client.store.return_value = {"status": "ok"}
     client.query_graph.return_value = []

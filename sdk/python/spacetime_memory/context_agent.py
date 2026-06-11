@@ -61,11 +61,12 @@ class ContextAgent:
         ])
 
         # 2. Read the pack
-        packs = self._client._sql(
-            "SELECT * FROM context_pack WHERE "
-            f"workspace_id = '{_esc(workspace_id)}' "
-            "ORDER BY created_at DESC LIMIT 1"
+        packs = self._client._query(
+            "context_pack", workspace_id=workspace_id
         )
+        # Take most recent (server returns unsorted)
+        packs.sort(key=lambda p: p.get("created_at", 0), reverse=True)
+        packs = packs[:1]
         if not packs:
             return {"error": "No context pack generated"}
 
@@ -73,11 +74,10 @@ class ContextAgent:
         pack_id = pack.get("id", "")
 
         # 3. Read entries
-        entries = self._client._sql(
-            "SELECT * FROM context_entry WHERE "
-            f"pack_id = '{_esc(pack_id)}' "
-            "ORDER BY rank ASC"
+        entries = self._client._query(
+            "context_entry", filter_dict={"pack_id": pack_id}
         )
+        entries.sort(key=lambda e: e.get("rank", 0))
 
         result: dict[str, Any] = {
             "pack": pack,
@@ -87,10 +87,8 @@ class ContextAgent:
         # 4. If delta was requested, compute it
         if previous_pack_id:
             self._client._call("get_delta", [previous_pack_id])
-            result["delta"] = self._client._sql(
-                "SELECT * FROM context_delta WHERE "
-                f"previous_pack_id = '{_esc(previous_pack_id)}' "
-                "ORDER BY rank ASC"
+            result["delta"] = self._client._query(
+                "context_delta", filter_dict={"previous_pack_id": previous_pack_id}
             )
 
         # 5. Optionally synthesize an LLM answer

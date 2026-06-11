@@ -480,10 +480,8 @@ class Graphiti:
         def _get_or_create_node(
             node: EntityNode, workspace_uuid: str
         ) -> tuple[str, float]:
-            all_nodes = self._sql_query(
-                "SELECT id, label FROM kg_node WHERE "
-                f"workspace_id = '{_esc(workspace_uuid)}' "
-            )
+            all_nodes = self._query("kg_node", workspace_id=workspace_uuid,
+                                    columns=["id", "label"])
 
             # Pass 1: exact match (current behavior)
             for n in all_nodes:
@@ -525,10 +523,8 @@ class Graphiti:
             except RuntimeError:
                 pass
             # Re-query to get the new node's UUID
-            all_nodes = self._sql_query(
-                "SELECT id, label FROM kg_node WHERE "
-                f"workspace_id = '{_esc(workspace_uuid)}' "
-            )
+            all_nodes = self._query("kg_node", workspace_id=workspace_uuid,
+                                    columns=["id", "label"])
             for n in all_nodes:
                 if n.get("label") == node.name:
                     return n["id"], 0.0
@@ -558,13 +554,13 @@ class Graphiti:
         actual_edge_id = edge.uuid  # fallback
         actual_version = 1
         actual_edge_group_id = ""
-        edge_rows = self._sql_query(
-            "SELECT id, version, edge_group_id FROM kg_edge WHERE "
-            f"source_node_id = '{_esc(actual_source_id)}' AND "
-            f"target_node_id = '{_esc(actual_target_id)}' AND "
-            f"relation = '{_esc(edge.name)}' AND "
-            f"workspace_id = '{_esc(ws_id)}'"
-        )
+        edge_rows = self._query("kg_edge", workspace_id=ws_id,
+                                 filter_dict={
+                                     "source_node_id": actual_source_id,
+                                     "target_node_id": actual_target_id,
+                                     "relation": edge.name
+                                 },
+                                 columns=["id", "version", "edge_group_id"])
         if edge_rows:
             r = edge_rows[0]
             actual_edge_id = r.get("id", edge.uuid)
@@ -952,11 +948,8 @@ class Graphiti:
         except RuntimeError:
             pass
 
-        community_nodes = self._sql_query(
-            "SELECT * FROM kg_node WHERE "
-            f"workspace_id = '{_esc(ws_id)}' AND "
-            "node_type = 'community'"
-        )
+        community_nodes = self._query("kg_node", workspace_id=ws_id,
+                                     filter_dict={"node_type": "community"})
 
         communities = []
         for row in community_nodes:
@@ -1030,10 +1023,8 @@ class Graphiti:
         Returns:
             Dict with operation status.
         """
-        memories = self._sql_query(
-            "SELECT id FROM memory WHERE "
-            f"source_session_id = '{_esc(episode_uuid)}'"
-        )
+        memories = self._query("memory", filter_dict={"source_session_id": episode_uuid},
+                               columns=["id"])
 
         count = 0
         for mem in memories:
@@ -1159,19 +1150,20 @@ class Graphiti:
         edges: list[EntityEdge] = []
 
         for ep_uuid in episode_uuids:
-            memories = self._sql_query(
-                "SELECT id, content FROM memory WHERE "
-                f"source_session_id = '{_esc(ep_uuid)}'"
-            )
+            memories = self._query("memory",
+                                    filter_dict={"source_session_id": ep_uuid},
+                                    columns=["id", "content"])
 
             if not memories:
                 continue
 
-            edge_rows = self._sql_query(
-                "SELECT e.* FROM kg_edge e, memory m WHERE "
-                f"m.source_session_id = '{_esc(ep_uuid)}' AND "
-                "e.source_node_id = m.id"
-            )
+            # Find memory IDs for this episode, then look up edges by source_node_id
+            mems = self._query("memory", filter_dict={"source_session_id": ep_uuid},
+                              columns=["id"])
+            edge_rows = []
+            for mem in mems:
+                edges = self._query("kg_edge", filter_dict={"source_node_id": mem.get("id", "")})
+                edge_rows.extend(edges)
 
             for row in edge_rows:
                 edge = EntityEdge.from_stmem(row)
