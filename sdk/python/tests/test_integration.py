@@ -226,9 +226,7 @@ class TestSessions:
         result = stdb_client._call("create_session", [ws, session_name, "{}"])
         assert result["status"] == "ok"
 
-        sessions = stdb_client._sql(
-            f"SELECT * FROM session WHERE workspace_id = '{ws}'"
-        )
+        sessions = stdb_client._query("session", workspace_id=ws)
         assert isinstance(sessions, list)
         assert len(sessions) >= 1
         found = any(s.get("name") == session_name for s in sessions)
@@ -237,9 +235,7 @@ class TestSessions:
     def test_send_message(self, stdb_client, ws):
         session_name = _unique("msg-session")
         stdb_client._call("create_session", [ws, session_name, "{}"])
-        sessions = stdb_client._sql(
-            f"SELECT * FROM session WHERE workspace_id = '{ws}'"
-        )
+        sessions = stdb_client._query("session", workspace_id=ws)
         sid = next(s["id"] for s in sessions if s.get("name") == session_name)
         result = stdb_client._call("send_message", [sid, "it-bot", "Hello, world!", "text", "{}"])
         assert result["status"] == "ok"
@@ -264,10 +260,11 @@ class TestGraph:
     def test_create_edge(self, stdb_client, ws):
         n1 = stdb_client.create_node(ws, "ConceptA", "concept")
         n2 = stdb_client.create_node(ws, "ConceptB", "concept")
-        # Find node IDs by label (SpacetimeDB SQL doesn't support IN)
+        # Find node IDs by label using _query
         def _node_id(label: str) -> str:
-            rows = stdb_client._sql(
-                f"SELECT id FROM kg_node WHERE workspace_id = '{ws}' AND label = '{label}'"
+            rows = stdb_client._query(
+                "kg_node", workspace_id=ws,
+                filter_dict={"label": label}, columns=["id"],
             )
             return rows[0]["id"] if rows else ""
         result = stdb_client._call("create_edge", [
@@ -351,9 +348,9 @@ class TestCLI:
     def test_cli_memory_store(self, stdb_client, stdb_session):
         ws_name = _unique("cli-mem")
         stdb_client._call("create_workspace", [ws_name, "CLI test", _unique("ws")])
-        # Verify the workspace exists (CLI can list public ones when auth is added)
-        workspaces = stdb_client._sql(
-            f"SELECT id, name FROM workspace WHERE name = '{ws_name}'"
+        # Verify the workspace exists via _query (private table)
+        workspaces = stdb_client._query(
+            "workspace", filter_dict={"name": ws_name}
         )
         assert len(workspaces) >= 1, f"Workspace '{ws_name}' not found"
         assert workspaces[0]["name"] == ws_name

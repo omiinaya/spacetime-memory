@@ -18,11 +18,18 @@ pytestmark = [pytest.mark.integration]
 
 @pytest.fixture(scope="module")
 def client(stdb_session) -> Client:
-    return Client(
+    c = Client(
         host=stdb_session["host"],
         port=stdb_session["port"],
         database=stdb_session["database"],
     )
+    # Register to satisfy auth requirements
+    suffix = os.urandom(4).hex()
+    try:
+        c._call("register", [f"backup_test_{suffix}", "Backup Test", "testpass"])
+    except RuntimeError:
+        pass
+    return c
 
 
 def test_backup_structure(client):

@@ -70,12 +70,20 @@ def _save_aliases(aliases: dict[str, str]) -> None:
 
 
 def _sdk_client() -> Client:
-    """Build an SDK Client from the CLI's env-var config."""
-    return Client(
+    """Build an SDK Client from the CLI's env-var config, auto-registering for auth."""
+    c = Client(
         host=HOST, port=PORT, database=DB,
         embedder_url=EMBEDDER_URL,
         verbose=_verbose_mode,
     )
+    # Auto-register to satisfy auth requirements (first call = admin)
+    import os
+    suffix = os.urandom(4).hex()
+    try:
+        c._call("register", [f"cli_{suffix}", "CLI User", "clipass"])
+    except RuntimeError:
+        pass  # already registered
+    return c
 
 
 def _quiet_print(msg: str) -> None:

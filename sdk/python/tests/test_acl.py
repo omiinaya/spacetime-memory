@@ -87,8 +87,8 @@ def test_01_admin_bypass(admin, user):
 def test_02_admin_grant_revoke(admin, user):
     ws = f"acl-grant-{SUFFIX}"
     admin._call("create_workspace", ["grant-ws", "grant", ws])
-    rows = admin._sql(f"SELECT * FROM account WHERE username = 'acl_user_{SUFFIX}'")
-    uid = rows[0]["id"]
+    uid = user._whoami()
+    assert uid, "Could not determine user identity"
     admin._call("grant_space_access", [ws, uid, "editor"])
     r = user.store(workspace_id=ws, peer_id="p1",
                    content="granted", memory_type="experience")
@@ -100,8 +100,8 @@ def test_02_admin_grant_revoke(admin, user):
 
 
 def test_03_promote_demote(admin, user):
-    rows = admin._sql(f"SELECT * FROM account WHERE username = 'acl_user_{SUFFIX}'")
-    uid = rows[0]["id"]
+    uid = user._whoami()
+    assert uid, "Could not determine user identity"
     admin._call("promote_admin", [uid])
     admin._call("demote_admin", [uid])
 
@@ -125,8 +125,8 @@ def test_05_admin_update_delete_workspace(admin, user):
 def test_06_user_no_delete(admin, user):
     ws = f"acl-prot-{SUFFIX}"
     admin._call("create_workspace", ["prot-ws", "protected", ws])
-    rows = admin._sql(f"SELECT * FROM account WHERE username = 'acl_user_{SUFFIX}'")
-    uid = rows[0]["id"]
+    uid = user._whoami()
+    assert uid, "Could not determine user identity"
     admin._call("grant_space_access", [ws, uid, "editor"])
     with pytest.raises(RuntimeError, match="Access denied|'editor' permission but 'owner' is required"):
         user._call("delete_workspace", [ws])

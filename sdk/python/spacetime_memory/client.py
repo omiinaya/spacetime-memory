@@ -1668,9 +1668,9 @@ class Client:
 
         for table in self._BACKUP_TABLES:
             try:
-                rows = self._sql(f"SELECT * FROM {table}")
+                rows = self._query(table)
             except RuntimeError:
-                continue  # table doesn't exist in this module version
+                continue  # table doesn't exist or isn't queryable
             if rows:
                 manifest[table] = rows
                 total_rows += len(rows)

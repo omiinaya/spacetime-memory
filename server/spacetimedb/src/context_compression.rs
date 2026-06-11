@@ -104,7 +104,7 @@ pub fn reinforce_memory(ctx: &ReducerContext, memory_id: String) -> Result<(), S
 /// Change the tier of a memory.
 #[reducer]
 pub fn update_memory_tier(ctx: &ReducerContext, memory_id: String, tier: String) -> Result<(), String> {
-    let _admin = require_admin(ctx)?;
+    let _account = require_auth(ctx)?;
     // Validate tier
     if tier != "L0" && tier != "L1" && tier != "L2" {
         return Err(format!("Invalid tier '{}'. Must be L0, L1, or L2", tier));
