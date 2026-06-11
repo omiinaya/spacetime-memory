@@ -9,7 +9,7 @@ use crate::{memory::memory, now_micros, uuid_v4};
 
 /// A hierarchical context directory (OpenViking concept).
 /// Directories form a tree structure via `parent_id`.
-#[table(accessor = context_directory, public)]
+#[table(accessor = context_directory)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ContextDirectory {
     #[primary_key]
@@ -46,7 +46,7 @@ pub struct DirectoryResult {
 }
 
 /// Links memories to directories for hierarchical organisation.
-#[table(accessor = directory_memory_link, public)]
+#[table(accessor = directory_memory_link)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DirectoryMemoryLink {
     #[primary_key]

@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
 
 /// An insight represents a Hindsight reflect-style reasoning result.
-#[table(accessor = insight, public)]
+#[table(accessor = insight)]
 #[derive(Debug, Clone)]
 pub struct Insight {
     #[primary_key]
@@ -74,7 +74,7 @@ pub fn delete_insight(ctx: &ReducerContext, id: String) -> Result<(), String> {
 
 /// A mental model is a higher-level abstraction, belief, pattern, heuristic,
 /// or rule synthesized from a set of experiences (raw memories).
-#[table(accessor = mental_model, public)]
+#[table(accessor = mental_model)]
 #[derive(Debug, Clone)]
 pub struct MentalModel {
     #[primary_key]

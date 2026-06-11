@@ -6,7 +6,7 @@ use crate::auth;
 ///
 /// Stored in the database so the connector daemon can load and run
 /// connectors across restarts without re-registration.
-#[table(accessor = connector_config, public)]
+#[table(accessor = connector_config)]
 #[derive(Debug, Clone)]
 pub struct ConnectorConfig {
     #[primary_key]

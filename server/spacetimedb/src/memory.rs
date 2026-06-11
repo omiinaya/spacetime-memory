@@ -7,7 +7,7 @@ use crate::workspace::check_space_access;
 
 /// A memory entry storing world facts, experiences, or mental models
 /// for an AI agent within a workspace.
-#[table(accessor = memory, public)]
+#[table(accessor = memory)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Memory {
     #[primary_key]

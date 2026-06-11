@@ -350,7 +350,12 @@ class Client:
         ) from last_exc
 
     def _sql(self, query: str) -> list[dict[str, Any]]:
-        """Run a SELECT query against the SpacetimeDB SQL API."""
+        """Run a SELECT query against the SpacetimeDB SQL API.
+        
+        DEPRECATED for content tables — use _query() instead. Content tables
+        are now private and SQL queries against them will fail. This method
+        remains for public result tables (hybrid_result, etc.).
+        """
         self._ensure_identity()
         headers = self._headers()
         headers["Content-Type"] = "text/plain"
@@ -374,6 +379,37 @@ class Client:
             friendly = self._map_sql_error(error_text)
             raise RuntimeError(friendly)
         return _parse_sql_response(resp.text)
+
+    def _query(
+        self,
+        table: str,
+        workspace_id: str = "",
+        filter_dict: dict[str, Any] | None = None,
+        columns: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query a private content table through the query_table reducer.
+
+        The reducer checks auth + workspace access and stores results in
+        the public query_result table, scoped by a random query_id.
+        """
+        import secrets
+        import json
+
+        query_id = secrets.token_hex(16)
+        filter_json = json.dumps(filter_dict or {})
+        columns_json = json.dumps(columns or [])
+
+        self._call("query_table", [
+            query_id, table, workspace_id, filter_json, columns_json,
+        ])
+
+        # Read results from the public query_result table
+        rows = self._sql(
+            "SELECT table_name, row_json FROM query_result WHERE "
+            f"query_id = '{_esc(query_id)}' "
+            "ORDER BY created_at"
+        )
+        return [json.loads(r["row_json"]) for r in rows]
 
     def _map_sql_error(self, error_text: str) -> str:
         """Map raw SQL error text to a human-friendly message."""

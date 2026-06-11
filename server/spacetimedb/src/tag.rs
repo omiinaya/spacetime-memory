@@ -4,7 +4,7 @@ use crate::auth::require_auth;
 use crate::{now_micros, uuid_v4};
 
 /// A tag that can be attached to memories and other entities.
-#[table(accessor = tag, public)]
+#[table(accessor = tag)]
 #[derive(Debug, Clone)]
 pub struct Tag {
     #[primary_key]
@@ -17,7 +17,7 @@ pub struct Tag {
 
 /// Associates a tag with a memory.
 /// Both fields together act as the logical composite key.
-#[table(accessor = memory_tag, public)]
+#[table(accessor = memory_tag)]
 #[derive(Debug, Clone)]
 pub struct MemoryTag {
     pub memory_id: String,

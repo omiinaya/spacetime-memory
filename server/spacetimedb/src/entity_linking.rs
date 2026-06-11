@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v4};
 
 /// An entity link stores a canonical entity name with aliases,
 /// providing Mem0-style entity resolution for the knowledge graph.
-#[table(accessor = entity_link, public)]
+#[table(accessor = entity_link)]
 #[derive(Debug, Clone)]
 pub struct EntityLink {
     #[primary_key]

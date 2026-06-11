@@ -5,7 +5,7 @@ use crate::auth::require_auth;
 use crate::workspace::check_space_access;
 
 /// A note — markdown document with wikilink backlinking support.
-#[table(accessor = note, public)]
+#[table(accessor = note)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Note {
     #[primary_key]
@@ -29,7 +29,7 @@ pub struct Note {
 }
 
 /// A backlink — forward edge from note A → note B ([[wikilink]]).
-#[table(accessor = note_backlink, public)]
+#[table(accessor = note_backlink)]
 #[derive(Debug, Clone)]
 pub struct NoteBacklink {
     #[primary_key]
@@ -45,7 +45,7 @@ pub struct NoteBacklink {
 
 /// A block — individual paragraph/heading/list-item within a note.
 /// Blocks are parsed from markdown content and given stable IDs.
-#[table(accessor = note_block, public)]
+#[table(accessor = note_block)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NoteBlock {
     #[primary_key]
@@ -73,7 +73,7 @@ pub struct NoteBlock {
 }
 
 /// A block-level reference — ((block-id)) or {{embed ((block-id))}}
-#[table(accessor = block_reference, public)]
+#[table(accessor = block_reference)]
 #[derive(Debug, Clone)]
 pub struct BlockReference {
     #[primary_key]

@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
 
 /// A peer represents a user, AI agent, or other entity participating in sessions.
-#[table(accessor = peer, public)]
+#[table(accessor = peer)]
 #[derive(Debug, Clone)]
 pub struct Peer {
     #[primary_key]

@@ -4,7 +4,7 @@ use crate::auth::require_auth;
 use crate::{now_micros, uuid_v4};
 
 /// A guided tour that walks through a sequence of KG nodes.
-#[table(accessor = tour, public)]
+#[table(accessor = tour)]
 #[derive(Debug, Clone)]
 pub struct Tour {
     #[primary_key]
@@ -16,7 +16,7 @@ pub struct Tour {
 }
 
 /// A single stop on a guided tour.
-#[table(accessor = tour_stop, public)]
+#[table(accessor = tour_stop)]
 #[derive(Debug, Clone)]
 pub struct TourStop {
     #[primary_key]

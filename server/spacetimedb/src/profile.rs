@@ -4,7 +4,7 @@ use crate::auth::require_auth;
 use crate::{now_micros, uuid_v4};
 
 /// A profile accumulates static facts and dynamic context about a peer.
-#[table(accessor = profile, public)]
+#[table(accessor = profile)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Profile {
     #[primary_key]
@@ -152,7 +152,7 @@ pub fn add_dynamic_context(
 // =========================================================================
 
 /// A static or dynamic fact about a peer (Facts project parity).
-#[table(accessor = fact, public)]
+#[table(accessor = fact)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Fact {
     #[primary_key]

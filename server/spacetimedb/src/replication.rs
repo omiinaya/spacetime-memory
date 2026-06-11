@@ -25,7 +25,7 @@ struct IncomingEntry {
 // ---------------------------------------------------------------------------
 
 /// A replication peer — another SpacetimeDB instance to sync with.
-#[table(accessor = replication_peer, public)]
+#[table(accessor = replication_peer)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ReplicationPeer {
     #[primary_key]
@@ -44,7 +44,7 @@ pub struct ReplicationPeer {
 }
 
 /// A log entry recording a mutation for replication.
-#[table(accessor = replication_log, public)]
+#[table(accessor = replication_log)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ReplicationLog {
     #[primary_key]

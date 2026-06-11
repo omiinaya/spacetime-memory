@@ -6,7 +6,7 @@ use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
 
 /// A node in the knowledge graph, representing a concept, entity, or document.
-#[table(accessor = kg_node, public)]
+#[table(accessor = kg_node)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KgNode {
     #[primary_key]
@@ -27,7 +27,7 @@ pub struct KgNode {
 
 /// A directed, typed edge between two knowledge graph nodes.
 /// Supports temporal versioning (Graphiti parity).
-#[table(accessor = kg_edge, public)]
+#[table(accessor = kg_edge)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KgEdge {
     #[primary_key]
@@ -55,7 +55,7 @@ pub struct KgEdge {
 
 /// A community (cluster) grouping related nodes in the knowledge graph.
 /// Uses u64 auto-increment primary key.
-#[table(accessor = kg_community, public)]
+#[table(accessor = kg_community)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KgCommunity {
     #[primary_key]
@@ -721,7 +721,7 @@ pub fn compute_pagerank(
 // ---------------------------------------------------------------------------
 
 /// A cluster in the community hierarchy dendrogram.
-#[table(accessor = hierarchy_cluster, public)]
+#[table(accessor = hierarchy_cluster)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HierarchyCluster {
     #[primary_key]
@@ -733,7 +733,7 @@ pub struct HierarchyCluster {
 }
 
 /// A parent-child relationship in the community dendrogram.
-#[table(accessor = community_hierarchy, public)]
+#[table(accessor = community_hierarchy)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CommunityHierarchy {
     #[primary_key]

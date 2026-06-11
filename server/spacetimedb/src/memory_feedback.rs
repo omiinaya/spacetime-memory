@@ -6,7 +6,7 @@ use crate::{memory::memory, now_micros, uuid_v4};
 use crate::workspace::workspace;
 
 /// Records user feedback on a memory for trust scoring.
-#[table(accessor = memory_feedback, public)]
+#[table(accessor = memory_feedback)]
 #[derive(Debug, Clone)]
 pub struct MemoryFeedback {
     #[primary_key]
@@ -26,7 +26,7 @@ pub struct MemoryFeedback {
 ///
 /// Controls how memory trust scores decay over time when not reinforced.
 /// Each workspace can have its own decay parameters.
-#[table(accessor = workspace_config, public)]
+#[table(accessor = workspace_config)]
 #[derive(Debug, Clone)]
 pub struct WorkspaceConfig {
     #[primary_key]

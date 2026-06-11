@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v4};
 use crate::auth;
 
 /// A workspace representing a project, agent-world, or sandbox.
-#[table(accessor = workspace, public)]
+#[table(accessor = workspace)]
 #[derive(Debug, Clone)]
 pub struct Workspace {
     #[primary_key]
@@ -23,7 +23,7 @@ pub struct Workspace {
 /// - `"owner"`   — full control (grant/revoke, read, write, delete)
 /// - `"editor"`  — read and write
 /// - `"viewer"`  — read only
-#[table(accessor = space_permission, public)]
+#[table(accessor = space_permission)]
 #[derive(Debug, Clone)]
 pub struct SpacePermission {
     #[primary_key]

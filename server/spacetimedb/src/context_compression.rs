@@ -8,7 +8,7 @@ use crate::{now_micros, uuid_v4};
 /// A cached compressed context pack (RetainDB-style).
 /// Allows cache-lookup via `query_hash` so repeated queries reuse
 /// previously compressed context.
-#[table(accessor = context_pack, public)]
+#[table(accessor = context_pack)]
 #[derive(Debug, Clone)]
 pub struct ContextPack {
     #[primary_key]

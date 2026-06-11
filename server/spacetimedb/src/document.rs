@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
 
 /// A document ingested into the workspace.
-#[table(accessor = document, public)]
+#[table(accessor = document)]
 #[derive(Debug, Clone)]
 pub struct Document {
     #[primary_key]
@@ -25,7 +25,7 @@ pub struct Document {
 }
 
 /// A chunk of a document, holding a segment of content and its embedding.
-#[table(accessor = doc_chunk, public)]
+#[table(accessor = doc_chunk)]
 #[derive(Debug, Clone)]
 pub struct DocChunk {
     #[primary_key]

@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
 
 /// A session represents a conversation or interaction within a workspace.
-#[table(accessor = session, public)]
+#[table(accessor = session)]
 #[derive(Debug, Clone)]
 pub struct Session {
     #[primary_key]
@@ -20,7 +20,7 @@ pub struct Session {
 
 /// Join table linking sessions to peers. Composite key: (session_id, peer_id).
 /// No `#[primary_key]` attribute; SpacetimeDB uses the combination as a unique constraint.
-#[table(accessor = session_participant, public)]
+#[table(accessor = session_participant)]
 #[derive(Debug, Clone)]
 pub struct SessionParticipant {
     pub session_id: String,
@@ -30,7 +30,7 @@ pub struct SessionParticipant {
 }
 
 /// Agent reasoning step — records chain-of-thought, tool calls, observations.
-#[table(accessor = agent_step, public)]
+#[table(accessor = agent_step)]
 #[derive(Debug, Clone)]
 pub struct AgentStep {
     #[primary_key]

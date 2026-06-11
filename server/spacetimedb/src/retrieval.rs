@@ -7,7 +7,7 @@ use crate::{now_micros, uuid_v4};
 /// text for retrieval. Since SpacetimeDB cannot perform native vector
 /// search, this table stores the data that clients query via SQL and
 /// post-process with their own vector comparison logic.
-#[table(accessor = search_index, public)]
+#[table(accessor = search_index)]
 #[derive(Debug, Clone)]
 pub struct SearchIndex {
     #[primary_key]

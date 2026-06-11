@@ -12,7 +12,7 @@ use crate::retrieval::search_index;
 use crate::workspace::workspace;
 
 /// Tracks consolidation operations (dedup, rollup, decay, version_merge).
-#[table(accessor = consolidation_log, public)]
+#[table(accessor = consolidation_log)]
 #[derive(Debug, Clone)]
 pub struct ConsolidationLog {
     #[primary_key]
@@ -153,7 +153,7 @@ pub fn decay_weak_memories(
 // ── Merge Suggestion System ─────────────────────────────────────────────
 
 /// A suggested merge between two near-duplicate memories, awaiting review.
-#[table(accessor = merge_suggestion, public)]
+#[table(accessor = merge_suggestion)]
 #[derive(Debug, Clone)]
 pub struct MergeSuggestion {
     #[primary_key]
@@ -682,7 +682,7 @@ pub fn init(ctx: &ReducerContext) {
 // ── Backup / Restore ──────────────────────────────────────────────────────
 
 /// A backup entry storing the JSON-serialised state of a single record.
-#[table(accessor = backup_entry, public)]
+#[table(accessor = backup_entry)]
 #[derive(Debug, Clone)]
 pub struct BackupEntry {
     #[primary_key]

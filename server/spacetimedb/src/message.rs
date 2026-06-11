@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v4};
 use crate::session::check_session_access;
 
 /// A message within a session. Content types: "text", "tool_call", "tool_result", "event".
-#[table(accessor = message, public)]
+#[table(accessor = message)]
 #[derive(Debug, Clone)]
 pub struct Message {
     #[primary_key]
