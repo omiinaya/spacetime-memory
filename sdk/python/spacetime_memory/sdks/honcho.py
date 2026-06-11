@@ -158,6 +158,7 @@ class SessionSummaries(BaseModel):
 
 
 class SessionContext(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
     session_id: str
     messages: list[Message]
     summary: Summary | None = None

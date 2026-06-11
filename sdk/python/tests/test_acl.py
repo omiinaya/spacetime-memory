@@ -2,9 +2,6 @@
 
 These tests require a running SpacetimeDB standalone.  The ``stdb_session``
 fixture auto-publishes the module with a clean data dir.
-
-Uses JWT tokens from the project key pair for deterministic admin identity
-across test runs so admin bootstrapping is reliable even after DB wipes.
 """
 
 from __future__ import annotations
@@ -25,72 +22,31 @@ pytestmark = [
 ]
 
 SUFFIX = os.urandom(4).hex()
-TOKEN_PATH = str(REPO_ROOT / "data" / "id_ecdsa_pkcs8.pem")
-
-
-def _generate_admin_token() -> str:
-    """Generate a JWT token from the project key pair for admin identity."""
-    try:
-        from spacetime_memory.auth import generate_token
-        return generate_token(TOKEN_PATH)
-    except ImportError:
-        return ""
-
-
-def _admin_token_works(stdb_session: dict) -> bool:
-    """Check if the generated JWT token can authenticate against the server."""
-    token = _generate_admin_token()
-    if not token:
-        return False
-    try:
-        c = Client(
-            host=stdb_session["host"],
-            port=stdb_session["port"],
-            database=stdb_session["database"],
-            token=token,
-        )
-        # Try a harmless reducer call to verify JWT works
-        c._call("list_workspaces", [])
-        return True
-    except Exception:
-        return False
 
 
 @pytest.fixture(scope="module")
 def admin(stdb_session) -> Client:
-    """Create an admin client using a JWT token for deterministic identity.
+    """Create an admin client by registering and bootstrapping as admin.
 
-    The project's key pair produces a stable SpacetimeDB identity so the
-    admin bootstrapping (register + set_initial_admin) produces the same
-    result every run, even after the DB is wiped by --delete-data=always.
+    Works without JWT: registers a new user with the anonymous identity,
+    then calls set_initial_admin(self_identity) since no admin exists yet.
+    The conftest publishes with --delete-data=always, so each run is clean.
     """
-    if not _admin_token_works(stdb_session):
-        pytest.skip("JWT admin token does not match server key — skipping ACL tests")
     c = Client(
         host=stdb_session["host"],
         port=stdb_session["port"],
         database=stdb_session["database"],
-        token=_generate_admin_token(),
     )
 
-    # Bootstrap admin: register + set_initial_admin
     uname = f"acl_admin_{SUFFIX}"
-    my_id = ""
-    try:
-        c._call("register", [uname, "Admin", "adminpass"])
-    except RuntimeError:
-        pass  # already registered — identity already has an account
+    c._call("register", [uname, "Admin", "adminpass"])
 
-    try:
-        my_id = c._whoami()
-    except Exception:
-        pass
-
+    my_id = c._whoami()
     if my_id:
         try:
             c._call("set_initial_admin", [my_id])
         except RuntimeError:
-            pass  # admin already exists
+            pass  # admin already exists (race unlikely)
 
     return c
 

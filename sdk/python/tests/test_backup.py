@@ -1,4 +1,6 @@
 """Backup/restore integration tests."""
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -11,22 +13,16 @@ sys.path.insert(0, str(REPO_ROOT / "sdk" / "python"))
 
 from spacetime_memory import Client
 
-DB = os.environ.get("SPACETIMEDB_DB", None)
-HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
-PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
-
-pytestmark = [pytest.mark.skipif(not DB, reason="SPACETIMEDB_DB required")]
-
-
-def _make_token() -> str:
-    from spacetime_memory.auth import generate_token
-    key_path = REPO_ROOT / "data" / "id_ecdsa_pkcs8.pem"
-    return generate_token(str(key_path))
+pytestmark = [pytest.mark.integration]
 
 
 @pytest.fixture(scope="module")
-def client() -> Client:
-    return Client(host=HOST, port=PORT, database=DB)
+def client(stdb_session) -> Client:
+    return Client(
+        host=stdb_session["host"],
+        port=stdb_session["port"],
+        database=stdb_session["database"],
+    )
 
 
 def test_backup_structure(client):
