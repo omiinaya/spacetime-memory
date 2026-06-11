@@ -718,7 +718,7 @@ class Client:
 
     def list_workspaces(self) -> list[dict[str, Any]]:
         """List all workspaces."""
-        return self._sql("SELECT * FROM workspace")
+        return self._query("workspace")
 
     # -----------------------------------------------------------------------
     # Memory
@@ -1509,11 +1509,7 @@ class Client:
 
     def list_peers(self, workspace_id: str | None = None) -> list[dict[str, Any]]:
         """List peers, optionally filtered by workspace."""
-        if workspace_id:
-            return self._sql(
-                f"SELECT * FROM peer WHERE workspace_id = '{_esc(workspace_id)}'"
-            )
-        return self._sql("SELECT * FROM peer")
+        return self._query("peer", workspace_id=workspace_id or "")
 
     # -----------------------------------------------------------------------
     # Context pack queries
