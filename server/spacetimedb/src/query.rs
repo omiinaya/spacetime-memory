@@ -170,6 +170,22 @@ fn filter_matches(row: &serde_json::Value, filter: &serde_json::Map<String, serd
             if (e - a).abs() > f64::EPSILON {
                 return false;
             }
+        // Coerce string to boolean for SDK convenience (list_memories sends "true"/"false")
+        } else if expected.is_string() && actual.is_boolean() {
+            let expected_bool = expected.as_str().unwrap().eq_ignore_ascii_case("true");
+            if expected_bool != actual.as_bool().unwrap() {
+                return false;
+            }
+        // Coerce string to number for SDK convenience
+        } else if expected.is_string() && actual.is_number() {
+            let expected_num: f64 = match expected.as_str().unwrap().parse() {
+                Ok(n) => n,
+                Err(_) => { if expected != actual { return false; } continue; },
+            };
+            let actual_num = actual.as_f64().unwrap_or(0.0);
+            if (expected_num - actual_num).abs() > f64::EPSILON {
+                return false;
+            }
         } else if expected != actual {
             return false;
         }

@@ -269,16 +269,34 @@ def stdb_session() -> dict:
 
 @pytest.fixture
 def stdb_client(stdb_session) -> Client:
-    """Create a Client connected to the published database.
+    """Create a Client connected to the published database, auto-registered as admin.
 
-    Uses anonymous identity (no JWT) — the SpacetimeDB standalone server
-    issues an ephemeral identity token automatically.
+    Registers a test account and promotes to admin on first use so that
+    authenticated reducers (require_auth) work for integration tests.
     """
-    return Client(
+    c = Client(
         host=stdb_session["host"],
         port=stdb_session["port"],
         database=stdb_session["database"],
     )
+
+    # Register and self-promote to admin for test access
+    import os
+    suffix = os.urandom(4).hex()
+    uname = f"test_{suffix}"
+    try:
+        c._call("register", [uname, "Test User", "testpass"])
+    except RuntimeError:
+        pass  # already registered from a prior test in this session
+
+    my_id = c._whoami()
+    if my_id:
+        try:
+            c._call("set_initial_admin", [my_id])
+        except RuntimeError:
+            pass  # admin already exists
+
+    return c
 
 
 def _generate_test_token() -> str:

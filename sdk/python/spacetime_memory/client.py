@@ -406,8 +406,7 @@ class Client:
         # Read results from the public query_result table
         rows = self._sql(
             "SELECT table_name, row_json FROM query_result WHERE "
-            f"query_id = '{_esc(query_id)}' "
-            "ORDER BY created_at"
+            f"query_id = '{_esc(query_id)}'"
         )
         results = []
         for r in rows:
@@ -1024,19 +1023,9 @@ class Client:
         self, workspace_id: str, memory_type: str = "", limit: int = 50
     ) -> list[dict[str, Any]]:
         """List active memories in a workspace."""
-        clauses = [
-            f"workspace_id = '{_esc(workspace_id)}'",
-            "is_active = true",
-        ]
-        if memory_type:
-            clauses.append(f"memory_type = '{_esc(memory_type)}'")
         filt = {}
-        for clause in clauses:
-            parts = clause.split(" = ", 1)
-            if len(parts) == 2:
-                key = parts[0].strip()
-                val = parts[1].strip().strip("'")
-                filt[key] = val
+        if memory_type:
+            filt["memory_type"] = memory_type
         rows = self._query("memory", workspace_id=workspace_id, filter_dict=filt)
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         return rows[:limit]
