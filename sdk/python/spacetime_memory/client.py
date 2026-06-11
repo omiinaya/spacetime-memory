@@ -1412,18 +1412,20 @@ class Client:
         raw = secrets.token_bytes(32)
         api_key = "sk-" + raw.hex()
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        request_id = secrets.token_hex(16)
 
         self._call("create_api_key", [
-            workspace_id, name, permissions, key_hash,
+            workspace_id, name, permissions, key_hash, request_id,
         ])
 
-        # Fetch the just-created key to get its ID
+        # Fetch the just-created key from the public result table
         rows = self._sql(
-            "SELECT id FROM api_key WHERE "
-            f"key_hash = '{_esc(key_hash)}' "
+            "SELECT api_key_id, name, permissions FROM api_key_result WHERE "
+            f"request_id = '{_esc(request_id)}' "
+            "AND operation = 'create' "
             "ORDER BY created_at DESC LIMIT 1"
         )
-        key_id = rows[0]["id"] if rows else ""
+        key_id = rows[0]["api_key_id"] if rows else ""
 
         return {
             "status": "ok",
@@ -1446,17 +1448,22 @@ class Client:
     def list_api_keys(self, workspace_id: str) -> list[dict[str, Any]]:
         """List all API keys for a workspace.
 
+        Calls the ``list_api_keys`` reducer which populates the public
+        ``api_key_result`` table with metadata (key_hash excluded).
+
         Args:
             workspace_id: The workspace to query.
 
         Returns:
-            List of ``ApiKey`` table rows (dicts).  Note that the
-            ``key_hash`` column is a one-way hash of the secret — the
-            plaintext secret is never stored server-side.
+            List of API key metadata dicts.  The ``key_hash`` is never
+            exposed — only safe metadata is returned.
         """
+        self._call("list_api_keys", [workspace_id])
         return self._sql(
-            "SELECT * FROM api_key WHERE "
+            "SELECT api_key_id, name, permissions, is_active, created_at, last_used_at "
+            "FROM api_key_result WHERE "
             f"workspace_id = '{_esc(workspace_id)}' "
+            "AND operation = 'list' "
             "ORDER BY created_at DESC"
         )
 

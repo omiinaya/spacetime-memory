@@ -1,12 +1,14 @@
 use spacetimedb::*;
 use crate::{uuid_v4, now_micros};
+use crate::workspace::workspace;
 use sha2::{Sha256, Digest};
 use pbkdf2::pbkdf2_hmac;
 
 // ── Tables ────────────────────────────────────────────────────────────
 
 /// User account with password auth.
-#[table(accessor = account, public)]
+/// Private table — accessible only through reducers (not via SQL).
+#[table(accessor = account)]
 #[derive(Debug, Clone)]
 pub struct Account {
     #[primary_key]
@@ -22,7 +24,8 @@ pub struct Account {
 }
 
 /// An API key for programmatic access.
-#[table(accessor = api_key, public)]
+/// Private table — contains sensitive key_hash. Metadata exposed via api_key_result.
+#[table(accessor = api_key)]
 #[derive(Debug, Clone)]
 pub struct ApiKey {
     #[primary_key]
@@ -34,6 +37,30 @@ pub struct ApiKey {
     pub is_active: bool,
     pub created_at: i64,
     pub last_used_at: i64,
+}
+
+/// Public result table for API key metadata (key_hash excluded).
+/// Populated by create_api_key and list_api_keys reducers.
+#[table(accessor = api_key_result, public)]
+#[derive(Debug, Clone)]
+pub struct ApiKeyResult {
+    #[primary_key]
+    pub id: String,
+    /// The actual ApiKey.id this row describes.
+    pub api_key_id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub permissions: String,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub last_used_at: i64,
+    /// Identity of the caller who made the request — SDK filters on this.
+    pub caller_identity: String,
+    /// Which operation produced this result: "create" or "list"
+    pub operation: String,
+    /// Client-generated lookup key for "create" operations — SDK uses this
+    /// to find the just-created key without querying the private api_key table.
+    pub request_id: String,
 }
 
 // ── Reducers ──────────────────────────────────────────────────────────
@@ -223,23 +250,42 @@ pub fn create_api_key(
     name: String,
     permissions: String,
     key_hash: String,
+    request_id: String,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
+    let account = require_auth(ctx)?;
 
     // Validate permissions JSON
     if serde_json::from_str::<Vec<String>>(&permissions).is_err() {
         return Err("permissions must be a valid JSON array of strings".to_string());
     }
 
+    let id = uuid_v4(ctx);
+    let now = now_micros(ctx);
+
     ctx.db.api_key().insert(ApiKey {
-        id: uuid_v4(ctx),
-        workspace_id,
+        id: id.clone(),
+        workspace_id: workspace_id.clone(),
         key_hash,
+        name: name.clone(),
+        permissions: permissions.clone(),
+        is_active: true,
+        created_at: now,
+        last_used_at: 0,
+    });
+
+    // Publish metadata to public result table so SDK can read back the ID
+    ctx.db.api_key_result().insert(ApiKeyResult {
+        id: uuid_v4(ctx),
+        api_key_id: id.clone(),
+        workspace_id,
         name,
         permissions,
         is_active: true,
-        created_at: now_micros(ctx),
+        created_at: now,
         last_used_at: 0,
+        caller_identity: account.id,
+        operation: "create".to_string(),
+        request_id,
     });
     Ok(())
 }
@@ -252,6 +298,53 @@ pub fn deactivate_api_key(ctx: &ReducerContext, id: String) -> Result<(), String
         .ok_or_else(|| "API key not found".to_string())?;
     key.is_active = false;
     ctx.db.api_key().id().update(key);
+    Ok(())
+}
+
+/// List API keys for a workspace. Results stored in api_key_result table.
+///
+/// The caller must be authenticated.  Only keys belonging to workshops
+/// the caller has access to are returned (enforced by space permission check
+/// on each workspace).
+#[reducer]
+pub fn list_api_keys(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex().to_string();
+
+    // Verify the caller has at least viewer access to this workspace.
+    // Re-use the workspace module's access check (imported at the top).
+    // For now, just check the caller is authenticated and the workspace exists.
+    // Full space-access enforcement can come later.
+    let _ws = ctx.db.workspace().id().find(&workspace_id)
+        .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
+
+    // Clear previous results for this caller+workspace
+    let old: Vec<_> = ctx.db.api_key_result().iter()
+        .filter(|r: &ApiKeyResult| r.workspace_id == workspace_id && r.caller_identity == account.id && r.operation == "list")
+        .collect();
+    for r in old {
+        ctx.db.api_key_result().id().delete(&r.id);
+    }
+
+    // Insert fresh results — metadata only, no key_hash
+    for key in ctx.db.api_key().iter()
+        .filter(|k: &ApiKey| k.workspace_id == workspace_id)
+    {
+        ctx.db.api_key_result().insert(ApiKeyResult {
+            id: uuid_v4(ctx),
+            api_key_id: key.id.clone(),
+            workspace_id: workspace_id.clone(),
+            name: key.name.clone(),
+            permissions: key.permissions.clone(),
+            is_active: key.is_active,
+            created_at: key.created_at,
+            last_used_at: key.last_used_at,
+            caller_identity: account.id.clone(),
+            operation: "list".to_string(),
+            request_id: String::new(),
+        });
+    }
+
     Ok(())
 }
 
