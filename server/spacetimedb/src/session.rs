@@ -200,6 +200,7 @@ pub fn add_agent_step(
     summary: String,
     parent_step_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);

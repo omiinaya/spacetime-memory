@@ -68,6 +68,7 @@ pub fn create_workspace(ctx: &ReducerContext, name: String, description: String,
 
 #[reducer]
 pub fn update_workspace(ctx: &ReducerContext, id: String, name: String, description: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex().to_string();
     let existing = ctx
         .db
@@ -92,6 +93,7 @@ pub fn update_workspace(ctx: &ReducerContext, id: String, name: String, descript
 
 #[reducer]
 pub fn delete_workspace(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex().to_string();
 
     ctx.db
@@ -123,6 +125,7 @@ pub fn delete_workspace(ctx: &ReducerContext, id: String) -> Result<(), String> 
 /// (requires explicit permission). Only owners can change visibility.
 #[reducer]
 pub fn set_workspace_visibility(ctx: &ReducerContext, workspace_id: String, is_public: bool) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "owner")?;
 
