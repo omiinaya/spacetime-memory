@@ -1,4 +1,6 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
+use crate::auth::require_admin;
 
 use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
@@ -77,6 +79,7 @@ pub fn create_node(
     summary: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
@@ -115,6 +118,7 @@ pub fn create_node(
 
 #[reducer]
 pub fn delete_node(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let node = ctx
         .db
         .kg_node()
@@ -143,6 +147,7 @@ pub fn create_edge(
     confidence: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
@@ -186,6 +191,7 @@ pub fn create_edge(
 
 #[reducer]
 pub fn delete_edge(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let edge = ctx
         .db
         .kg_edge()
@@ -216,6 +222,7 @@ pub fn update_edge(
     weight: f64,
     metadata_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
 
     // Find the initial edge by ID
@@ -310,6 +317,7 @@ pub struct EdgeHistoryResult {
 /// Queries by `edge_group_id` and stores results in `edge_history_result`.
 #[reducer]
 pub fn get_edge_history(ctx: &ReducerContext, edge_group_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Require auth
     let _caller = ctx.sender().to_hex();
 
@@ -351,6 +359,9 @@ pub fn create_community(
     name: String,
     summary: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
 
     let community = KgCommunity {
@@ -371,6 +382,7 @@ pub fn assign_to_community(
     node_id: String,
     community_id: u64,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let mut node = ctx
         .db
         .kg_node()
@@ -398,6 +410,7 @@ pub fn detect_communities(
     ctx: &ReducerContext,
     workspace_id: String,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     const MAX_ITER: u32 = 10;
 
     // Pre-collect edges for the workspace (avoids repeated full-scan filtering)
@@ -478,6 +491,7 @@ pub fn detect_communities(
 /// community ID (from kg_community.next_id).  Nodes with no edges stay as 0.
 #[reducer]
 pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let node_ids: Vec<(String, bool)> = ctx
         .db
@@ -559,6 +573,7 @@ pub fn compute_pagerank(
     damping: f64,
     max_iterations: u32,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let d = if damping <= 0.0 || damping >= 1.0 {
         0.85
@@ -741,6 +756,7 @@ pub fn compute_community_hierarchy(
     ctx: &ReducerContext,
     workspace_id: String,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     // Get all communities in this workspace
     let communities: Vec<(u64, String)> = ctx
         .db

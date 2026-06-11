@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 use crate::session::check_session_access;
@@ -27,6 +28,7 @@ pub fn send_message(
     content_type: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Verify session exists + caller has permission
     let caller = ctx.sender().to_hex();
     let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
@@ -63,6 +65,7 @@ pub fn send_message(
 
 #[reducer]
 pub fn delete_message(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let msg = ctx
         .db
         .message()

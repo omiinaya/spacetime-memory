@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::context_directory::context_directory;
 use crate::insight::insight;
@@ -65,6 +66,7 @@ pub struct DirectoryContentResult {
 /// `ProfileContextResult` so the client can read it back.
 #[reducer]
 pub fn get_profile_context(ctx: &ReducerContext, peer_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let profile = ctx
         .db
         .profile()
@@ -95,6 +97,7 @@ pub fn search_profiles(
     _workspace_id: String,
     query_text: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let query_lower = query_text.to_lowercase();
 
@@ -129,6 +132,7 @@ pub fn search_profiles(
 /// and store the result in `PeerSummaryResult`.
 #[reducer]
 pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let _now = now_micros(ctx);
 
     // Count active memories for this peer
@@ -211,6 +215,7 @@ pub fn search_directory_contents(
     workspace_id: String,
     directory_path: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
     // 1. Find the root directory by path

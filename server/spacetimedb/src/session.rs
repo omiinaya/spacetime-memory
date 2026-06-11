@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
@@ -68,6 +69,7 @@ pub fn create_session(
     name: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
@@ -96,6 +98,7 @@ pub fn join_session(
     peer_id: String,
     role: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Verify session exists + caller has permission
     let caller = ctx.sender().to_hex();
     let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
@@ -129,6 +132,7 @@ pub fn leave_session(
     session_id: String,
     peer_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Verify session exists + caller has permission
     let caller = ctx.sender().to_hex();
     let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
@@ -165,6 +169,7 @@ pub fn update_session_summary(
     session_id: String,
     summary: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
 
@@ -233,6 +238,7 @@ pub fn get_session_steps(
     ctx: &ReducerContext,
     session_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     let _workspace_id = check_session_access(ctx, &session_id, &caller, "viewer")?;
     let query_hash = format!("steps:{}", session_id);
@@ -270,6 +276,7 @@ pub fn get_session_steps(
 /// Delete all agent steps for a given session.
 #[reducer]
 pub fn delete_session_steps(ctx: &ReducerContext, session_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
     let to_delete: Vec<_> = ctx.db.agent_step().iter()

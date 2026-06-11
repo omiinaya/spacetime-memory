@@ -1,4 +1,6 @@
 use spacetimedb::*;
+use crate::auth::require_admin;
+use crate::auth::require_auth;
 
 use crate::memory::memory;
 use crate::{now_micros, uuid_v4};
@@ -30,6 +32,7 @@ pub fn store_context_pack(
     pack_json: String,
     token_count: u32,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -66,6 +69,7 @@ pub fn store_context_pack(
 /// Strength-based escalation is also applied as a secondary mechanism.
 #[reducer]
 pub fn reinforce_memory(ctx: &ReducerContext, memory_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let mut mem = ctx
         .db
         .memory()
@@ -100,6 +104,7 @@ pub fn reinforce_memory(ctx: &ReducerContext, memory_id: String) -> Result<(), S
 /// Change the tier of a memory.
 #[reducer]
 pub fn update_memory_tier(ctx: &ReducerContext, memory_id: String, tier: String) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     // Validate tier
     if tier != "L0" && tier != "L1" && tier != "L2" {
         return Err(format!("Invalid tier '{}'. Must be L0, L1, or L2", tier));
@@ -127,6 +132,7 @@ pub fn escalate_memories(
     l2_to_l1: u64,
     l1_to_l0: u64,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let t_l2l1 = if l2_to_l1 == 0 { 5 } else { l2_to_l1 };
     let t_l1l0 = if l1_to_l0 == 0 { 20 } else { l1_to_l0 };
     let now = now_micros(ctx);

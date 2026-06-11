@@ -1,4 +1,6 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
+use crate::auth::require_admin;
 
 use crate::knowledge_graph::{kg_edge, kg_node};
 use crate::memory::memory;
@@ -110,6 +112,7 @@ pub fn hybrid_search(
     limit: u32,
     strategies_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let qhash = query_hash(&query);
     let query_lower = query.to_lowercase();
@@ -404,6 +407,7 @@ pub fn get_search_results(
     workspace_id: String,
     query_hash: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Validate that results exist for this workspace+hash combination
     let exists = ctx
         .db
@@ -437,6 +441,7 @@ pub fn compute_god_nodes(
     workspace_id: String,
     top_n: u32,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let top_n = if top_n == 0 { 10 } else { top_n };
 

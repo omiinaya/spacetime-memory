@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
@@ -27,6 +28,7 @@ pub fn create_peer(
     peer_type: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     // Validate peer_type
@@ -66,6 +68,7 @@ pub fn update_peer(
     name: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let existing = ctx
         .db
         .peer()
@@ -93,6 +96,7 @@ pub fn update_peer(
 
 #[reducer]
 pub fn delete_peer(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let peer = ctx
         .db
         .peer()

@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 
@@ -29,6 +30,7 @@ pub fn upsert_profile(
     preferences_json: String,
     tags_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
     // Attempt to find existing profile for this peer
@@ -61,6 +63,7 @@ pub fn upsert_profile(
 
 #[reducer]
 pub fn add_profile_fact(ctx: &ReducerContext, peer_id: String, fact: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
     let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
@@ -106,6 +109,7 @@ pub fn add_dynamic_context(
     peer_id: String,
     context: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
     let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
@@ -195,6 +199,7 @@ pub fn add_fact(
     source: String,
     tier: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -234,6 +239,7 @@ pub fn update_fact(
     category: String,
     tier: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let existing = ctx.db.fact().id().find(&fact_id);
 
@@ -269,6 +275,7 @@ pub fn update_fact(
 
 #[reducer]
 pub fn delete_fact(ctx: &ReducerContext, fact_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let existing = ctx.db.fact().id().find(&fact_id);
 
@@ -292,6 +299,7 @@ pub fn list_facts(
     tier: String,
     category: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
     let facts: Vec<Fact> = ctx
@@ -343,6 +351,7 @@ pub fn search_facts(
     query: String,
     tier: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
     let query_lower = query.to_lowercase();

@@ -1,4 +1,6 @@
 use spacetimedb::*;
+use crate::auth::require_admin;
+use crate::auth::require_auth;
 
 use crate::{memory::memory, now_micros, uuid_v4};
 use crate::workspace::workspace;
@@ -53,6 +55,7 @@ pub fn rate_memory(
     rating: String,
     peer_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Parse rating into numeric score 1.0–5.0
     let score: f64 = match rating.as_str() {
         "helpful" => 5.0,
@@ -199,6 +202,7 @@ pub fn apply_reputation_decay(
     decay_rate: f64,
     max_days: i64,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     apply_decay_inner(ctx, &workspace_id, decay_rate, max_days)
 }
 
@@ -209,6 +213,7 @@ pub fn apply_reputation_decay(
 /// Intended to be called from the consolidation cron.
 #[reducer]
 pub fn manual_decay(ctx: &ReducerContext) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     const DEFAULT_DECAY_RATE: f64 = 0.005;
     const DEFAULT_MAX_DAYS: i64 = 90;
 

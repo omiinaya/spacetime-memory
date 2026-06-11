@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_admin;
 
 use crate::{now_micros, uuid_v4};
 
@@ -87,6 +88,7 @@ pub fn add_replication_peer(
     remote_db: String,
     auth_token: String,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -109,6 +111,7 @@ pub fn add_replication_peer(
 /// Remove a replication peer.
 #[reducer]
 pub fn remove_replication_peer(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let peer = ctx
         .db
         .replication_peer()
@@ -123,6 +126,7 @@ pub fn remove_replication_peer(ctx: &ReducerContext, id: String) -> Result<(), S
 /// List replication peers — stores result in the `replication_result` table.
 #[reducer]
 pub fn list_replication_peers(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let result_id = uuid_v4(ctx);
 
@@ -164,6 +168,7 @@ pub fn list_replication_peers(ctx: &ReducerContext, workspace_id: String) -> Res
 /// `log_ids_json` — JSON array of log entry IDs to mark synced.
 #[reducer]
 pub fn mark_log_synced(ctx: &ReducerContext, log_ids_json: String) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let ids: Vec<String> = serde_json::from_str(&log_ids_json)
         .map_err(|e| format!("Invalid log_ids_json: {}", e))?;
 
@@ -180,6 +185,7 @@ pub fn mark_log_synced(ctx: &ReducerContext, log_ids_json: String) -> Result<(),
 /// Get unsynced log entries — stores result in `replication_result` table.
 #[reducer]
 pub fn get_unsynced_entries(ctx: &ReducerContext, workspace_id: String, limit: i64) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let result_id = uuid_v4(ctx);
 
@@ -220,6 +226,7 @@ pub fn get_unsynced_entries(ctx: &ReducerContext, workspace_id: String, limit: i
 /// Get replication status — stores result in `replication_result` table.
 #[reducer]
 pub fn get_replication_status(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let result_id = uuid_v4(ctx);
 
@@ -288,6 +295,7 @@ pub fn get_replication_status(ctx: &ReducerContext, workspace_id: String) -> Res
 /// Clean up old synced log entries (older than 7 days).
 #[reducer]
 pub fn cleanup_replication_log(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let seven_days_ago = now - 7 * 86_400_000_000; // 7 days in microseconds
 
@@ -322,6 +330,7 @@ pub fn replicate_incoming(
     peer_id: String,
     entries_json: String,
 ) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let entries: Vec<IncomingEntry> = serde_json::from_str(&entries_json)
         .map_err(|e| format!("Invalid entries_json: {}", e))?;
 
@@ -695,6 +704,7 @@ fn apply_incoming_delete(
 /// Store a single peer's details in the replication_result table (for daemon read).
 #[reducer]
 pub fn get_replication_peer_by_id(ctx: &ReducerContext, peer_id: String) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
     let peer = ctx
         .db
@@ -733,6 +743,7 @@ pub fn get_replication_peer_by_id(ctx: &ReducerContext, peer_id: String) -> Resu
 /// Update a peer's last_sync_at timestamp.
 #[reducer]
 pub fn mark_peer_synced(ctx: &ReducerContext, peer_id: String, last_sync_at: i64) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let mut peer = ctx
         .db
         .replication_peer()

@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 
@@ -29,6 +30,7 @@ pub fn create_entity_link(
     entity_type: String,
     description: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -48,6 +50,7 @@ pub fn create_entity_link(
 
 #[reducer]
 pub fn add_alias(ctx: &ReducerContext, id: String, alias: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let mut el = ctx
         .db
         .entity_link()
@@ -79,6 +82,7 @@ pub fn resolve_entity(
     workspace_id: String,
     name: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Check if entity already exists in this workspace
     let existing = ctx
         .db

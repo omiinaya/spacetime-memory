@@ -1,6 +1,8 @@
 use spacetimedb::*;
 
 use crate::{now_micros, uuid_v4};
+use crate::auth::require_auth;
+use crate::auth::require_admin;
 use crate::workspace::check_space_access;
 
 /// A memory entry storing world facts, experiences, or mental models
@@ -82,6 +84,7 @@ pub fn store_memory_batch(
     ctx: &ReducerContext,
     items_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let items: Vec<StoreMemoryItem> = serde_json::from_str(&items_json)
         .map_err(|e| format!("Invalid batch items JSON: {}", e))?;
     let caller = ctx.sender().to_hex();
@@ -135,6 +138,7 @@ pub fn store_memory(
     source_session_id: String,
     source_message_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
@@ -182,6 +186,7 @@ pub fn update_memory(
     summary: String,
     confidence: f64,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let mut mem = ctx
         .db
         .memory()
@@ -202,6 +207,7 @@ pub fn update_memory(
 
 #[reducer]
 pub fn deactivate_memory(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let mut mem = ctx
         .db
         .memory()
@@ -220,6 +226,7 @@ pub fn deactivate_memory(ctx: &ReducerContext, id: String) -> Result<(), String>
 
 #[reducer]
 pub fn expire_memories(ctx: &ReducerContext) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
 
     let expired: Vec<_> = ctx
@@ -269,6 +276,7 @@ pub fn set_memory_scope(
     memory_id: String,
     user_scope: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let mut mem = ctx
         .db
         .memory()
@@ -295,6 +303,7 @@ pub fn get_user_memories(
     user_scope: String,
     workspace_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "viewer")?;
 

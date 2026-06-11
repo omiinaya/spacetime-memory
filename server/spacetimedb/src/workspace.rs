@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 use crate::auth;
@@ -38,6 +39,7 @@ pub struct SpacePermission {
 
 #[reducer]
 pub fn create_workspace(ctx: &ReducerContext, name: String, description: String, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let workspace_id = if id.is_empty() { uuid_v4(ctx) } else { id };
     let caller = ctx.sender().to_hex().to_string();
@@ -213,6 +215,7 @@ pub fn grant_space_access(
     peer_id: String,
     permission: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex().to_string();
 
     // Validate permission value
@@ -284,6 +287,7 @@ pub fn revoke_space_access(
     workspace_id: String,
     peer_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex().to_string();
 
     // Verify the workspace exists
@@ -324,6 +328,7 @@ pub fn revoke_space_access(
 /// query them via SQL. Any caller with at least viewer access can list members.
 #[reducer]
 pub fn list_space_members(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex().to_string();
 
     // Verify the workspace exists

@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 
@@ -38,6 +39,7 @@ pub fn index_entity(
     content: String,
     embedding_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -82,6 +84,7 @@ pub fn remove_from_index(
     entity_type: String,
     entity_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let matched = ctx
         .db
         .search_index()

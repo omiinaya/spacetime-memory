@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::knowledge_graph::{kg_edge, kg_node};
 use crate::{now_micros, uuid_v4};
@@ -46,6 +47,7 @@ pub fn graph_bfs(
     start_node_id: String,
     max_depth: u32,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let qid = format!("{:x}", ctx.timestamp.to_micros_since_unix_epoch());
     let now = now_micros(ctx);
     let max_depth = max_depth.min(6).max(1);
@@ -129,6 +131,7 @@ pub fn shortest_path(
     target_id: String,
     max_hops: u32,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let qid = format!("{:x}", ctx.timestamp.to_micros_since_unix_epoch());
     let now = now_micros(ctx);
     let max_hops = max_hops.min(12).max(1);
@@ -215,6 +218,7 @@ pub fn get_neighbors(
     workspace_id: String,
     node_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let qid = format!("{:x}", ctx.timestamp.to_micros_since_unix_epoch());
     let now = now_micros(ctx);
 

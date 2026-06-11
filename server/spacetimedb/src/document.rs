@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
@@ -52,6 +53,7 @@ pub fn create_document(
     source_url: String,
     metadata_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
@@ -98,6 +100,7 @@ pub fn add_chunk(
     chunk_index: u32,
     embedding_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -137,6 +140,7 @@ pub fn add_chunk(
 
 #[reducer]
 pub fn delete_document(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let doc = ctx
         .db
         .document()

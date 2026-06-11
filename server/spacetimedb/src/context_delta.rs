@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::context_compression::context_pack;
 use crate::context_compression::ContextPack;
@@ -187,6 +188,7 @@ pub fn generate_context_pack(
     peer_id: String,
     previous_pack_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let query_hash = compute_query_hash(&query_text);
 
@@ -290,6 +292,7 @@ pub fn generate_context_pack(
 /// On success the delta pack is accessible via the client's subscription.
 #[reducer]
 pub fn get_delta(ctx: &ReducerContext, previous_pack_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let delta = ctx
         .db
         .delta_pack()

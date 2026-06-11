@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 
@@ -38,6 +39,7 @@ pub fn create_tour(
     title: String,
     description: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
     ctx.db.tour().insert(Tour {
@@ -58,6 +60,7 @@ pub fn add_tour_stop(
     heading: String,
     description: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Verify the tour exists
     ctx.db.tour().id().find(&tour_id)
         .ok_or_else(|| format!("Tour '{}' not found", tour_id))?;
@@ -86,6 +89,7 @@ pub fn remove_tour_stop(
     ctx: &ReducerContext,
     stop_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     ctx.db.tour_stop().id().find(&stop_id)
         .ok_or_else(|| format!("TourStop '{}' not found", stop_id))?;
     ctx.db.tour_stop().id().delete(&stop_id);
@@ -97,6 +101,7 @@ pub fn delete_tour(
     ctx: &ReducerContext,
     tour_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Delete all stops
     let stops: Vec<_> = ctx.db.tour_stop().iter()
         .filter(|s| s.tour_id == tour_id)

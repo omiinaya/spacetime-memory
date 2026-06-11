@@ -228,6 +228,7 @@ pub fn delete_note(ctx: &ReducerContext, id: String) -> Result<(), String> {
 
 #[reducer]
 pub fn parse_note_blocks(ctx: &ReducerContext, note_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let note = ctx
         .db
         .note()

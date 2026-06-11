@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
@@ -30,6 +31,7 @@ pub fn create_insight(
     source_memory_ids_json: String,
     confidence: f64,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
@@ -52,6 +54,7 @@ pub fn create_insight(
 
 #[reducer]
 pub fn delete_insight(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let insight = ctx
         .db
         .insight()
@@ -97,6 +100,7 @@ pub fn synthesize_mental_models(
     workspace_id: String,
     memory_ids_json: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
@@ -131,6 +135,7 @@ pub fn update_mental_model(
     confidence: f64,
     status: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
     let mut model = ctx
@@ -154,6 +159,7 @@ pub fn update_mental_model(
 
 #[reducer]
 pub fn delete_mental_model(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let model = ctx
         .db
         .mental_model()

@@ -1,4 +1,5 @@
 use spacetimedb::*;
+use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4};
 
@@ -34,6 +35,7 @@ pub fn create_tag(
     name: String,
     color: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -55,6 +57,7 @@ pub fn tag_memory(
     memory_id: String,
     tag_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     let mt = MemoryTag {
         memory_id,
         tag_id,
@@ -70,6 +73,7 @@ pub fn untag_memory(
     memory_id: String,
     tag_id: String,
 ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
     // Delete matching rows (table has no PK, so iterate and delete each row)
     let to_delete: Vec<_> = ctx
         .db

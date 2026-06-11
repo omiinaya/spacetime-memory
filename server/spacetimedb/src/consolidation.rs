@@ -37,6 +37,7 @@ pub fn consolidate_memories(
     target_content: String,
     target_summary: String,
 ) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
 
@@ -107,6 +108,7 @@ pub fn decay_weak_memories(
     workspace_id: String,
     strength_threshold: f64,
 ) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     let now = now_micros(ctx);
     let stale_cutoff = now - 7 * 86_400_000_000; // 7 days ago in micros
 
@@ -183,6 +185,7 @@ pub fn suggest_merges(
     workspace_id: String,
     threshold: f64,
 ) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     let now = now_micros(ctx);
 
     // ── Collect active memories with embeddings ────────────────────────
@@ -278,6 +281,7 @@ pub fn suggest_merges(
 /// Approve a merge suggestion: deactivate the source memory into the target.
 #[reducer]
 pub fn approve_merge(ctx: &ReducerContext, suggestion_id: String) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     let now = now_micros(ctx);
 
     let mut suggestion = ctx
@@ -335,6 +339,7 @@ pub fn approve_merge(ctx: &ReducerContext, suggestion_id: String) -> Result<(), 
 /// Reject a merge suggestion without merging.
 #[reducer]
 pub fn reject_merge(ctx: &ReducerContext, suggestion_id: String) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     let mut suggestion = ctx
         .db
         .merge_suggestion()
@@ -461,6 +466,7 @@ mod tests {
 /// newer one is marked inactive and consolidated_to the older one.
 #[reducer]
 pub fn dedup_memories(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     let now = now_micros(ctx);
 
     // Collect active memories with their embeddings
@@ -552,12 +558,14 @@ pub struct MaintenanceSchedule {
 /// Runs via SpacetimeDB scheduler (every 5 minutes, configured in `init`).
 #[reducer]
 pub fn run_maintenance(ctx: &ReducerContext, _arg: MaintenanceSchedule) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     _run_maintenance(ctx)
 }
 
 /// Manual maintenance trigger — callable from HTTP API (no scheduled arg needed).
 #[reducer]
 pub fn manual_maintenance(ctx: &ReducerContext) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     _run_maintenance(ctx)
 }
 
@@ -696,6 +704,7 @@ pub struct BackupEntry {
 /// note, note_block, directory_memory_link, context_directory.
 #[reducer]
 pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     let now = now_micros(ctx);
 
     let insert_entry = |table_name: &str, record_id: String, data_json: String| {
@@ -783,6 +792,7 @@ pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
 /// Validates that `data_json` is well-formed JSON before attempting restore.
 #[reducer]
 pub fn restore_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _admin = crate::auth::require_admin(ctx)?;
     let entries: Vec<_> = ctx
         .db
         .backup_entry()
