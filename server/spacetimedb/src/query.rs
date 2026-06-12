@@ -200,7 +200,7 @@ fn query_memory(
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
     for m in ctx.db.memory().iter().filter(|m: &crate::memory::Memory| {
-        m.workspace_id == workspace_id && m.is_active
+        (workspace_id.is_empty() || m.workspace_id == workspace_id) && m.is_active
     }) {
         let row = serde_json::json!({
             "id": m.id, "workspace_id": m.workspace_id, "content": m.content,
@@ -224,7 +224,7 @@ fn query_kg_node(
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
     for n in ctx.db.kg_node().iter().filter(|n: &crate::knowledge_graph::KgNode| {
-        n.workspace_id == workspace_id
+        workspace_id.is_empty() || n.workspace_id == workspace_id
     }) {
         let row = serde_json::json!({
             "id": n.id, "workspace_id": n.workspace_id, "label": n.label,
@@ -245,13 +245,14 @@ fn query_kg_edge(
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
     for e in ctx.db.kg_edge().iter().filter(|e: &crate::knowledge_graph::KgEdge| {
-        e.workspace_id == workspace_id
+        workspace_id.is_empty() || e.workspace_id == workspace_id
     }) {
         let row = serde_json::json!({
             "id": e.id, "workspace_id": e.workspace_id,
             "source_node_id": e.source_node_id, "target_node_id": e.target_node_id,
             "relation": e.relation, "weight": e.weight,
             "confidence": e.confidence, "metadata_json": e.metadata_json,
+            "edge_group_id": e.edge_group_id,
             "version": e.version, "valid_at": e.valid_at, "invalid_at": e.invalid_at,
             "created_at": e.created_at,
         });

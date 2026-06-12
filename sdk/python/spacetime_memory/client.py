@@ -922,7 +922,9 @@ class Client:
             mem_map = {}
             node_map = {}
             for mid in mem_ids:
-                mems = self._query("memory", filter_dict={"id": mid}, columns=["id", "content"])
+                mems = self._query("memory", filter_dict={"id": mid},
+                                   workspace_id=workspace_id,
+                                   columns=["id", "content"])
                 if mems:
                     mem_map[mid] = mems[0].get("content", "")
             for nid in node_ids:
@@ -1220,11 +1222,13 @@ class Client:
             ]
         return rows
 
-    def get_neighbors(self, node_id: str) -> list[dict[str, Any]]:
-        """Get edges connected to a node."""
+    def get_neighbors(self, node_id: str, workspace_id: str = "") -> list[dict[str, Any]]:
+        """Get edges connected to a node within an optional workspace."""
         # Query both directions since _query doesn't support OR
-        edges_src = self._query("kg_edge", filter_dict={"source_node_id": node_id})
-        edges_tgt = self._query("kg_edge", filter_dict={"target_node_id": node_id})
+        edges_src = self._query("kg_edge", workspace_id=workspace_id,
+                                filter_dict={"source_node_id": node_id})
+        edges_tgt = self._query("kg_edge", workspace_id=workspace_id,
+                                filter_dict={"target_node_id": node_id})
         seen = set()
         edges = []
         for e in edges_src + edges_tgt:
@@ -1239,7 +1243,8 @@ class Client:
         node_ids.discard("")
         label_map = {}
         for nid in node_ids:
-            rows = self._query("kg_node", filter_dict={"id": nid}, columns=["id", "label"])
+            rows = self._query("kg_node", workspace_id=workspace_id,
+                               filter_dict={"id": nid}, columns=["id", "label"])
             if rows:
                 label_map[nid] = rows[0].get("label", "")
 

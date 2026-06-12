@@ -49,7 +49,20 @@ def token() -> str:
 def client(stdb_session: dict) -> Client:
     kwargs = {"host": stdb_session["host"], "port": stdb_session["port"],
               "database": stdb_session["database"]}
-    return Client(**kwargs)
+    c = Client(**kwargs)
+    # Auto-register for auth
+    import secrets
+    try:
+        c._call("register", [f"lc_test_{secrets.token_hex(4)}", "LC Test", "testpass"])
+    except RuntimeError:
+        pass
+    my_id = c._whoami()
+    if my_id:
+        try:
+            c._call("set_initial_admin", [my_id])
+        except RuntimeError:
+            pass
+    return c
 
 
 @pytest.fixture(scope="module")

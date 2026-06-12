@@ -295,7 +295,7 @@ class TestGetEntityEdgeSummary:
         )
 
         # Now get the summary
-        summary = graphiti.get_entity_edge_summary(source_uuid)
+        summary = graphiti.get_entity_edge_summary(source_uuid, group_ids=[workspace_id])
         assert "edges" in summary
         assert "nodes" in summary
         assert "summary" in summary

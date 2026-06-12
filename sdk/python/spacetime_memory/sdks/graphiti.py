@@ -363,17 +363,24 @@ class Graphiti:
         """Resolve a group_id string to an actual workspace UUID.
 
         Caches the mapping.  Creates the workspace if it doesn't exist.
+        Checks by UUID first, then by name.
         """
         if group_id in self._ws_cache:
             return self._ws_cache[group_id]
 
-        # Search existing workspaces by name
+        # Search existing workspaces
         try:
             workspaces = self._client.list_workspaces()
         except RuntimeError:
             workspaces = []
 
         if isinstance(workspaces, list):
+            # Pass 1: exact UUID match
+            for ws in workspaces:
+                if ws.get("id") == group_id:
+                    self._ws_cache[group_id] = group_id
+                    return group_id
+            # Pass 2: name match
             for ws in workspaces:
                 if ws.get("name") == group_id and ws.get("id"):
                     self._ws_cache[group_id] = ws["id"]
@@ -392,6 +399,10 @@ class Graphiti:
             workspaces = []
 
         if isinstance(workspaces, list):
+            for ws in workspaces:
+                if ws.get("id") == group_id:
+                    self._ws_cache[group_id] = group_id
+                    return group_id
             for ws in workspaces:
                 if ws.get("name") == group_id and ws.get("id"):
                     self._ws_cache[group_id] = ws["id"]
@@ -535,7 +546,7 @@ class Graphiti:
 
         # Create the edge
         try:
-            self._client.create_edge(
+            result = self._client.create_edge(
                 workspace_id=ws_id,
                 source_node_id=actual_source_id,
                 target_node_id=actual_target_id,
@@ -546,8 +557,8 @@ class Graphiti:
                     **edge.attributes,
                 }),
             )
-        except RuntimeError:
-            pass
+        except RuntimeError as e:
+            raise RuntimeError(f"create_edge failed: {e}") from e
 
         # Query the actual DB-assigned edge UUID and temporal fields
         # Use a unique edge identifier: source + target + relation
@@ -737,7 +748,7 @@ class Graphiti:
         seen_edge_ids: set[str] = set()
         for nid in node_ids_to_lookup:
             try:
-                neighbor_rows = self._client.get_neighbors(nid)
+                neighbor_rows = self._client.get_neighbors(nid, workspace_id=ws_id)
             except RuntimeError:
                 neighbor_rows = []
             for row in neighbor_rows:
@@ -763,7 +774,7 @@ class Graphiti:
                     nid = n.get("id", "")
                     if nid:
                         try:
-                            neighbor_rows = self._client.get_neighbors(nid)
+                            neighbor_rows = self._client.get_neighbors(nid, workspace_id=ws_id)
                         except RuntimeError:
                             continue
                         for row in neighbor_rows:
@@ -882,14 +893,16 @@ class Graphiti:
 
         Args:
             entity_uuid: The UUID of the entity node.
-            group_ids: Not used (accepted for compat).
+            group_ids: Workspace names/UUIDs to scope the query.
 
         Returns:
             Dict with ``edges`` (list of EntityEdge), ``nodes`` (list of
             connected EntityNode), ``summary`` (concatenated facts).
         """
+        gid = group_ids[0] if group_ids else "default"
+        ws_id = self._resolve_workspace(gid)
         try:
-            edge_rows = self._client.get_neighbors(entity_uuid)
+            edge_rows = self._client.get_neighbors(entity_uuid, workspace_id=ws_id)
         except RuntimeError:
             return {"edges": [], "nodes": [], "summary": ""}
 

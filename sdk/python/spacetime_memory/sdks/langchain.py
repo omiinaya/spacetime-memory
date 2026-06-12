@@ -393,7 +393,7 @@ class StmemStore(BaseStore):
         ws_name = self._ns_to_ws(namespace)
         ws_id = self._resolve_workspace(ws_name)
 
-        rows = self._query(
+        rows = self._client._query(
             "memory", workspace_id=ws_id,
             filter_dict={"source_session_id": key}
         )
@@ -470,7 +470,7 @@ class StmemStore(BaseStore):
         """
         ws_name = self._ns_to_ws(namespace)
         ws_id = self._resolve_workspace(ws_name)
-        rows = self._query(
+        rows = self._client._query(
             "memory", workspace_id=ws_id,
             filter_dict={"source_session_id": key},
             columns=["id"]
@@ -527,7 +527,7 @@ class StmemStore(BaseStore):
                 for r in results:
                     eid = r.get("entity_id", "")
                     if eid:
-                        mems = self._query("memory", filter_dict={"id": eid})
+                        mems = self._client._query("memory", filter_dict={"id": eid})
                         if mems:
                             all_rows.append(mems[0])
             except RuntimeError:
@@ -536,7 +536,7 @@ class StmemStore(BaseStore):
         # If no semantic results or no query, fall back to listing
         if not all_rows:
             try:
-                rows = self._query(
+                rows = self._client._query(
                     "memory", workspace_id=ws_id,
                     filter_dict={"is_active": "true"}
                 )
