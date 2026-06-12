@@ -25,6 +25,10 @@ pub mod tour;
 pub mod replication;
 pub mod query;
 
+/// Maximum number of rows any read reducer will return.
+/// This caps all `.iter()` scans to prevent OOM/timeout on large tables.
+pub const MAX_RESULTS: usize = 1000;
+
 /// Generate a UUID v4 using the SpacetimeDB reducer timestamp and RNG.
 /// Safe for WASM — does not use `std::time::SystemTime`.
 /// Each call advances the RNG, so consecutive calls in the same reducer

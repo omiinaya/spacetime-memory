@@ -201,7 +201,7 @@ fn query_memory(
 ) -> Result<(), String> {
     for m in ctx.db.memory().iter().filter(|m: &crate::memory::Memory| {
         (workspace_id.is_empty() || m.workspace_id == workspace_id) && m.is_active
-    }) {
+    }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": m.id, "workspace_id": m.workspace_id, "content": m.content,
             "summary": m.summary, "memory_type": m.memory_type,
@@ -225,7 +225,7 @@ fn query_kg_node(
 ) -> Result<(), String> {
     for n in ctx.db.kg_node().iter().filter(|n: &crate::knowledge_graph::KgNode| {
         workspace_id.is_empty() || n.workspace_id == workspace_id
-    }) {
+    }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": n.id, "workspace_id": n.workspace_id, "label": n.label,
             "node_type": n.node_type, "metadata_json": n.metadata_json,
@@ -246,7 +246,7 @@ fn query_kg_edge(
 ) -> Result<(), String> {
     for e in ctx.db.kg_edge().iter().filter(|e: &crate::knowledge_graph::KgEdge| {
         workspace_id.is_empty() || e.workspace_id == workspace_id
-    }) {
+    }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": e.id, "workspace_id": e.workspace_id,
             "source_node_id": e.source_node_id, "target_node_id": e.target_node_id,
@@ -286,7 +286,7 @@ fn query_session(
 ) -> Result<(), String> {
     for s in ctx.db.session().iter().filter(|s: &crate::session::Session| {
         s.workspace_id == workspace_id
-    }) {
+    }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": s.id, "workspace_id": s.workspace_id, "name": s.name,
             "summary": s.summary, "metadata": s.metadata,
@@ -323,7 +323,7 @@ fn query_note(
 ) -> Result<(), String> {
     for n in ctx.db.note().iter().filter(|n: &crate::note::Note| {
         n.workspace_id == workspace_id && n.is_active
-    }) {
+    }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": n.id, "workspace_id": n.workspace_id,
             "title": n.title, "content": n.content,
@@ -374,7 +374,7 @@ fn query_profile(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for p in ctx.db.profile().iter() {
+    for p in ctx.db.profile().iter().take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": p.id,
             "peer_id": p.peer_id,
@@ -397,7 +397,7 @@ fn query_peer(
 ) -> Result<(), String> {
     for p in ctx.db.peer().iter().filter(|p: &crate::peer::Peer| {
         workspace_id.is_empty() || p.workspace_id == workspace_id
-    }) {
+    }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": p.id, "workspace_id": p.workspace_id,
             "name": p.name, "peer_type": p.peer_type,
@@ -452,7 +452,7 @@ fn query_context_pack(
 ) -> Result<(), String> {
     for cp in ctx.db.context_pack().iter().filter(|cp: &crate::context_compression::ContextPack| {
         cp.workspace_id == workspace_id
-    }) {
+    }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": cp.id, "workspace_id": cp.workspace_id,
             "query_hash": cp.query_hash, "pack_json": cp.pack_json,
