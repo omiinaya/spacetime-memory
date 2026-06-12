@@ -222,8 +222,8 @@ Status: P3.1-P3.2 done. Mem0 at 99%, Hindsight at 99%. Work remaining:
 |----------|------|------|--------|
 | P3.1 | ✅ **Mem0 `create_memory_tool()`** | Done | Deprecation stub added. Returns `{"status":"not_implemented"}` with note. |
 | P3.2 | ✅ **Hindsight 5 shell properties** | Done | Shells now return graceful empty responses instead of NotImplementedError. |
-| P3.3 | **PyPI publish** | 2h | Package `spacetime-memory` so it's `pip install`-able. |
-| P3.4 | **Rust integration tests** | 4h | `#[spacetimedb::test]` reducer-level tests. Currently 0 reducer tests in Rust. |
+| P3.3 | ✅ **PyPI publish** | Done | Package builds, twine check passes, installs from wheel. Publish blocked on PyPI token. PYPI_PUBLISH.md documents one-command deploy. |
+| P3.4 | ✅ **Rust integration tests** | Done | 13 new tests across query.rs + context_delta.rs. Rust tests: 77 → 90. |
 | P3.5 | **Frontend rendering tests** | 4h | 0 component tests. Add basic smoke tests for key pages. |
 | P3.6 | **`connectors.py` split** | 2h | 2,200-line monolith → per-connector modules. |
 | P3.7 | **Type hints completion** | 2h | Bring all adapters to >80% typed methods. |
