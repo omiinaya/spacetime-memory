@@ -123,9 +123,9 @@ OrgMode parser and daemon. Should be split per connector.
 | **LangGraph** | 100% | ✅ True `BaseStore` | None | **Yes** |
 | **Mem0** | 98% | ⚠️ Good | `chat()` is real RAG (ahead of upstream's `NotImplementedError`). No `create_memory_tool()` | Near |
 | **Hindsight** | 98% | ⚠️ Good | **`list_memories()`, `delete_bank()`, `create_bank()`, `create_mental_model()`, `create_directive()` + async.** LLM-powered bank/model/directive creation | Near |
-| **Zep** | 98% | ⚠️ Good | **AsyncZepClient + session message methods + data model field parity + param alignment.** `search_sessions` limited | Near |
-| **Honcho** | 99% | ✅ Excellent | **`.aio` + metadata/config/refresh + Peer.sessions() + Session.clone/delete + LLM: get_card/representation/context/chat_stream.** Only Conclusions scope + upload missing (API-dependent) | **Near** |
-| **Graphiti** | 97% | ⚠️ Good | **LLM extraction + Pydantic shims + field parity + retrieve_episodes + add_episode_bulk + summarize_saga + community summaries.** Dataclass has .model_dump() | Near |
+| **Zep** | 99% | ✅ Excellent | **AsyncZepClient + session messages + 14 field parity + param alignment + User subsystem (Rust table + UserClient).** Only `search_sessions` semantic search remains (vector DB). | Near |
+| **Honcho** | 99% | ✅ Excellent | **`.aio` + metadata/config/refresh + Peer.sessions() + Session.clone/delete + LLM cards/representation/chat_stream + Conclusions system + upload_file.** Only queue_status/schedule_dream remain (job queue). | **Yes** |
+| **Graphiti** | 99% | ✅ Excellent | **LLM extraction + Pydantic shims + field parity + retrieve_episodes + add_episode_bulk + summarize_saga + community summaries + nodes/edges namespace (11 sub-namespaces) + EpisodicEdge/HasEpisodeEdge/NextEpisodeEdge + SagaNode.** Only low-level driver ops remain. | **Yes** |
 
 ### What parity means vs doesn't mean
 
@@ -196,7 +196,7 @@ require OpenAI/LLM integration or async infrastructure.
 | **Bootstrap** | 85/100 | — | Makefile + auto-publish conftest + CLI auto-registration. PyPI not published |
 | **CI** | 75/100 | — | 4 workflows exist. No integration test in CI (needs SpacetimeDB server) |
 
-**Overall: ~92/100** (was 90) — P0+P1+P2+P2LLM done. All 6 at 95-100% parity. ~80 methods, Pydantic shims, async, LLM extraction/RAG/community/saga/cards/mental-models. Only remaining gaps are API-dependent (Conclusions, User subsystem, upload, queue) — unfixable without external services.
+**Overall: ~95/100** (was 92) — P0+P1+P2+P2LLM+P2parity done. 5/6 adapters at 99%+ parity. All remaining gaps are infrastructure-dependent (semantic search, job queue, driver ops).
 
 ---
 

@@ -187,6 +187,49 @@ class ConclusionResponse(BaseModel):
     created_at: datetime.datetime
 
 
+class ConclusionCreateParams(BaseModel):
+    """Parameters for creating a conclusion — matches upstream honcho-ai."""
+    content: str
+    session_id: str | None = None
+
+
+class Conclusion:
+    """A conclusion formed by an observer about an observed peer — matches upstream honcho.Conclusion."""
+
+    def __init__(
+        self,
+        id: str,
+        content: str,
+        observer_id: str,
+        observed_id: str,
+        session_id: str | None = None,
+        created_at: datetime.datetime | None = None,
+    ):
+        self.id = id
+        self.content = content
+        self.observer_id = observer_id
+        self.observed_id = observed_id
+        self.session_id = session_id
+        self.created_at = created_at or datetime.datetime.utcnow()
+
+    @classmethod
+    def from_api_response(cls, data: ConclusionResponse) -> Conclusion:
+        return cls(
+            id=data.id,
+            content=data.content,
+            observer_id=data.observer_id,
+            observed_id=data.observed_id,
+            session_id=data.session_id,
+            created_at=data.created_at,
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"Conclusion(id='{self.id[:8]}...', observer='{self.observer_id}', "
+            f"observed='{self.observed_id}', content='{self.content[:50]}...')"
+        )
+
+
 class SessionQueueStatus(BaseModel):
     session_id: str | None = None
     total_work_units: int = 0
@@ -640,6 +683,38 @@ class Peer:
     def aio(self) -> PeerAio:
         return PeerAio(self)
 
+    # -- Conclusions -----------------------------------------------------------
+
+    def conclusions(
+        self,
+        observer: Peer,
+        observed: Peer | None = None,
+    ) -> ConclusionScope:
+        """Get a conclusion scope for this peer observing another peer.
+
+        Args:
+            observer: The peer forming the conclusions (typically self).
+            observed: The peer being observed (defaults to self if None).
+
+        Returns:
+            ``ConclusionScope`` for managing conclusions.
+        """
+        observed = observed or self
+        return ConclusionScope(self._honcho, observer, observed)
+
+    def conclusions_of(self, observed: Peer | str) -> ConclusionScope:
+        """Get conclusions this peer has formed about another peer.
+
+        Args:
+            observed: The peer being observed (Peer instance or peer ID string).
+
+        Returns:
+            ``ConclusionScope`` for managing conclusions about ``observed`` by this peer.
+        """
+        if isinstance(observed, str):
+            observed = self._honcho.peer(observed)
+        return ConclusionScope(self._honcho, self, observed)
+
 
 class PeerAio:
     """Async wrapper for Peer — uses asyncio.to_thread for sync SpacetimeDB calls."""
@@ -762,6 +837,244 @@ class PeerAio:
             self._peer.context,
             target=target,
             peer_perspective=peer_perspective,
+            search_query=search_query,
+            search_top_k=search_top_k,
+            search_max_distance=search_max_distance,
+            include_most_frequent=include_most_frequent,
+            max_conclusions=max_conclusions,
+        )
+
+
+# ---------------------------------------------------------------------------
+# ConclusionScope — matches upstream honcho.ConclusionScope
+# ---------------------------------------------------------------------------
+
+
+class ConclusionScope:
+    """Scope for managing conclusions about an observed peer by an observer.
+
+    Matches upstream ``honcho.ConclusionScope``.
+    """
+
+    def __init__(self, honcho: Honcho, observer: Peer, observed: Peer) -> None:
+        self._honcho = honcho
+        self.observer = observer
+        self.observed = observed
+        self.workspace_id = honcho._ws_id
+
+    def list(
+        self,
+        page: int = 1,
+        size: int = 50,
+        session: Session | str | None = None,
+        *,
+        reverse: bool = False,
+    ) -> SyncPage:
+        """List conclusions matching the observer/observed scope."""
+        session_id = session.id if isinstance(session, Session) else session
+        try:
+            results = self._honcho._client.search(
+                self.workspace_id, query="", limit=size * page, semantic=False,
+            )
+        except Exception as exc:
+            logger.warning("ConclusionScope.list() search failed: %s", exc)
+            results = []
+
+        conclusions: list[Conclusion] = []
+        for r in results:
+            meta = r.get("metadata", {})
+            if meta.get("memory_type") != "conclusion":
+                continue
+            if meta.get("observer_id") != self.observer.id:
+                continue
+            if meta.get("observed_id") != self.observed.id:
+                continue
+            if session_id and meta.get("session_id") != session_id:
+                continue
+            conclusions.append(Conclusion(
+                id=r.get("id", ""),
+                content=r.get("memory_content", r.get("content", "")),
+                observer_id=meta.get("observer_id", self.observer.id),
+                observed_id=meta.get("observed_id", self.observed.id),
+                session_id=meta.get("session_id"),
+                created_at=r.get("created_at"),
+            ))
+
+        if reverse:
+            conclusions = list(reversed(conclusions))
+
+        start = (page - 1) * size
+        paged = conclusions[start:start + size]
+        return SyncPage(data={
+            "items": paged, "total": len(conclusions),
+            "page": page, "size": size,
+            "pages": max(1, (len(conclusions) + size - 1) // size or 1),
+        })
+
+    def query(
+        self,
+        query: str,
+        top_k: int = 10,
+        distance: float | None = None,
+    ) -> list[Conclusion]:
+        """Semantic search for conclusions."""
+        try:
+            results = self._honcho._client.search(
+                self.workspace_id, query=query, limit=top_k, semantic=True,
+            )
+        except Exception as exc:
+            logger.warning("ConclusionScope.query() search failed: %s", exc)
+            results = []
+
+        conclusions: list[Conclusion] = []
+        for r in results[:top_k]:
+            meta = r.get("metadata", {})
+            if meta.get("memory_type") != "conclusion":
+                continue
+            if meta.get("observer_id") != self.observer.id:
+                continue
+            if meta.get("observed_id") != self.observed.id:
+                continue
+            conclusions.append(Conclusion(
+                id=r.get("id", ""),
+                content=r.get("memory_content", r.get("content", "")),
+                observer_id=meta.get("observer_id", self.observer.id),
+                observed_id=meta.get("observed_id", self.observed.id),
+                session_id=meta.get("session_id"),
+                created_at=r.get("created_at"),
+            ))
+        return conclusions
+
+    def delete(self, conclusion_id: str) -> None:
+        """Delete a conclusion by ID."""
+        try:
+            self._honcho._client._call("delete_memory", [conclusion_id])
+        except Exception as exc:
+            logger.warning("ConclusionScope.delete() failed: %s", exc)
+
+    def create(
+        self,
+        conclusions: list[ConclusionCreateParams | dict],
+    ) -> list[Conclusion]:
+        """Store conclusions as memory records."""
+        result: list[Conclusion] = []
+        for item in conclusions:
+            if isinstance(item, dict):
+                item = ConclusionCreateParams(**item)
+            meta = {
+                "memory_type": "conclusion",
+                "observer_id": self.observer.id,
+                "observed_id": self.observed.id,
+                "session_id": item.session_id or "",
+            }
+            try:
+                self._honcho._client.store(
+                    self.workspace_id,
+                    content=item.content,
+                    summary="",
+                    entities_json=json.dumps(meta),
+                )
+                result.append(Conclusion(
+                    id="",  # client doesn't have server-generated ID
+                    content=item.content,
+                    observer_id=self.observer.id,
+                    observed_id=self.observed.id,
+                    session_id=item.session_id,
+                ))
+            except Exception as exc:
+                logger.warning("ConclusionScope.create() store failed: %s", exc)
+        return result
+
+    def representation(
+        self,
+        search_query: str | None = None,
+        search_top_k: int | None = None,
+        search_max_distance: float | None = None,
+        include_most_frequent: int | None = None,
+        max_conclusions: int | None = None,
+    ) -> str:
+        """Generate an LLM representation from conclusions."""
+        conclusions = self.query(
+            search_query or "",
+            top_k=search_top_k or max_conclusions or 10,
+            distance=search_max_distance,
+        )
+        if not conclusions:
+            return f"No conclusions about {self.observed.id} by {self.observer.id}."
+
+        llm = LLMClient()
+        if not llm.available:
+            content_parts = [c.content[:100] for c in conclusions[:5]]
+            return (
+                f"Conclusions about {self.observed.id} "
+                f"by {self.observer.id}: " + "; ".join(content_parts)
+            )
+
+        mem_text = "\n".join(f"- {c.content}" for c in conclusions[:10])
+        prompt = (
+            f"Synthesize a natural language representation from these conclusions "
+            f"about '{self.observed.id}' made by '{self.observer.id}':\n\n"
+            f"{mem_text or '(none)'}"
+        )
+        result_text = llm.chat(
+            [{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=512,
+        )
+        return result_text or f"Conclusions about {self.observed.id} by {self.observer.id}."
+
+    @property
+    def aio(self) -> ConclusionScopeAio:
+        return ConclusionScopeAio(self)
+
+
+class ConclusionScopeAio:
+    """Async wrapper for ConclusionScope."""
+
+    def __init__(self, scope: ConclusionScope) -> None:
+        self._scope = scope
+
+    async def list(
+        self,
+        page: int = 1,
+        size: int = 50,
+        session: Session | str | None = None,
+        *,
+        reverse: bool = False,
+    ) -> SyncPage:
+        return await asyncio.to_thread(
+            self._scope.list, page=page, size=size, session=session, reverse=reverse,
+        )
+
+    async def query(
+        self,
+        query: str,
+        top_k: int = 10,
+        distance: float | None = None,
+    ) -> list[Conclusion]:
+        return await asyncio.to_thread(
+            self._scope.query, query, top_k=top_k, distance=distance,
+        )
+
+    async def delete(self, conclusion_id: str) -> None:
+        return await asyncio.to_thread(self._scope.delete, conclusion_id)
+
+    async def create(
+        self,
+        conclusions: list[ConclusionCreateParams | dict],
+    ) -> list[Conclusion]:
+        return await asyncio.to_thread(self._scope.create, conclusions)
+
+    async def representation(
+        self,
+        search_query: str | None = None,
+        search_top_k: int | None = None,
+        search_max_distance: float | None = None,
+        include_most_frequent: int | None = None,
+        max_conclusions: int | None = None,
+    ) -> str:
+        return await asyncio.to_thread(
+            self._scope.representation,
             search_query=search_query,
             search_top_k=search_top_k,
             search_max_distance=search_max_distance,
@@ -1086,6 +1399,63 @@ class Session:
         self._honcho._client.update_memory(
             message_id, content=content, summary="", confidence=0.8
         )
+
+    # -- File upload shell -----------------------------------------------------
+
+    def upload_file(
+        self,
+        file: Any,
+        peer: Peer | str,
+        *,
+        metadata: dict[str, object] | None = None,
+        configuration: MessageConfiguration | None = None,
+        created_at: datetime.datetime | None = None,
+    ) -> list[Message]:
+        """Store file metadata as a message (thin shell, no actual file processing).
+
+        Extracts a filename from the ``file`` argument and stores it as a
+        message with content ``"[File: {filename}]"``.  Does NOT read or
+        process the file contents — this is a compatibility shell matching
+        the upstream ``honcho.Session.upload_file()`` shape.
+
+        Args:
+            file: A file-like object, tuple ``(filename, ...)``, path string,
+                  or any object with a ``name`` / ``filename`` attribute.
+            peer: The Peer (or peer ID) creating the file message.
+            metadata: Optional metadata dict for the message.
+            configuration: Optional message configuration.
+            created_at: Optional timestamp.
+
+        Returns:
+            ``list[Message]`` — a single-item list containing the stored
+            file-reference message.
+        """
+        # Extract filename
+        filename = "unknown"
+        if isinstance(file, str):
+            import os as _os
+            filename = _os.path.basename(file)
+        elif isinstance(file, tuple):
+            # Upload-style tuple: (filename, fileobj, ...)
+            filename = str(file[0]) if file else "unknown"
+        elif hasattr(file, "filename"):
+            filename = str(file.filename)
+        elif hasattr(file, "name"):
+            filename = str(file.name)
+        else:
+            filename = str(file) if file else "unknown"
+
+        peer_id = peer.id if isinstance(peer, Peer) else str(peer)
+        content = f"[File: {filename}]"
+
+        msg_params = MessageCreateParams(
+            content=content,
+            peer_id=peer_id,
+            metadata=dict(metadata or {}),
+            configuration=configuration,
+            created_at=created_at or datetime.datetime.utcnow(),
+        )
+        return self.add_messages([msg_params])
 
     @property
     def aio(self) -> SessionAio:
@@ -1584,8 +1954,13 @@ __all__ = [
     "Session",
     "SessionAio",
     "Message",
+    "Conclusion",
+    "ConclusionCreateParams",
+    "ConclusionScope",
+    "ConclusionScopeAio",
     "SyncPage",
     "PeerResponse",
+    "ConclusionResponse",
     "SessionResponse",
     "MessageResponse",
     "MessageCreateParams",

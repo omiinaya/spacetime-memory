@@ -256,8 +256,72 @@ def _make_op_id() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Hindsight client — drop-in replacement for hindsight_client.Hindsight v0.8.1
+# Low-level property shells
 # ---------------------------------------------------------------------------
+
+
+class _HindsightLowLevelShell:
+    """Shell for low-level API properties that need a REST server.
+
+    Raises ``NotImplementedError`` for anything beyond attribute access.
+    """
+
+    def __init__(self, name: str) -> None:
+        self._shell_name = name
+
+    def __getattr__(self, attr: str):
+        raise NotImplementedError(
+            f"Hindsight.{self._shell_name}.{attr}() requires the Hindsight REST "
+            f"server. This SpacetimeDB-backed client does not implement "
+            f"low-level {self._shell_name} operations."
+        )
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError(
+            f"Hindsight.{self._shell_name}() requires the Hindsight REST server."
+        )
+
+
+class _HindsightMentalModelsShell:
+    """Mental models shell — delegates to Hindsight.create_mental_model()."""
+
+    def __init__(self, hindsight: Hindsight) -> None:
+        self._h = hindsight
+
+    def create(self, bank_id: str, name: str, query: str | None = None, **params):
+        return self._h.create_mental_model(bank_id=bank_id, name=name, query=query, **params)
+
+
+class _HindsightDirectivesShell:
+    """Directives shell — delegates to Hindsight.create_directive()."""
+
+    def __init__(self, hindsight: Hindsight) -> None:
+        self._h = hindsight
+
+    def create(self, bank_id: str, name: str, prompt: str, **params):
+        return self._h.create_directive(bank_id=bank_id, name=name, prompt=prompt, **params)
+
+
+class _HindsightFilesShell:
+    """Files shell — delegates to Hindsight.retain_files()."""
+
+    def __init__(self, hindsight: Hindsight) -> None:
+        self._h = hindsight
+
+    def upload(
+        self,
+        bank_id: str,
+        files: list[str | Path],
+        *,
+        context: str | None = None,
+        files_metadata: list[dict[str, Any]] | None = None,
+    ):
+        return self._h.retain_files(
+            bank_id=bank_id,
+            files=files,
+            context=context,
+            files_metadata=files_metadata,
+        )
 
 class Hindsight:
     """Drop-in replacement for ``hindsight_client.Hindsight`` (v0.8.1).
@@ -312,6 +376,58 @@ class Hindsight:
         # bank_id → workspace_id cache
         self._ws_cache: dict[str, str] = {}
         self._llm: LLMClient | None = None
+
+    # -- low-level API property shells -----------------------------------------
+
+    @property
+    def memory(self):
+        """Low-level memory operations — returns self (all ops on Hindsight)."""
+        return self
+
+    @property
+    def banks(self):
+        """Low-level bank operations — returns self (bank ops map to workspace ops)."""
+        return self
+
+    @property
+    def documents(self):
+        """Low-level document operations shell — NotImplementedError for server ops."""
+        return _HindsightLowLevelShell("documents")
+
+    @property
+    def entities(self):
+        """Low-level entity operations shell — NotImplementedError for server ops."""
+        return _HindsightLowLevelShell("entities")
+
+    @property
+    def mental_models(self):
+        """Low-level mental model operations — delegates to create_mental_model."""
+        return _HindsightMentalModelsShell(self)
+
+    @property
+    def directives(self):
+        """Low-level directive operations — delegates to create_directive."""
+        return _HindsightDirectivesShell(self)
+
+    @property
+    def operations(self):
+        """Low-level operation tracking shell — NotImplementedError for server ops."""
+        return _HindsightLowLevelShell("operations")
+
+    @property
+    def webhooks(self):
+        """Low-level webhook management shell — NotImplementedError for server ops."""
+        return _HindsightLowLevelShell("webhooks")
+
+    @property
+    def files(self):
+        """Low-level file operations — delegates to retain_files."""
+        return _HindsightFilesShell(self)
+
+    @property
+    def monitoring(self):
+        """Low-level monitoring shell — NotImplementedError for server ops."""
+        return _HindsightLowLevelShell("monitoring")
 
     # -- helpers ---------------------------------------------------------------
 

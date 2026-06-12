@@ -24,6 +24,7 @@ pub mod graph_traversal;
 pub mod tour;
 pub mod replication;
 pub mod query;
+pub mod user;
 
 /// Maximum number of rows any read reducer will return.
 /// This caps all `.iter()` scans to prevent OOM/timeout on large tables.

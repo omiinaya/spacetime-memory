@@ -61,10 +61,11 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from typing import Any
 
-from ..client import Client
+from ..client import Client, _esc
 
 try:
     from zep_python import NotFoundError, BadRequestError, ApiError
@@ -1206,6 +1207,256 @@ class ZepClient:
             text,
             instruction="Summarize this conversation, highlighting key topics, decisions, and action items.",
         )
+
+# ---------------------------------------------------------------------------
+# UserClient — Zep User management
+# ---------------------------------------------------------------------------
+
+
+class UserClient:
+    """Manage Zep Users mapped to SpacetimeDB user table.
+
+    Usage::
+
+        from spacetime_memory.sdks.zep import ZepClient
+
+        client = ZepClient(host="localhost", port=3001)
+        users = UserClient(client._client)
+
+        # Add a user
+        user = users.add(
+            user_id="user-123",
+            email="alice@example.com",
+            first_name="Alice",
+        )
+
+        # Get a user
+        user = users.get("user-123")
+
+        # List all users
+        all_users = users.list_ordered(page_number=1, page_size=50)
+
+        # Get sessions for a user
+        sessions = users.get_sessions("user-123")
+
+        # Update a user
+        users.update("user-123", email="new@example.com")
+
+        # Delete a user
+        users.delete("user-123")
+    """
+
+    def __init__(self, client: Client):
+        self._client = client
+
+    def add(
+        self,
+        *,
+        user_id: str | None = None,
+        email: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Add a new user.
+
+        Args:
+            user_id: Unique user identifier. Auto-generated if omitted.
+            email: Optional email address.
+            first_name: Optional first name.
+            last_name: Optional last name.
+            metadata: Optional metadata dict.
+
+        Returns:
+            User dict with user_id, email, first_name, last_name,
+            metadata_json, created_at, updated_at.
+
+        Raises:
+            RuntimeError: If the user already exists.
+        """
+        import uuid as _uuid
+        uid = user_id or _uuid.uuid4().hex[:32]
+        meta_json = json.dumps(metadata or {})
+
+        self._client._call("add_user", [
+            uid,
+            email or "",
+            first_name or "",
+            last_name or "",
+            meta_json,
+        ])
+
+        # Read back from the public user table
+        rows = self._client._sql(
+            f'SELECT * FROM "user" WHERE user_id = {_esc(uid)}'
+        )
+        if rows:
+            return self._row_to_user(rows[0])
+        return {
+            "user_id": uid,
+            "email": email,
+            "first_name": first_name,
+            "last_name": last_name,
+            "metadata_json": meta_json,
+        }
+
+    def get(self, user_id: str) -> dict[str, Any]:
+        """Get a user by user_id.
+
+        Args:
+            user_id: The user's unique identifier.
+
+        Returns:
+            User dict.
+
+        Raises:
+            NotFoundError: If the user is not found.
+        """
+        self._client._call("get_user", [user_id])
+
+        rows = self._client._sql(
+            f'SELECT * FROM "user" WHERE user_id = {_esc(user_id)}'
+        )
+        if not rows:
+            raise NotFoundError(f"User '{user_id}' not found")
+        return self._row_to_user(rows[0])
+
+    def update(
+        self,
+        user_id: str,
+        *,
+        email: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Update an existing user.
+
+        Args:
+            user_id: The user's unique identifier.
+            email: New email (only updated if provided).
+            first_name: New first name.
+            last_name: New last name.
+            metadata: New metadata dict.
+
+        Returns:
+            Updated user dict.
+
+        Raises:
+            NotFoundError: If the user is not found.
+        """
+        meta_json = json.dumps(metadata) if metadata is not None else ""
+
+        self._client._call("update_user", [
+            user_id,
+            email or "",
+            first_name or "",
+            last_name or "",
+            meta_json,
+        ])
+
+        rows = self._client._sql(
+            f'SELECT * FROM "user" WHERE user_id = {_esc(user_id)}'
+        )
+        if not rows:
+            raise NotFoundError(f"User '{user_id}' not found after update")
+        return self._row_to_user(rows[0])
+
+    def delete(self, user_id: str) -> dict[str, Any]:
+        """Delete a user by user_id.
+
+        Args:
+            user_id: The user's unique identifier.
+
+        Returns:
+            A dict with status and message.
+        """
+        self._client._call("delete_user", [user_id])
+        return {"status": "ok", "message": f"User '{user_id}' deleted"}
+
+    def list_ordered(
+        self,
+        *,
+        page_number: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        """List all users with pagination.
+
+        Args:
+            page_number: Page number (1-indexed).
+            page_size: Number of users per page.
+
+        Returns:
+            Dict with ``users`` list and pagination metadata.
+        """
+        self._client._call("list_users", [])
+
+        offset = (page_number - 1) * page_size
+        # Get total count
+        count_rows = self._client._sql('SELECT count(*) as cnt FROM "user"')
+        total = count_rows[0].get("cnt", 0) if count_rows else 0
+
+        rows = self._client._sql(
+            f'SELECT * FROM "user" ORDER BY created_at DESC '
+            f'LIMIT {int(page_size)} OFFSET {int(offset)}'
+        )
+        users = [self._row_to_user(r) for r in rows]
+
+        return {
+            "users": users,
+            "total": total,
+            "page": page_number,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size),
+        }
+
+    def get_sessions(self, user_id: str) -> list[dict[str, Any]]:
+        """Get all sessions associated with a user.
+
+        Args:
+            user_id: The user's unique identifier.
+
+        Returns:
+            List of session dicts (session_id, session_name, workspace_id,
+            created_at).
+        """
+        self._client._call("get_user_sessions", [user_id])
+
+        query_id = f"user_sessions:{user_id}"
+        rows = self._client._sql(
+            "SELECT * FROM user_session_result WHERE "
+            f"query_id = {_esc(query_id)}"
+        )
+        return [
+            {
+                "session_id": r.get("session_id", ""),
+                "session_name": r.get("session_name", ""),
+                "workspace_id": r.get("workspace_id", ""),
+                "created_at": r.get("created_at", ""),
+                "user_id": r.get("user_id", ""),
+            }
+            for r in rows
+        ]
+
+    @staticmethod
+    def _row_to_user(row: dict[str, Any]) -> dict[str, Any]:
+        """Convert a raw SQL row to a user dict."""
+        metadata_raw = row.get("metadata_json", "{}")
+        try:
+            metadata = json.loads(metadata_raw) if isinstance(metadata_raw, str) else metadata_raw
+        except (json.JSONDecodeError, TypeError):
+            metadata = {}
+
+        return {
+            "user_id": row.get("user_id", ""),
+            "email": row.get("email") or None,
+            "first_name": row.get("first_name") or None,
+            "last_name": row.get("last_name") or None,
+            "metadata": metadata,
+            "metadata_json": metadata_raw,
+            "created_at": row.get("created_at"),
+            "updated_at": row.get("updated_at"),
+        }
 
 
 # ---------------------------------------------------------------------------
