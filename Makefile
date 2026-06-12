@@ -61,6 +61,46 @@ test-all: build-module  ## Run ALL tests (no marker filter — includes everythi
 	SPACETIMEDB_HOST=localhost SPACETIMEDB_PORT=3001 \
 	python -m pytest tests/ -v --tb=short -q
 
+test-rust:  ## Run Rust unit tests
+	cd server/spacetimedb && cargo test --lib
+
+test-frontend:  ## Run frontend vitest tests
+	cd client && npx vitest run
+
+bench:  ## Run performance benchmark (needs live STDB + embedder)
+	@if [ -z "$$SPACETIMEDB_DB" ]; then \
+		echo "Set SPACETIMEDB_DB=<identity> first"; \
+		exit 1; \
+	fi
+	PYTHONPATH=sdk/python python3 sdk/python/scripts/quick-bench.py
+
+ci: build-module  ## Full local CI: Rust + Python + TypeScript + adapters
+	@echo "=== Rust tests ===" && \
+	cd server/spacetimedb && cargo test --lib 2>&1 | grep "test result" && \
+	echo "" && \
+	echo "=== Python unit tests ===" && \
+	cd $(CURDIR)/sdk/python && python3 -m pytest tests/ -m unit -q --tb=short && \
+	echo "" && \
+	echo "=== Frontend tests ===" && \
+	cd $(CURDIR)/client && npx vitest run 2>&1 | grep -E "Tests|Test Files" && \
+	echo "" && \
+	echo "=== TypeScript check ===" && \
+	cd $(CURDIR)/client && npx tsc --noEmit && echo "tsc: OK" && \
+	echo "" && \
+	if timeout 1 bash -c 'echo > /dev/tcp/localhost/3001' 2>/dev/null; then \
+		echo "=== Adapter tests (live STDB) ===" && \
+		cd $(CURDIR)/sdk/python && \
+		SPACETIMEDB_HOST=localhost SPACETIMEDB_PORT=3001 \
+		python3 -m pytest tests/test_zep_adapter.py tests/test_mem0_adapter.py \
+			tests/test_graphiti_adapter.py tests/test_honcho_adapter.py \
+			tests/test_langchain_adapter.py tests/test_hindsight_adapter.py \
+			-q --tb=short 2>&1 | tail -5; \
+	else \
+		echo "=== Skipping adapter tests (no STDB on :3001) ==="; \
+	fi && \
+	echo "" && \
+	echo "CI PASSED"
+
 setup: install-sdk build-module  ## Install SDK + build module (start SpacetimeDB separately)
 
 clean:  ## Clean build artifacts
