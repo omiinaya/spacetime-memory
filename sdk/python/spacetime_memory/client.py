@@ -726,6 +726,10 @@ class Client:
         """List all workspaces."""
         return self._query("workspace")
 
+    def delete_workspace(self, workspace_id: str) -> dict[str, Any]:
+        """Delete a workspace and all its data."""
+        return self._call("delete_workspace", [workspace_id])
+
     # -----------------------------------------------------------------------
     # Memory
     # -----------------------------------------------------------------------

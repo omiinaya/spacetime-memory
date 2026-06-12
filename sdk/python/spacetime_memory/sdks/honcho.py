@@ -700,8 +700,57 @@ class Session:
         return SessionSummaries(id=self._id)
 
     def delete(self) -> None:
-        """Delete this session."""
+        """Delete this session (workspace) from SpacetimeDB."""
+        try:
+            if hasattr(self._honcho._client, "delete_workspace"):
+                self._honcho._client.delete_workspace(self._ws_id)
+            else:
+                self._honcho._client._call("delete_workspace", [self._ws_id])
+        except Exception as exc:
+            logger.warning(
+                "Session.delete() failed to delete workspace %s: %s",
+                self._ws_id, exc,
+            )
         self._is_active = False
+
+    def clone(self, *, message_id: str | None = None) -> Session:
+        """Clone this session into a new session with its own workspace.
+
+        Creates a new workspace in SpacetimeDB and copies peers and
+        optionally messages from *message_id* forward.
+        """
+        import uuid
+
+        new_id = uuid.uuid4().hex
+
+        # Create new workspace in StDB
+        self._honcho._client.create_workspace(name=new_id, id=new_id)
+
+        # Create new session via the Honcho parent
+        new_session = self._honcho.session(new_id)
+        new_session._ws_id = new_id  # point to the new workspace
+
+        # Copy peers
+        new_session.add_peers(self._peers)
+
+        # Optionally copy messages from message_id forward
+        if message_id:
+            msgs = self.messages(size=10000)
+            copying = False
+            for msg in msgs:
+                if msg.id == message_id:
+                    copying = True
+                if copying:
+                    new_session.add_messages([
+                        MessageCreateParams(
+                            content=msg.content,
+                            peer_id=msg.peer_id,
+                            metadata=msg.metadata,
+                            created_at=msg.created_at,
+                        )
+                    ])
+
+        return new_session
 
     def refresh(self) -> None:
         """Refresh session state."""
@@ -856,6 +905,9 @@ class SessionAio:
 
     async def delete(self) -> None:
         return await asyncio.to_thread(self._session.delete)
+
+    async def clone(self, *, message_id: str | None = None) -> Session:
+        return await asyncio.to_thread(self._session.clone, message_id=message_id)
 
     async def refresh(self) -> None:
         return await asyncio.to_thread(self._session.refresh)
