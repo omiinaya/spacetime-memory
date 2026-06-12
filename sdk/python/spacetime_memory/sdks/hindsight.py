@@ -272,10 +272,10 @@ class _HindsightLowLevelShell:
     def __init__(self, name: str) -> None:
         self._shell_name = name
 
-    def __getattr__(self, attr: str):
+    def __getattr__(self, attr: str) -> Any:
         return lambda *a, **kw: _empty_shell_response(self._shell_name, attr)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         return _empty_shell_response(self._shell_name, "call")
 
 
@@ -298,7 +298,7 @@ class _HindsightMentalModelsShell:
     def __init__(self, hindsight: Hindsight) -> None:
         self._h = hindsight
 
-    def create(self, bank_id: str, name: str, query: str | None = None, **params):
+    def create(self, bank_id: str, name: str, query: str | None = None, **params: Any) -> "CreateMentalModelResponse":
         return self._h.create_mental_model(bank_id=bank_id, name=name, query=query, **params)
 
 
@@ -308,7 +308,7 @@ class _HindsightDirectivesShell:
     def __init__(self, hindsight: Hindsight) -> None:
         self._h = hindsight
 
-    def create(self, bank_id: str, name: str, prompt: str, **params):
+    def create(self, bank_id: str, name: str, prompt: str, **params: Any) -> "CreateDirectiveResponse":
         return self._h.create_directive(bank_id=bank_id, name=name, prompt=prompt, **params)
 
 
@@ -325,7 +325,7 @@ class _HindsightFilesShell:
         *,
         context: str | None = None,
         files_metadata: list[dict[str, Any]] | None = None,
-    ):
+    ) -> "FileRetainResponse":
         return self._h.retain_files(
             bank_id=bank_id,
             files=files,
@@ -365,9 +365,9 @@ class Hindsight:
         stdb_host: str = "localhost",
         stdb_port: int = 3001,
         stdb_database: str | None = None,
-    ):
-        import hashlib
+    ) -> None:
 
+        import hashlib
         self._timeout = timeout
         self._user_agent = user_agent or "spacetime-memory-hindsight/0.0.0"
         self._api_key = api_key
@@ -390,52 +390,52 @@ class Hindsight:
     # -- low-level API property shells -----------------------------------------
 
     @property
-    def memory(self):
+    def memory(self) -> "Hindsight":
         """Low-level memory operations — returns self (all ops on Hindsight)."""
         return self
 
     @property
-    def banks(self):
+    def banks(self) -> "Hindsight":
         """Low-level bank operations — returns self (bank ops map to workspace ops)."""
         return self
 
     @property
-    def documents(self):
+    def documents(self) -> "_HindsightLowLevelShell":
         """Low-level document operations shell — NotImplementedError for server ops."""
         return _HindsightLowLevelShell("documents")
 
     @property
-    def entities(self):
+    def entities(self) -> "_HindsightLowLevelShell":
         """Low-level entity operations shell — NotImplementedError for server ops."""
         return _HindsightLowLevelShell("entities")
 
     @property
-    def mental_models(self):
+    def mental_models(self) -> "_HindsightMentalModelsShell":
         """Low-level mental model operations — delegates to create_mental_model."""
         return _HindsightMentalModelsShell(self)
 
     @property
-    def directives(self):
+    def directives(self) -> "_HindsightDirectivesShell":
         """Low-level directive operations — delegates to create_directive."""
         return _HindsightDirectivesShell(self)
 
     @property
-    def operations(self):
+    def operations(self) -> "_HindsightLowLevelShell":
         """Low-level operation tracking shell — NotImplementedError for server ops."""
         return _HindsightLowLevelShell("operations")
 
     @property
-    def webhooks(self):
+    def webhooks(self) -> "_HindsightLowLevelShell":
         """Low-level webhook management shell — NotImplementedError for server ops."""
         return _HindsightLowLevelShell("webhooks")
 
     @property
-    def files(self):
+    def files(self) -> "_HindsightFilesShell":
         """Low-level file operations — delegates to retain_files."""
         return _HindsightFilesShell(self)
 
     @property
-    def monitoring(self):
+    def monitoring(self) -> "_HindsightLowLevelShell":
         """Low-level monitoring shell — NotImplementedError for server ops."""
         return _HindsightLowLevelShell("monitoring")
 
@@ -465,17 +465,17 @@ class Hindsight:
 
     # -- context manager -------------------------------------------------------
 
-    def __enter__(self):
+    def __enter__(self) -> "Hindsight":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: type | None, exc_val: BaseException | None, exc_tb: Any | None) -> None:
         self.close()
 
-    def close(self):
+    def close(self) -> None:
         """Close the client."""
         self._closed = True
 
-    async def aclose(self):
+    async def aclose(self) -> None:
         """Close the client (async version)."""
         self._closed = True
 

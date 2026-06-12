@@ -90,7 +90,7 @@ class EntityNode:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
-    def from_stmem(cls, row: dict[str, Any]) -> "EntityNode":
+    def from_stmem(cls: type["EntityNode"], row: dict[str, Any]) -> "EntityNode":
         """Build from a SpacetimeDB ``kg_node`` row."""
         attrs = {}
         raw = row.get("metadata_json", "{}")
@@ -120,7 +120,7 @@ class EntityNode:
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
-    def model_validate(cls, data: dict) -> Self:
+    def model_validate(cls: type["Self"], data: dict) -> Self:
         return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
 
 
@@ -156,7 +156,7 @@ class EntityEdge:
     reference_time: datetime | None = None
 
     @classmethod
-    def from_stmem(cls, row: dict[str, Any]) -> "EntityEdge":
+    def from_stmem(cls: type["EntityEdge"], row: dict[str, Any]) -> "EntityEdge":
         """Build from a SpacetimeDB ``kg_edge`` row."""
         attrs = {}
         raw = row.get("metadata_json", "{}")
@@ -199,7 +199,7 @@ class EntityEdge:
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
-    def model_validate(cls, data: dict) -> Self:
+    def model_validate(cls: type["Self"], data: dict) -> Self:
         return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
 
 
@@ -226,7 +226,7 @@ class EpisodicNode:
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
-    def model_validate(cls, data: dict) -> Self:
+    def model_validate(cls: type["Self"], data: dict) -> Self:
         return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
 
 
@@ -247,7 +247,7 @@ class CommunityNode:
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
-    def model_validate(cls, data: dict) -> Self:
+    def model_validate(cls: type["Self"], data: dict) -> Self:
         return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
 
 
@@ -317,7 +317,7 @@ class SagaNode:
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
-    def model_validate(cls, data: dict) -> Self:
+    def model_validate(cls: type["Self"], data: dict) -> Self:
         return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
 
 
@@ -436,7 +436,7 @@ class Graphiti:
         embedder_url: str | None = None,
         embedder_type: str | None = None,
         client: Client | None = None,
-    ):
+    ) -> None:
         """
         Args:
             host: SpacetimeDB host (default: localhost).
@@ -465,7 +465,7 @@ class Graphiti:
         self._token_tracker = None
 
     @property
-    def token_tracker(self):
+    def token_tracker(self) -> "TokenTracker":
         """Token usage tracker (upstream compat — returns None for SpacetimeDB."""
         return self._token_tracker
 
@@ -1784,7 +1784,7 @@ class Graphiti:
 class EntityNodeNamespace:
     """Namespace for entity node operations. Accessed as ``graphiti.nodes.entity``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, node: EntityNode) -> EntityNode:
@@ -1845,7 +1845,7 @@ class EntityNodeNamespace:
 class EpisodeNodeNamespace:
     """Namespace for episode node operations. Accessed as ``graphiti.nodes.episode``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, node: EpisodicNode) -> EpisodicNode:
@@ -1931,7 +1931,7 @@ class EpisodeNodeNamespace:
 class CommunityNodeNamespace:
     """Namespace for community node operations. Accessed as ``graphiti.nodes.community``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, node: CommunityNode) -> CommunityNode:
@@ -2007,7 +2007,7 @@ class CommunityNodeNamespace:
 class SagaNodeNamespace:
     """Namespace for saga node operations. Accessed as ``graphiti.nodes.saga``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, node: SagaNode) -> SagaNode:
@@ -2088,7 +2088,7 @@ class NodeNamespace:
     community: CommunityNodeNamespace
     saga: SagaNodeNamespace
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self.entity = EntityNodeNamespace(graphiti)
         self.episode = EpisodeNodeNamespace(graphiti)
         self.community = CommunityNodeNamespace(graphiti)
@@ -2098,7 +2098,7 @@ class NodeNamespace:
 class EntityEdgeNamespace:
     """Namespace for entity edge operations. Accessed as ``graphiti.edges.entity``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, edge: EntityEdge) -> EntityEdge:
@@ -2186,7 +2186,7 @@ class EntityEdgeNamespace:
 class EpisodicEdgeNamespace:
     """Namespace for episodic edge operations. Accessed as ``graphiti.edges.episodic``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, edge: EpisodicEdge) -> EpisodicEdge:
@@ -2258,7 +2258,7 @@ class EpisodicEdgeNamespace:
 class CommunityEdgeNamespace:
     """Namespace for community edge operations. Accessed as ``graphiti.edges.community``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, edge: CommunityEdge) -> CommunityEdge:
@@ -2330,7 +2330,7 @@ class CommunityEdgeNamespace:
 class HasEpisodeEdgeNamespace:
     """Namespace for has_episode edge operations. Accessed as ``graphiti.edges.has_episode``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, edge: HasEpisodeEdge) -> HasEpisodeEdge:
@@ -2402,7 +2402,7 @@ class HasEpisodeEdgeNamespace:
 class NextEpisodeEdgeNamespace:
     """Namespace for next_episode edge operations. Accessed as ``graphiti.edges.next_episode``."""
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self._g = graphiti
 
     def save(self, edge: NextEpisodeEdge) -> NextEpisodeEdge:
@@ -2480,7 +2480,7 @@ class EdgeNamespace:
     has_episode: HasEpisodeEdgeNamespace
     next_episode: NextEpisodeEdgeNamespace
 
-    def __init__(self, graphiti: "Graphiti"):
+    def __init__(self, graphiti: "Graphiti") -> None:
         self.entity = EntityEdgeNamespace(graphiti)
         self.episodic = EpisodicEdgeNamespace(graphiti)
         self.community = CommunityEdgeNamespace(graphiti)
