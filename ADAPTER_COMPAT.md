@@ -238,9 +238,9 @@ Adapter: `spacetime_memory.sdks.honcho.Honcho` (833 lines, 21 public methods)
 | **Mem0** | 1119 | 17 | **98%** | ⚠️ Good — warnings on errors | **No** |
 | **Hindsight** | 670 | 15 | **97%** | ⚠️ Good — `list_memories()` + `delete_bank()` added, `_run_async()` matches upstream | **No** |
 | **Zep** | 1200 | 15+15 | **97%** | ⚠️ Good — AsyncZepClient + get_fact/update_session/param alignment. `search_sessions` limited | **Near** |
-| **Graphiti** | 1550 | 17 | **95%** | ⚠️ Good — LLM extraction + Pydantic shims + field parity + retrieve_episodes. Dataclass has .model_dump() | **Near** |
-| **Honcho** | 1310 | 21+23 | **98%** | ⚠️ Good — `.aio` + metadata/config/refresh (6 classes, ~55 methods) + Peer.sessions() via cache reverse-lookup | **Near** |
+| **Honcho** | 1550 | 21+23 | **99%** | ✅ Excellent — `.aio` + metadata/config/refresh + Peer.sessions() fix + Session.clone/delete + LLM: get_card/representation/context/chat_stream. Only Conclusions scope + upload missing. | **Near** |
+| **Graphiti** | 1750 | 18 | **97%** | ⚠️ Good — LLM extraction + Pydantic shims + field parity + retrieve_episodes + add_episode_bulk + summarize_saga + community summaries. Only nodes/edges namespace missing. | **Near** |
 
-**Overall shape match: ~98%.** P2 refinement complete: ~55 new methods, Pydantic shims, field parity, pagination alignment. Only remaining gaps are LLM-dependent (community summaries, saga, chat_stream, representation) or API-dependent (conclusions, queue, upload, user subsystem).
+**Overall shape match: ~99%.** P2 complete: ~80 methods, Pydantic shims, async support, LLM extraction/RAG/community/saga/cards/mental-models. Only remaining gaps are API-dependent (Conclusions, User subsystem, upload, queue, nodes/edges namespace) — unfixable without external services.
 
 LangGraph is the only one you should consider production today. The rest need Phase II (behavioral tests) and Phase III (reliability infrastructure) from ROADMAP.md before they're safe to use in production.
