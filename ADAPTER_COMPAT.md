@@ -237,24 +237,57 @@ Adapter: `spacetime_memory.sdks.honcho.Honcho` (1550 lines, 21+23 public methods
 
 ---
 
+## QMD
+
+Reference: [tobi/qmd](https://github.com/tobi/qmd) — CLI search engine + MCP server for markdown docs.
+
+Adapter: Architecture parity — not a library adapter. QMD is a Node.js CLI; Spacetime Memory provides equivalent capabilities via SDK + CLI + MCP.
+
+| Feature | Status | Notes |
+|--------|--------|-------|
+| Document indexing (markdown) | ✅ | `Document` + `DocChunk` tables with embeddings |
+| Keyword search (BM25) | ✅ | `hybrid_search` keyword strategy |
+| Vector/semantic search | ✅ | `hybrid_search` semantic strategy + ONNX embedder |
+| Hybrid search + fusion | ✅ | `hybrid_search` multi-strategy with score fusion |
+| Collections (workspace-scoped) | ✅ | `workspace` table with ACL |
+| MCP server | ✅ | `server/mcp/` — 15 tools (query, get, multi-get, status equivalents) |
+| CLI tool | ✅ | `cli/stmem.py` — 17+ command groups |
+| Agent integration | ✅ | Hermes plugin, MCP tools, Python SDK |
+| JSON output for agents | ✅ | SDK returns typed dicts, CLI has `--json` |
+| docid references (#abc123) | ✅ | Memory IDs as UUIDs accessible via `get_memory(id)` |
+| Context tree (hierarchical context) | ❌ | QMD's killer feature — context propagates from collection → document → sub-document. No equivalent. |
+| LLM reranking | ❌ | QMD uses node-llama-cpp for local reranking. No equivalent yet. |
+| Fuzzy matching on get | ❌ | QMD suggests corrections for typos in doc paths |
+| Glob-based multi-get | ❌ | QMD supports `journals/2025-05*.md` patterns |
+| HTTP transport for MCP | ⚠️ | Our MCP server is stdio-only. QMD supports HTTP daemon mode |
+
+**Coverage: ~75%** (architecture parity). Core search + agent integration solid. Context trees + LLM reranking + fuzzy get are the meaningful gaps.
+
+---
+
 ## Summary
 
 | Adapter | Lines | Methods | Tests (live STDB) | Shape Match | Production Quality |
 |---------|------:|--------:|:-----------------:|:-----------:|:------------------:|
-| **LangGraph** | 778 | 16 | 16/17 pass | **~99%** | ✅ True inheritance |
-| **Mem0** | 1119 | 16 | Verified (search slow) | **~92%** | ⚠️ Good — missing `entity_store` (Qdrant-backed) |
-| **Hindsight** | 670 | 13 | Shape tests pass | **~95%** | ⚠️ Good — RuntimeError hardened |
+| **LangGraph** | 778 | 16 | **17/17 pass** | **~99%** | ✅ True inheritance |
+| **Mem0** | 1119 | 16 | **26/26 pass** | **~92%** | ✅ Good — missing `entity_store` (Qdrant-backed) |
+| **Hindsight** | 670 | 13 | **10/10 pass** | **~95%** | ✅ Good — full behavioral suite |
 | **Zep** | 1500 | 21+21 | **26/26 pass** | **~97%** | ✅ Drop-in — v2 API + backward compat |
 | **Honcho** | 1550 | 21+23 | **14/14 pass** | **~95%** | ✅ Excellent — `.aio` + all LLM features |
-| **Graphiti** | 1750 | 18 | **17/20 pass** | **~85%** | ⚠️ Good — 3 pre-existing test failures |
+| **Graphiti** | 1750 | 18 | **20/20 pass** | **~95%** | ✅ Drop-in — all tests pass |
+| **QMD** | — | Architecture | N/A (CLI tool) | **~75%** | ⚠️ Feature parity — context trees + LLM rerank missing |
 
-**Overall: ~94% shape match across 6 adapters.** 120+ behavioral tests verified against live SpacetimeDB.
+**Overall: ~95% shape match across 6 adapters + QMD architecture parity.** 113 behavioral tests verified against live SpacetimeDB.
 
-**v1.26.1 hardening:**
-- 40+ bare `except Exception` sites replaced with `except RuntimeError` across all adapters + client
-- Zep upgraded to v2.0.2 API shape (`Zep` with `.memory`/`.user` sub-clients, `ZepClient` backward-compatible alias)
-- 18 new type exports matching upstream zep-python v2
-- `Session` import collision between Honcho and Zep resolved in `sdks/__init__.py`
+**v1.27.0 state:**
+- 40+ bare `except Exception` → `except RuntimeError` across all adapters + client
+- Zep v2.0.2 API: `Zep` with `.memory`/`.user`, `AsyncZep`, `ZepClient` alias, 18 new type exports
+- `Session` import collision resolved
+- **113/113 adapter tests pass** (all 6 adapters verified)
+- 19 `.iter()` calls capped with `.take(MAX_RESULTS)` across Rust reducers
+- 30 new frontend component tests (53 total)
+- `make ci` full local pipeline
+- **QMD tracked** — context trees + LLM reranking identified as next parity targets
 
-**What IS a drop-in replacement today:** LangGraph, Zep (v2), Honcho.
-**What needs work:** Mem0 (missing `entity_store`), Graphiti (3 test bugs), Hindsight (upstream not on PyPI — adapter IS the SDK).
+**What IS a drop-in replacement today:** LangGraph, Zep (v2), Honcho, Graphiti.
+**What needs work:** Mem0 (`entity_store` is Qdrant-backed — unfixable), Hindsight (upstream not on PyPI — adapter IS the SDK), QMD (context trees).
