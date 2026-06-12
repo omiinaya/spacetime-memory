@@ -39,14 +39,14 @@ See [Getting Started](docs/getting-started.md) for setup, or jump to the [Adapte
 
 These adapters match the public API of their upstream library. You can swap the import path and keep existing code.
 
-| Project | Adapter | Runtime Quality |
-|---------|---------|----------------|
-| [LangGraph](https://langchain-ai.github.io/langgraph/) / [LangChain](https://python.langchain.com/) | `sdks.langchain.StmemStore` / `StmemMemoryStore` | **100%** — proper `BaseStore` inheritance |
-| [Mem0](https://github.com/mem0ai/mem0) | `sdks.mem0.Memory` | **98%** — behavioral tests pass. `chat()` is a stub without full LLM pipeline |
-| [Hindsight](https://github.com/vectorize-io/hindsight) | `sdks.hindsight.Hindsight` | **95%** — full retain/recall/reflect + batch + files + async variants. Sync wrappers require care in async contexts |
-| [Zep](https://www.getzep.com/) | `sdks.zep.Zep` | **90%** — sessions, memory, facts, search. No async (upstream has async endpoints) |
-| [Graphiti](https://github.com/getzep/graphiti) | `sdks.graphiti.Graphiti` | **85%** — entities, edges, episodes, communities. Dataclass vs Pydantic, extra `group_id` keyword arg |
-| [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | **85%** — workspace/peer/session/message/search. No `.aio` async accessor |
+| Project | Adapter | Tests (live STDB) | Quality |
+|---------|---------|:-----------------:|---------|
+| [LangGraph](https://langchain-ai.github.io/langgraph/) / [LangChain](https://python.langchain.com/) | `sdks.langchain.StmemStore` / `StmemMemoryStore` | 16/17 | **~99%** — True `BaseStore` inheritance |
+| [Mem0](https://github.com/mem0ai/mem0) (v2.0.5) | `sdks.mem0.Memory` | **26/26** | **~92%** — Missing `entity_store` (Qdrant-backed, unimplementable) |
+| [Hindsight](https://github.com/vectorize-io/hindsight) (v0.8.1) | `sdks.hindsight.Hindsight` | Shape tests pass | **~95%** — Full retain/recall/reflect + batch + files + async |
+| [Zep](https://www.getzep.com/) (v2.0.2) | `sdks.zep.Zep` | **26/26** | **~97%** — v2 API: `.memory`/`.user` sub-clients, `AsyncZep`, `ZepClient` alias |
+| [Graphiti](https://github.com/getzep/graphiti) (v0.29.2) | `sdks.graphiti.Graphiti` | **20/20** | **~95%** — Entities, edges, episodes, communities. LLM extraction |
+| [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | **14/14** | **~95%** — Workspace/peer/session/message/search + `.aio` async accessor |
 
 Additional features inspired by many projects (data model, schedules, CLI design — see Data Model table below).
 

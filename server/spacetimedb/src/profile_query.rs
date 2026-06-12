@@ -6,7 +6,7 @@ use crate::insight::insight;
 use crate::memory::memory;
 use crate::profile::profile;
 use crate::session::session_participant;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4, MAX_RESULTS};
 
 // ---------------------------------------------------------------------------
 // Result tables (client reads these after a reducer call)
@@ -70,7 +70,7 @@ pub fn get_profile_context(ctx: &ReducerContext, peer_id: String) -> Result<(), 
     let profile = ctx
         .db
         .profile()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .find(|p| p.peer_id == peer_id)
         .ok_or_else(|| format!("Profile for peer '{}' not found", peer_id))?;
 
@@ -104,7 +104,7 @@ pub fn search_profiles(
     let matches: Vec<_> = ctx
         .db
         .profile()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|p| {
             p.static_facts_json.to_lowercase().contains(&query_lower)
                 || p.dynamic_context_json.to_lowercase().contains(&query_lower)
@@ -139,7 +139,7 @@ pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<
     let memory_count = ctx
         .db
         .memory()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|m| m.peer_id == peer_id && m.is_active)
         .count() as u64;
 
@@ -147,7 +147,7 @@ pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<
     let insight_count = ctx
         .db
         .insight()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|i| i.peer_id == peer_id)
         .count() as u64;
 
@@ -155,7 +155,7 @@ pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<
     let session_count = ctx
         .db
         .session_participant()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|sp| sp.peer_id == peer_id)
         .count() as u64;
 
@@ -163,7 +163,7 @@ pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<
     let latest_memory = ctx
         .db
         .memory()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|m| m.peer_id == peer_id)
         .map(|m| m.created_at)
         .max()
@@ -172,7 +172,7 @@ pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<
     let latest_insight = ctx
         .db
         .insight()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|i| i.peer_id == peer_id)
         .map(|i| i.created_at)
         .max()
@@ -181,7 +181,7 @@ pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<
     let latest_session = ctx
         .db
         .session_participant()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|sp| sp.peer_id == peer_id)
         .map(|sp| sp.joined_at)
         .max()
@@ -222,7 +222,7 @@ pub fn search_directory_contents(
     let root_dir = ctx
         .db
         .context_directory()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .find(|d| d.path == directory_path)
         .ok_or_else(|| format!("ContextDirectory with path '{}' not found", directory_path))?;
 
@@ -238,7 +238,7 @@ pub fn search_directory_contents(
         let children: Vec<_> = ctx
             .db
             .context_directory()
-            .iter()
+            .iter().take(crate::MAX_RESULTS)
             .filter(|d| d.parent_id == did)
             .collect();
 
@@ -251,7 +251,7 @@ pub fn search_directory_contents(
     let memory_ids: Vec<String> = ctx
         .db
         .memory()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|m| !m.parent_directory_id.is_empty() && all_dir_ids.contains(&m.parent_directory_id))
         .map(|m| m.id.clone())
         .collect();

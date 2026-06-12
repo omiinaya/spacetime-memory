@@ -6,7 +6,7 @@ use crate::knowledge_graph::{kg_edge, kg_node};
 use crate::memory::memory;
 use crate::retrieval::search_index;
 use crate::workspace::workspace;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4, MAX_RESULTS};
 
 // ---------------------------------------------------------------------------
 // Tables
@@ -354,7 +354,7 @@ pub fn hybrid_search(
                 let mut memories: Vec<_> = ctx
                     .db
                     .memory()
-                    .iter()
+                    .iter().take(crate::MAX_RESULTS)
                     .filter(|m| {
                         if m.workspace_id != workspace_id {
                             return false;
@@ -435,7 +435,7 @@ pub fn get_search_results(
     let exists = ctx
         .db
         .hybrid_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .any(|r| r.workspace_id == workspace_id && r.query_hash == query_hash);
 
     if !exists {

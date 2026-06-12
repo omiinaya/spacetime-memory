@@ -1,6 +1,6 @@
 use spacetimedb::*;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4, MAX_RESULTS};
 use crate::auth::require_auth;
 use crate::workspace::check_space_access;
 
@@ -916,6 +916,7 @@ fn resolve_backlinks(ctx: &ReducerContext, source_id: &str, content: &str, now: 
             .db
             .note()
             .iter()
+            .take(crate::MAX_RESULTS)
             .filter(|n: &Note| n.title == target_title && n.id != source_id)
             .map(|n| n.id.clone())
             .collect();

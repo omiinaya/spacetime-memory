@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_admin;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4, MAX_RESULTS};
 
 // Re-import table structs for direct manipulation in replicate_incoming
 use crate::memory::{memory, Memory};
@@ -134,7 +134,7 @@ pub fn list_replication_peers(ctx: &ReducerContext, workspace_id: String) -> Res
     let peers: Vec<_> = ctx
         .db
         .replication_peer()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|p| p.workspace_id == workspace_id)
         .collect();
 
@@ -233,28 +233,28 @@ pub fn get_replication_status(ctx: &ReducerContext, workspace_id: String) -> Res
     let total_peers = ctx
         .db
         .replication_peer()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|p| p.workspace_id == workspace_id)
         .count();
 
     let active_peers = ctx
         .db
         .replication_peer()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|p| p.workspace_id == workspace_id && p.is_active)
         .count();
 
     let unsynced_count = ctx
         .db
         .replication_log()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|e| e.workspace_id == workspace_id && !e.synced)
         .count();
 
     let total_log_entries = ctx
         .db
         .replication_log()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|e| e.workspace_id == workspace_id)
         .count();
 
