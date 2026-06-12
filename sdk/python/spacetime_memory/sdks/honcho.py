@@ -420,9 +420,37 @@ class Peer:
         reverse: bool = False,
     ) -> SyncPage[SessionResponse, Session]:
         """List sessions this peer participates in."""
-        # In SpacetimeDB, we don't have a direct peer→session mapping
-        # Return empty page for now
-        return SyncPage(data={"items": [], "total": 0, "page": page, "size": size, "pages": 1})
+        filtered: list[Session] = []
+        for session in self._honcho._session_cache.values():
+            if self in session._peers:
+                filtered.append(session)
+        if reverse:
+            filtered = list(reversed(filtered))
+        total = len(filtered)
+        start = (page - 1) * size
+        paged = filtered[start:start + size]
+        return SyncPage(data={
+            "items": paged, "total": total,
+            "page": page, "size": size,
+            "pages": max(1, (total + size - 1) // size or 1),
+        })
+
+    # -- Metadata / Config / Refresh ------------------------------------------
+
+    def get_metadata(self) -> dict[str, object]:
+        return self._metadata
+
+    def set_metadata(self, metadata: dict[str, object]) -> None:
+        self._metadata = metadata
+
+    def get_configuration(self) -> PeerConfig:
+        return self._configuration or PeerConfig()
+
+    def set_configuration(self, configuration: PeerConfig) -> None:
+        self._configuration = configuration
+
+    def refresh(self) -> None:
+        pass
 
     @property
     def aio(self) -> PeerAio:
@@ -483,6 +511,21 @@ class PeerAio:
             self._peer.sessions, filters=filters, page=page, size=size, reverse=reverse,
         )
 
+    async def get_metadata(self) -> dict[str, object]:
+        return await asyncio.to_thread(self._peer.get_metadata)
+
+    async def set_metadata(self, metadata: dict[str, object]) -> None:
+        return await asyncio.to_thread(self._peer.set_metadata, metadata)
+
+    async def get_configuration(self) -> PeerConfig:
+        return await asyncio.to_thread(self._peer.get_configuration)
+
+    async def set_configuration(self, configuration: PeerConfig) -> None:
+        return await asyncio.to_thread(self._peer.set_configuration, configuration)
+
+    async def refresh(self) -> None:
+        return await asyncio.to_thread(self._peer.refresh)
+
 
 # ---------------------------------------------------------------------------
 # Session class
@@ -510,6 +553,7 @@ class Session:
         self._created_at = created_at or datetime.datetime.utcnow()
         self._is_active = is_active if is_active is not None else True
         self._peers: list[Peer] = []
+        self._peer_configs: dict[str, SessionPeerConfig] = {}
 
     @property
     def id(self) -> str:  # noqa: A003
@@ -663,6 +707,94 @@ class Session:
         """Refresh session state."""
         pass
 
+    # -- Metadata / Config ----------------------------------------------------
+
+    def get_metadata(self) -> dict[str, object]:
+        return self._metadata
+
+    def set_metadata(self, metadata: dict[str, object]) -> None:
+        self._metadata = metadata
+
+    def get_configuration(self) -> SessionConfiguration:
+        return self._configuration or SessionConfiguration()
+
+    def set_configuration(self, configuration: SessionConfiguration) -> None:
+        self._configuration = configuration
+
+    # -- Peer management ------------------------------------------------------
+
+    def set_peers(self, peers: Any | list[Any]) -> None:
+        """Replace the peers list with the given peers."""
+        if not isinstance(peers, list):
+            peers = [peers]
+        new_peers: list[Peer] = []
+        for p in peers:
+            if isinstance(p, Peer):
+                new_peers.append(p)
+            elif isinstance(p, str):
+                new_peers.append(self._honcho.peer(p))
+        self._peers = new_peers
+
+    def remove_peers(self, peers: Any | list[Any]) -> None:
+        """Remove peers from this session."""
+        if not isinstance(peers, list):
+            peers = [peers]
+        remove_ids: set[str] = set()
+        for p in peers:
+            if isinstance(p, Peer):
+                remove_ids.add(p.id)
+            elif isinstance(p, str):
+                remove_ids.add(p)
+        self._peers = [p for p in self._peers if p.id not in remove_ids]
+
+    def get_peer_configuration(self, peer: Peer | str) -> SessionPeerConfig:
+        """Get configuration for a peer in this session."""
+        peer_id = peer.id if isinstance(peer, Peer) else peer
+        return self._peer_configs.get(peer_id, SessionPeerConfig())
+
+    def set_peer_configuration(
+        self, peer: Peer | str, config: SessionPeerConfig
+    ) -> None:
+        """Set configuration for a peer in this session."""
+        peer_id = peer.id if isinstance(peer, Peer) else peer
+        self._peer_configs[peer_id] = config
+
+    # -- Message access -------------------------------------------------------
+
+    def get_message(self, message_id: str) -> Message | None:
+        """Get a single message by ID."""
+        try:
+            results = self._honcho._client.get_memory(message_id)
+        except Exception:
+            return None
+        if not results:
+            return None
+        r = results[0]
+        return Message(
+            id=r.get("id", message_id),
+            content=r.get("memory_content", r.get("content", "")),
+            peer_id=r.get("peer_id", ""),
+            session_id=self._id,
+            workspace_id=self._ws_id,
+            metadata=r.get("metadata", {}),
+        )
+
+    def update_message(
+        self, message_id: str, metadata: dict[str, object]
+    ) -> None:
+        """Update message metadata."""
+        try:
+            results = self._honcho._client.get_memory(message_id)
+        except Exception:
+            return
+        if not results:
+            return
+        r = results[0]
+        content = r.get("memory_content", r.get("content", ""))
+        self._honcho._client.update_memory(
+            message_id, content=content, summary="", confidence=0.8
+        )
+
     @property
     def aio(self) -> SessionAio:
         return SessionAio(self)
@@ -728,6 +860,52 @@ class SessionAio:
     async def refresh(self) -> None:
         return await asyncio.to_thread(self._session.refresh)
 
+    async def get_metadata(self) -> dict[str, object]:
+        return await asyncio.to_thread(self._session.get_metadata)
+
+    async def set_metadata(self, metadata: dict[str, object]) -> None:
+        return await asyncio.to_thread(self._session.set_metadata, metadata)
+
+    async def get_configuration(self) -> SessionConfiguration:
+        return await asyncio.to_thread(self._session.get_configuration)
+
+    async def set_configuration(
+        self, configuration: SessionConfiguration
+    ) -> None:
+        return await asyncio.to_thread(
+            self._session.set_configuration, configuration
+        )
+
+    async def set_peers(self, peers: Any | list[Any]) -> None:
+        return await asyncio.to_thread(self._session.set_peers, peers)
+
+    async def remove_peers(self, peers: Any | list[Any]) -> None:
+        return await asyncio.to_thread(self._session.remove_peers, peers)
+
+    async def get_peer_configuration(
+        self, peer: Peer | str
+    ) -> SessionPeerConfig:
+        return await asyncio.to_thread(
+            self._session.get_peer_configuration, peer
+        )
+
+    async def set_peer_configuration(
+        self, peer: Peer | str, config: SessionPeerConfig
+    ) -> None:
+        return await asyncio.to_thread(
+            self._session.set_peer_configuration, peer, config
+        )
+
+    async def get_message(self, message_id: str) -> Message | None:
+        return await asyncio.to_thread(self._session.get_message, message_id)
+
+    async def update_message(
+        self, message_id: str, metadata: dict[str, object]
+    ) -> None:
+        return await asyncio.to_thread(
+            self._session.update_message, message_id, metadata
+        )
+
 
 # ---------------------------------------------------------------------------
 # Honcho client — drop-in replacement for honcho.Honcho
@@ -782,6 +960,8 @@ class Honcho:
         )
         self._peer_cache: dict[str, Peer] = {}
         self._session_cache: dict[str, Session] = {}
+        self._metadata: dict[str, object] = {}
+        self._configuration: WorkspaceConfiguration = WorkspaceConfiguration()
         self._closed = False
 
     # -- Properties -----------------------------------------------------------
@@ -949,6 +1129,23 @@ class Honcho:
         """Schedule a dream operation."""
         pass
 
+    # -- Metadata / Config / Refresh ------------------------------------------
+
+    def get_metadata(self) -> dict[str, object]:
+        return self._metadata
+
+    def set_metadata(self, metadata: dict[str, object]) -> None:
+        self._metadata = metadata
+
+    def get_configuration(self) -> WorkspaceConfiguration:
+        return self._configuration
+
+    def set_configuration(self, configuration: WorkspaceConfiguration) -> None:
+        self._configuration = configuration
+
+    def refresh(self) -> None:
+        pass
+
     # -- Close ----------------------------------------------------------------
 
     def close(self) -> None:
@@ -1063,6 +1260,25 @@ class HonchoAio:
 
     async def close(self) -> None:
         return await asyncio.to_thread(self._honcho.close)
+
+    async def get_metadata(self) -> dict[str, object]:
+        return await asyncio.to_thread(self._honcho.get_metadata)
+
+    async def set_metadata(self, metadata: dict[str, object]) -> None:
+        return await asyncio.to_thread(self._honcho.set_metadata, metadata)
+
+    async def get_configuration(self) -> WorkspaceConfiguration:
+        return await asyncio.to_thread(self._honcho.get_configuration)
+
+    async def set_configuration(
+        self, configuration: WorkspaceConfiguration
+    ) -> None:
+        return await asyncio.to_thread(
+            self._honcho.set_configuration, configuration
+        )
+
+    async def refresh(self) -> None:
+        return await asyncio.to_thread(self._honcho.refresh)
 
 
 __all__ = [

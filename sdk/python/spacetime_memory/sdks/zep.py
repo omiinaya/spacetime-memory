@@ -330,6 +330,8 @@ class ZepClient:
         session_id: str,
         messages: list[dict[str, Any]] | list[MemoryMessage],
         metadata: dict[str, Any] | None = None,
+        fact_instruction: str | None = None,
+        summary_instruction: str | None = None,
     ) -> dict[str, Any]:
         """Store messages as memory for a session.
 
@@ -338,6 +340,8 @@ class ZepClient:
             messages: List of message dicts (``{role, content}``) or
                 ``MemoryMessage`` objects.
             metadata: Optional metadata dict.
+            fact_instruction: Ignored (LLM instruction for Zep Cloud, N/A).
+            summary_instruction: Ignored (LLM instruction for Zep Cloud, N/A).
 
         Returns:
             A dict with operation status.
@@ -642,29 +646,64 @@ class ZepClient:
             for r in rows or []
         ]
 
-    def delete_fact(self, session_id: str, fact_id: str) -> dict[str, Any]:
-        """Delete a specific fact by its ID.
+    def delete_fact(self, fact_uuid: str, **kwargs: Any) -> dict[str, Any]:
+        """Delete a specific fact by its UUID.
 
         Args:
-            session_id: Zep session identifier.
-            fact_id: The UUID of the fact to delete.
+            fact_uuid: The UUID of the fact to delete.
+            **kwargs: Backward compat for ``session_id`` and ``fact_id``.
 
         Returns:
             A dict with operation status.
 
         Example::
 
-            >>> client.delete_fact(session_id="my-session", fact_id="abc-123")
+            >>> client.delete_fact(fact_uuid="abc-123")
+            {'status': 'ok', 'deleted': 1}
+            >>> client.delete_fact(session_id="my-session", fact_id="abc-123")  # legacy
             {'status': 'ok', 'deleted': 1}
 
         """
-        result = self._client.delete_memory(fact_id)
+        # Backward compat: accept old signature
+        if "fact_id" in kwargs:
+            fact_uuid = kwargs["fact_id"]
+        result = self._client.delete_memory(fact_uuid)
         # delete_memory returns {"status": "ok", "note": "already deleted"}
         # when the memory wasn't found — treat as deleted=0
         note = result.get("note", "")
         if note == "already deleted":
             return {"status": "ok", "deleted": 0, "note": "not found"}
         return {"status": "ok", "deleted": 1}
+
+    def get_fact(self, fact_uuid: str) -> Fact:
+        """Get a single fact by its UUID.
+
+        Args:
+            fact_uuid: The UUID of the fact to retrieve.
+
+        Returns:
+            A ``Fact`` object.
+
+        Raises:
+            NotFoundError: If the fact does not exist.
+
+        Example::
+
+            >>> fact = client.get_fact(fact_uuid="abc-123")
+            >>> fact.fact
+            'User prefers dark mode'
+
+        """
+        rows = self._client._query("memory", filter_dict={"id": fact_uuid})
+        if not rows:
+            raise NotFoundError(f"Fact '{fact_uuid}' not found")
+        r = rows[0]
+        return Fact(
+            uuid=r.get("id", r.get("entity_id", "")),
+            fact=r.get("content", ""),
+            created_at=str(r.get("created_at", "")),
+            rating=r.get("confidence", None),
+        )
 
     # ------------------------------------------------------------------
     # Zep Memory Update
@@ -724,18 +763,33 @@ class ZepClient:
     # ------------------------------------------------------------------
 
     def list_sessions(
-        self, limit: int = 100, offset: int = 0
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        page_number: int | None = None,
+        page_size: int | None = None,
+        order_by: str = "created_at",
+        asc: bool = False,
     ) -> list[Session]:
         """List all sessions (workspaces).
 
         Args:
             limit: Max sessions to return (default 100).
             offset: Pagination offset (default 0).
+            page_number: Page number (1-indexed, maps to offset).
+            page_size: Page size (maps to limit).
+            order_by: Sort field (default ``"created_at"``).
+            asc: Sort ascending (default ``False`` = newest first).
 
         Returns:
             A list of ``Session`` objects.
 
         """
+        # Map page_number/page_size to limit/offset
+        if page_size is not None:
+            limit = page_size
+        if page_number is not None:
+            offset = (page_number - 1) * limit
         workspaces = self._client.list_workspaces()
         sliced = workspaces[offset:offset + limit] if workspaces else []
         sessions = []
@@ -797,12 +851,14 @@ class ZepClient:
         self,
         session_id: str,
         metadata: dict[str, Any] | None = None,
+        fact_rating_instruction: str | None = None,
     ) -> Session:
         """Update a session's metadata.
 
         Args:
             session_id: Session identifier.
             metadata: New metadata dict (replaces existing).
+            fact_rating_instruction: Ignored (LLM instruction for Zep Cloud, N/A).
 
         Returns:
             The updated ``Session``.
@@ -949,9 +1005,14 @@ class AsyncZepClient:
         session_id: str,
         messages: list[dict[str, Any]] | list[MemoryMessage],
         metadata: dict[str, Any] | None = None,
+        fact_instruction: str | None = None,
+        summary_instruction: str | None = None,
     ) -> dict[str, Any]:
         return await asyncio.to_thread(
-            self._sync.add_memory, session_id, messages, metadata=metadata
+            self._sync.add_memory, session_id, messages,
+            metadata=metadata,
+            fact_instruction=fact_instruction,
+            summary_instruction=summary_instruction,
         )
 
     async def get_memory(
@@ -1008,11 +1069,14 @@ class AsyncZepClient:
         )
 
     async def delete_fact(
-        self, session_id: str, fact_id: str
+        self, fact_uuid: str, **kwargs: Any
     ) -> dict[str, Any]:
         return await asyncio.to_thread(
-            self._sync.delete_fact, session_id, fact_id
+            self._sync.delete_fact, fact_uuid, **kwargs
         )
+
+    async def get_fact(self, fact_uuid: str) -> Fact:
+        return await asyncio.to_thread(self._sync.get_fact, fact_uuid)
 
     # ------------------------------------------------------------------
     # Async Memory Update
@@ -1041,9 +1105,19 @@ class AsyncZepClient:
         self,
         limit: int = 100,
         offset: int = 0,
+        page_number: int | None = None,
+        page_size: int | None = None,
+        order_by: str = "created_at",
+        asc: bool = False,
     ) -> list[Session]:
         return await asyncio.to_thread(
-            self._sync.list_sessions, limit=limit, offset=offset
+            self._sync.list_sessions,
+            limit=limit,
+            offset=offset,
+            page_number=page_number,
+            page_size=page_size,
+            order_by=order_by,
+            asc=asc,
         )
 
     async def get_session(self, session_id: str) -> Session | None:
@@ -1062,9 +1136,12 @@ class AsyncZepClient:
         self,
         session_id: str,
         metadata: dict[str, Any] | None = None,
+        fact_rating_instruction: str | None = None,
     ) -> Session:
         return await asyncio.to_thread(
-            self._sync.update_session, session_id, metadata=metadata
+            self._sync.update_session, session_id,
+            metadata=metadata,
+            fact_rating_instruction=fact_rating_instruction,
         )
 
     async def search_sessions(

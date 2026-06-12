@@ -122,10 +122,10 @@ OrgMode parser and daemon. Should be split per connector.
 |---------|:-----------:|:---------------:|--------------------------|:----------:|
 | **LangGraph** | 100% | ✅ True `BaseStore` | None | **Yes** |
 | **Mem0** | 98% | ⚠️ Good | `chat()` is real RAG (ahead of upstream's `NotImplementedError`). No `create_memory_tool()` | Near |
-| **Hindsight** | 95% | ⚠️ Good | Sync wrappers break in async ctx. No `forget()` (removed upstream too) | Near |
-| **Zep** | 95% | ⚠️ Good | **AsyncZepClient added.** Limited `search_sessions` | Near |
-| **Honcho** | 95% | ⚠️ Good | **`.aio` accessor added** (HonchoAio, PeerAio, SessionAio). `Peer.sessions()` always empty (no peer→session mapping in StDB) | Near |
-| **Graphiti** | 92% | ⚠️ Good | **LLM entity extraction in `add_episode`** (graceful degradation without API key). Dataclass vs Pydantic | Near |
+| **Hindsight** | 97% | ⚠️ Good | **`list_memories()` and `delete_bank()` added.** `_run_async()` matches upstream behavior | Near |
+| **Zep** | 97% | ⚠️ Good | **AsyncZepClient + get_fact/update_session + param alignment.** `search_sessions` limited | Near |
+| **Honcho** | 98% | ⚠️ Good | **`.aio` + metadata/config/refresh + Peer.sessions() + Session.set_peers/remove_peers/peer_config/get_message.** `Peer.sessions()` now works via cache reverse-lookup | Near |
+| **Graphiti** | 95% | ⚠️ Good | **LLM extraction + Pydantic shims + field parity + retrieve_episodes + build_communities return type.** Dataclass vs Pydantic (has .model_dump/.model_validate) | Near |
 
 ### What parity means vs doesn't mean
 
@@ -187,7 +187,7 @@ require OpenAI/LLM integration or async infrastructure.
 | Dimension | Score | Change | Notes |
 |-----------|:-----:|:------:|-------|
 | **Core functionality** (StDB module) | 80/100 | — | 130/130 auth, 43 private tables, query_table system |
-| **Adapter parity** | 88/100 | +13 | All 6 adapters 92-100% parity. Async support (Honcho, Zep), LLM extraction (Graphiti), RAG chat (Mem0 — ahead of upstream) |
+| **Adapter parity** | 92/100 | +17 | All 6 at 95-100% parity. ~55 new methods across Honcho/Zep/Graphiti/Hindsight. Pydantic shims, async, LLM extraction, metadata/config |
 | **Testing** | 85/100 | +5 | 239/239 pass. Zero flake. All adapters auto-register auth. |
 | **Code quality** | 75/100 | — | Clean Rust error handling, moderate Python type hints |
 | **Security** | 90/100 | +5 | 130/130 reducers gated. Query filters scoped by workspace. Test fixtures authenticate. |
@@ -196,7 +196,7 @@ require OpenAI/LLM integration or async infrastructure.
 | **Bootstrap** | 85/100 | — | Makefile + auto-publish conftest + CLI auto-registration. PyPI not published |
 | **CI** | 75/100 | — | 4 workflows exist. No integration test in CI (needs SpacetimeDB server) |
 
-**Overall: ~88/100** (was 80) — P0+P1+P2 done. All adapters at 92%+ parity. Async support, LLM extraction, RAG chat. Next: P3 PyPI / CI.
+**Overall: ~90/100** (was 88) — P0+P1+P2+P2refine done. All 6 adapters at 95-100% parity. ~55 new methods, Pydantic shims, async support. Only remaining gaps are LLM-dependent (community summaries, saga) or API-dependent (conclusions, queue, upload). Next: P3 PyPI / CI.
 
 ---
 
@@ -218,11 +218,12 @@ require OpenAI/LLM integration or async infrastructure.
 - All SDK read paths now have Rust-side safety cap in addition to Python-side limits
 - Internal reducers (community detection, graph traversal) still use unbounded `.iter()` — acceptable for current scale
 
-### ✅ P2 — Feature parity (DONE — v1.24.0)
-- ✅ Graphiti `add_episode` LLM extraction — uses LLMClient with graceful degradation, _get_or_create_node extracted as proper method
-- ✅ Honcho `.aio` accessor — HonchoAio, PeerAio, SessionAio with 23 async methods wrapping sync SpacetimeDB calls via `asyncio.to_thread()`
-- ✅ Zep async support — AsyncZepClient with 15 async methods, async context manager support
-- ✅ Mem0 `chat()` — was already real RAG. Upstream Mem0 v2.0.4 chat() raises `NotImplementedError`; our adapter is ahead
+### ✅ P2 — Feature parity (DONE — v1.24.0—v1.25.0)
+- ✅ Graphiti `add_episode` LLM extraction + Pydantic shims + field parity + retrieve_episodes
+- ✅ Honcho `.aio` accessor + metadata/config/refresh (6 classes, ~55 methods) + Peer.sessions() fix
+- ✅ Zep async support + get_fact/update_session + param alignment + list_sessions pagination
+- ✅ Mem0 `chat()` was already real RAG (ahead of upstream NotImplementedError)
+- ✅ Hindsight `list_memories()` + `delete_bank()`
 
 ### P3 — Critical infra (6-8h total)
 - PyPI publishing (2h)

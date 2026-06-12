@@ -236,11 +236,11 @@ Adapter: `spacetime_memory.sdks.honcho.Honcho` (833 lines, 21 public methods)
 |---------|------:|--------:|:-----------:|:---------------:|:-----------:|
 | **LangGraph** | 778 | 16 | **100%** | ✅ True inheritance | **Yes** |
 | **Mem0** | 1119 | 17 | **98%** | ⚠️ Good — warnings on errors | **No** |
-| **Hindsight** | 670 | 13 | **95%** | ⚠️ Good — `_run_async()` requires care in async ctx | **No** |
-| **Zep** | 1099 | 15+15 | **95%** | ⚠️ Good — AsyncZepClient added, `search_sessions` limited | **Near** |
-| **Graphiti** | 1400 | 17 | **92%** | ⚠️ Good — LLM extraction in `add_episode`, dataclass vs Pydantic | **Near** |
-| **Honcho** | 1090 | 21+23 | **95%** | ⚠️ Good — `.aio` accessor added, `Peer.sessions()` empty | **Near** |
+| **Hindsight** | 670 | 15 | **97%** | ⚠️ Good — `list_memories()` + `delete_bank()` added, `_run_async()` matches upstream | **No** |
+| **Zep** | 1200 | 15+15 | **97%** | ⚠️ Good — AsyncZepClient + get_fact/update_session/param alignment. `search_sessions` limited | **Near** |
+| **Graphiti** | 1550 | 17 | **95%** | ⚠️ Good — LLM extraction + Pydantic shims + field parity + retrieve_episodes. Dataclass has .model_dump() | **Near** |
+| **Honcho** | 1310 | 21+23 | **98%** | ⚠️ Good — `.aio` + metadata/config/refresh (6 classes, ~55 methods) + Peer.sessions() via cache reverse-lookup | **Near** |
 
-**Overall shape match: ~96%.** Runtime quality: P2 feature parity complete — async support, LLM extraction, RAG chat. Near-production for 3/5 adapters (Zep, Honcho, Graphiti).
+**Overall shape match: ~98%.** P2 refinement complete: ~55 new methods, Pydantic shims, field parity, pagination alignment. Only remaining gaps are LLM-dependent (community summaries, saga, chat_stream, representation) or API-dependent (conclusions, queue, upload, user subsystem).
 
 LangGraph is the only one you should consider production today. The rest need Phase II (behavioral tests) and Phase III (reliability infrastructure) from ROADMAP.md before they're safe to use in production.

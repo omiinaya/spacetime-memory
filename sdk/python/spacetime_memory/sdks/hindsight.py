@@ -676,6 +676,74 @@ class Hindsight:
             ),
         )
 
+    # -- list_memories ---------------------------------------------------------
+
+    def list_memories(
+        self,
+        bank_id: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> ListMemoryUnitsResponse:
+        """List memory units in a bank (sync wrapper)."""
+        return _run_async(
+            self.alist_memories(bank_id=bank_id, limit=limit, offset=offset)
+        )
+
+    async def alist_memories(
+        self,
+        bank_id: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> ListMemoryUnitsResponse:
+        """List memory units in a bank (async)."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+
+        ws_id = self._ensure_bank(bank_id)
+
+        try:
+            rows = self._client.search(
+                ws_id, query="", limit=limit + offset, semantic=False
+            )
+        except Exception as exc:
+            logger.warning("alist_memories() search failed: %s", exc)
+            rows = []
+
+        rows = rows[offset:]
+
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            items.append({
+                "id": row.get("id", ""),
+                "content": row.get("memory_content", row.get("content", "")),
+                "created_at": row.get("created_at", ""),
+                "metadata": row.get("metadata", {}),
+            })
+
+        return ListMemoryUnitsResponse(
+            items=items,
+            total=len(items),
+            limit=limit,
+            offset=offset,
+        )
+
+    # -- delete_bank -----------------------------------------------------------
+
+    def delete_bank(self, bank_id: str) -> None:
+        """Delete a memory bank (sync wrapper)."""
+        return _run_async(
+            self.adelete_bank(bank_id=bank_id)
+        )
+
+    async def adelete_bank(self, bank_id: str) -> None:
+        """Delete a memory bank (async)."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+
+        ws_id = self._ensure_bank(bank_id)
+        self._client._call("delete_workspace", [ws_id])
+        self._ws_cache.pop(bank_id, None)
+
 
 __all__ = [
     "Hindsight",

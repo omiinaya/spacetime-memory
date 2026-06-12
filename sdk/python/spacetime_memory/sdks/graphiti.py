@@ -52,13 +52,14 @@ Usage::
 
 from __future__ import annotations
 
+import dataclasses
 import difflib
 import json
 import logging
 import uuid as _uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Self
 
 from ..client import Client
 from ..llm import LLMClient
@@ -114,6 +115,13 @@ class EntityNode:
             if created
             else datetime.now(timezone.utc),
         )
+
+    def model_dump(self, **kwargs) -> dict:
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+
+    @classmethod
+    def model_validate(cls, data: dict) -> Self:
+        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
 
 
 @dataclass
@@ -187,6 +195,13 @@ class EntityEdge:
             edge_group_id=row.get("edge_group_id", ""),
         )
 
+    def model_dump(self, **kwargs) -> dict:
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+
+    @classmethod
+    def model_validate(cls, data: dict) -> Self:
+        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
+
 
 @dataclass
 class EpisodicNode:
@@ -201,9 +216,18 @@ class EpisodicNode:
     source: str = "message"
     source_description: str = ""
     group_id: str = "default"
+    labels: list[str] = field(default_factory=list)
+    episode_metadata: dict[str, Any] = field(default_factory=dict)
     entity_edges: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     valid_at: datetime | None = None
+
+    def model_dump(self, **kwargs) -> dict:
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+
+    @classmethod
+    def model_validate(cls, data: dict) -> Self:
+        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
 
 
 @dataclass
@@ -214,8 +238,17 @@ class CommunityNode:
     name: str = ""
     group_id: str = "default"
     summary: str = ""
+    labels: list[str] = field(default_factory=list)
+    name_embedding: list[float] | None = None
     member_uuids: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def model_dump(self, **kwargs) -> dict:
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+
+    @classmethod
+    def model_validate(cls, data: dict) -> Self:
+        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
 
 
 @dataclass
@@ -238,6 +271,18 @@ class SearchResults:
 
 
 @dataclass
+class AddBulkEpisodeResults:
+    """Results from a bulk ``add_episode`` operation."""
+
+    episodes: list[EpisodicNode] = field(default_factory=list)
+    episodic_edges: list[Any] = field(default_factory=list)
+    nodes: list[EntityNode] = field(default_factory=list)
+    edges: list[EntityEdge] = field(default_factory=list)
+    communities: list[CommunityNode] = field(default_factory=list)
+    community_edges: list[CommunityEdge] = field(default_factory=list)
+
+
+@dataclass
 class AddEpisodeResults:
     """Results from ``add_episode``."""
 
@@ -247,6 +292,18 @@ class AddEpisodeResults:
     edges: list[EntityEdge] = field(default_factory=list)
     communities: list[CommunityNode] = field(default_factory=list)
     community_edges: list[CommunityEdge] = field(default_factory=list)
+
+
+@dataclass
+class RawEpisode:
+    """Raw episode data before processing (forward compat)."""
+
+    name: str = ""
+    content: str = ""
+    source: str = "message"
+    source_description: str = ""
+    reference_time: datetime | None = None
+    uuid: str = field(default_factory=lambda: _uuid.uuid4().hex[:32])
 
 
 @dataclass
@@ -1096,7 +1153,7 @@ class Graphiti:
 
     def build_communities(
         self, group_ids: list[str] | None = None
-    ) -> list[CommunityNode]:
+    ) -> tuple[list[CommunityNode], list[CommunityEdge]]:
         """Run community detection on the knowledge graph.
 
         Delegates to SpacetimeDB's ``detect_communities`` reducer.
@@ -1105,7 +1162,7 @@ class Graphiti:
             group_ids: List of workspace names.  Uses first if multiple.
 
         Returns:
-            List of :class:`CommunityNode` objects.
+            Tuple of (list of CommunityNode, list of CommunityEdge).
         """
         gid = group_ids[0] if group_ids else "default"
         ws_id = self._resolve_workspace(gid)
@@ -1121,7 +1178,8 @@ class Graphiti:
         community_nodes = self._client._query("kg_node", workspace_id=ws_id,
                                      filter_dict={"node_type": "community"})
 
-        communities = []
+        communities: list[CommunityNode] = []
+        community_edges: list[CommunityEdge] = []
         for row in community_nodes:
             community = CommunityNode(
                 uuid=row.get("id", ""),
@@ -1129,6 +1187,22 @@ class Graphiti:
                 group_id=gid,
                 summary=row.get("summary", ""),
             )
+            # Fetch community edges (member relationships)
+            try:
+                edge_rows = self._client._query(
+                    "kg_edge",
+                    workspace_id=ws_id,
+                    filter_dict={"source_node_id": community.uuid},
+                )
+                for erow in edge_rows:
+                    community_edges.append(CommunityEdge(
+                        uuid=erow.get("id", ""),
+                        source_node_uuid=erow.get("source_node_id", ""),
+                        target_node_uuid=erow.get("target_node_id", ""),
+                        group_id=gid,
+                    ))
+            except RuntimeError:
+                pass
             # Generate LLM summary if one isn't already set
             if not community.summary:
                 try:
@@ -1177,34 +1251,90 @@ class Graphiti:
                     pass
             communities.append(community)
 
-        return communities
+        return communities, community_edges
 
     # -------------------------------------------------------------------
     # Episode removal
     # -------------------------------------------------------------------
 
-    def remove_episode(self, episode_uuid: str) -> dict[str, Any]:
+    def remove_episode(self, episode_uuid: str) -> None:
         """Remove an episode (deactivate the associated memory).
 
         Args:
             episode_uuid: The episode UUID (stored as
                 ``source_session_id`` on the memory).
-
-        Returns:
-            Dict with operation status.
         """
         memories = self._client._query("memory", filter_dict={"source_session_id": episode_uuid},
                                columns=["id"])
 
-        count = 0
         for mem in memories:
             try:
                 self._client.delete_memory(mem["id"])
-                count += 1
             except RuntimeError:
                 pass
 
-        return {"status": "ok", "deleted_count": count, "episode_uuid": episode_uuid}
+    # -------------------------------------------------------------------
+    # Episode retrieval
+    # -------------------------------------------------------------------
+
+    def retrieve_episodes(
+        self,
+        reference_time: datetime | None = None,
+        last_n: int = 10,
+        group_ids: list[str] | None = None,
+        source: str | None = None,
+    ) -> list[EpisodicNode]:
+        """Retrieve episodes from the memory table.
+
+        Args:
+            reference_time: If set, only return episodes with
+                ``created_at`` >= this datetime.
+            last_n: Maximum number of episodes to return (default 10).
+            group_ids: Workspace names to scope the query.
+            source: Filter by episode source type.
+
+        Returns:
+            List of :class:`EpisodicNode` objects.
+        """
+        gid = group_ids[0] if group_ids else "default"
+        ws_id = self._resolve_workspace(gid)
+
+        memories = self._client._query(
+            "memory",
+            workspace_id=ws_id,
+            columns=["id", "content", "created_at", "source_session_id",
+                     "workspace_id", "peer_id"],
+        )
+
+        episodes: list[EpisodicNode] = []
+        for mem in memories:
+            created = mem.get("created_at", 0)
+            if created:
+                if created > 1e12:
+                    created_dt = datetime.fromtimestamp(created / 1_000_000, tz=timezone.utc)
+                else:
+                    created_dt = datetime.fromtimestamp(created, tz=timezone.utc)
+            else:
+                created_dt = datetime.now(timezone.utc)
+
+            # Filter by reference_time
+            if reference_time is not None and created_dt < reference_time:
+                continue
+
+            ep = EpisodicNode(
+                uuid=mem.get("source_session_id", mem.get("id", "")),
+                name=mem.get("peer_id", mem.get("id", ""))[:64],
+                content=mem.get("content", ""),
+                source=source or "message",
+                source_description=mem.get("peer_id", ""),
+                group_id=gid,
+                created_at=created_dt,
+            )
+            episodes.append(ep)
+
+        # Sort by created_at descending (newest first)
+        episodes.sort(key=lambda e: e.created_at, reverse=True)
+        return episodes[:last_n]
 
     # -------------------------------------------------------------------
     # Index maintenance
