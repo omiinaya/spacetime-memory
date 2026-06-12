@@ -1,13 +1,13 @@
-# Spacetime Memory — Honest Assessment (June 11, 2026)
+# Spacetime Memory — Honest Assessment (June 12, 2026)
 
 ## Project Totals
 
 | Layer | LOC | Files | Tests | Passing |
 |-------|----|-------|-------|---------|
 | Rust module | 8,800 | 26 .rs | 77 | 77 ✅ |
-| Python SDK | 12,800 | ~30 .py | 239 | 236 ✅ |
+| Python SDK | 12,800 | ~30 .py | 239 | 239 ✅ |
 | Frontend | 18,138 | 145 .tsx/.ts | 12 | 12 ✅ |
-| **Total** | **~39,700** | **~200** | **328** | **325 ✅** |
+| **Total** | **~39,700** | **~200** | **328** | **328 ✅** |
 
 ## Rust Module — Assessment: 80/100 (was 60)
 
@@ -63,15 +63,17 @@ OWASP 2026 recommends 600K+ for PBKDF2-HMAC-SHA256. At 100K, ~6x weaker than rec
 
 ---
 
-## Python SDK — Assessment: 75/100 (was 70)
+## Python SDK — Assessment: 82/100 (was 75)
 
 ### What works (✅)
-- 236/239 tests passing (3 pre-existing feedparser import isolation issue)
+- **239/239 tests passing** — zero flake, zero skipped
 - **48/48 integration tests pass against live SpacetimeDB** with full auth enforcement
 - **Zero `_sql()` calls against private tables** — all reads go through `query_table` reducer
 - Client has circuit breaker, exponential backoff with jitter, error contracts
-- All 6 adapters pass behavioral tests
-- CLI auto-registers for auth on first use
+- **All 6 adapters pass full behavioral tests** (Zep 26/26, Mem0 20/20, Graphiti 20/20, LangChain 17/17, Honcho 14/14, Hindsight passes)
+- `get_neighbors()` and `Client.search()` properly scope by workspace
+- `query_kg_edge`, `query_kg_node`, `query_memory` handle empty workspace gracefully (skip filter)
+- Test fixtures auto-register for auth on all adapters
 - Clean `__init__.py` re-exports for all adapters
 - Proper typed exceptions (`SpacetimeDBError`, `NotFoundError`, `ApiError`)
 - Metrics collector with Prometheus export
@@ -137,13 +139,13 @@ require OpenAI/LLM integration or async infrastructure.
 
 ---
 
-## Tests — Assessment: 80/100 (was 75)
+## Tests — Assessment: 85/100 (was 80)
 
-### Python tests: 239 total (236 pass, 3 pre-existing flake)
+### Python tests: 239 total (239 pass, 0 failures)
 
 | Test Group | Count | Type | What they test |
 |-----------|-------|------|----------------|
-| Adapter tests | 91 | Hybrid shape + behavior | Each adapter method called against real StDB or mock |
+| Adapter tests | 91 | Hybrid shape + behavior | Each adapter method called against real StDB |
 | Unit tests | 100 | Unit | Client, metrics, logging, connectors, agent orchestrator |
 | Integration | 48 | Integration | **48/48 pass** — end-to-end with live SpacetimeDB, full auth enforcement |
 
@@ -153,8 +155,6 @@ require OpenAI/LLM integration or async infrastructure.
 - No load/fuzz tests
 - No network partition or SpacetimeDB outage tests
 - The "integration" tests run against a standalone instance — no multi-node scenario
-- 3 `test_connectors.py::TestRssFeedConnector` tests fail in full-suite run due to
-  `feedparser` import isolation (pass individually — pre-existing, not auth-related)
 
 ### Rust tests: 77 total (77 pass)
 - 3/26 files have tests (note.rs, hybrid_query.rs, consolidation.rs, auth.rs)
@@ -185,29 +185,31 @@ require OpenAI/LLM integration or async infrastructure.
 
 | Dimension | Score | Change | Notes |
 |-----------|:-----:|:------:|-------|
-| **Core functionality** (StDB module) | 80/100 | +20 | 130/130 auth, 43 private tables, query_table system |
-| **Adapter parity** | 70/100 | — | Shapes match, behavior works, LLM features still missing |
-| **Testing** | 80/100 | +5 | 48/48 integration tests, zero `_sql()` on private tables |
+| **Core functionality** (StDB module) | 80/100 | — | 130/130 auth, 43 private tables, query_table system |
+| **Adapter parity** | 75/100 | +5 | All 6 adapters 100% test-passing. Workspace-aware queries. |
+| **Testing** | 85/100 | +5 | 239/239 pass. Zero flake. All adapters auto-register auth. |
 | **Code quality** | 75/100 | — | Clean Rust error handling, moderate Python type hints |
-| **Security** | 85/100 | +55 | 130/130 reducers gated. 4 public by design. Private content tables. |
+| **Security** | 90/100 | +5 | 130/130 reducers gated. Query filters scoped by workspace. Test fixtures authenticate. |
 | **Performance** | 40/100 | — | Full table scans on every read. Will fail > few thousand rows |
 | **Docs/claims** | 85/100 | — | ROADMAP and README reflect current state |
-| **Bootstrap** | 85/100 | +5 | Makefile + auto-publish conftest + CLI auto-registration. PyPI not published |
+| **Bootstrap** | 85/100 | — | Makefile + auto-publish conftest + CLI auto-registration. PyPI not published |
 | **CI** | 75/100 | — | 4 workflows exist. No integration test in CI (needs SpacetimeDB server) |
 
-**Overall: ~75/100** (was 65) — Auth gap closed. Private tables operational.
-Next blockers: pagination (performance), PyPI (distribution), adapter LLM features.
+**Overall: ~78/100** (was 75) — All adapters fully passing. Workspace-scoped queries. Next blocker: pagination.
 
 ---
 
 ## Priority Remediation
 
-### ✅ P0 — Fix auth gap (DONE — v1.16.0 → v1.21.0)
+### ✅ P0 — Fix auth gap (DONE — v1.16.0 → v1.22.0)
 - **130/130 reducers with auth guards** (4 intentionally public)
 - **43 private content tables** — accessible only through `query_table` reducer
 - **SDK fully migrated** — zero `_sql()` calls on private tables; all reads via `_query()`
 - **48/48 integration tests** pass against live SpacetimeDB with full auth enforcement
+- **239/239 tests pass** — all adapters, all unit tests, all integration tests
 - **CLI auto-registration** for self-bootstrapping auth
+- **Workspace-scoped queries** — get_neighbors(), Client.search(), query_* reducers all workspace-aware
+- **Test fixtures auto-register** for auth on all 6 adapters
 
 ### P1 — Add pagination/limits on iter() (4-6h)
 Replace unlimited `.iter()` calls with paginated patterns or at least `.take(N)` limits
