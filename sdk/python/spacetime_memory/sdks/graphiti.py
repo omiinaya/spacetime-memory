@@ -402,6 +402,13 @@ class Graphiti:
         self.clients = self._client
         # Cache: group_id (str) -> workspace_id (str)
         self._ws_cache: dict[str, str] = {}
+        # Token tracker (property — upstream compat)
+        self._token_tracker = None
+
+    @property
+    def token_tracker(self):
+        """Token usage tracker (upstream compat — returns None for SpacetimeDB)."""
+        return self._token_tracker
 
     # -------------------------------------------------------------------
     # Lifecycle

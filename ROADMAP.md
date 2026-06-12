@@ -123,7 +123,7 @@ OrgMode parser and daemon. Should be split per connector.
 | **LangGraph** | 100% | ✅ True `BaseStore` | None | **Yes** |
 | **Mem0** | 98% | ⚠️ Good | `chat()` is real RAG (ahead of upstream's `NotImplementedError`). No `create_memory_tool()` | Near |
 | **Hindsight** | 97% | ⚠️ Good | **`list_memories()` and `delete_bank()` added.** `_run_async()` matches upstream behavior | Near |
-| **Zep** | 97% | ⚠️ Good | **AsyncZepClient + get_fact/update_session + param alignment.** `search_sessions` limited | Near |
+| **Zep** | 98% | ⚠️ Good | **AsyncZepClient + session message methods + data model field parity + param alignment.** `search_sessions` limited | Near |
 | **Honcho** | 98% | ⚠️ Good | **`.aio` + metadata/config/refresh + Peer.sessions() + Session.set_peers/remove_peers/peer_config/get_message.** `Peer.sessions()` now works via cache reverse-lookup | Near |
 | **Graphiti** | 95% | ⚠️ Good | **LLM extraction + Pydantic shims + field parity + retrieve_episodes + build_communities return type.** Dataclass vs Pydantic (has .model_dump/.model_validate) | Near |
 
