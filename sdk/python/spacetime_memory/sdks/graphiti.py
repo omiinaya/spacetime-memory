@@ -1278,7 +1278,7 @@ class Graphiti:
 
     def build_communities(
         self, group_ids: list[str] | None = None
-    ) -> tuple[list[CommunityNode], list[CommunityEdge]]:
+    ) -> list[CommunityNode]:
         """Run community detection on the knowledge graph.
 
         Delegates to SpacetimeDB's ``detect_communities`` reducer.
@@ -1287,7 +1287,7 @@ class Graphiti:
             group_ids: List of workspace names.  Uses first if multiple.
 
         Returns:
-            Tuple of (list of CommunityNode, list of CommunityEdge).
+            List of CommunityNode objects.
         """
         gid = group_ids[0] if group_ids else "default"
         ws_id = self._resolve_workspace(gid)
@@ -1410,7 +1410,7 @@ class Graphiti:
                     pass
             communities.append(community)
 
-        return communities, community_edges
+        return communities
 
     # -------------------------------------------------------------------
     # Saga operations
@@ -1560,12 +1560,15 @@ class Graphiti:
     # Episode removal
     # -------------------------------------------------------------------
 
-    def remove_episode(self, episode_uuid: str) -> None:
+    def remove_episode(self, episode_uuid: str) -> dict:
         """Remove an episode (deactivate the associated memory).
 
         Args:
             episode_uuid: The episode UUID (stored as
                 ``source_session_id`` on the memory).
+
+        Returns:
+            dict with ``status`` and ``episode_uuid`` keys.
         """
         memories = self._client._query("memory", filter_dict={"source_session_id": episode_uuid},
                                columns=["id"])
@@ -1575,6 +1578,8 @@ class Graphiti:
                 self._client.delete_memory(mem["id"])
             except RuntimeError:
                 pass
+
+        return {"status": "ok", "episode_uuid": episode_uuid}
 
     # -------------------------------------------------------------------
     # Episode retrieval
