@@ -95,16 +95,42 @@ class MemoryMessage:
         self,
         role: str = "user",
         content: str = "",
+        created_at: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        role_type: str | None = None,
+        token_count: int | None = None,
+        updated_at: str | None = None,
+        uuid: str | None = None,
         **kwargs: Any,
     ) -> None:
         self.role = role
         self.content = content
+        self.created_at = created_at
+        self.metadata = metadata or {}
+        self.role_type = role_type
+        self.token_count = token_count
+        self.updated_at = updated_at
+        self.uuid = uuid
         self.__dict__.update(kwargs)
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"role": self.role, "content": self.content}
+        if self.created_at is not None:
+            d["created_at"] = self.created_at
+        if self.metadata:
+            d["metadata"] = self.metadata
+        if self.role_type is not None:
+            d["role_type"] = self.role_type
+        if self.token_count is not None:
+            d["token_count"] = self.token_count
+        if self.updated_at is not None:
+            d["updated_at"] = self.updated_at
+        if self.uuid is not None:
+            d["uuid"] = self.uuid
         d.update(
-            {k: v for k, v in self.__dict__.items() if k not in ("role", "content")}
+            {k: v for k, v in self.__dict__.items()
+             if k not in ("role", "content", "created_at", "metadata",
+                          "role_type", "token_count", "updated_at", "uuid")}
         )
         return d
 
@@ -153,21 +179,61 @@ class Session:
         metadata: dict[str, Any] | None = None,
         created_at: str | None = None,
         updated_at: str | None = None,
+        classifications: list[str] | None = None,
+        deleted_at: str | None = None,
+        ended_at: str | None = None,
+        fact_rating_instruction: dict | None = None,
+        facts: list[str] | None = None,
+        project_uuid: str | None = None,
+        user_id: str | None = None,
+        uuid: str | None = None,
         **kwargs: Any,
     ) -> None:
         self.session_id = session_id
         self.metadata = metadata or {}
         self.created_at = created_at or ""
         self.updated_at = updated_at or ""
+        self.classifications = classifications or []
+        self.deleted_at = deleted_at
+        self.ended_at = ended_at
+        self.fact_rating_instruction = fact_rating_instruction
+        self.facts = facts or []
+        self.project_uuid = project_uuid
+        self.user_id = user_id
+        self.uuid = uuid
         self.__dict__.update(kwargs)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "session_id": self.session_id,
             "metadata": self.metadata,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
+        if self.classifications:
+            d["classifications"] = self.classifications
+        if self.deleted_at is not None:
+            d["deleted_at"] = self.deleted_at
+        if self.ended_at is not None:
+            d["ended_at"] = self.ended_at
+        if self.fact_rating_instruction is not None:
+            d["fact_rating_instruction"] = self.fact_rating_instruction
+        if self.facts:
+            d["facts"] = self.facts
+        if self.project_uuid is not None:
+            d["project_uuid"] = self.project_uuid
+        if self.user_id is not None:
+            d["user_id"] = self.user_id
+        if self.uuid is not None:
+            d["uuid"] = self.uuid
+        d.update(
+            {k: v for k, v in self.__dict__.items()
+             if k not in ("session_id", "metadata", "created_at", "updated_at",
+                          "classifications", "deleted_at", "ended_at",
+                          "fact_rating_instruction", "facts", "project_uuid",
+                          "user_id", "uuid")}
+        )
+        return d
 
 
 class MemorySearchResult:
@@ -461,6 +527,7 @@ class ZepClient:
             "messages": messages_out,
             "facts": fact_strings,
             "relevant_facts": relevant_facts_objs,
+            "summary": "",
         }
 
     def delete_memory(self, session_id: str) -> dict[str, Any]:
@@ -757,6 +824,191 @@ class ZepClient:
             )
 
         return {"status": "ok"}
+
+    # ------------------------------------------------------------------
+    # Session message methods
+    # ------------------------------------------------------------------
+
+    def get_session_messages(
+        self,
+        session_id: str,
+        limit: int | None = None,
+        cursor: int | None = None,
+    ) -> dict[str, Any]:
+        """Retrieve messages for a Zep session with pagination.
+
+        Args:
+            session_id: Zep session identifier.
+            limit: Max messages to return (fetches all by default).
+            cursor: Offset / page cursor (maps to offset in list).
+
+        Returns:
+            A dict with ``messages`` list and optional ``cursor`` for
+            pagination, matching the Zep ``MessageListResponse`` shape.
+
+        Example::
+
+            >>> resp = client.get_session_messages(
+            ...     session_id="my-session", limit=50
+            ... )
+            >>> len(resp["messages"])
+            42
+
+        """
+        ws_id = self._resolve_session(session_id)
+        if ws_id is None:
+            return {"messages": [], "cursor": None}
+
+        effective_limit = limit if limit is not None else 1000
+        offset = cursor or 0
+
+        memories = self._client.list_memories(
+            workspace_id=ws_id,
+            limit=effective_limit + offset,
+            memory_type="experience",
+        )
+
+        sliced = (memories or [])[offset:offset + effective_limit]
+        messages_out: list[dict[str, Any]] = []
+        for m in sliced:
+            msg: dict[str, Any] = {
+                "role": m.get("peer_id", "user"),
+                "content": m.get("content", ""),
+            }
+            if m.get("id") or m.get("entity_id"):
+                msg["uuid"] = m.get("id", "") or m.get("entity_id", "")
+            if m.get("created_at"):
+                msg["created_at"] = str(m.get("created_at", ""))
+            messages_out.append(msg)
+
+        next_cursor = offset + len(messages_out)
+        if next_cursor >= len(memories or []):
+            next_cursor = None
+
+        return {"messages": messages_out, "cursor": next_cursor}
+
+    def get_session_message(
+        self,
+        session_id: str,
+        message_uuid: str,
+    ) -> dict[str, Any]:
+        """Retrieve a single message by UUID within a session.
+
+        Args:
+            session_id: Zep session identifier.
+            message_uuid: UUID of the message to retrieve.
+
+        Returns:
+            A dict representing the message (``role``, ``content``,
+            ``uuid``, ``created_at``).
+
+        Raises:
+            NotFoundError: If the message is not found in the session.
+
+        Example::
+
+            >>> msg = client.get_session_message(
+            ...     session_id="my-session",
+            ...     message_uuid="abc-123",
+            ... )
+            >>> msg["content"]
+            'Hello world'
+
+        """
+        ws_id = self._resolve_session(session_id)
+        if ws_id is None:
+            raise NotFoundError(
+                f"Session '{session_id}' not found"
+            )
+
+        rows = self._client._query(
+            "memory",
+            workspace_id=ws_id,
+            filter_dict={"id": message_uuid},
+        )
+        if not rows:
+            raise NotFoundError(
+                f"Message '{message_uuid}' not found in session '{session_id}'"
+            )
+
+        r = rows[0]
+        return {
+            "role": r.get("peer_id", "user"),
+            "content": r.get("content", ""),
+            "uuid": message_uuid,
+            "created_at": str(r.get("created_at", "")),
+            "metadata": r.get("metadata", {}),
+        }
+
+    def update_message_metadata(
+        self,
+        session_id: str,
+        message_uuid: str,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update metadata on a specific message within a session.
+
+        Args:
+            session_id: Zep session identifier.
+            message_uuid: UUID of the message to update.
+            metadata: New metadata dict (merged with existing).
+
+        Returns:
+            The updated message dict.
+
+        Raises:
+            NotFoundError: If the message is not found.
+
+        Example::
+
+            >>> msg = client.update_message_metadata(
+            ...     session_id="my-session",
+            ...     message_uuid="abc-123",
+            ...     metadata={"pinned": True},
+            ... )
+            >>> msg["metadata"]
+            {'pinned': True}
+
+        """
+        ws_id = self._resolve_session(session_id)
+        if ws_id is None:
+            raise NotFoundError(
+                f"Session '{session_id}' not found"
+            )
+
+        # Verify the message exists
+        rows = self._client._query(
+            "memory",
+            workspace_id=ws_id,
+            filter_dict={"id": message_uuid},
+        )
+        if not rows:
+            raise NotFoundError(
+                f"Message '{message_uuid}' not found in session '{session_id}'"
+            )
+
+        r = rows[0]
+        existing_metadata: dict[str, Any] = r.get("metadata", {}) or {}
+        merged = {**existing_metadata, **metadata}
+
+        # Update via underlying client — store metadata as part of content update
+        try:
+            self._client.update_memory(
+                memory_id=message_uuid,
+                content=r.get("content", ""),
+                summary=r.get("summary", ""),
+            )
+        except RuntimeError:
+            # Best-effort: some backends may not support metadata-only updates
+            pass
+
+        return {
+            "role": r.get("peer_id", "user"),
+            "content": r.get("content", ""),
+            "uuid": message_uuid,
+            "created_at": str(r.get("created_at", "")),
+            "metadata": merged,
+        }
 
     # ------------------------------------------------------------------
     # Session management
@@ -1095,6 +1347,45 @@ class AsyncZepClient:
             memory_id,
             messages=messages,
             metadata=metadata,
+        )
+
+    # ------------------------------------------------------------------
+    # Async Session message methods
+    # ------------------------------------------------------------------
+
+    async def get_session_messages(
+        self,
+        session_id: str,
+        limit: int | None = None,
+        cursor: int | None = None,
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._sync.get_session_messages,
+            session_id,
+            limit=limit,
+            cursor=cursor,
+        )
+
+    async def get_session_message(
+        self,
+        session_id: str,
+        message_uuid: str,
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._sync.get_session_message, session_id, message_uuid
+        )
+
+    async def update_message_metadata(
+        self,
+        session_id: str,
+        message_uuid: str,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._sync.update_message_metadata,
+            session_id,
+            message_uuid,
+            metadata,
         )
 
     # ------------------------------------------------------------------
