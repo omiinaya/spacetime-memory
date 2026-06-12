@@ -45,6 +45,12 @@ def mem(host: str, port: int, stdb_session: dict) -> Memory:
         "host": host, "port": port,
         "db": stdb_session["database"],
     })
+    # Auto-register for auth
+    import secrets
+    try:
+        m._client._call("register", [f"mem0_test_{secrets.token_hex(4)}", "Mem0 Test", "testpass"])
+    except RuntimeError:
+        pass
     yield m
     m.reset()
 

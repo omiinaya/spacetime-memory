@@ -53,11 +53,18 @@ def token() -> str:
 
 @pytest.fixture(scope="module")
 def client(stdb_session: dict) -> Client:
-    return Client(
+    c = Client(
         host=stdb_session["host"],
         port=stdb_session["port"],
         database=stdb_session["database"],
     )
+    # Auto-register for auth
+    import secrets
+    try:
+        c._call("register", [f"graphiti_test_{secrets.token_hex(4)}", "Graphiti Test", "testpass"])
+    except RuntimeError:
+        pass
+    return c
 
 
 @pytest.fixture(scope="module")

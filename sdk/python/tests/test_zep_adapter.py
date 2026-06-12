@@ -73,6 +73,12 @@ def zep(host: str, port: int, stdb_session: dict):
         port=port,
         config={"db": stdb_session["database"]},
     )
+    # Auto-register for auth
+    import secrets
+    try:
+        client._client._call("register", [f"zep_test_{secrets.token_hex(4)}", "Zep Test", "testpass"])
+    except RuntimeError:
+        pass
     yield client
     client.close()
 

@@ -480,7 +480,7 @@ class Graphiti:
         def _get_or_create_node(
             node: EntityNode, workspace_uuid: str
         ) -> tuple[str, float]:
-            all_nodes = self._query("kg_node", workspace_id=workspace_uuid,
+            all_nodes = self._client._query("kg_node", workspace_id=workspace_uuid,
                                     columns=["id", "label"])
 
             # Pass 1: exact match (current behavior)
@@ -523,7 +523,7 @@ class Graphiti:
             except RuntimeError:
                 pass
             # Re-query to get the new node's UUID
-            all_nodes = self._query("kg_node", workspace_id=workspace_uuid,
+            all_nodes = self._client._query("kg_node", workspace_id=workspace_uuid,
                                     columns=["id", "label"])
             for n in all_nodes:
                 if n.get("label") == node.name:
@@ -554,7 +554,7 @@ class Graphiti:
         actual_edge_id = edge.uuid  # fallback
         actual_version = 1
         actual_edge_group_id = ""
-        edge_rows = self._query("kg_edge", workspace_id=ws_id,
+        edge_rows = self._client._query("kg_edge", workspace_id=ws_id,
                                  filter_dict={
                                      "source_node_id": actual_source_id,
                                      "target_node_id": actual_target_id,
@@ -750,7 +750,7 @@ class Graphiti:
         for eid in edge_ids_to_lookup:
             if eid not in seen_edge_ids:
                 seen_edge_ids.add(eid)
-                edge_rows = self._query("kg_edge", filter_dict={"id": eid})
+                edge_rows = self._client._query("kg_edge", filter_dict={"id": eid})
                 if edge_rows:
                     edges.append(EntityEdge.from_stmem(edge_rows[0]))
 
@@ -841,13 +841,13 @@ class Graphiti:
 
             if entity_type == "node" and entity_id and entity_id not in seen_node_ids:
                 seen_node_ids.add(entity_id)
-                node_rows = self._query("kg_node", filter_dict={"id": entity_id})
+                node_rows = self._client._query("kg_node", filter_dict={"id": entity_id})
                 if node_rows:
                     nodes.append(EntityNode.from_stmem(node_rows[0]))
 
             elif entity_type == "edge" and entity_id and entity_id not in seen_edge_ids:
                 seen_edge_ids.add(entity_id)
-                edge_rows = self._query("kg_edge", filter_dict={"id": entity_id})
+                edge_rows = self._client._query("kg_edge", filter_dict={"id": entity_id})
                 if edge_rows:
                     edges.append(EntityEdge.from_stmem(edge_rows[0]))
 
@@ -911,7 +911,7 @@ class Graphiti:
 
         nodes: list[EntityNode] = []
         for nid in node_ids:
-            nrows = self._query("kg_node", filter_dict={"id": nid})
+            nrows = self._client._query("kg_node", filter_dict={"id": nid})
             if nrows:
                 nodes.append(EntityNode.from_stmem(nrows[0]))
 
@@ -948,7 +948,7 @@ class Graphiti:
         except RuntimeError:
             pass
 
-        community_nodes = self._query("kg_node", workspace_id=ws_id,
+        community_nodes = self._client._query("kg_node", workspace_id=ws_id,
                                      filter_dict={"node_type": "community"})
 
         communities = []
@@ -1023,7 +1023,7 @@ class Graphiti:
         Returns:
             Dict with operation status.
         """
-        memories = self._query("memory", filter_dict={"source_session_id": episode_uuid},
+        memories = self._client._query("memory", filter_dict={"source_session_id": episode_uuid},
                                columns=["id"])
 
         count = 0
@@ -1109,7 +1109,7 @@ class Graphiti:
             List of :class:`EntityEdge` objects, one per version.
         """
         # First find the edge_group_id from this edge
-        edge_rows = self._query("kg_edge", filter_dict={"id": edge_id}, columns=["edge_group_id"])
+        edge_rows = self._client._query("kg_edge", filter_dict={"id": edge_id}, columns=["edge_group_id"])
         if not edge_rows:
             return []
         edge_group_id = edge_rows[0].get("edge_group_id", "")
@@ -1150,7 +1150,7 @@ class Graphiti:
         edges: list[EntityEdge] = []
 
         for ep_uuid in episode_uuids:
-            memories = self._query("memory",
+            memories = self._client._query("memory",
                                     filter_dict={"source_session_id": ep_uuid},
                                     columns=["id", "content"])
 
@@ -1158,11 +1158,11 @@ class Graphiti:
                 continue
 
             # Find memory IDs for this episode, then look up edges by source_node_id
-            mems = self._query("memory", filter_dict={"source_session_id": ep_uuid},
+            mems = self._client._query("memory", filter_dict={"source_session_id": ep_uuid},
                               columns=["id"])
             edge_rows = []
             for mem in mems:
-                edges = self._query("kg_edge", filter_dict={"source_node_id": mem.get("id", "")})
+                edges = self._client._query("kg_edge", filter_dict={"source_node_id": mem.get("id", "")})
                 edge_rows.extend(edges)
 
             for row in edge_rows:
