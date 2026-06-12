@@ -903,8 +903,23 @@ class Client:
         tier: str = "",
         limit: int = 20,
         semantic: bool = True,
+        rerank: bool = False,
+        rerank_endpoint: str | None = None,
+        rerank_model: str | None = None,
+        rerank_api_key: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Search memories.  When *semantic* is True uses hybrid search."""
+        """Search memories.  When *semantic* is True uses hybrid search.
+
+        Args:
+            rerank: If True, passes top results through an LLM reranker
+                    (QMD-style) for relevance re-scoring.
+            rerank_endpoint: OpenAI-compatible base URL for reranker
+                    (default: ``LLM_RERANK_ENDPOINT`` env var).
+            rerank_model: Model name for reranker
+                    (default: ``LLM_RERANK_MODEL`` env var).
+            rerank_api_key: API key for reranker
+                    (default: ``LLM_RERANK_API_KEY`` or ``OPENAI_API_KEY`` env var).
+        """
         if semantic:
             emb = self._embed(query)
             emb_json = json.dumps(emb) if emb else "[]"
@@ -943,6 +958,14 @@ class Client:
                     r["memory_content"] = node_map.get(eid, "")
                 else:
                     r["memory_content"] = ""
+            if rerank:
+                rows = llm_rerank(
+                    query, rows,
+                    endpoint=rerank_endpoint,
+                    model=rerank_model,
+                    api_key=rerank_api_key,
+                    top_k=min(10, limit),
+                )
             return rows[:limit]
 
         # Non-semantic (keyword) fallback
@@ -1010,6 +1033,96 @@ class Client:
             except RuntimeError:
                 pass
         return results
+
+    def fuzzy_get(
+        self,
+        workspace_id: str,
+        name: str,
+        *,
+        field: str = "content",
+        threshold: float = 0.5,
+        limit: int = 50,
+    ) -> dict[str, Any] | None:
+        """Find the closest-matching memory by string similarity (QMD parity).
+
+        Fetches up to *limit* memories from the workspace and uses
+        ``difflib.SequenceMatcher`` to find the one whose *field* value is
+        most similar to *name*.
+
+        Returns the best match if similarity >= *threshold*, otherwise
+        ``None``.
+
+        Args:
+            workspace_id: The workspace to search.
+            name: The target name to fuzzy-match against.
+            field: Which memory field to compare (default ``\"content\"``).
+            threshold: Minimum similarity ratio (0.0–1.0, default 0.5).
+            limit: Max memories to scan (default 50).
+        """
+        from difflib import SequenceMatcher
+
+        rows = self._query(
+            "memory",
+            workspace_id=workspace_id,
+            filter_dict={},
+        )
+        if not rows:
+            return None
+
+        best = None
+        best_ratio = 0.0
+        for r in rows[:limit]:
+            text = r.get(field, "")
+            if not text:
+                continue
+            ratio = SequenceMatcher(None, name.lower(), text.lower()).ratio()  # isjunk=None: treat all chars equally
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best = r
+
+        if best and best_ratio >= threshold:
+            return best
+        return None
+
+    def glob_get(
+        self,
+        workspace_id: str,
+        pattern: str,
+        *,
+        field: str = "id",
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Return all memories matching a glob pattern (QMD parity).
+
+        Uses ``fnmatch``-style wildcards (``*``, ``?``, ``[...]``) against
+        the specified *field*.  Example::
+
+            c.glob_get(\"ws-1\", \"auth-*\")      # IDs starting with \"auth-\"
+            c.glob_get(\"ws-1\", \"auth-*\", field=\"content\")  # content match
+
+        Args:
+            workspace_id: The workspace to search.
+            pattern: Glob pattern (e.g. ``\"journals/2025-05*\"``,
+                     ``\"*auth*\"``).
+            field: Which memory field to match against (default ``\"id\"``).
+            limit: Max memories to scan (default 200).
+
+        Returns:
+            List of matching memory dicts (empty list if none match).
+        """
+        from fnmatch import fnmatch
+
+        rows = self._query(
+            "memory",
+            workspace_id=workspace_id,
+            filter_dict={},
+        )
+        matches = []
+        for r in rows[:limit]:
+            val = r.get(field, "")
+            if isinstance(val, str) and fnmatch(val.lower(), pattern.lower()):
+                matches.append(r)
+        return matches
 
     def update_memory(
         self, memory_id: str, content: str, summary: str = "", confidence: float = 0.8
@@ -1859,4 +1972,124 @@ def _parse_sql_response(raw: str) -> list[dict[str, Any]]:
                 key = col_names[i] if i < len(col_names) else f"col{i}"
                 row_dict[key] = val
             results.append(row_dict)
+    return results
+
+
+# ---------------------------------------------------------------------------
+# LLM Reranking (QMD parity)
+# ---------------------------------------------------------------------------
+
+_RERANK_PROMPT = """You are a search result relevance judge. Given a query and \
+a list of candidate search results, assign each a relevance score from 1-10.
+
+Scoring:
+  10 — perfectly answers the query, exact match
+  7-9 — highly relevant, contains key information
+  4-6 — partially relevant, related concepts
+  1-3 — barely relevant, tangential mention
+
+Query: {query}
+
+Candidates:
+{candidates}
+
+Return ONLY a JSON array in this exact format, no other text:
+[{{"index": 0, "score": 8, "reason": "contains exact match for 'auth'"}}, ...]
+
+JSON:"""
+
+
+def llm_rerank(
+    query: str,
+    results: list[dict[str, Any]],
+    endpoint: str | None = None,
+    model: str | None = None,
+    api_key: str | None = None,
+    top_k: int = 10,
+    timeout: int = 15,
+) -> list[dict[str, Any]]:
+    """Rerank search results using an LLM (QMD-style).
+
+    Sends top *top_k* results to an OpenAI-compatible chat completions
+    endpoint and returns the original result dicts with scores replaced by
+    the LLM's relevance scores and a ``rerank_reason`` field appended.
+
+    Falls back to original results if the LLM call fails.
+
+    Args:
+        query: The original search query.
+        results: Search result dicts (must have ``content`` key).
+        endpoint: OpenAI-compatible base URL (default: env ``LLM_RERANK_ENDPOINT``
+                  or ``http://localhost:4000/v1``).
+        model: Model name (default: env ``LLM_RERANK_MODEL`` or ``gpt-4o-mini``).
+        api_key: API key (default: env ``LLM_RERANK_API_KEY`` or ``OPENAI_API_KEY``).
+        top_k: Number of results to send for reranking (default 10).
+        timeout: HTTP timeout in seconds (default 15).
+    """
+    if not results:
+        return results
+
+    # Resolve config
+    endpoint = endpoint or os.getenv(
+        "LLM_RERANK_ENDPOINT", "http://localhost:4000/v1"
+    )
+    model = model or os.getenv("LLM_RERANK_MODEL", "gpt-4o-mini")
+    api_key = api_key or os.getenv("LLM_RERANK_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+
+    # Build candidate list
+    candidates_text = "\n".join(
+        f"[{i}] {r.get('content', '')[:500]}"
+        for i, r in enumerate(results[:top_k])
+    )
+    prompt = _RERANK_PROMPT.format(query=query, candidates=candidates_text)
+
+    try:
+        resp = httpx.post(
+            f"{endpoint.rstrip('/')}/chat/completions",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "You are a search reranker. Return only JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 1024,
+            },
+            headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"].strip()
+
+        # Strip markdown code fences if present
+        if content.startswith("```"):
+            content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+
+        scores: list[dict] = json.loads(content)
+
+        # Merge LLM scores back into original results
+        score_map: dict[int, tuple[float, str]] = {}
+        for s in scores:
+            idx = int(s["index"])
+            score_map[idx] = (float(s["score"]) / 10.0, s.get("reason", ""))
+
+        for i, r in enumerate(results[:top_k]):
+            if i in score_map:
+                r["score"] = score_map[i][0]
+                r["rerank_reason"] = score_map[i][1]
+            else:
+                r["score"] = r.get("score", 0.0) * 0.5  # penalize unranked
+                r["rerank_reason"] = "not reranked by LLM"
+
+        # Re-sort by new scores
+        results[:top_k] = sorted(
+            results[:top_k],
+            key=lambda r: r.get("score", 0.0),
+            reverse=True,
+        )
+
+    except Exception as exc:
+        logger.warning("LLM rerank failed, returning original results: %s", exc)
+
     return results

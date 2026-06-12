@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect } from 'react';
 import { Route, Switch } from 'wouter';
+import { Toaster } from 'sonner';
 import Layout from '@/components/Layout';
 import { Loader2, Sparkles } from 'lucide-react';
 import { initReactiveDb } from '@/lib/useReactiveDb';
@@ -109,6 +110,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AuthenticatedApp />
+      <Toaster richColors theme="dark" position="bottom-right" />
     </AuthProvider>
   );
 }

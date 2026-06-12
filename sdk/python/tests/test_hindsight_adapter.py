@@ -71,13 +71,26 @@ def token() -> str:
 @pytest.fixture
 def hindsight(stdb_client: Client, stdb_session: dict) -> Hindsight:
     """Hindsight adapter backed by the auto-registered test client."""
-    return Hindsight(
+    h = Hindsight(
         base_url=None,
         stdb_host=stdb_session["host"],
         stdb_port=int(stdb_session["port"]),
         stdb_database=stdb_session["database"],
         api_key=None,
     )
+    # Auto-register for auth
+    import secrets
+    try:
+        h._client._call("register", [f"hs_test_{secrets.token_hex(4)}", "Hindsight Test", "testpass"])
+    except RuntimeError:
+        pass
+    my_id = h._client._whoami()
+    if my_id:
+        try:
+            h._client._call("set_initial_admin", [my_id])
+        except RuntimeError:
+            pass
+    return h
 
 
 def _bid(prefix: str = "hs-test") -> str:
@@ -191,7 +204,20 @@ class TestHindsightCore:
             stdb_host=host,
             stdb_port=port,
             stdb_database=stdb_session["database"],
+            api_key=None,
         ) as h:
+            # Register for auth so retain/recall work
+            import secrets
+            try:
+                h._client._call("register", [f"hs_cm_{secrets.token_hex(4)}", "CM Test", "testpass"])
+            except RuntimeError:
+                pass
+            my_id = h._client._whoami()
+            if my_id:
+                try:
+                    h._client._call("set_initial_admin", [my_id])
+                except RuntimeError:
+                    pass
             result = h.retain(bank_id=bid, content="Context manager test")
             assert result.success is True
 

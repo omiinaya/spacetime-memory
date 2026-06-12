@@ -11,8 +11,25 @@ import React from 'react';
 // Use vi.hoisted() so variable refs survive vitest hoisting.
 // ---------------------------------------------------------------------------
 
+interface MemoryRow {
+  id: string;
+  workspace_id: string;
+  peer_id: string;
+  content: string;
+  summary: string;
+  memory_type: string;
+  tier: string;
+  confidence: number;
+  strength: number;
+  trust_score: number;
+  is_active: boolean;
+  access_count: number;
+  created_at: number;
+  updated_at: number;
+}
+
 const { useTableMock } = vi.hoisted(() => ({
-  useTableMock: vi.fn(() => ({
+  useTableMock: vi.fn<() => { data: MemoryRow[]; loading: boolean; error: string | null }>(() => ({
     data: [],
     loading: false,
     error: null,

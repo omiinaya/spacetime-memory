@@ -42,6 +42,7 @@ export interface SearchResult {
   strategy: string;
   memory_content?: string;
   node_label?: string;
+  context_json?: string;
 }
 
 export interface ClientOptions {

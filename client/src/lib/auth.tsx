@@ -10,6 +10,17 @@ interface AccountRow {
   is_active: boolean;
 }
 
+/** E2E test bypass shape — set by Playwright before page load. */
+interface MockAuth {
+  account: AccountRow;
+}
+
+declare global {
+  interface Window {
+    __MOCK_AUTH__?: MockAuth;
+  }
+}
+
 export type AuthStatus =
   | { type: 'loading' }
   | { type: 'needs_account' }
@@ -35,6 +46,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>({ type: 'loading' });
   const [myIdentity, setMyIdentity] = useState<string>('');
 
+  // E2E test hook — bypass auth when Playwright sets window.__MOCK_AUTH__
+  useEffect(() => {
+    const mock = window.__MOCK_AUTH__;
+    if (mock?.account) {
+      setStatus({ type: 'authenticated', account: mock.account });
+      setMyIdentity(mock.account.id);
+      return;
+    }
+  }, []);
+
   // Extract current identity from connection
   useEffect(() => {
     const conn = getConnection();
@@ -53,6 +74,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Recompute auth status when accounts or identity changes
   useEffect(() => {
+    // E2E mock short-circuit — skip real auth logic when mocked
+    const mock = window.__MOCK_AUTH__;
+    if (mock?.account) {
+      return;
+    }
+
     if (!myIdentity) {
       // Still waiting for identity
       return;

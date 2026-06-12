@@ -67,6 +67,9 @@ test-rust:  ## Run Rust unit tests
 test-frontend:  ## Run frontend vitest tests
 	cd client && npx vitest run
 
+test-e2e:  ## Run Playwright E2E tests
+	cd client && npx playwright test
+
 bench:  ## Run performance benchmark (needs live STDB + embedder)
 	@if [ -z "$$SPACETIMEDB_DB" ]; then \
 		echo "Set SPACETIMEDB_DB=<identity> first"; \

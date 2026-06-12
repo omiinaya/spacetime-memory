@@ -9,6 +9,7 @@ import {
   Sparkles,
   Database,
   AlertCircle,
+  Layers,
 } from 'lucide-react';
 import {
   callReducer,
@@ -24,7 +25,23 @@ interface SearchResult {
   content: string;
   score: number;
   strategy: string;
+  context_json?: string;
   created_at: string | null;
+}
+
+interface ContextTree {
+  workspace_context?: string;
+  memory_context?: string;
+}
+
+function parseContext(json: string): ContextTree | null {
+  try {
+    const parsed = JSON.parse(json);
+    if (!parsed.workspace_context && !parsed.memory_context) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 function ResultSkeleton() {
@@ -165,7 +182,9 @@ export default function Search() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {results.map((r) => (
+              {results.map((r) => {
+                const ctx = r.context_json ? parseContext(r.context_json) : null;
+                return (
                 <div key={r.id} className="rounded-lg border border-border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <Badge variant="outline" className="text-xs shrink-0">
@@ -175,12 +194,31 @@ export default function Search() {
                       {(r.score * 100).toFixed(0)}%
                     </span>
                   </div>
+                  {ctx && (
+                    <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground/70 border-b border-border/50 pb-1.5 mb-1.5">
+                      <Layers className="h-3 w-3 shrink-0" />
+                      {ctx.workspace_context && (
+                        <span className="truncate max-w-[200px]" title={ctx.workspace_context}>
+                          {ctx.workspace_context}
+                        </span>
+                      )}
+                      {ctx.workspace_context && ctx.memory_context && (
+                        <span className="text-muted-foreground/40">›</span>
+                      )}
+                      {ctx.memory_context && (
+                        <span className="truncate max-w-[200px] italic" title={ctx.memory_context}>
+                          {ctx.memory_context}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <p className="text-sm mt-2 line-clamp-3">{r.content}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {r.entity_type} · {r.entity_id.slice(0, 16)}… · {formatMemoryTimestamp(r.created_at)}
                   </p>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
