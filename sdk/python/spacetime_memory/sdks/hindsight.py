@@ -33,6 +33,7 @@ from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field
 
 from ..client import Client
+from ..llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +201,30 @@ class ListMemoryUnitsResponse(BaseModel):
     offset: int
 
 
+class CreateBankResponse(BaseModel):
+    """Response model for create_bank endpoint."""
+    id: str
+    name: str
+    config: dict[str, Any] = Field(default_factory=dict)
+    success: bool = True
+
+
+class CreateMentalModelResponse(BaseModel):
+    """Response model for create_mental_model endpoint."""
+    id: str
+    name: str
+    content: str = ""
+    success: bool = True
+
+
+class CreateDirectiveResponse(BaseModel):
+    """Response model for create_directive endpoint."""
+    id: str
+    name: str
+    content: str = ""
+    success: bool = True
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -286,8 +311,15 @@ class Hindsight:
         self._closed = False
         # bank_id → workspace_id cache
         self._ws_cache: dict[str, str] = {}
+        self._llm: LLMClient | None = None
 
     # -- helpers ---------------------------------------------------------------
+
+    def _get_llm(self) -> LLMClient:
+        """Lazy-init the LLM client."""
+        if self._llm is None:
+            self._llm = LLMClient()
+        return self._llm
 
     def _ensure_bank(self, bank_id: str) -> str:
         """Resolve a bank_id to a SpacetimeDB workspace_id, creating if needed."""
@@ -745,6 +777,288 @@ class Hindsight:
         self._ws_cache.pop(bank_id, None)
 
 
+    # -- create_bank -----------------------------------------------------------
+
+    def create_bank(
+        self,
+        name: str | None = None,
+        description: str | None = None,
+        **config: Any,
+    ) -> CreateBankResponse:
+        """Create a new memory bank (workspace) with optional LLM-generated config.
+
+        Sync wrapper — see ``acreate_bank`` for async implementation.
+        """
+        return _run_async(
+            self.acreate_bank(name=name, description=description, **config)
+        )
+
+    async def acreate_bank(
+        self,
+        name: str | None = None,
+        description: str | None = None,
+        **config: Any,
+    ) -> CreateBankResponse:
+        """Create a new memory bank (workspace) with optional LLM-generated config.
+
+        Args:
+            name: Bank name (required).
+            description: Optional description for LLM context.
+            **config: Additional config (disposition, mission, etc.) merged into result.
+
+        Returns:
+            ``CreateBankResponse`` with id, name, and generated config.
+        """
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+
+        bank_name = name or config.get("name", "default")
+        if not bank_name:
+            bank_name = "default"
+
+        # Check if bank already exists
+        existing = self._client.list_workspaces()
+        for ws in existing:
+            if ws.get("name") == bank_name:
+                ws_id = ws["id"]
+                self._ws_cache[bank_name] = ws_id
+                return CreateBankResponse(
+                    id=ws_id, name=bank_name,
+                    config={**config, "pre_existing": True},
+                    success=True,
+                )
+
+        # Create workspace
+        result = self._client.create_workspace(name=bank_name, description=description or "")
+        ws_id = result.get("id", bank_name) if isinstance(result, dict) else bank_name
+        self._ws_cache[bank_name] = ws_id
+
+        # Generate bank configuration via LLM
+        bank_config: dict[str, Any] = dict(config)
+        try:
+            llm = self._get_llm()
+            if llm.available:
+                prompt = (
+                    f"Generate a configuration for a memory bank named '{bank_name}'.\n"
+                    + (f"Description: {description}\n" if description else "")
+                    + "Return valid JSON with these keys:\n"
+                    "  - disposition: object with skepticism (1-5), literalism (1-5), empathy (1-5)\n"
+                    "  - mission: string describing the bank's purpose\n"
+                    "  - extraction_modes: list of strings (e.g. ['facts', 'entities', 'sentiment'])\n"
+                    "  - background: optional string\n"
+                    "Return ONLY the JSON object, no markdown, no explanation."
+                )
+                response = llm.chat(
+                    [{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                    max_tokens=512,
+                )
+                if response:
+                    try:
+                        gen_config = json.loads(response)
+                        if isinstance(gen_config, dict):
+                            bank_config.update(gen_config)
+                    except (json.JSONDecodeError, TypeError):
+                        bank_config["_llm_raw"] = response
+            else:
+                bank_config.update({
+                    "disposition": {"skepticism": 3, "literalism": 3, "empathy": 3},
+                    "mission": f"Memory bank for {bank_name}",
+                    "extraction_modes": ["facts", "entities"],
+                })
+        except Exception as exc:
+            logger.warning("acreate_bank() LLM config generation failed: %s", exc)
+            bank_config.update({
+                "disposition": {"skepticism": 3, "literalism": 3, "empathy": 3},
+                "mission": f"Memory bank for {bank_name}",
+                "extraction_modes": ["facts", "entities"],
+            })
+
+        return CreateBankResponse(
+            id=ws_id, name=bank_name,
+            config=bank_config,
+            success=True,
+        )
+
+    # -- create_mental_model ---------------------------------------------------
+
+    def create_mental_model(
+        self,
+        bank_id: str,
+        name: str,
+        query: str | None = None,
+        **params: Any,
+    ) -> CreateMentalModelResponse:
+        """Create a mental model synthesized from bank memories.
+
+        Sync wrapper — see ``acreate_mental_model`` for async implementation.
+        """
+        return _run_async(
+            self.acreate_mental_model(
+                bank_id=bank_id, name=name, query=query, **params
+            )
+        )
+
+    async def acreate_mental_model(
+        self,
+        bank_id: str,
+        name: str,
+        query: str | None = None,
+        **params: Any,
+    ) -> CreateMentalModelResponse:
+        """Create a mental model synthesized from bank memories.
+
+        Searches the bank for relevant memories, uses LLM to synthesize
+        a mental model, and stores it as a memory in the workspace.
+
+        Args:
+            bank_id: The bank to search.
+            name: Name for the mental model.
+            query: Query to find relevant memories (defaults to name).
+            **params: Additional parameters passed through.
+
+        Returns:
+            ``CreateMentalModelResponse`` with id, name, and content.
+        """
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+
+        ws_id = self._ensure_bank(bank_id)
+        search_query = query or name
+
+        # Search for relevant memories
+        memories: list[dict[str, Any]] = []
+        try:
+            memories = self._client.search(
+                ws_id, query=search_query, limit=10, semantic=True,
+            )
+        except Exception as exc:
+            logger.warning("acreate_mental_model() search failed: %s", exc)
+
+        # Synthesize mental model via LLM
+        content: str = ""
+        try:
+            llm = self._get_llm()
+            if llm.available and memories:
+                memory_snippets = "\n".join(
+                    f"- {m.get('memory_content', m.get('content', ''))}"
+                    for m in memories[:10]
+                )
+                prompt = (
+                    f"Synthesize a mental model named '{name}' from these memories:\n\n"
+                    f"{memory_snippets or 'No relevant memories found.'}\n\n"
+                    "Create a concise, coherent summary that captures the key "
+                    "patterns, facts, and relationships. This mental model will "
+                    "be used to guide future memory formation and reflection."
+                )
+                response = llm.chat(
+                    [
+                        {"role": "system", "content": "You are a knowledge synthesis assistant. Create concise mental models from memory fragments."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.3,
+                    max_tokens=1024,
+                )
+                content = response or ""
+            elif memories:
+                # Fallback: join memory contents
+                content = " / ".join(
+                    m.get("memory_content", m.get("content", ""))
+                    for m in memories[:5]
+                )
+            # else: no memories, content stays empty
+        except Exception as exc:
+            logger.warning("acreate_mental_model() LLM synthesis failed: %s", exc)
+            if not content and memories:
+                content = " / ".join(
+                    m.get("memory_content", m.get("content", ""))
+                    for m in memories[:5]
+                )
+
+        if not content:
+            content = f"Mental model '{name}' — insufficient data to synthesize."
+
+        # Store as memory
+        model_id = ""
+        try:
+            result = self._client.store(
+                ws_id,
+                content=content,
+                summary=f"Mental model: {name}",
+                memory_type="mental_model",
+            )
+            model_id = result.get("id", _make_op_id()) if isinstance(result, dict) else _make_op_id()
+        except Exception as exc:
+            logger.warning("acreate_mental_model() store failed: %s", exc)
+            model_id = _make_op_id()
+
+        return CreateMentalModelResponse(
+            id=model_id, name=name, content=content, success=True,
+        )
+
+    # -- create_directive ------------------------------------------------------
+
+    def create_directive(
+        self,
+        bank_id: str,
+        name: str,
+        prompt: str,
+        **params: Any,
+    ) -> CreateDirectiveResponse:
+        """Store a directive (system prompt) in a bank.
+
+        Sync wrapper — see ``acreate_directive`` for async implementation.
+        """
+        return _run_async(
+            self.acreate_directive(
+                bank_id=bank_id, name=name, prompt=prompt, **params
+            )
+        )
+
+    async def acreate_directive(
+        self,
+        bank_id: str,
+        name: str,
+        prompt: str,
+        **params: Any,
+    ) -> CreateDirectiveResponse:
+        """Store a directive (system prompt) in a bank.
+
+        Directives are stored as memories with type ``directive`` and are
+        injected into LLM calls during reflection.
+
+        Args:
+            bank_id: The bank to store the directive in.
+            name: Name for the directive.
+            prompt: The directive content/prompt text.
+            **params: Additional parameters passed through.
+
+        Returns:
+            ``CreateDirectiveResponse`` with id, name, and content.
+        """
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+
+        ws_id = self._ensure_bank(bank_id)
+
+        directive_id = ""
+        try:
+            result = self._client.store(
+                ws_id,
+                content=prompt,
+                summary=f"Directive: {name}",
+                memory_type="directive",
+            )
+            directive_id = result.get("id", _make_op_id()) if isinstance(result, dict) else _make_op_id()
+        except Exception as exc:
+            logger.warning("acreate_directive() store failed: %s", exc)
+            directive_id = _make_op_id()
+
+        return CreateDirectiveResponse(
+            id=directive_id, name=name, content=prompt, success=True,
+        )
+
+
 __all__ = [
     "Hindsight",
     "RetainResponse",
@@ -755,6 +1069,9 @@ __all__ = [
     "FileRetainResponse",
     "BankProfileResponse",
     "ListMemoryUnitsResponse",
+    "CreateBankResponse",
+    "CreateMentalModelResponse",
+    "CreateDirectiveResponse",
     "DispositionTraits",
     "TokenUsage",
 ]

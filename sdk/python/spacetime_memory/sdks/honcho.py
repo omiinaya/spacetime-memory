@@ -43,6 +43,7 @@ from typing import Any, Generic, Literal, TypeVar
 from pydantic import BaseModel, Field
 
 from ..client import Client
+from ..llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -386,6 +387,189 @@ class Peer:
             return f"Based on stored context: {mem_text[:200]}"
         return None
 
+    def chat_stream(
+        self,
+        query: str,
+        *,
+        target: Any | None = None,
+        session: Session | str | None = None,
+        reasoning_level: Literal["minimal", "low", "medium", "high", "max"] | None = None,
+    ):
+        """Stream chat responses from peer context.
+
+        Yields response chunks as a generator. Uses the non-streaming
+        ``chat()`` path since the SpacetimeDB backend does not support
+        native streaming.
+
+        Returns:
+            A generator that yields ``str`` chunks.
+        """
+        response = self.chat(
+            query,
+            target=target,
+            session=session,
+            reasoning_level=reasoning_level,
+        )
+
+        def _generator():
+            if response:
+                yield response
+
+        return _generator()
+
+    def get_card(self, target: str | None = None) -> dict:
+        """Generate a peer card using LLM based on peer messages and behavior.
+
+        Args:
+            target: Optional target peer ID for perspective.
+
+        Returns:
+            ``{"summary": "...", "traits": [...]}`` or
+            ``{"summary": "", "traits": []}`` if LLM unavailable.
+        """
+        llm = LLMClient()
+        if not llm.available:
+            return {"summary": "", "traits": []}
+
+        # Gather peer messages
+        try:
+            memories = self._honcho._client.search(
+                self._ws_id, query="", limit=20, semantic=False,
+            )
+        except Exception:
+            memories = []
+
+        mem_text = "\n".join(
+            f"- [{m.get('metadata', {}).get('peer_id', '?')}]: "
+            f"{m.get('memory_content', m.get('content', ''))}"
+            for m in memories[:20]
+        )
+
+        # Gather session info
+        sessions = self.sessions()
+        session_ids = [s.id for s in sessions]
+
+        prompt = (
+            f"Based on the following messages and context about peer {self._id}, "
+            f"generate a brief peer card describing their role, interests, and "
+            f"behavior patterns. Return as JSON with 'summary' and 'traits' fields.\n\n"
+            f"Messages:\n{mem_text or '(none)'}\n\n"
+            f"Sessions: {session_ids or '(none)'}"
+        )
+
+        result = llm.chat(
+            [{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.3,
+            max_tokens=512,
+        )
+        if not result:
+            return {"summary": "", "traits": []}
+
+        try:
+            data = json.loads(result)
+            return {
+                "summary": data.get("summary", ""),
+                "traits": data.get("traits", []),
+            }
+        except (json.JSONDecodeError, TypeError):
+            return {"summary": "", "traits": []}
+
+    def representation(
+        self,
+        session: Session | str | None = None,
+        target: str | None = None,
+        search_query: str | None = None,
+        search_top_k: int | None = None,
+        search_max_distance: float | None = None,
+        include_most_frequent: int | None = None,
+        max_conclusions: int | None = None,
+    ) -> str:
+        """Generate a natural-language representation of this peer.
+
+        Uses LLM to synthesize a description from stored memories. Falls
+        back to a simple memory summary when no LLM is available.
+
+        Returns:
+            A natural-language representation string.
+        """
+        llm = LLMClient()
+
+        try:
+            memories = self._honcho._client.search(
+                self._ws_id,
+                query=search_query or "",
+                limit=search_top_k or 10,
+                semantic=True,
+            )
+        except Exception:
+            memories = []
+
+        mem_text = "\n".join(
+            f"- {m.get('memory_content', m.get('content', ''))}"
+            for m in memories[: (search_top_k or 10)]
+        )
+
+        if not llm.available:
+            if memories:
+                contents = [
+                    m.get("memory_content", m.get("content", ""))
+                    for m in memories[:5]
+                ]
+                return (
+                    f"Peer {self._id}: "
+                    + "; ".join(c[:100] for c in contents if c)
+                )
+            return f"Peer {self._id} (no context available)"
+
+        prompt = (
+            f"Generate a natural language representation describing peer "
+            f"'{self._id}' based on their stored memories and behavior.\n\n"
+            f"Memories:\n{mem_text or '(none)'}"
+        )
+
+        result = llm.chat(
+            [{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=512,
+        )
+        return result or f"Peer {self._id} (representation unavailable)"
+
+    def context(
+        self,
+        target: str | None = None,
+        *,
+        peer_perspective: str | None = None,
+        search_query: str | None = None,
+        search_top_k: int = 10,
+        search_max_distance: float | None = None,
+        include_most_frequent: int | None = None,
+        max_conclusions: int | None = None,
+    ) -> PeerContextResponse:
+        """Combine representation and peer card into a PeerContextResponse.
+
+        Returns:
+            ``PeerContextResponse`` with peer_id, target_id,
+            representation, and peer_card.
+        """
+        rep = self.representation(
+            target=target,
+            search_query=search_query,
+            search_top_k=search_top_k,
+            search_max_distance=search_max_distance,
+            include_most_frequent=include_most_frequent,
+            max_conclusions=max_conclusions,
+        )
+
+        card = self.get_card(target=target)
+
+        return PeerContextResponse(
+            peer_id=self._id,
+            target_id=str(target) if target else "",
+            representation=rep,
+            peer_card=card.get("traits", []),
+        )
+
     def search(
         self,
         query: str,
@@ -525,6 +709,65 @@ class PeerAio:
 
     async def refresh(self) -> None:
         return await asyncio.to_thread(self._peer.refresh)
+
+    async def chat_stream(
+        self,
+        query: str,
+        *,
+        target: Any | None = None,
+        session: Session | str | None = None,
+        reasoning_level: Literal["minimal", "low", "medium", "high", "max"] | None = None,
+    ):
+        return await asyncio.to_thread(
+            self._peer.chat_stream, query,
+            target=target, session=session, reasoning_level=reasoning_level,
+        )
+
+    async def get_card(self, target: str | None = None) -> dict:
+        return await asyncio.to_thread(self._peer.get_card, target=target)
+
+    async def representation(
+        self,
+        session: Session | str | None = None,
+        target: str | None = None,
+        search_query: str | None = None,
+        search_top_k: int | None = None,
+        search_max_distance: float | None = None,
+        include_most_frequent: int | None = None,
+        max_conclusions: int | None = None,
+    ) -> str:
+        return await asyncio.to_thread(
+            self._peer.representation,
+            session=session,
+            target=target,
+            search_query=search_query,
+            search_top_k=search_top_k,
+            search_max_distance=search_max_distance,
+            include_most_frequent=include_most_frequent,
+            max_conclusions=max_conclusions,
+        )
+
+    async def context(
+        self,
+        target: str | None = None,
+        *,
+        peer_perspective: str | None = None,
+        search_query: str | None = None,
+        search_top_k: int = 10,
+        search_max_distance: float | None = None,
+        include_most_frequent: int | None = None,
+        max_conclusions: int | None = None,
+    ) -> PeerContextResponse:
+        return await asyncio.to_thread(
+            self._peer.context,
+            target=target,
+            peer_perspective=peer_perspective,
+            search_query=search_query,
+            search_top_k=search_top_k,
+            search_max_distance=search_max_distance,
+            include_most_frequent=include_most_frequent,
+            max_conclusions=max_conclusions,
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -40,9 +40,17 @@ class LLMClient:
         base_url: str | None = None,
         model: str | None = None,
     ) -> None:
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        self.base_url = (base_url or os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")).rstrip("/")
-        self.model = model or os.environ.get("LLM_MODEL", "gpt-4o-mini")
+        self.api_key = (
+            api_key
+            or os.environ.get("OPENAI_API_KEY", "")
+            or os.environ.get("LITELLM_MASTER_KEY", "")
+        )
+        self.base_url = (
+            base_url
+            or os.environ.get("OPENAI_BASE_URL", "")
+            or "https://api.openai.com/v1"
+        ).rstrip("/")
+        self.model = model or os.environ.get("LLM_MODEL", "un-qwen3.6-plus")
 
     @property
     def available(self) -> bool:

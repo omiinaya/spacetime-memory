@@ -263,6 +263,32 @@ class CommunityEdge:
 
 
 @dataclass
+class SagaNode:
+    """An episode saga — a named, summarised group of episodes.
+
+    Maps to SpacetimeDB ``kg_node`` with ``node_type=\"saga\"``.
+    """
+
+    uuid: str = field(default_factory=lambda: _uuid.uuid4().hex[:32])
+    name: str = ""
+    group_id: str = "default"
+    labels: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    summary: str = ""
+    first_episode_uuid: str | None = None
+    last_episode_uuid: str | None = None
+    last_summarized_at: datetime | None = None
+    last_summarized_episode_valid_at: datetime | None = None
+
+    def model_dump(self, **kwargs) -> dict:
+        return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
+
+    @classmethod
+    def model_validate(cls, data: dict) -> Self:
+        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
+
+
+@dataclass
 class SearchResults:
     """Results from an advanced search (``search_``)."""
 
@@ -902,6 +928,55 @@ class Graphiti:
             edges=edges,
         )
 
+    def add_episode_bulk(
+        self,
+        bulk_episodes: list[RawEpisode],
+        group_id: str | None = None,
+        **kwargs: Any,
+    ) -> AddBulkEpisodeResults:
+        """Add multiple episodes in bulk.
+
+        Processes each episode through :meth:`add_episode`, collecting
+        all extracted nodes and edges into a single result.
+
+        Args:
+            bulk_episodes: List of :class:`RawEpisode` objects to process.
+            group_id: Workspace name override.
+            **kwargs: Forward-compat params (entity_types, edge_types, etc.)
+
+        Returns:
+            :class:`AddBulkEpisodeResults` with all episodes, nodes, and edges.
+        """
+        all_episodes: list[EpisodicNode] = []
+        all_nodes: list[EntityNode] = []
+        all_edges: list[EntityEdge] = []
+        episodic_edges: list[Any] = []
+
+        for raw in bulk_episodes:
+            result = self.add_episode(
+                name=raw.name,
+                episode_body=raw.content,
+                source_description=raw.source_description or raw.source,
+                reference_time=raw.reference_time,
+                source=raw.source,
+                group_id=group_id or getattr(raw, 'group_id', 'default'),
+                uuid=raw.uuid,
+                **kwargs,
+            )
+            if result.episode:
+                all_episodes.append(result.episode)
+            all_nodes.extend(result.nodes)
+            all_edges.extend(result.edges)
+
+        return AddBulkEpisodeResults(
+            episodes=all_episodes,
+            episodic_edges=episodic_edges,
+            nodes=all_nodes,
+            edges=all_edges,
+            communities=[],
+            community_edges=[],
+        )
+
     # -------------------------------------------------------------------
     # Search operations
     # -------------------------------------------------------------------
@@ -1210,8 +1285,8 @@ class Graphiti:
                     ))
             except RuntimeError:
                 pass
-            # Generate LLM summary if one isn't already set
-            if not community.summary:
+            # Generate LLM name and summary if not already set
+            if not community.summary or not community.name or community.name.startswith("community_"):
                 try:
                     llm = LLMClient()
                     if llm.available:
@@ -1238,18 +1313,52 @@ class Graphiti:
                              "fact": r.get("fact", "")}
                             for r in edge_rows
                         ]
-                        summary_text = llm.summarize_community(
-                            community.name or community.uuid[:12],
-                            nodes_for_llm,
-                            edges_for_llm,
+
+                        # Generate name + summary via LLM
+                        entity_names = [n.get("name", "?") for n in nodes_for_llm]
+                        name_prompt = (
+                            f"Based on these entity names: {entity_names}, "
+                            "generate a short community name (2-5 words) and a 1-sentence description "
+                            "of what this community represents. "
+                            'Return JSON: {"name": "...", "summary": "..."}'
                         )
-                        if summary_text:
-                            community.summary = summary_text
+                        name_result = llm.chat(
+                            [
+                                {"role": "system", "content": "You are a concise knowledge graph analyst. Return ONLY valid JSON, no markdown, no explanation."},
+                                {"role": "user", "content": name_prompt},
+                            ],
+                            response_format={"type": "json_object"},
+                            temperature=0.3,
+                        )
+                        if name_result:
+                            try:
+                                parsed = json.loads(name_result)
+                                llm_name = parsed.get("name", "").strip()
+                                llm_summary = parsed.get("summary", "").strip()
+                                if llm_name and (not community.name or community.name.startswith("community_")):
+                                    community.name = llm_name
+                                if llm_summary:
+                                    community.summary = llm_summary
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+
+                        # Fall back to summarize_community if summary still empty
+                        if not community.summary:
+                            summary_text = llm.summarize_community(
+                                community.name or community.uuid[:12],
+                                nodes_for_llm,
+                                edges_for_llm,
+                            )
+                            if summary_text:
+                                community.summary = summary_text
+
+                        # Persist updated name/summary
+                        if community.summary or community.name:
                             try:
                                 self._client._call(
                                     "update_node",
                                     [community.uuid, community.name, "community",
-                                     summary_text, "{}"],
+                                     community.summary, "{}"],
                                 )
                             except RuntimeError:
                                 pass
@@ -1259,6 +1368,150 @@ class Graphiti:
             communities.append(community)
 
         return communities, community_edges
+
+    # -------------------------------------------------------------------
+    # Saga operations
+    # -------------------------------------------------------------------
+
+    def summarize_saga(self, saga_id: str) -> SagaNode:
+        """Generate or update an incremental summary for an episode saga.
+
+        Queries all episodes linked to *saga_id* (via ``source_session_id``),
+        uses the LLM to produce an incremental summary, and persists the
+        result as a :class:`SagaNode` in the knowledge graph
+        (``node_type=\"saga\"``).
+
+        Args:
+            saga_id: The saga / session identifier.  Maps to
+                ``source_session_id`` on the memory table.
+
+        Returns:
+            A :class:`SagaNode` with the current summary and episode range.
+
+        Graceful degradation: returns a SagaNode with minimal metadata
+        when no LLM is available.
+        """
+        now = datetime.now(timezone.utc)
+
+        # Query episodes linked to this saga
+        episodes = self._client._query(
+            "memory",
+            filter_dict={"source_session_id": saga_id},
+            columns=["id", "content", "created_at", "peer_id", "workspace_id"],
+        )
+
+        if not episodes:
+            # No episodes yet — return a stub
+            return SagaNode(
+                uuid=saga_id,
+                name=saga_id[:64],
+                group_id="default",
+                created_at=now,
+                summary="",
+            )
+
+        # Sort by created_at ascending
+        episodes.sort(key=lambda e: e.get("created_at", 0))
+
+        first_ep = episodes[0]
+        last_ep = episodes[-1]
+        group_id = first_ep.get("workspace_id", "default")
+        saga_name = first_ep.get("peer_id", saga_id)[:64] or saga_id[:64]
+
+        first_ep_uuid = first_ep.get("id", "")
+        last_ep_uuid = last_ep.get("id", "")
+
+        # Build episode content for LLM summarization
+        episode_texts = []
+        for ep in episodes:
+            content = ep.get("content", "")
+            ep_id = ep.get("id", "")[:12]
+            if content:
+                episode_texts.append(f"[{ep_id}] {content[:500]}")
+            else:
+                episode_texts.append(f"[{ep_id}] (no content)")
+
+        combined = "\n".join(episode_texts)
+
+        # Try LLM summarization
+        summary = ""
+        last_summarized_at: datetime | None = None
+        try:
+            llm = LLMClient()
+            if llm.available:
+                prompt = (
+                    f"You are summarizing an episode saga with {len(episodes)} episodes. "
+                    "Write a concise 3-5 sentence summary of the key events, entities, "
+                    "and narrative arc across all episodes.\n\n"
+                    f"### Episodes\n{combined}"
+                )
+                result = llm.chat(
+                    [
+                        {"role": "system", "content": "You are a precise summarization assistant. Summarize the following episode log concisely while preserving key facts, entities, and narrative arc."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.3,
+                    max_tokens=512,
+                )
+                if result:
+                    summary = result.strip()
+                    last_summarized_at = now
+        except Exception:
+            logger.warning("summarize_saga() LLM call failed for saga %s", saga_id)
+
+        # Build SagaNode
+        saga = SagaNode(
+            uuid=saga_id,
+            name=saga_name,
+            group_id=group_id,
+            created_at=now,
+            summary=summary,
+            first_episode_uuid=first_ep_uuid,
+            last_episode_uuid=last_ep_uuid,
+            last_summarized_at=last_summarized_at,
+            last_summarized_episode_valid_at=(
+                datetime.fromtimestamp(
+                    last_ep.get("created_at", 0) / 1_000_000, tz=timezone.utc
+                )
+                if last_ep.get("created_at", 0) and last_ep.get("created_at", 0) > 1e12
+                else datetime.fromtimestamp(last_ep.get("created_at", 0), tz=timezone.utc)
+                if last_ep.get("created_at", 0)
+                else now
+            ),
+        )
+
+        # Persist as a kg_node with node_type="saga"
+        ws_id = self._resolve_workspace(group_id)
+        try:
+            self._client.create_node(
+                workspace_id=ws_id,
+                label=saga_name,
+                node_type="saga",
+                summary=summary,
+                metadata_json=json.dumps({
+                    "saga_id": saga_id,
+                    "first_episode_uuid": first_ep_uuid,
+                    "last_episode_uuid": last_ep_uuid,
+                    "episode_count": len(episodes),
+                }),
+            )
+        except RuntimeError:
+            # Node may already exist — try updating
+            try:
+                self._client._call(
+                    "update_node",
+                    [saga_id, saga_name, "saga", summary,
+                     json.dumps({
+                         "saga_id": saga_id,
+                         "first_episode_uuid": first_ep_uuid,
+                         "last_episode_uuid": last_ep_uuid,
+                         "episode_count": len(episodes),
+                     })],
+                )
+            except RuntimeError:
+                pass
+
+        return saga
 
     # -------------------------------------------------------------------
     # Episode removal
