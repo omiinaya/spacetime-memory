@@ -42,14 +42,23 @@ pub fn uuid_v4(ctx: &spacetimedb::ReducerContext) -> String {
     let high = (ts as u64 ^ r1) as u64;
     let low = r2;
     let ts_part = format!("{:016x}", high);
-    let rand_part = format!("{:016x}", low);
+    let mut rand_hex = format!("{:016x}", low);
+
+    // RFC 4122 v4 UUID compliance — set version and variant bits
+    // Version 4: 13th hex digit → '4'
+    rand_hex.replace_range(0..1, "4");
+    // Variant 10xx: 17th hex digit → 8,9,a, or b
+    let var = ((high >> 60) & 0x3) as u8;
+    let vc = match var { 0 => '8', 1 => '9', 2 => 'a', _ => 'b' };
+    rand_hex.replace_range(4..5, &vc.to_string());
+
     format!(
         "{}-{}-{}-{}-{}",
         &ts_part[..8],
         &ts_part[8..12],
-        &rand_part[..4],
-        &rand_part[4..8],
-        &rand_part[8..]
+        &rand_hex[..4],
+        &rand_hex[4..8],
+        &rand_hex[8..]
     )
 }
 

@@ -44,9 +44,8 @@ graph traversal, consolidation) still use unbounded `.iter()` — acceptable for
 
 With >100K rows, some reducers will still be slow but won't OOM.
 
-**2. Custom UUID isn't RFC-compliant**
-`uuid_v4()` in lib.rs generates unique IDs but doesn't set the RFC 4122 version/variant bits.
-Fine for internal use but these IDs won't be recognized as UUIDv4 by external systems.
+**2. UUID now RFC 4122 v4 compliant ✅**
+Version (4) and variant (10xx) bits set. Will be recognized as UUIDv4 by external systems.
 
 **3. JSON manipulation via string concatenation**
 `entity_linking.rs:65`, `profile.rs:77`, `profile.rs:120` build JSON arrays using
