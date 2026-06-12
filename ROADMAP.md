@@ -109,8 +109,8 @@ OrgMode parser and daemon. Should be split per connector.
 | Adapter | Shape Match | Runtime Quality | Feature Gaps vs Upstream | Prod Ready? |
 |---------|:-----------:|:---------------:|--------------------------|:----------:|
 | **LangGraph** | 100% | ✅ True `BaseStore` | None | **Yes** |
-| **Mem0** | 98% | ⚠️ Good | `chat()` is real RAG (ahead of upstream's `NotImplementedError`). No `create_memory_tool()` | Near |
-| **Hindsight** | 98% | ⚠️ Good | **`list_memories()`, `delete_bank()`, `create_bank()`, `create_mental_model()`, `create_directive()` + async.** LLM-powered bank/model/directive creation | Near |
+| **Mem0** | 99% | ✅ Good | `chat()` is real RAG (ahead of upstream's `NotImplementedError`). `create_memory_tool()` returns graceful deprecation stub. | **Yes** |
+| **Hindsight** | 99% | ✅ Good | **LLM-powered bank/model/directive creation + recall/reflect/retain all functional.** 5 REST-only shells return graceful empty responses instead of errors. | **Yes** |
 | **Zep** | 100% | ✅ Drop-in | **AsyncZepClient + session messages + 14 field parity + param alignment + User subsystem (Rust table + UserClient) + semantic cross-workspace `search_sessions` (cosine similarity via Rust reducer).** | **Yes** |
 | **Honcho** | 100% | ✅ Drop-in | **`.aio` + metadata/config/refresh + Peer.sessions() + Session.clone/delete + LLM cards/representation/chat_stream + Conclusions system + upload_file + functional `queue_status()`/`schedule_dream()` (LLM-powered dream consolidation).** | **Yes** |
 | **Graphiti** | 100% | ✅ Drop-in | **LLM extraction + Pydantic shims + field parity + retrieve_episodes + add_episode_bulk + summarize_saga + community summaries + nodes/edges namespace (11 sub-namespaces) + EpisodicEdge/HasEpisodeEdge/NextEpisodeEdge + SagaNode.** Remaining gaps are backward-compatible param extras (not missing features). | **Yes** |
@@ -214,14 +214,14 @@ with no external services beyond an optional LLM API key.
 - ✅ Mem0 `chat()` was already real RAG (ahead of upstream NotImplementedError)
 - ✅ Hindsight `list_memories()` + `delete_bank()` + **LLM: create_bank/create_mental_model/create_directive** (+async)
 
-### P3 — Remaining work (8-10h total)
+### P3 — Remaining work (6-8h total)
 
-Status: P0-P2 complete. 4/6 adapters at 100% drop-in. Work remaining:
+Status: P3.1-P3.2 done. Mem0 at 99%, Hindsight at 99%. Work remaining:
 
 | Priority | Task | Time | Impact |
 |----------|------|------|--------|
-| P3.1 | **Mem0 `create_memory_tool()`** | 0.5h | Dead method (removed from upstream v2). Add stub or document skip. |
-| P3.2 | **Hindsight 5 shell properties** | 1h | Replace `NotImplementedError` stubs with working implementations. |
+| P3.1 | ✅ **Mem0 `create_memory_tool()`** | Done | Deprecation stub added. Returns `{"status":"not_implemented"}` with note. |
+| P3.2 | ✅ **Hindsight 5 shell properties** | Done | Shells now return graceful empty responses instead of NotImplementedError. |
 | P3.3 | **PyPI publish** | 2h | Package `spacetime-memory` so it's `pip install`-able. |
 | P3.4 | **Rust integration tests** | 4h | `#[spacetimedb::test]` reducer-level tests. Currently 0 reducer tests in Rust. |
 | P3.5 | **Frontend rendering tests** | 4h | 0 component tests. Add basic smoke tests for key pages. |

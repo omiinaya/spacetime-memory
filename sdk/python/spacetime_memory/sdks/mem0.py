@@ -1126,3 +1126,30 @@ class Memory:
             "context": context_texts,
             "memories": search_results.get("results", []),
         }
+
+    def create_memory_tool(
+        self,
+        *,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a memory tool for agent frameworks.
+
+        .. deprecated:: 2.0
+            This method was removed from upstream Mem0 v2.0.  It existed
+            in v1.x as a way to generate a tool definition for agent
+            frameworks (LangChain, CrewAI, etc.).  The SpacetimeDB adapter
+            does not implement it — use :meth:`chat` for RAG-augmented
+            responses or :meth:`search` + :meth:`add` for manual memory
+            management.
+
+        Returns:
+            A dict with ``\"status\": \"not_implemented\"`` and a
+            deprecation note.
+        """
+        return {
+            "status": "not_implemented",
+            "note": "create_memory_tool was removed from Mem0 v2.0. "
+                    "Use chat() for RAG or search()+add() directly.",
+        }

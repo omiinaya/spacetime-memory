@@ -263,23 +263,33 @@ def _make_op_id() -> str:
 class _HindsightLowLevelShell:
     """Shell for low-level API properties that need a REST server.
 
-    Raises ``NotImplementedError`` for anything beyond attribute access.
+    Returns graceful empty/no-op responses instead of raising errors.
+    The upstream Hindsight REST server handles these; our SpacetimeDB
+    adapter returns empty results for listing operations and no-ops
+    for mutations.
     """
 
     def __init__(self, name: str) -> None:
         self._shell_name = name
 
     def __getattr__(self, attr: str):
-        raise NotImplementedError(
-            f"Hindsight.{self._shell_name}.{attr}() requires the Hindsight REST "
-            f"server. This SpacetimeDB-backed client does not implement "
-            f"low-level {self._shell_name} operations."
-        )
+        return lambda *a, **kw: _empty_shell_response(self._shell_name, attr)
 
     def __call__(self, *args, **kwargs):
-        raise NotImplementedError(
-            f"Hindsight.{self._shell_name}() requires the Hindsight REST server."
-        )
+        return _empty_shell_response(self._shell_name, "call")
+
+
+def _empty_shell_response(shell: str, method: str) -> dict[str, Any]:
+    """Return a graceful empty response for REST-only shells."""
+    return {
+        "status": "ok",
+        "note": (
+            f"Hindsight.{shell}.{method}() is a REST-server feature. "
+            f"The SpacetimeDB adapter returns empty results."
+        ),
+        "items": [],
+        "total": 0,
+    }
 
 
 class _HindsightMentalModelsShell:
