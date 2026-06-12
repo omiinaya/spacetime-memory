@@ -635,4 +635,35 @@ mod tests {
         let s = derive_salt("", 0);
         assert_eq!(s.len(), 32);
     }
+
+    #[test]
+    fn test_pbkdf2_benchmark_iterations() {
+        use std::time::Instant;
+        use pbkdf2::pbkdf2_hmac;
+        use sha2::Sha256;
+
+        let password = b"test-password-123";
+        let salt = b"test-salt-16bytes";
+        let mut output = vec![0u8; 32];
+
+        // 100K (current)
+        let start = Instant::now();
+        pbkdf2_hmac::<Sha256>(password, salt, 100_000, &mut output);
+        let t_100k = start.elapsed();
+
+        // 600K (OWASP 2026 recommended)
+        let start = Instant::now();
+        pbkdf2_hmac::<Sha256>(password, salt, 600_000, &mut output);
+        let t_600k = start.elapsed();
+
+        let ratio = t_600k.as_micros() as f64 / t_100k.as_micros().max(1) as f64;
+        println!("\nPBKDF2 benchmark:");
+        println!("  100K iterations: {:?}", t_100k);
+        println!("  600K iterations: {:?}", t_600k);
+        println!("  Ratio: {:.1}x", ratio);
+        println!("  Host target: x86_64 (WASM will be slower)");
+
+        // Just verify both produce output
+        assert_eq!(output.len(), 32);
+    }
 }

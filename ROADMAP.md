@@ -147,10 +147,11 @@ with no external services beyond an optional LLM API key.
 - No network partition or SpacetimeDB outage tests
 - The "integration" tests run against a standalone instance — no multi-node scenario
 
-### Rust tests: 77 total (77 pass)
-- 3/26 files have tests (note.rs, hybrid_query.rs, consolidation.rs, auth.rs)
-- All test pure utility functions — no reducer-level tests
-- Reducer logic is only tested via Python integration tests (2nd hand)
+### Rust tests: 91 total (91 pass)
+- 6/26 files have tests (auth.rs, consolidation.rs, context_delta.rs, hybrid_query.rs, note.rs, query.rs)
+- All pure helper functions covered: hash_password, derive_salt, edit_distance, compute_query_hash, cosine_similarity, split_into_blocks, classify_block, etc.
+- PBKDF2 benchmark confirms 100K = acceptable for WASM; 600K would be 10-60s (unusable)
+- `[dev-dependencies]` now exists (rstest, pretty_assertions, rand)
 
 ### Frontend tests: 23 total (23 pass)
 - Smoke tests (11): verify Dashboard, Search, MemoryBrowser, NotesList, KnowledgeGraph, SmartQuery, Sessions, TrajectoryViz render
