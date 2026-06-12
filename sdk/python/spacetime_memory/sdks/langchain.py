@@ -649,7 +649,7 @@ class StmemStore(BaseStore):
         results: list[Any] = []
         for op in ops:
             if isinstance(op, GetOp):
-                results.append(self.get(op.namespace, op.key, refresh_ttl=op.refresh_ttl))
+                results.append(self.get(op.namespace, op.key, refresh_ttl=getattr(op, 'refresh_ttl', None)))
             elif isinstance(op, PutOp):
                 if op.value is None:
                     self.delete(op.namespace, op.key)
