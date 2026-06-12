@@ -273,10 +273,10 @@ class Graphiti:
     * Our adapter is **synchronous** (Graphiti uses ``asyncio``).  All
       ``async def`` methods in the real API are ``def`` here.
     * The real Graphiti uses an **LLM** to extract entities and edges
-      from raw text (``add_episode``).  This adapter does NOT include
-      an LLM — you must provide pre-extracted nodes and edges via
-      ``add_triplet``, or use ``add_episode`` which stores the content
-      as a memory (without automatic entity extraction).
+      from raw text (``add_episode``).  This adapter includes optional
+      LLM-powered extraction via ``LLMClient`` — it degrades gracefully
+      (stores the episode without extracting entities) when no API key
+      is configured.
     * ``group_id`` maps to a SpacetimeDB workspace **name**.  The
       adapter resolves group_id strings to actual workspace UUIDs via
       the ``_resolve_workspace`` cache.
@@ -457,6 +457,78 @@ class Graphiti:
     # Triplet operations (primary API for direct KG manipulation)
     # -------------------------------------------------------------------
 
+    def _get_or_create_node(
+        self,
+        node: EntityNode,
+        workspace_uuid: str,
+        *,
+        create: bool = True,
+    ) -> tuple[str, float] | None:
+        """Get or create a node by label within a workspace.
+
+        Returns (DB-assigned UUID, dedup_score) where dedup_score is:
+          1.0  = exact match
+          0.95 = case-insensitive match
+          >0.85 .. <1.0 = fuzzy difflib match
+          0.0  = new node created
+
+        If *create* is False, returns ``(uuid, score)`` for existing
+        matching nodes or ``None`` when no match is found.
+        """
+        all_nodes = self._client._query(
+            "kg_node", workspace_id=workspace_uuid, columns=["id", "label"]
+        )
+
+        # Pass 1: exact match
+        for n in all_nodes:
+            if n.get("label") == node.name:
+                return n["id"], 1.0
+
+        name_lower = node.name.lower()
+
+        # Pass 2: case-insensitive matching
+        for n in all_nodes:
+            if n.get("label", "").lower() == name_lower:
+                return n["id"], 0.95
+
+        # Pass 3: fuzzy matching via difflib.SequenceMatcher
+        fuzzy_matches: list[tuple[dict[str, Any], float]] = []
+        for n in all_nodes:
+            label = n.get("label", "")
+            ratio = difflib.SequenceMatcher(
+                None, name_lower, label.lower()
+            ).ratio()
+            if ratio > 0.85:
+                fuzzy_matches.append((n, ratio))
+
+        if fuzzy_matches:
+            fuzzy_matches.sort(key=lambda x: x[1], reverse=True)
+            best_node, best_ratio = fuzzy_matches[0]
+            return best_node["id"], best_ratio
+
+        if not create:
+            return None
+
+        # Node doesn't exist — create it
+        try:
+            self._client.create_node(
+                workspace_id=workspace_uuid,
+                label=node.name,
+                node_type="entity",
+                summary=node.summary,
+                metadata_json=json.dumps(node.attributes),
+            )
+        except RuntimeError:
+            pass
+        # Re-query to get the new node's UUID
+        all_nodes = self._client._query(
+            "kg_node", workspace_id=workspace_uuid, columns=["id", "label"]
+        )
+        for n in all_nodes:
+            if n.get("label") == node.name:
+                return n["id"], 0.0
+        return node.uuid, 0.0  # fallback
+
     def add_triplet(
         self,
         source_node: EntityNode,
@@ -482,67 +554,12 @@ class Graphiti:
         gid = group_id or source_node.group_id or edge.group_id or target_node.group_id
         ws_id = self._resolve_workspace(gid)
 
-        # Helper: get or create a node by label within a workspace.
-        # Returns (DB-assigned UUID, dedup_score) where dedup_score is:
-        #   1.0  = exact match
-        #   0.95 = case-insensitive match
-        #   >0.85 .. <1.0 = fuzzy difflib match
-        #   0.0  = new node created
-        def _get_or_create_node(
-            node: EntityNode, workspace_uuid: str
-        ) -> tuple[str, float]:
-            all_nodes = self._client._query("kg_node", workspace_id=workspace_uuid,
-                                    columns=["id", "label"])
-
-            # Pass 1: exact match (current behavior)
-            for n in all_nodes:
-                if n.get("label") == node.name:
-                    return n["id"], 1.0
-
-            name_lower = node.name.lower()
-
-            # Pass 2: case-insensitive matching
-            for n in all_nodes:
-                if n.get("label", "").lower() == name_lower:
-                    return n["id"], 0.95
-
-            # Pass 3: fuzzy matching via difflib.SequenceMatcher
-            fuzzy_matches: list[tuple[dict[str, Any], float]] = []
-            for n in all_nodes:
-                label = n.get("label", "")
-                ratio = difflib.SequenceMatcher(
-                    None, name_lower, label.lower()
-                ).ratio()
-                if ratio > 0.85:
-                    fuzzy_matches.append((n, ratio))
-
-            if fuzzy_matches:
-                # Prefer the closest match
-                fuzzy_matches.sort(key=lambda x: x[1], reverse=True)
-                best_node, best_ratio = fuzzy_matches[0]
-                return best_node["id"], best_ratio
-
-            # Node doesn't exist — create it
-            try:
-                self._client.create_node(
-                    workspace_id=workspace_uuid,
-                    label=node.name,
-                    node_type="entity",
-                    summary=node.summary,
-                    metadata_json=json.dumps(node.attributes),
-                )
-            except RuntimeError:
-                pass
-            # Re-query to get the new node's UUID
-            all_nodes = self._client._query("kg_node", workspace_id=workspace_uuid,
-                                    columns=["id", "label"])
-            for n in all_nodes:
-                if n.get("label") == node.name:
-                    return n["id"], 0.0
-            return node.uuid, 0.0  # fallback
-
-        actual_source_id, source_dedup_score = _get_or_create_node(source_node, ws_id)
-        actual_target_id, target_dedup_score = _get_or_create_node(target_node, ws_id)
+        actual_source_id, source_dedup_score = self._get_or_create_node(
+            source_node, ws_id
+        )
+        actual_target_id, target_dedup_score = self._get_or_create_node(
+            target_node, ws_id
+        )
 
         # Create the edge
         try:
@@ -619,6 +636,59 @@ class Graphiti:
     # Episode operations
     # -------------------------------------------------------------------
 
+    def _extract_entities_from_text(self, text: str) -> dict[str, Any] | None:
+        """Extract entities and relationships from text using LLM.
+
+        Uses the shared ``LLMClient`` to call an LLM; degrades
+        gracefully when no API key is configured.
+
+        Returns:
+            Dict with ``entities`` and ``edges`` lists, or ``None`` on
+            failure or when LLM is unavailable.
+        """
+        llm = LLMClient()
+        if not llm.available:
+            return None
+
+        prompt = (
+            "Extract entities and relationships from the following text. "
+            "Return a JSON object with two arrays: 'entities' (each with "
+            "'name' and 'entity_type' fields) and 'edges' (each with "
+            "'source', 'target', and 'relation' fields). Source and target "
+            "in edges must match entity names. Only include clear, "
+            "explicitly mentioned entities and relationships.\n\n"
+            f"Text: {text}"
+        )
+
+        result = llm.chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a precise knowledge-graph entity extractor. "
+                        "Return ONLY valid JSON, no markdown, no explanation."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+
+        if not result:
+            return None
+
+        try:
+            data = json.loads(result)
+            if not isinstance(data, dict):
+                return None
+            if "entities" not in data or "edges" not in data:
+                return None
+            return data
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("add_episode: LLM returned invalid JSON; skipping extraction")
+            return None
+
     def add_episode(
         self,
         name: str,
@@ -630,13 +700,12 @@ class Graphiti:
         uuid: str | None = None,
         **kwargs: Any,
     ) -> AddEpisodeResults:
-        """Store an episode (text content) as a memory in the workspace.
+        """Store an episode (text content) and extract entities/edges via LLM.
 
-        **Important:** The real Graphiti uses an LLM to automatically
-        extract entities and edges from the episode body.  This adapter
-        does NOT include an LLM — it stores the episode as a memory
-        record and returns it.  Use ``add_triplet`` to manually add
-        extracted nodes and edges.
+        Stores the episode as a memory record and attempts to extract
+        entities and relationships from the episode body using the
+        configured LLM.  Extraction degrades gracefully when no LLM is
+        configured.
 
         Args:
             name: Episode name.
@@ -650,9 +719,11 @@ class Graphiti:
                 compatibility, ignored).
 
         Returns:
-            :class:`AddEpisodeResults` with the stored episode.
+            :class:`AddEpisodeResults` with the stored episode and any
+            extracted nodes and edges.
         """
         ws_id = self._resolve_workspace(group_id or "default")
+        gid = group_id or "default"
         ts = reference_time or datetime.now(timezone.utc)
         episode_uuid = uuid or _uuid.uuid4().hex[:32]
 
@@ -675,11 +746,97 @@ class Graphiti:
             content=episode_body,
             source=source,
             source_description=source_description,
-            group_id=group_id or "default",
+            group_id=gid,
             valid_at=ts,
         )
 
-        return AddEpisodeResults(episode=episode)
+        # Attempt LLM-powered entity / relationship extraction
+        nodes: list[EntityNode] = []
+        edges: list[EntityEdge] = []
+
+        extracted = self._extract_entities_from_text(episode_body)
+        if extracted is None:
+            return AddEpisodeResults(episode=episode, nodes=nodes, edges=edges)
+
+        # Map entity names to (node_uuid, EntityNode) pairs
+        entity_map: dict[str, tuple[str, EntityNode]] = {}
+        for entity in extracted.get("entities", []) or []:
+            ent_name = entity.get("name", "")
+            if not ent_name:
+                continue
+            ent_type: str = entity.get("entity_type", "entity")
+            ent_node = EntityNode(
+                name=ent_name,
+                group_id=gid,
+                labels=[ent_type] if ent_type else [],
+            )
+            result = self._get_or_create_node(ent_node, ws_id, create=True)
+            if result is None:
+                continue
+            node_uuid, dedup_score = result
+            ent_node.uuid = node_uuid
+            ent_node.attributes["_dedup_score"] = dedup_score
+            entity_map[ent_name] = (node_uuid, ent_node)
+            nodes.append(ent_node)
+
+        # Create edges from extracted relationships
+        for edge_data in extracted.get("edges", []) or []:
+            source_name: str = edge_data.get("source", "")
+            target_name: str = edge_data.get("target", "")
+            relation: str = edge_data.get("relation", "related_to")
+
+            if not source_name or not target_name:
+                continue
+
+            src_entry = entity_map.get(source_name)
+            tgt_entry = entity_map.get(target_name)
+            if src_entry is None or tgt_entry is None:
+                continue
+
+            src_uuid, _ = src_entry
+            tgt_uuid, _ = tgt_entry
+
+            try:
+                self._client.create_edge(
+                    workspace_id=ws_id,
+                    source_node_id=src_uuid,
+                    target_node_id=tgt_uuid,
+                    relation=relation,
+                    weight=1.0,
+                    metadata_json=json.dumps({"fact": f"{source_name} {relation} {target_name}"}),
+                )
+            except RuntimeError:
+                continue
+
+            # Query the edge to get its DB-assigned UUID
+            edge_id = _uuid.uuid4().hex[:32]  # fallback
+            e_rows = self._client._query(
+                "kg_edge",
+                workspace_id=ws_id,
+                filter_dict={
+                    "source_node_id": src_uuid,
+                    "target_node_id": tgt_uuid,
+                    "relation": relation,
+                },
+                columns=["id"],
+            )
+            if e_rows:
+                edge_id = e_rows[0].get("id", edge_id)
+
+            edges.append(EntityEdge(
+                uuid=edge_id,
+                name=relation,
+                fact=f"{source_name} {relation} {target_name}",
+                source_node_uuid=src_uuid,
+                target_node_uuid=tgt_uuid,
+                group_id=gid,
+            ))
+
+        return AddEpisodeResults(
+            episode=episode,
+            nodes=nodes,
+            edges=edges,
+        )
 
     # -------------------------------------------------------------------
     # Search operations

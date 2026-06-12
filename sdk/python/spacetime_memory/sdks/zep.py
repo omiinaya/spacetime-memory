@@ -60,6 +60,7 @@ Usage::
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -897,3 +898,196 @@ class ZepClient:
             text,
             instruction="Summarize this conversation, highlighting key topics, decisions, and action items.",
         )
+
+
+# ---------------------------------------------------------------------------
+# AsyncZepClient — async mirror of ZepClient
+# ---------------------------------------------------------------------------
+
+
+class AsyncZepClient:
+    """Async wrapper around ``ZepClient`` for use in asyncio applications.
+
+    Mirrors the full ``ZepClient`` API with async methods. Each method
+    delegates to the synchronous ``ZepClient`` via ``asyncio.to_thread()``
+    to avoid blocking the event loop.
+
+    Usage::
+
+        from spacetime_memory.sdks.zep import AsyncZepClient
+
+        client = AsyncZepClient(host="localhost", port=3001)
+
+        async with client:
+            result = await client.add_memory(
+                session_id="my-session",
+                messages=[{"role": "user", "content": "Hello"}],
+            )
+            memory = await client.get_memory(session_id="my-session")
+    """
+
+    def __init__(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        config: dict[str, Any] | None = None,
+        token: str | None = None,
+    ) -> None:
+        self._sync = ZepClient(
+            host=host,
+            port=port,
+            config=config,
+            token=token,
+        )
+
+    # ------------------------------------------------------------------
+    # Async Memory API
+    # ------------------------------------------------------------------
+
+    async def add_memory(
+        self,
+        session_id: str,
+        messages: list[dict[str, Any]] | list[MemoryMessage],
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._sync.add_memory, session_id, messages, metadata=metadata
+        )
+
+    async def get_memory(
+        self,
+        session_id: str,
+        limit: int = 10,
+        min_rating: float = 0.0,
+    ) -> dict[str, Any] | None:
+        return await asyncio.to_thread(
+            self._sync.get_memory, session_id, limit=limit, min_rating=min_rating
+        )
+
+    async def delete_memory(self, session_id: str) -> dict[str, Any]:
+        return await asyncio.to_thread(self._sync.delete_memory, session_id)
+
+    async def search_memory(
+        self,
+        session_id: str,
+        query: str,
+        limit: int = 10,
+        score_threshold: float = 0.0,
+        min_score: float | None = None,
+    ) -> list[MemorySearchResult]:
+        return await asyncio.to_thread(
+            self._sync.search_memory,
+            session_id,
+            query,
+            limit=limit,
+            score_threshold=score_threshold,
+            min_score=min_score,
+        )
+
+    # ------------------------------------------------------------------
+    # Async Facts API
+    # ------------------------------------------------------------------
+
+    async def add_fact(
+        self,
+        session_id: str,
+        fact: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._sync.add_fact, session_id, fact, metadata=metadata
+        )
+
+    async def list_facts(
+        self,
+        session_id: str,
+        limit: int = 100,
+    ) -> list[Fact]:
+        return await asyncio.to_thread(
+            self._sync.list_facts, session_id, limit=limit
+        )
+
+    async def delete_fact(
+        self, session_id: str, fact_id: str
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._sync.delete_fact, session_id, fact_id
+        )
+
+    # ------------------------------------------------------------------
+    # Async Memory Update
+    # ------------------------------------------------------------------
+
+    async def update_memory(
+        self,
+        session_id: str,
+        memory_id: str,
+        messages: list[dict[str, Any]] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._sync.update_memory,
+            session_id,
+            memory_id,
+            messages=messages,
+            metadata=metadata,
+        )
+
+    # ------------------------------------------------------------------
+    # Async Session management
+    # ------------------------------------------------------------------
+
+    async def list_sessions(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Session]:
+        return await asyncio.to_thread(
+            self._sync.list_sessions, limit=limit, offset=offset
+        )
+
+    async def get_session(self, session_id: str) -> Session | None:
+        return await asyncio.to_thread(self._sync.get_session, session_id)
+
+    async def add_session(
+        self,
+        session_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> Session:
+        return await asyncio.to_thread(
+            self._sync.add_session, session_id, metadata=metadata
+        )
+
+    async def update_session(
+        self,
+        session_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> Session:
+        return await asyncio.to_thread(
+            self._sync.update_session, session_id, metadata=metadata
+        )
+
+    async def search_sessions(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> list[Session]:
+        return await asyncio.to_thread(
+            self._sync.search_sessions, query, limit=limit
+        )
+
+    async def close(self) -> None:
+        return await asyncio.to_thread(self._sync.close)
+
+    async def summarize_memory(self, session_id: str) -> str | None:
+        return await asyncio.to_thread(self._sync.summarize_memory, session_id)
+
+    # ------------------------------------------------------------------
+    # Async context manager
+    # ------------------------------------------------------------------
+
+    async def __aenter__(self) -> "AsyncZepClient":
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        await self.close()

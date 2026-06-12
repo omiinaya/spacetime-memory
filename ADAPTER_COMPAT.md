@@ -68,7 +68,7 @@ Adapter: `spacetime_memory.sdks.mem0.Memory` (1119 lines, 16 public methods)
 | `from_config(config_dict)` | ✅ | Classmethod |
 | `close()` | ✅ | No-op |
 | `.graph.add/search/get_all/delete` | ✅ | Entity persistence via `kg_node` table |
-| `chat()` | ✅ | RAG + LLM pipeline |
+| `chat()` | ✅ | Real RAG: stores query, retrieves memories, augments LLM response (upstream Mem0 v2.0.4 raises `NotImplementedError`) |
 | `create_memory_tool()` | ❌ | Removed from Mem0 v2 API |
 
 **Runtime notes:**
@@ -109,11 +109,11 @@ Adapter: `spacetime_memory.sdks.zep.ZepClient` (892 lines, 15 public methods)
 
 **Runtime notes:**
 - Typed exceptions: `NotFoundError`, `BadRequestError`, `ApiError` (from imported `zep_python` or local fallback)
-- Missing: async support (upstream Zep has async endpoints)
+- **AsyncZepClient added** — 15 async methods wrapping sync calls via `asyncio.to_thread()`, async context manager support
 - `search_sessions()` results are limited — SpacetimeDB doesn't have a cross-workspace search index
 - Error paths: `NotFoundError` raised for missing sessions, `RuntimeError` for DB failures
 
-**Coverage: ~90%**
+**Coverage: ~95%**
 
 ---
 
@@ -147,11 +147,13 @@ Adapter: `spacetime_memory.sdks.graphiti.Graphiti` (1190 lines, 17 public method
 - `EntityNode` and `EntityEdge` are dataclasses, not Pydantic models (upstream uses Pydantic)
 - All upstream fields present: `EntityNode` 8/8, `EntityEdge` 14/14 (plus extras: `version`, `edge_group_id`)
 - Constructor params differ upstream (`uri`, `password`, `graph_driver` → Neo4j) vs ours (`host`, `port`, `database` → SpacetimeDB) — unavoidable
+- **LLM entity extraction in `add_episode`** — uses LLMClient to extract entities and edges from text; graceful degradation without API key
+- `_get_or_create_node` extracted as proper method with 3-pass dedup (exact → case-insensitive → fuzzy difflib)
 - `group_id` is keyword-only in `add_triplet` (extra vs upstream)
 - `search()` accepts `**kwargs` for forward compat
 - Error paths: warnings logged, empty results on failure
 
-**Coverage: ~85%** (shape match). Runtime quality: best of the rewritten adapters.
+**Coverage: ~92%** (shape match). Runtime quality: LLM extraction added, rest solid.
 
 ---
 
@@ -221,10 +223,10 @@ Adapter: `spacetime_memory.sdks.honcho.Honcho` (833 lines, 21 public methods)
 - `Peer.sessions()` returns empty — SpacetimeDB has no direct peer→session index
 - Error swallowing was fixed in v1.14.0 (prev: 5 sites returned `None`/`[]` silently, now logged)
 - `Session.add_messages()` skips items that fail to store (logged), continues with rest
-- No `.aio` async accessor (upstream has this — planned)
+- **`.aio` accessor added** — HonchoAio, PeerAio, SessionAio wrapping sync calls via `asyncio.to_thread()`
 - The real `honcho` is not on PyPI (the PyPI `honcho` is a Procfile manager)
 
-**Coverage: ~85%** (shape match). Runtime: improved in v1.14.0.
+**Coverage: ~95%** (shape match). **`.aio` accessor added** (HonchoAio, PeerAio, SessionAio — 23 async methods).
 
 ---
 
@@ -235,10 +237,10 @@ Adapter: `spacetime_memory.sdks.honcho.Honcho` (833 lines, 21 public methods)
 | **LangGraph** | 778 | 16 | **100%** | ✅ True inheritance | **Yes** |
 | **Mem0** | 1119 | 17 | **98%** | ⚠️ Good — warnings on errors | **No** |
 | **Hindsight** | 670 | 13 | **95%** | ⚠️ Good — `_run_async()` requires care in async ctx | **No** |
-| **Zep** | 892 | 15 | **90%** | ⚠️ OK — missing async support | **No** |
-| **Graphiti** | 1190 | 17 | **85%** | ⚠️ Best of rewritten — dataclass vs Pydantic, extra `group_id` | **No** |
-| **Honcho** | 833 | 21 | **85%** | ⚠️ Improved — `Peer.sessions()` empty, no `.aio` | **No** |
+| **Zep** | 1099 | 15+15 | **95%** | ⚠️ Good — AsyncZepClient added, `search_sessions` limited | **Near** |
+| **Graphiti** | 1400 | 17 | **92%** | ⚠️ Good — LLM extraction in `add_episode`, dataclass vs Pydantic | **Near** |
+| **Honcho** | 1090 | 21+23 | **95%** | ⚠️ Good — `.aio` accessor added, `Peer.sessions()` empty | **Near** |
 
-**Overall shape match: ~92%.** Runtime quality: improving but not production-ready for 5/6 adapters.
+**Overall shape match: ~96%.** Runtime quality: P2 feature parity complete — async support, LLM extraction, RAG chat. Near-production for 3/5 adapters (Zep, Honcho, Graphiti).
 
 LangGraph is the only one you should consider production today. The rest need Phase II (behavioral tests) and Phase III (reliability infrastructure) from ROADMAP.md before they're safe to use in production.

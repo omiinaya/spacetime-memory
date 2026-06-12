@@ -33,6 +33,7 @@ Usage::
 from __future__ import annotations
 
 import datetime
+import asyncio
 import json
 import logging
 import os
@@ -423,6 +424,65 @@ class Peer:
         # Return empty page for now
         return SyncPage(data={"items": [], "total": 0, "page": page, "size": size, "pages": 1})
 
+    @property
+    def aio(self) -> PeerAio:
+        return PeerAio(self)
+
+
+class PeerAio:
+    """Async wrapper for Peer — uses asyncio.to_thread for sync SpacetimeDB calls."""
+
+    def __init__(self, peer: Peer) -> None:
+        self._peer = peer
+
+    async def message(
+        self,
+        content: str,
+        *,
+        metadata: dict[str, object] | None = None,
+        configuration: dict[str, Any] | None = None,
+        created_at: datetime.datetime | str | None = None,
+    ) -> MessageCreateParams:
+        return await asyncio.to_thread(
+            self._peer.message, content,
+            metadata=metadata, configuration=configuration, created_at=created_at,
+        )
+
+    async def chat(
+        self,
+        query: str,
+        *,
+        target: Any | None = None,
+        session: Session | str | None = None,
+        reasoning_level: Literal["minimal", "low", "medium", "high", "max"] | None = None,
+    ) -> str | None:
+        return await asyncio.to_thread(
+            self._peer.chat, query,
+            target=target, session=session, reasoning_level=reasoning_level,
+        )
+
+    async def search(
+        self,
+        query: str,
+        filters: dict[str, object] | None = None,
+        limit: int = 10,
+    ) -> list[Message]:
+        return await asyncio.to_thread(
+            self._peer.search, query, filters=filters, limit=limit,
+        )
+
+    async def sessions(
+        self,
+        filters: dict[str, object] | None = None,
+        *,
+        page: int = 1,
+        size: int = 50,
+        reverse: bool = False,
+    ) -> SyncPage[SessionResponse, Session]:
+        return await asyncio.to_thread(
+            self._peer.sessions, filters=filters, page=page, size=size, reverse=reverse,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Session class
@@ -602,6 +662,71 @@ class Session:
     def refresh(self) -> None:
         """Refresh session state."""
         pass
+
+    @property
+    def aio(self) -> SessionAio:
+        return SessionAio(self)
+
+
+class SessionAio:
+    """Async wrapper for Session — uses asyncio.to_thread for sync SpacetimeDB calls."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    async def add_peers(self, peers: Any | list[Any]) -> None:
+        return await asyncio.to_thread(self._session.add_peers, peers)
+
+    async def peers(self) -> list[Peer]:
+        return await asyncio.to_thread(self._session.peers)
+
+    async def add_messages(
+        self,
+        messages: MessageCreateParams | list[MessageCreateParams],
+    ) -> list[Message]:
+        return await asyncio.to_thread(self._session.add_messages, messages)
+
+    async def messages(
+        self,
+        *,
+        filters: dict[str, object] | None = None,
+        page: int = 1,
+        size: int = 50,
+        reverse: bool = False,
+    ) -> SyncPage[MessageResponse, Message]:
+        return await asyncio.to_thread(
+            self._session.messages, filters=filters, page=page, size=size, reverse=reverse,
+        )
+
+    async def search(
+        self,
+        query: str,
+        filters: dict[str, object] | None = None,
+        limit: int = 10,
+    ) -> list[Message]:
+        return await asyncio.to_thread(
+            self._session.search, query, filters=filters, limit=limit,
+        )
+
+    async def context(
+        self,
+        *,
+        summary: bool = False,
+        tokens: int | None = None,
+        **kwargs: Any,
+    ) -> SessionContext:
+        return await asyncio.to_thread(
+            self._session.context, summary=summary, tokens=tokens, **kwargs,
+        )
+
+    async def summaries(self) -> SessionSummaries:
+        return await asyncio.to_thread(self._session.summaries)
+
+    async def delete(self) -> None:
+        return await asyncio.to_thread(self._session.delete)
+
+    async def refresh(self) -> None:
+        return await asyncio.to_thread(self._session.refresh)
 
 
 # ---------------------------------------------------------------------------
@@ -832,11 +957,121 @@ class Honcho:
         self._session_cache.clear()
         self._peer_cache.clear()
 
+    @property
+    def aio(self) -> HonchoAio:
+        return HonchoAio(self)
+
+
+class HonchoAio:
+    """Async wrapper for Honcho — uses asyncio.to_thread for sync SpacetimeDB calls."""
+
+    def __init__(self, honcho: Honcho) -> None:
+        self._honcho = honcho
+
+    async def peer(
+        self,
+        id: str,
+        *,
+        metadata: dict[str, object] | None = None,
+        configuration: PeerConfig | None = None,
+    ) -> Peer:
+        return await asyncio.to_thread(
+            self._honcho.peer, id, metadata=metadata, configuration=configuration,
+        )
+
+    async def peers(
+        self,
+        filters: dict[str, object] | None = None,
+        *,
+        page: int = 1,
+        size: int = 50,
+        reverse: bool = False,
+    ) -> SyncPage[PeerResponse, Peer]:
+        return await asyncio.to_thread(
+            self._honcho.peers, filters=filters, page=page, size=size, reverse=reverse,
+        )
+
+    async def session(
+        self,
+        id: str,
+        *,
+        metadata: dict[str, object] | None = None,
+        configuration: SessionConfiguration | None = None,
+        peers: Any = None,
+    ) -> Session:
+        return await asyncio.to_thread(
+            self._honcho.session, id,
+            metadata=metadata, configuration=configuration, peers=peers,
+        )
+
+    async def sessions(
+        self,
+        filters: dict[str, object] | None = None,
+        *,
+        page: int = 1,
+        size: int = 50,
+        reverse: bool = False,
+    ) -> SyncPage[SessionResponse, Session]:
+        return await asyncio.to_thread(
+            self._honcho.sessions, filters=filters, page=page, size=size, reverse=reverse,
+        )
+
+    async def search(
+        self,
+        query: str,
+        filters: dict[str, object] | None = None,
+        limit: int = 10,
+    ) -> list[Message]:
+        return await asyncio.to_thread(
+            self._honcho.search, query, filters=filters, limit=limit,
+        )
+
+    async def workspaces(
+        self,
+        filters: dict[str, object] | None = None,
+        *,
+        page: int = 1,
+        size: int = 50,
+        reverse: bool = False,
+    ) -> SyncPage[WorkspaceResponse, str]:
+        return await asyncio.to_thread(
+            self._honcho.workspaces, filters=filters, page=page, size=size, reverse=reverse,
+        )
+
+    async def delete_workspace(self, workspace_id: str | None = None) -> None:
+        return await asyncio.to_thread(self._honcho.delete_workspace, workspace_id)
+
+    async def queue_status(
+        self,
+        observer: Any = None,
+        sender: Any = None,
+        session: Any = None,
+    ) -> QueueStatusResponse:
+        return await asyncio.to_thread(
+            self._honcho.queue_status, observer=observer, sender=sender, session=session,
+        )
+
+    async def schedule_dream(
+        self,
+        observer: Any,
+        session: Any | None = None,
+        observed: Any | None = None,
+    ) -> None:
+        return await asyncio.to_thread(
+            self._honcho.schedule_dream, observer, session=session, observed=observed,
+        )
+
+    async def close(self) -> None:
+        return await asyncio.to_thread(self._honcho.close)
+
 
 __all__ = [
     "Honcho",
+    "HonchoAio",
     "Peer",
+    "PeerAio",
     "Session",
+    "SessionAio",
     "Message",
     "SyncPage",
     "PeerResponse",
