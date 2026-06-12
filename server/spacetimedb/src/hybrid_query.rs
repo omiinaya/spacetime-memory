@@ -5,6 +5,7 @@ use crate::auth::require_admin;
 use crate::knowledge_graph::{kg_edge, kg_node};
 use crate::memory::memory;
 use crate::retrieval::search_index;
+use crate::workspace::workspace;
 use crate::{now_micros, uuid_v4};
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,28 @@ pub struct GodNode {
     /// Number of edges this node participates in (as source or target)
     pub edge_count: u64,
     pub computed_at: i64,
+}
+
+/// Result table for cross-workspace session search via semantic (cosine)
+/// similarity.  Clients call ``search_sessions_semantic`` then read this table.
+#[table(accessor = session_search_result, public)]
+#[derive(Debug, Clone)]
+pub struct SessionSearchResult {
+    #[primary_key]
+    pub id: String,
+    /// Deterministic hash of the query — groups result sets
+    pub query_hash: String,
+    pub workspace_id: String,
+    pub session_name: String,
+    /// Cosine-similarity score of the best-matching memory in this session
+    pub score: f64,
+    /// ID of the best-matching memory
+    pub top_memory_id: String,
+    /// Content of the best-matching memory
+    pub top_memory_content: String,
+    /// Total number of memories in this session
+    pub memory_count: u32,
+    pub created_at: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -486,6 +509,105 @@ pub fn compute_god_nodes(
             node_id: node_id.clone(),
             edge_count: *edge_count,
             computed_at: now,
+        });
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: search_sessions_semantic
+// ---------------------------------------------------------------------------
+
+/// Cross-workspace semantic session search.
+///
+/// Iterates all indexed memories (entity_type=\"memory\") across ALL workspaces,
+/// computes cosine similarity against ``query_embedding_json``, groups by
+/// workspace to find each session's best match, and stores the top-*limit*
+/// results in the ``SessionSearchResult`` table.
+///
+/// This enables Zep-style ``search_sessions``: given a natural-language query,
+/// return sessions whose memory content is semantically relevant — not just
+/// those whose name matches the query string.
+#[reducer]
+pub fn search_sessions_semantic(
+    ctx: &ReducerContext,
+    query_embedding_json: String,
+    limit: u32,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let now = now_micros(ctx);
+
+    let query_emb = parse_embedding_json(&query_embedding_json);
+    if query_emb.is_empty() {
+        return Err("No query embedding provided — cannot perform semantic search".to_string());
+    }
+
+    let limit = if limit == 0 { 10 } else { limit };
+    let qhash = format!("sessions:{}", limit);
+
+    // Clear previous results for this query hash
+    let old: Vec<_> = ctx.db.session_search_result().iter()
+        .filter(|r| r.query_hash == qhash)
+        .collect();
+    for r in old {
+        ctx.db.session_search_result().delete(r);
+    }
+
+    // Collect all indexed memories with embeddings, grouped by workspace
+    use std::collections::HashMap;
+    // (best_score, top_memory_id, top_memory_content, memory_count)
+    let mut workspace_scores: HashMap<String, (f64, String, String, u32)> = HashMap::new();
+
+    for si in ctx.db.search_index().iter() {
+        if si.entity_type != "memory" {
+            continue;
+        }
+        let stored_emb = parse_embedding_json(&si.embedding_json);
+        if stored_emb.is_empty() {
+            continue;
+        }
+        let score = cosine_similarity(&query_emb, &stored_emb);
+        if score < 0.1 {
+            continue;
+        }
+
+        let entry = workspace_scores
+            .entry(si.workspace_id.clone())
+            .or_insert_with(|| (0.0, String::new(), String::new(), 0));
+        entry.3 += 1; // count
+
+        if score > entry.0 {
+            entry.0 = score;
+            entry.1 = si.entity_id.clone();
+            entry.2 = si.content.clone();
+        }
+    }
+
+    // Sort by score descending, take top-k
+    let mut sorted: Vec<(String, (f64, String, String, u32))> = workspace_scores
+        .into_iter()
+        .collect();
+    sorted.sort_by(|a, b| b.1.0.partial_cmp(&a.1.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (ws_id, (score, mem_id, mem_content, count)) in sorted.iter().take(limit as usize) {
+        // Try to resolve the workspace name as the session name
+        let session_name = ctx.db.workspace()
+            .id()
+            .find(ws_id.clone())
+            .map(|ws| ws.name.clone())
+            .unwrap_or_else(|| ws_id.clone());
+
+        ctx.db.session_search_result().insert(SessionSearchResult {
+            id: uuid_v4(ctx),
+            query_hash: qhash.clone(),
+            workspace_id: ws_id.clone(),
+            session_name,
+            score: *score,
+            top_memory_id: mem_id.clone(),
+            top_memory_content: mem_content.clone(),
+            memory_count: *count,
+            created_at: now,
         });
     }
 

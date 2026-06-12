@@ -1130,16 +1130,36 @@ class ZepClient:
         query: str,
         limit: int = 10,
     ) -> list[Session]:
-        """Search sessions by name/ID.
+        """Search sessions by semantic relevance to the query.
+
+        Tries semantic search first (requires an embedder -- local ONNX sidecar
+        or OpenAI API key).  Falls back to session-name substring matching when
+        no embedding is available.
 
         Args:
-            query: Search string to match against session names.
+            query: Natural-language search query.
             limit: Max results (default 10).
 
         Returns:
-            A list of matching ``Session`` objects.
-
+            A list of matching ``Session`` objects, ranked by relevance.
         """
+        # Try semantic search first
+        semantic_results = self._client.search_sessions_semantic(query, limit=limit)
+        if semantic_results:
+            sessions = []
+            for r in semantic_results:
+                sessions.append(Session(
+                    session_id=r.get("workspace_id", r.get("session_name", "")),
+                    metadata={
+                        "name": r.get("session_name", ""),
+                        "score": r.get("score", 0.0),
+                        "top_memory_content": r.get("top_memory_content", "")[:200],
+                        "memory_count": r.get("memory_count", 0),
+                    },
+                ))
+            return sessions
+
+        # Fallback: name/substring match (works without embedder)
         workspaces = self._client.list_workspaces()
         results = []
         for ws in workspaces:

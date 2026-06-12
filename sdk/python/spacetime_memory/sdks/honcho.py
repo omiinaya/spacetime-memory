@@ -1774,7 +1774,7 @@ class Honcho:
         self._session_cache.clear()
         self._peer_cache.clear()
 
-    # -- Queue / Dream (stubs, match API shape) -------------------------------
+    # -- Queue / Dream ---------------------------------------------------------
 
     def queue_status(
         self,
@@ -1782,8 +1782,39 @@ class Honcho:
         sender: Any = None,
         session: Any = None,
     ) -> QueueStatusResponse:
-        """Get queue processing status."""
-        return QueueStatusResponse()
+        """Get queue processing status.
+
+        Since the SpacetimeDB adapter processes conclusions and dreams
+        synchronously (no background queue), this always reports zero
+        queued / in-progress work units.  Completed work units reflects
+        the number of conclusions stored.
+
+        Args:
+            observer: Optional observer peer (ID string or Peer) to scope.
+            sender: Optional sender peer (ID string or Peer) to scope.
+            session: Optional session (ID string or Session) to scope.
+
+        Returns:
+            ``QueueStatusResponse`` with work-unit counts.
+        """
+        # Count completed conclusions (they run synchronously, so
+        # completed = total processed, in_progress = pending = 0)
+        completed = 0
+        try:
+            mems = self._client.list_memories(
+                workspace_id=self._ws_id,
+                memory_type="conclusion",
+            )
+            completed = len(mems)
+        except Exception:
+            pass
+
+        return QueueStatusResponse(
+            total_work_units=completed,
+            completed_work_units=completed,
+            in_progress_work_units=0,
+            pending_work_units=0,
+        )
 
     def schedule_dream(
         self,
@@ -1791,8 +1822,77 @@ class Honcho:
         session: Any | None = None,
         observed: Any | None = None,
     ) -> None:
-        """Schedule a dream operation."""
-        pass
+        """Run a dream operation synchronously.
+
+        Dreams consolidate observations about a peer into higher-level
+        insights via LLM.  Upstream Honcho queues dreams for background
+        processing; the SpacetimeDB adapter runs them immediately.
+
+        Args:
+            observer: The observing peer (ID string or Peer) whose
+                perspective to use.
+            session: Optional session to scope the dream.
+            observed: Optional observed peer.  Defaults to the observer
+                (self-reflection).
+        """
+        # Resolve IDs
+        observer_id = observer.id if hasattr(observer, 'id') else str(observer)
+        observed_id = observer_id
+        if observed is not None:
+            observed_id = observed.id if hasattr(observed, 'id') else str(observed)
+
+        session_id = None
+        if session is not None:
+            session_id = session.id if hasattr(session, 'id') else str(session)
+
+        # Gather existing conclusions about the observed peer
+        try:
+            conclusions = self._client.list_memories(
+                workspace_id=self._ws_id,
+                memory_type="conclusion",
+            )
+            # Filter to conclusions about the observed peer
+            peer_conclusions = [
+                c for c in conclusions
+                if c.get("peer_id") == observed_id
+                or str(observed_id) in c.get("content", "")
+            ]
+        except Exception:
+            peer_conclusions = []
+
+        # Generate dream via LLM
+        try:
+            from ..llm import LLMClient
+            llm = LLMClient()
+            if llm.available:
+                conclusion_text = "\n".join(
+                    f"- {c.get('content', '')}"
+                    for c in (peer_conclusions or [{"content": "No prior conclusions available."}])[:20]
+                )
+                prompt = (
+                    f"You are dreaming about observed peer '{observed_id}'.\n"
+                    f"Observed by '{observer_id}'.\n\n"
+                    f"Recent conclusions:\n{conclusion_text}\n\n"
+                    f"Consolidate these observations into a single dream insight "
+                    f"(2-4 sentences). Focus on patterns, personality traits, "
+                    f"preferences, or behavioral predictions."
+                )
+                dream_content = llm.chat([
+                    {"role": "system", "content": "You are a dream consolidation engine. Synthesize observations into concise insights."},
+                    {"role": "user", "content": prompt},
+                ], temperature=0.7, max_tokens=256)
+                if dream_content:
+                    self._client.store(
+                        workspace_id=self._ws_id,
+                        content=dream_content,
+                        summary=f"[dream] {observer_id} about {observed_id}"[:120],
+                        memory_type="dream",
+                        peer_id=observer_id,
+                        observer_id=observer_id,
+                        source_session_id=session_id or "",
+                    )
+        except Exception:
+            pass  # LLM unavailable — dream is best-effort
 
     # -- Metadata / Config / Refresh ------------------------------------------
 

@@ -385,7 +385,7 @@ class TestZepClient:
         fact_id = result["fact_id"]
         assert fact_id
 
-        del_result = zep.delete_fact(session_id=sid, fact_id=fact_id)
+        del_result = zep.delete_fact(fact_uuid=fact_id)
         assert del_result["status"] == "ok"
         assert del_result["deleted"] == 1
 
@@ -396,10 +396,7 @@ class TestZepClient:
 
     def test_delete_fact_nonexistent(self, zep: ZepClient) -> None:
         """Delete a nonexistent fact is idempotent."""
-        result = zep.delete_fact(
-            session_id=_sid("zep-test-fact-noexist"),
-            fact_id="nonexistent-uuid-123",
-        )
+        result = zep.delete_fact(fact_uuid="nonexistent-uuid-123")
         assert result["status"] == "ok"
         assert result["deleted"] == 0
 

@@ -973,6 +973,34 @@ class Client:
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         return rows[:limit]
 
+    def search_sessions_semantic(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Semantically search across all sessions/workspaces.
+
+        Embes the query, calls the ``search_sessions_semantic`` reducer,
+        and reads results from the ``session_search_result`` table.
+
+        Falls back to an empty list when no embedder is available.
+        """
+        emb = self._embed(query)
+        if not emb:
+            return []
+
+        import json as _json
+        emb_json = _json.dumps(emb)
+        self._call("search_sessions_semantic", [emb_json, limit])
+
+        qhash = f"sessions:{limit}"
+        rows = self._sql(
+            "SELECT * FROM session_search_result "
+            f"WHERE query_hash = '{_esc(qhash)}'"
+        )
+        rows.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+        return rows[:limit]
+
     def get_memory(self, memory_id: str) -> list[dict[str, Any]]:
         """Get a single memory by ID.  Auto-reinforces on read."""
         results = self._query("memory", filter_dict={"id": memory_id})
