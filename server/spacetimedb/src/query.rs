@@ -496,3 +496,77 @@ fn query_generic(
     let _ = (ctx, query_id, table_name, workspace_id, now);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_row_to_json_all_columns() {
+        let row = serde_json::json!({"id": "abc", "content": "hello", "score": 0.95});
+        let result = row_to_json(&row, &[]);
+        // All columns — should contain all three keys
+        assert!(result.contains("id"));
+        assert!(result.contains("content"));
+        assert!(result.contains("score"));
+    }
+
+    #[test]
+    fn test_row_to_json_filtered() {
+        let row = serde_json::json!({"id": "abc", "content": "hello", "score": 0.95});
+        let result = row_to_json(
+            &row,
+            &["id".to_string(), "score".to_string()],
+        );
+        assert!(result.contains("id"));
+        assert!(result.contains("score"));
+        assert!(!result.contains("content"));
+    }
+
+    #[test]
+    fn test_filter_matches_string_match() {
+        let row = serde_json::json!({"id": "abc", "type": "memory"});
+        let mut filter = serde_json::Map::new();
+        filter.insert("type".to_string(), serde_json::Value::String("memory".to_string()));
+        assert!(filter_matches(&row, &filter));
+    }
+
+    #[test]
+    fn test_filter_matches_string_mismatch() {
+        let row = serde_json::json!({"id": "abc", "type": "memory"});
+        let mut filter = serde_json::Map::new();
+        filter.insert("type".to_string(), serde_json::Value::String("fact".to_string()));
+        assert!(!filter_matches(&row, &filter));
+    }
+
+    #[test]
+    fn test_filter_matches_missing_key() {
+        let row = serde_json::json!({"id": "abc"});
+        let mut filter = serde_json::Map::new();
+        filter.insert("nonexistent".to_string(), serde_json::Value::String("x".to_string()));
+        assert!(!filter_matches(&row, &filter));
+    }
+
+    #[test]
+    fn test_filter_matches_boolean() {
+        let row = serde_json::json!({"active": true});
+        let mut filter = serde_json::Map::new();
+        filter.insert("active".to_string(), serde_json::Value::Bool(true));
+        assert!(filter_matches(&row, &filter));
+    }
+
+    #[test]
+    fn test_filter_matches_number() {
+        let row = serde_json::json!({"score": 0.95});
+        let mut filter = serde_json::Map::new();
+        filter.insert("score".to_string(), serde_json::json!(0.95));
+        assert!(filter_matches(&row, &filter));
+    }
+
+    #[test]
+    fn test_filter_matches_non_object() {
+        let row = serde_json::json!("not an object");
+        let filter = serde_json::Map::new();
+        assert!(!filter_matches(&row, &filter));
+    }
+}

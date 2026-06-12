@@ -310,3 +310,44 @@ pub fn get_delta(ctx: &ReducerContext, previous_pack_id: String) -> Result<(), S
     let _ = delta;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compute_query_hash_deterministic() {
+        let h1 = compute_query_hash("hello world");
+        let h2 = compute_query_hash("hello world");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_compute_query_hash_different() {
+        let h1 = compute_query_hash("hello");
+        let h2 = compute_query_hash("world");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_estimate_tokens_short() {
+        assert_eq!(estimate_tokens("hi"), 1);
+    }
+
+    #[test]
+    fn test_estimate_tokens_typical() {
+        // 100 bytes / 4 = 25 tokens
+        let text = "a".repeat(100);
+        assert_eq!(estimate_tokens(&text), 25);
+    }
+
+    #[test]
+    fn test_tier_ord_levels() {
+        assert_eq!(tier_ord("L0"), 0);
+        assert_eq!(tier_ord("L1"), 1);
+        assert_eq!(tier_ord("L2"), 2);
+        assert_eq!(tier_ord("L3"), 3);
+        assert_eq!(tier_ord("unknown"), 3);
+        assert_eq!(tier_ord(""), 3);
+    }
+}
