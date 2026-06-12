@@ -1405,7 +1405,7 @@ class Graphiti:
                                 )
                             except RuntimeError:
                                 pass
-                except Exception as exc:
+                except RuntimeError as exc:
                     logger.warning("build_communities() failed to process community: %s", exc)
                     pass
             communities.append(community)
@@ -1499,7 +1499,7 @@ class Graphiti:
                 if result:
                     summary = result.strip()
                     last_summarized_at = now
-        except Exception:
+        except RuntimeError:
             logger.warning("summarize_saga() LLM call failed for saga %s", saga_id)
 
         # Build SagaNode

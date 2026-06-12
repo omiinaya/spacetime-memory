@@ -402,7 +402,7 @@ class Memory:
                     nid = result.get("id", "")
                     if nid:
                         node_ids.append(nid)
-            except Exception:
+            except RuntimeError:
                 logger.debug("Failed to create KG node for fact: %s", fact)
         return node_ids
 
@@ -417,7 +417,7 @@ class Memory:
         try:
             rows = self._call("query_graph", workspace_id=ws_id, query=query)
             return [r.get("label", "") for r in rows[:limit] if r.get("label")]
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("_GraphStore.search() failed: %s", exc)
             return []
 
@@ -533,7 +533,7 @@ class Memory:
                                     "update_memory", mem_id,
                                     json.dumps({"extracted_facts": facts}),
                                 )
-                    except Exception as exc:
+                    except RuntimeError as exc:
                         logger.warning("Failed to update memory with KG facts: %s", exc)
                     return {
                         "results": [{
@@ -553,7 +553,7 @@ class Memory:
                     llm = self._resolve_llm_for(user_id)
                     if llm and llm.available:
                         extracted_facts = llm.extract_facts(content)
-                except Exception as exc:
+                except RuntimeError as exc:
                     logger.warning("LLM fact extraction failed: %s", exc)
 
             meta = {}
@@ -583,7 +583,7 @@ class Memory:
                     if mem_id:
                         try:
                             self._client._call("set_memory_scope", [mem_id, user_id])
-                        except Exception as exc:
+                        except RuntimeError as exc:
                             logger.warning(
                                 "mem0.add: set_memory_scope failed for %s: %s",
                                 mem_id, exc,
@@ -1108,7 +1108,7 @@ class Memory:
                         {"role": "user", "content": user_prompt},
                     ],
                 ) or query
-            except Exception as exc:
+            except RuntimeError as exc:
                 logger.warning("mem0.chat() LLM call failed: %s", exc)
                 response_text = query
 

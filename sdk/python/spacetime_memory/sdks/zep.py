@@ -68,7 +68,7 @@ from typing import Any
 from ..client import Client, _esc
 
 try:
-    from zep_python import NotFoundError, BadRequestError, ApiError
+    from zep_python import NotFoundError, BadRequestError, ApiError, ConflictError
 except ImportError:
     # Fallback: define our own so imports don't break
     class NotFoundError(RuntimeError):
@@ -78,6 +78,9 @@ except ImportError:
         pass
 
     class ApiError(RuntimeError):
+        pass
+
+    class ConflictError(RuntimeError):
         pass
 
 
@@ -1480,8 +1483,269 @@ class UserClient:
 
 
 # ---------------------------------------------------------------------------
-# AsyncZepClient — async mirror of ZepClient
+# Sub-client proxies (zep-python v2.0.2 — .memory / .user pattern)
 # ---------------------------------------------------------------------------
+
+class _MemoryProxy:
+    """Proxy for ``Zep.memory`` — wraps MemoryClient methods.
+
+    Delegates every call to the owning ``ZepClient``, mapping the
+    zep-python v2.0.2 ``MemoryClient`` method names onto our adapter's
+    flat methods.
+    """
+
+    def __init__(self, client: "ZepClient") -> None:
+        self._c = client  # owning ZepClient / Zep
+
+    # -- Memory CRUD --------------------------------------------------------
+
+    def add(
+        self,
+        session_id: str,
+        messages: list[dict[str, Any]] | list[MemoryMessage],
+        *,
+        metadata: dict[str, Any] | None = None,
+        # LLM instructions ignored (SpacetimeDB backend)
+        fact_instruction: str | None = None,
+        summary_instruction: str | None = None,
+    ) -> dict[str, Any]:
+        return self._c.add_memory(
+            session_id,
+            messages,
+            metadata=metadata,
+            fact_instruction=fact_instruction,
+            summary_instruction=summary_instruction,
+        )
+
+    def get(
+        self,
+        session_id: str,
+        *,
+        limit: int = 10,
+        min_rating: float = 0.0,
+    ) -> dict[str, Any] | None:
+        return self._c.get_memory(session_id, limit=limit, min_rating=min_rating)
+
+    def delete(self, session_id: str) -> dict[str, Any]:
+        return self._c.delete_memory(session_id)
+
+    def search(
+        self,
+        session_id: str,
+        query: str,
+        *,
+        limit: int = 10,
+        score_threshold: float = 0.0,
+        min_score: float | None = None,
+    ) -> list[MemorySearchResult]:
+        return self._c.search_memory(
+            session_id,
+            query,
+            limit=limit,
+            score_threshold=score_threshold,
+            min_score=min_score,
+        )
+
+    # -- Facts ---------------------------------------------------------------
+
+    def add_fact(
+        self,
+        session_id: str,
+        fact: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self._c.add_fact(session_id, fact, metadata=metadata)
+
+    def get_fact(self, fact_uuid: str) -> Fact:
+        return self._c.get_fact(fact_uuid)
+
+    def delete_fact(self, fact_uuid: str, **kwargs: Any) -> dict[str, Any]:
+        return self._c.delete_fact(fact_uuid, **kwargs)
+
+    # -- Session management --------------------------------------------------
+
+    def add_session(
+        self,
+        session_id: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> Session:
+        return self._c.add_session(session_id, metadata=metadata)
+
+    def get_session(self, session_id: str) -> Session | None:
+        return self._c.get_session(session_id)
+
+    def list_sessions(
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        page_number: int | None = None,
+        page_size: int | None = None,
+        order_by: str = "created_at",
+        asc: bool = False,
+    ) -> list[Session]:
+        return self._c.list_sessions(
+            limit=limit,
+            offset=offset,
+            page_number=page_number,
+            page_size=page_size,
+            order_by=order_by,
+            asc=asc,
+        )
+
+    def search_sessions(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+    ) -> list[Session]:
+        return self._c.search_sessions(query, limit=limit)
+
+    def update_session(
+        self,
+        session_id: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+        fact_rating_instruction: str | None = None,
+    ) -> Session:
+        return self._c.update_session(
+            session_id,
+            metadata=metadata,
+            fact_rating_instruction=fact_rating_instruction,
+        )
+
+    # -- Message-level -------------------------------------------------------
+
+    def get_session_messages(
+        self,
+        session_id: str,
+        *,
+        limit: int | None = None,
+        cursor: int | None = None,
+    ) -> dict[str, Any]:
+        return self._c.get_session_messages(session_id, limit=limit, cursor=cursor)
+
+    def get_session_message(
+        self,
+        session_id: str,
+        message_uuid: str,
+    ) -> dict[str, Any]:
+        return self._c.get_session_message(session_id, message_uuid)
+
+    def update_message_metadata(
+        self,
+        session_id: str,
+        message_uuid: str,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._c.update_message_metadata(
+            session_id, message_uuid, metadata
+        )
+
+
+class _UserProxy:
+    """Proxy for ``Zep.user`` — wraps UserClient methods."""
+
+    def __init__(self, client: Client) -> None:
+        self._inner = UserClient(client)
+
+    def add(
+        self,
+        *,
+        user_id: str | None = None,
+        email: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self._inner.add(
+            user_id=user_id,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            metadata=metadata,
+        )
+
+    def get(self, user_id: str) -> dict[str, Any]:
+        return self._inner.get(user_id)
+
+    def update(
+        self,
+        user_id: str,
+        *,
+        email: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self._inner.update(
+            user_id,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            metadata=metadata,
+        )
+
+    def delete(self, user_id: str) -> dict[str, Any]:
+        return self._inner.delete(user_id)
+
+    def list_ordered(
+        self,
+        *,
+        page_number: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        return self._inner.list_ordered(
+            page_number=page_number,
+            page_size=page_size,
+        )
+
+    def get_sessions(self, user_id: str) -> list[dict[str, Any]]:
+        return self._inner.get_sessions(user_id)
+
+
+# ---------------------------------------------------------------------------
+# Zep — zep-python v2.0.2 compatible client (replaces ZepClient)
+# ---------------------------------------------------------------------------
+
+class Zep(ZepClient):
+    """Zep-compatible client matching ``zep_python.Zep`` (v2.0.2+).
+
+    Adds ``.memory`` and ``.user`` sub-client proxies on top of the
+    existing ``ZepClient`` adapter.  The underlying flat methods
+    (``add_memory``, ``get_memory``, …) are still available directly
+    for backward compatibility.
+
+    Usage::
+
+        from spacetime_memory.sdks.zep import Zep
+
+        client = Zep(host="localhost", port=3001)
+
+        # v2.0.2 API — sub-client pattern
+        client.memory.add(session_id="s1", messages=[{"role": "user", "content": "Hi"}])
+        mem = client.memory.get(session_id="s1")
+
+        user = client.user.add(email="alice@example.com", first_name="Alice")
+        sessions = client.user.get_sessions("alice-123")
+
+        # v1.x API — flat methods still work
+        client.add_memory(session_id="s2", messages=[{"role": "user", "content": "Yo"}])
+
+    """
+
+    def __init__(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        config: dict[str, Any] | None = None,
+        token: str | None = None,
+    ) -> None:
+        super().__init__(host=host, port=port, config=config, token=token)
+        self.memory = _MemoryProxy(self)
+        self.user = _UserProxy(self._client)
 
 
 class AsyncZepClient:
@@ -1730,3 +1994,420 @@ class AsyncZepClient:
 
     async def __aexit__(self, *args: Any) -> None:
         await self.close()
+
+
+# ---------------------------------------------------------------------------
+# Async sub-client proxies (async mirror of .memory / .user)
+# ---------------------------------------------------------------------------
+
+class _AsyncMemoryProxy:
+    """Async proxy for ``AsyncZep.memory``."""
+
+    def __init__(self, client: "AsyncZepClient") -> None:
+        self._c = client
+
+    async def add(
+        self,
+        session_id: str,
+        messages: list[dict[str, Any]] | list[MemoryMessage],
+        *,
+        metadata: dict[str, Any] | None = None,
+        fact_instruction: str | None = None,
+        summary_instruction: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._c.add_memory(
+            session_id,
+            messages,
+            metadata=metadata,
+            fact_instruction=fact_instruction,
+            summary_instruction=summary_instruction,
+        )
+
+    async def get(
+        self,
+        session_id: str,
+        *,
+        limit: int = 10,
+        min_rating: float = 0.0,
+    ) -> dict[str, Any] | None:
+        return await self._c.get_memory(session_id, limit=limit, min_rating=min_rating)
+
+    async def delete(self, session_id: str) -> dict[str, Any]:
+        return await self._c.delete_memory(session_id)
+
+    async def search(
+        self,
+        session_id: str,
+        query: str,
+        *,
+        limit: int = 10,
+        score_threshold: float = 0.0,
+        min_score: float | None = None,
+    ) -> list[MemorySearchResult]:
+        return await self._c.search_memory(
+            session_id,
+            query,
+            limit=limit,
+            score_threshold=score_threshold,
+            min_score=min_score,
+        )
+
+    async def add_fact(
+        self,
+        session_id: str,
+        fact: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await self._c.add_fact(session_id, fact, metadata=metadata)
+
+    async def get_fact(self, fact_uuid: str) -> Fact:
+        return await self._c.get_fact(fact_uuid)
+
+    async def delete_fact(self, fact_uuid: str, **kwargs: Any) -> dict[str, Any]:
+        return await self._c.delete_fact(fact_uuid, **kwargs)
+
+    async def add_session(
+        self,
+        session_id: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> Session:
+        return await self._c.add_session(session_id, metadata=metadata)
+
+    async def get_session(self, session_id: str) -> Session | None:
+        return await self._c.get_session(session_id)
+
+    async def list_sessions(
+        self,
+        *,
+        limit: int = 100,
+        offset: int = 0,
+        page_number: int | None = None,
+        page_size: int | None = None,
+        order_by: str = "created_at",
+        asc: bool = False,
+    ) -> list[Session]:
+        return await self._c.list_sessions(
+            limit=limit,
+            offset=offset,
+            page_number=page_number,
+            page_size=page_size,
+            order_by=order_by,
+            asc=asc,
+        )
+
+    async def search_sessions(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+    ) -> list[Session]:
+        return await self._c.search_sessions(query, limit=limit)
+
+    async def update_session(
+        self,
+        session_id: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+        fact_rating_instruction: str | None = None,
+    ) -> Session:
+        return await self._c.update_session(
+            session_id,
+            metadata=metadata,
+            fact_rating_instruction=fact_rating_instruction,
+        )
+
+    async def get_session_messages(
+        self,
+        session_id: str,
+        *,
+        limit: int | None = None,
+        cursor: int | None = None,
+    ) -> dict[str, Any]:
+        return await self._c.get_session_messages(session_id, limit=limit, cursor=cursor)
+
+    async def get_session_message(
+        self,
+        session_id: str,
+        message_uuid: str,
+    ) -> dict[str, Any]:
+        return await self._c.get_session_message(session_id, message_uuid)
+
+    async def update_message_metadata(
+        self,
+        session_id: str,
+        message_uuid: str,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        return await self._c.update_message_metadata(
+            session_id, message_uuid, metadata
+        )
+
+
+class _AsyncUserProxy:
+    """Async proxy for ``AsyncZep.user``."""
+
+    def __init__(self, client: "AsyncZepClient") -> None:
+        self._inner = UserClient(client._sync._client)
+
+    async def add(
+        self,
+        *,
+        user_id: str | None = None,
+        email: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._inner.add,
+            user_id=user_id,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            metadata=metadata,
+        )
+
+    async def get(self, user_id: str) -> dict[str, Any]:
+        return await asyncio.to_thread(self._inner.get, user_id)
+
+    async def update(
+        self,
+        user_id: str,
+        *,
+        email: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._inner.update,
+            user_id,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            metadata=metadata,
+        )
+
+    async def delete(self, user_id: str) -> dict[str, Any]:
+        return await asyncio.to_thread(self._inner.delete, user_id)
+
+    async def list_ordered(
+        self,
+        *,
+        page_number: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            self._inner.list_ordered,
+            page_number=page_number,
+            page_size=page_size,
+        )
+
+    async def get_sessions(self, user_id: str) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self._inner.get_sessions, user_id)
+
+
+# ---------------------------------------------------------------------------
+# AsyncZep — async client with .memory / .user (zep-python v2.0.2+)
+# ---------------------------------------------------------------------------
+
+class AsyncZep(AsyncZepClient):
+    """Async Zep-compatible client with ``.memory`` and ``.user`` sub-clients.
+
+    Usage::
+
+        from spacetime_memory.sdks.zep import AsyncZep
+
+        client = AsyncZep(host="localhost", port=3001)
+
+        async with client:
+            await client.memory.add(session_id="s1", messages=[...])
+            mem = await client.memory.get(session_id="s1")
+            user = await client.user.add(email="a@b.com")
+
+    """
+
+    def __init__(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        config: dict[str, Any] | None = None,
+        token: str | None = None,
+    ) -> None:
+        super().__init__(host=host, port=port, config=config, token=token)
+        self.memory = _AsyncMemoryProxy(self)
+        self.user = _AsyncUserProxy(self)
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility aliases (zep-python v1.x → v2.0.2)
+# ---------------------------------------------------------------------------
+
+# ZepClient stays as an alias for Zep (old code still works)
+ZepClient = Zep
+
+# Message is an alias for MemoryMessage (zep-python v2.0.2 name)
+Message = MemoryMessage
+
+# ---------------------------------------------------------------------------
+# Stub type exports (zep-python v2.0.2 surface area)
+# ---------------------------------------------------------------------------
+
+class Summary:
+    """Stub for ``zep_python.types.Summary``.
+
+    Represents an LLM-generated session summary.  Currently a placeholder
+    because SpacetimeDB does not run Zep's LLM summarisation pipeline.
+    """
+
+    def __init__(
+        self,
+        uuid: str = "",
+        created_at: str = "",
+        content: str = "",
+        token_count: int = 0,
+        **kwargs: Any,
+    ) -> None:
+        self.uuid = uuid
+        self.created_at = created_at
+        self.content = content
+        self.token_count = token_count
+        self.__dict__.update(kwargs)
+
+
+class RoleType:
+    """Stub for ``zep_python.types.RoleType`` enum.
+
+    Maps to role strings used by Zep: ``"user"``, ``"assistant"``,
+    ``"system"``, ``"function"``, ``"tool"``.
+    """
+
+    UserRole = "user"
+    AssistantRole = "assistant"
+    SystemRole = "system"
+    FunctionRole = "function"
+    ToolRole = "tool"
+
+
+class SearchScope:
+    """Stub for ``zep_python.types.SearchScope`` enum.
+
+    ``MESSAGES`` — search message content.
+    ``FACTS`` — search factual statements.
+    ``SUMMARY`` — search session summaries.
+    """
+
+    MESSAGES = "messages"
+    FACTS = "facts"
+    SUMMARY = "summary"
+
+
+class SearchType:
+    """Stub for ``zep_python.types.SearchType`` enum.
+
+    ``SIMILARITY`` — vector / semantic search.
+    ``MMR`` — max-marginal-relevance search (not yet implemented).
+    """
+
+    SIMILARITY = "similarity"
+    MMR = "mmr"
+
+
+class ZepEnvironment:
+    """Stub for ``zep_python.types.ZepEnvironment`` enum.
+
+    ``CLOUD`` — Zep Cloud API.
+    ``SELF_HOSTED`` — on-premise / self-hosted Zep instance.
+    """
+
+    CLOUD = "cloud"
+    SELF_HOSTED = "self_hosted"
+
+
+class SuccessResponse:
+    """Stub for ``zep_python.types.SuccessResponse``.
+
+    Generic success envelope returned by many Zep API endpoints.
+    """
+
+    def __init__(self, message: str = "", **kwargs: Any) -> None:
+        self.message = message
+        self.__dict__.update(kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Fact-rating instruction stubs (zep-python v2.0.2)
+# ---------------------------------------------------------------------------
+
+class FactRatingExamples:
+    """Stub for ``zep_python.types.FactRatingExamples``.
+
+    Example fact-rating pairs used to steer Zep's LLM fact extraction.
+    """
+
+    def __init__(
+        self,
+        high: str = "",
+        medium: str = "",
+        low: str = "",
+        **kwargs: Any,
+    ) -> None:
+        self.high = high
+        self.medium = medium
+        self.low = low
+        self.__dict__.update(kwargs)
+
+
+class FactRatingInstruction:
+    """Stub for ``zep_python.types.FactRatingInstruction``.
+
+    Instruction template for the fact-rating LLM prompt.
+    """
+
+    def __init__(
+        self,
+        instruction: str = "",
+        examples: FactRatingExamples | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.instruction = instruction
+        self.examples = examples
+        self.__dict__.update(kwargs)
+
+
+class SessionFactRatingExamples:
+    """Stub for ``zep_python.types.SessionFactRatingExamples``.
+
+    Session-level fact-rating example pairs.
+    """
+
+    def __init__(
+        self,
+        high: str = "",
+        medium: str = "",
+        low: str = "",
+        **kwargs: Any,
+    ) -> None:
+        self.high = high
+        self.medium = medium
+        self.low = low
+        self.__dict__.update(kwargs)
+
+
+class SessionFactRatingInstruction:
+    """Stub for ``zep_python.types.SessionFactRatingInstruction``.
+
+    Per-session instruction template for the fact-rating LLM prompt.
+    """
+
+    def __init__(
+        self,
+        instruction: str = "",
+        examples: SessionFactRatingExamples | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.instruction = instruction
+        self.examples = examples
+        self.__dict__.update(kwargs)

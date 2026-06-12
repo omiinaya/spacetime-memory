@@ -418,7 +418,7 @@ class Peer:
         # Search relevant memories
         try:
             memories = self._honcho._client.search(self._ws_id, query=query, limit=10, semantic=True)
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("Peer.chat() search failed: %s", exc)
             memories = []
 
@@ -479,7 +479,7 @@ class Peer:
             memories = self._honcho._client.search(
                 self._ws_id, query="", limit=20, semantic=False,
             )
-        except Exception:
+        except RuntimeError:
             memories = []
 
         mem_text = "\n".join(
@@ -545,7 +545,7 @@ class Peer:
                 limit=search_top_k or 10,
                 semantic=True,
             )
-        except Exception:
+        except RuntimeError:
             memories = []
 
         mem_text = "\n".join(
@@ -622,7 +622,7 @@ class Peer:
         """Search messages from this peer."""
         try:
             results = self._honcho._client.search(self._ws_id, query=query, limit=limit, semantic=True)
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("Peer.search() failed: %s", exc)
             results = []
 
@@ -876,7 +876,7 @@ class ConclusionScope:
             results = self._honcho._client.search(
                 self.workspace_id, query="", limit=size * page, semantic=False,
             )
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("ConclusionScope.list() search failed: %s", exc)
             results = []
 
@@ -922,7 +922,7 @@ class ConclusionScope:
             results = self._honcho._client.search(
                 self.workspace_id, query=query, limit=top_k, semantic=True,
             )
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("ConclusionScope.query() search failed: %s", exc)
             results = []
 
@@ -949,7 +949,7 @@ class ConclusionScope:
         """Delete a conclusion by ID."""
         try:
             self._honcho._client._call("delete_memory", [conclusion_id])
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("ConclusionScope.delete() failed: %s", exc)
 
     def create(
@@ -981,7 +981,7 @@ class ConclusionScope:
                     observed_id=self.observed.id,
                     session_id=item.session_id,
                 ))
-            except Exception as exc:
+            except RuntimeError as exc:
                 logger.warning("ConclusionScope.create() store failed: %s", exc)
         return result
 
@@ -1165,7 +1165,7 @@ class Session:
                     summary="",
                     entities_json=json.dumps(msg.metadata or {}),
                 )
-            except Exception as exc:
+            except RuntimeError as exc:
                 logger.warning(
                     "Session.add_messages() failed to store message "
                     "(peer=%s, session=%s): %s",
@@ -1195,7 +1195,7 @@ class Session:
         """List messages in this session."""
         try:
             results = self._honcho._client.search(self._ws_id, query="", limit=size, semantic=False)
-        except Exception:
+        except RuntimeError:
             results = []
 
         items = []
@@ -1222,7 +1222,7 @@ class Session:
         """Search messages within this session."""
         try:
             results = self._honcho._client.search(self._ws_id, query=query, limit=limit, semantic=True)
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("Session.search() failed: %s", exc)
             results = []
 
@@ -1262,7 +1262,7 @@ class Session:
                 self._honcho._client.delete_workspace(self._ws_id)
             else:
                 self._honcho._client._call("delete_workspace", [self._ws_id])
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning(
                 "Session.delete() failed to delete workspace %s: %s",
                 self._ws_id, exc,
@@ -1370,7 +1370,7 @@ class Session:
         """Get a single message by ID."""
         try:
             results = self._honcho._client.get_memory(message_id)
-        except Exception:
+        except RuntimeError:
             return None
         if not results:
             return None
@@ -1390,7 +1390,7 @@ class Session:
         """Update message metadata."""
         try:
             results = self._honcho._client.get_memory(message_id)
-        except Exception:
+        except RuntimeError:
             return
         if not results:
             return
@@ -1738,7 +1738,7 @@ class Honcho:
         """Search across all sessions in the workspace."""
         try:
             results = self._client.search(self._ws_id, query=query, limit=limit, semantic=True)
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("Honcho.search() failed: %s", exc)
             results = []
 
@@ -1806,7 +1806,7 @@ class Honcho:
                 memory_type="conclusion",
             )
             completed = len(mems)
-        except Exception:
+        except RuntimeError:
             pass
 
         return QueueStatusResponse(
@@ -1857,7 +1857,7 @@ class Honcho:
                 if c.get("peer_id") == observed_id
                 or str(observed_id) in c.get("content", "")
             ]
-        except Exception:
+        except RuntimeError:
             peer_conclusions = []
 
         # Generate dream via LLM
@@ -1891,7 +1891,7 @@ class Honcho:
                         observer_id=observer_id,
                         source_session_id=session_id or "",
                     )
-        except Exception:
+        except RuntimeError:
             pass  # LLM unavailable — dream is best-effort
 
     # -- Metadata / Config / Refresh ------------------------------------------

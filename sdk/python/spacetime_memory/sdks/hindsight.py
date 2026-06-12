@@ -545,7 +545,7 @@ class Hindsight:
             ws_id = self._ensure_bank(bank_id)
             try:
                 self._client.store(ws_id, content=text, summary=merged.get("context", ""))
-            except Exception as exc:
+            except RuntimeError as exc:
                 logger.warning("retain_files() failed to store %s: %s", file_path, exc)
 
         return FileRetainResponse(operation_ids=operation_ids)
@@ -659,7 +659,7 @@ class Hindsight:
                 success=True, bank_id=bank_id, items_count=1,
                 async_=retain_async,
             )
-        except Exception:
+        except RuntimeError:
             return RetainResponse(
                 success=False, bank_id=bank_id, items_count=0,
                 async_=retain_async,
@@ -690,7 +690,7 @@ class Hindsight:
                 self._client.store(ws_id, content=content, summary=summary,
                                    entities_json=entities_json)
                 count += 1
-            except Exception as exc:
+            except RuntimeError as exc:
                 logger.warning("aretain_batch() failed to store item: %s", exc)
 
         return RetainResponse(
@@ -729,7 +729,7 @@ class Hindsight:
             rows = self._client.search(
                 ws_id, query=query, limit=limit, semantic=True,
             )
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("arecall() search failed: %s", exc)
             rows = []
 
@@ -778,7 +778,7 @@ class Hindsight:
         # Retrieve relevant context
         try:
             memories = self._client.search(ws_id, query=query, limit=20, semantic=True)
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("areflect() search failed: %s", exc)
             memories = []
 
@@ -799,7 +799,7 @@ class Hindsight:
                 ws_id, prompt, "", "reflect",
             ])
             answer_text = insight_result.get("insight", insight_result.get("content", str(insight_result)))
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("areflect() LLM insight failed: %s", exc)
             answer_text = (
                 "I don't have enough information to answer that based on "
@@ -863,7 +863,7 @@ class Hindsight:
             rows = self._client.search(
                 ws_id, query="", limit=limit + offset, semantic=False
             )
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("alist_memories() search failed: %s", exc)
             rows = []
 
@@ -992,7 +992,7 @@ class Hindsight:
                     "mission": f"Memory bank for {bank_name}",
                     "extraction_modes": ["facts", "entities"],
                 })
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("acreate_bank() LLM config generation failed: %s", exc)
             bank_config.update({
                 "disposition": {"skepticism": 3, "literalism": 3, "empathy": 3},
@@ -1058,7 +1058,7 @@ class Hindsight:
             memories = self._client.search(
                 ws_id, query=search_query, limit=10, semantic=True,
             )
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("acreate_mental_model() search failed: %s", exc)
 
         # Synthesize mental model via LLM
@@ -1093,7 +1093,7 @@ class Hindsight:
                     for m in memories[:5]
                 )
             # else: no memories, content stays empty
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("acreate_mental_model() LLM synthesis failed: %s", exc)
             if not content and memories:
                 content = " / ".join(
@@ -1114,7 +1114,7 @@ class Hindsight:
                 memory_type="mental_model",
             )
             model_id = result.get("id", _make_op_id()) if isinstance(result, dict) else _make_op_id()
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("acreate_mental_model() store failed: %s", exc)
             model_id = _make_op_id()
 
@@ -1176,7 +1176,7 @@ class Hindsight:
                 memory_type="directive",
             )
             directive_id = result.get("id", _make_op_id()) if isinstance(result, dict) else _make_op_id()
-        except Exception as exc:
+        except RuntimeError as exc:
             logger.warning("acreate_directive() store failed: %s", exc)
             directive_id = _make_op_id()
 

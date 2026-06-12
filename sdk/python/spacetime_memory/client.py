@@ -870,7 +870,7 @@ class Client:
                     emb_list = [resp.json().get("embedding", [])]
             else:
                 emb_list = []
-        except Exception:
+        except RuntimeError:
             emb_list = []
 
         # Call batch reducer — pass items as JSON string
@@ -1007,7 +1007,7 @@ class Client:
         if results:
             try:
                 self._call("reinforce_memory", [memory_id])
-            except Exception:
+            except RuntimeError:
                 pass
         return results
 
@@ -1183,7 +1183,7 @@ class Client:
                 meta_str = r.get("metadata_json", "{}")
                 try:
                     meta = json.loads(meta_str) if isinstance(meta_str, str) else meta_str
-                except Exception:
+                except RuntimeError:
                     meta = {}
                 matches = all(meta.get(k) == v for k, v in mf.items())
                 if matches:
@@ -1782,7 +1782,7 @@ class Client:
                         pass  # may be a duplicate or schema mismatch
                 restored.append(table)
                 total_restored += len(rows)
-            except Exception:
+            except RuntimeError:
                 continue
 
         return {
