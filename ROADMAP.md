@@ -47,10 +47,8 @@ With >100K rows, some reducers will still be slow but won't OOM.
 **2. UUID now RFC 4122 v4 compliant ✅**
 Version (4) and variant (10xx) bits set. Will be recognized as UUIDv4 by external systems.
 
-**3. JSON manipulation via string concatenation**
-`entity_linking.rs:65`, `profile.rs:77`, `profile.rs:120` build JSON arrays using
-`format!()" instead of `serde_json::Value` — fragile, can produce invalid JSON
-if input contains special characters.
+**3. JSON now built via serde_json ✅**
+3 sites in entity_linking.rs + profile.rs now use `serde_json::from_str`/`to_string` instead of manual `format!()` string concatenation. Guarantees valid JSON for any input.
 
 **4. PBKDF2 at only 100K iterations**
 OWASP 2026 recommends 600K+ for PBKDF2-HMAC-SHA256. At 100K, ~6x weaker than recommended.

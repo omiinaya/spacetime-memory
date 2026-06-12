@@ -58,18 +58,10 @@ pub fn add_alias(ctx: &ReducerContext, id: String, alias: String) -> Result<(), 
         .find(&id)
         .ok_or_else(|| format!("EntityLink '{}' not found", id))?;
 
-    // Append alias to aliases_json array
-    let new_alias = format!("\"{}\"", alias.replace('"', "\\\""));
-    if el.aliases_json.trim() == "[]" || el.aliases_json.trim().is_empty() {
-        el.aliases_json = format!("[{}]", new_alias);
-    } else {
-        let trimmed = el.aliases_json.trim_end().to_string();
-        if trimmed.ends_with(']') {
-            el.aliases_json = format!("{}, {}]", trimmed[..trimmed.len() - 1].trim(), new_alias);
-        } else {
-            el.aliases_json = format!("[{}]", new_alias);
-        }
-    }
+    // Append alias to aliases_json array — use serde_json for safety
+    let mut aliases: Vec<String> = serde_json::from_str(&el.aliases_json).unwrap_or_default();
+    aliases.push(alias);
+    el.aliases_json = serde_json::to_string(&aliases).unwrap_or_else(|_| "[]".to_string());
 
     ctx.db.entity_link().id().update(el);
     Ok(())

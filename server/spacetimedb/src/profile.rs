@@ -69,19 +69,10 @@ pub fn add_profile_fact(ctx: &ReducerContext, peer_id: String, fact: String) -> 
     let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
 
     if let Some(mut p) = existing {
-        // Append fact to static_facts_json array
-        let new_fact = format!("\"{}\"", fact.replace('"', "\\\""));
-        if p.static_facts_json.trim() == "[]" || p.static_facts_json.trim().is_empty() {
-            p.static_facts_json = format!("[{}]", new_fact);
-        } else {
-            // Insert before the closing bracket
-            let trimmed = p.static_facts_json.trim_end().to_string();
-            if trimmed.ends_with(']') {
-                p.static_facts_json = format!("{}, {}]", trimmed[..trimmed.len() - 1].trim(), new_fact);
-            } else {
-                p.static_facts_json = format!("[{}]", new_fact);
-            }
-        }
+        // Append fact to static_facts_json array — use serde_json for safety
+        let mut facts: Vec<String> = serde_json::from_str(&p.static_facts_json).unwrap_or_default();
+        facts.push(fact);
+        p.static_facts_json = serde_json::to_string(&facts).unwrap_or_else(|_| "[]".to_string());
         p.updated_at = now;
         ctx.db.profile().id().update(p);
     } else {
@@ -115,23 +106,16 @@ pub fn add_dynamic_context(
     let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
 
     if let Some(mut p) = existing {
-        let new_entry = format!("\"{}\"", context.replace('"', "\\\""));
-        if p.dynamic_context_json.trim() == "[]" || p.dynamic_context_json.trim().is_empty() {
-            p.dynamic_context_json = format!("[{}]", new_entry);
-        } else {
-            let trimmed = p.dynamic_context_json.trim_end().to_string();
-            if trimmed.ends_with(']') {
-                p.dynamic_context_json = format!("{}, {}]", trimmed[..trimmed.len() - 1].trim(), new_entry);
-            } else {
-                p.dynamic_context_json = format!("[{}]", new_entry);
-            }
-        }
+        // Append context entry to dynamic_context_json — use serde_json for safety
+        let mut entries: Vec<String> = serde_json::from_str(&p.dynamic_context_json).unwrap_or_default();
+        entries.push(context);
+        p.dynamic_context_json = serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string());
         p.updated_at = now;
         ctx.db.profile().id().update(p);
     } else {
         // Create a new profile with just this context entry
         let id = uuid_v4(ctx);
-        let context_entry = format!("[\"{}\"]", context.replace('"', "\\\""));
+        let context_entry = serde_json::to_string(&vec![&context]).unwrap_or_else(|_| "[]".to_string());
         let p = Profile {
             id: id.clone(),
             peer_id,
