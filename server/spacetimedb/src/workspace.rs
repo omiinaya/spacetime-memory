@@ -12,6 +12,7 @@ pub struct Workspace {
     pub id: String,
     pub name: String,
     pub description: String,
+    pub context: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub is_public: bool,
@@ -48,6 +49,7 @@ pub fn create_workspace(ctx: &ReducerContext, name: String, description: String,
         id: workspace_id.clone(),
         name,
         description,
+        context: String::new(),
         created_at: now,
         updated_at: now,
         is_public: false,
@@ -84,10 +86,75 @@ pub fn update_workspace(ctx: &ReducerContext, id: String, name: String, descript
         id: id.clone(),
         name,
         description,
+        context: existing.context,
         created_at: existing.created_at,
         updated_at: now_micros(ctx),
         is_public: existing.is_public,
     });
+    Ok(())
+}
+
+/// Set the context string for a workspace. Requires editor access.
+#[reducer]
+pub fn set_workspace_context(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    context_text: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex().to_string();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
+
+    let ws = ctx
+        .db
+        .workspace()
+        .id()
+        .find(&workspace_id)
+        .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
+
+    let updated = Workspace {
+        context: context_text,
+        ..ws
+    };
+    ctx.db.workspace().id().update(updated);
+    Ok(())
+}
+
+/// Result table for get_workspace_context queries.
+#[table(accessor = workspace_context_result, public)]
+#[derive(Debug, Clone)]
+pub struct WorkspaceContextResult {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub context: String,
+    pub queried_at: i64,
+}
+
+/// Retrieve the context string for a workspace. Result written to workspace_context_result.
+#[reducer]
+pub fn get_workspace_context(
+    ctx: &ReducerContext,
+    workspace_id: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex().to_string();
+    check_space_access(ctx, &workspace_id, &caller, "viewer")?;
+
+    let ws = ctx
+        .db
+        .workspace()
+        .id()
+        .find(&workspace_id)
+        .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
+
+    ctx.db.workspace_context_result().insert(WorkspaceContextResult {
+        id: uuid_v4(ctx),
+        workspace_id: workspace_id.clone(),
+        context: ws.context.clone(),
+        queried_at: now_micros(ctx),
+    });
+
     Ok(())
 }
 

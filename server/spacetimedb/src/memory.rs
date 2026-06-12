@@ -19,6 +19,7 @@ pub struct Memory {
     pub memory_type: String,
     pub content: String,
     pub summary: String,
+    pub context: String,
     /// JSON array of entity references
     pub entities_json: String,
     pub confidence: f64,
@@ -100,6 +101,7 @@ pub fn store_memory_batch(
             memory_type: item.memory_type,
             content: item.content,
             summary: item.summary,
+            context: String::new(),
             entities_json: item.entities_json,
             confidence: item.confidence,
             source_session_id: item.source_session_id,
@@ -152,6 +154,7 @@ pub fn store_memory(
         memory_type,
         content,
         summary,
+        context: String::new(),
         entities_json,
         confidence,
         source_session_id,
@@ -288,6 +291,32 @@ pub fn set_memory_scope(
     check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
 
     mem.user_scope = user_scope;
+    mem.updated_at = now_micros(ctx);
+
+    ctx.db.memory().id().update(mem);
+    Ok(())
+}
+
+/// Set the context string on an existing memory.
+/// The context string encodes hierarchical context tree information.
+#[reducer]
+pub fn set_memory_context(
+    ctx: &ReducerContext,
+    memory_id: String,
+    context_text: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let mut mem = ctx
+        .db
+        .memory()
+        .id()
+        .find(&memory_id)
+        .ok_or_else(|| format!("Memory '{}' not found", memory_id))?;
+
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
+
+    mem.context = context_text;
     mem.updated_at = now_micros(ctx);
 
     ctx.db.memory().id().update(mem);

@@ -436,6 +436,7 @@ fn apply_incoming_insert(
                 memory_type: data.get("memory_type").and_then(|v| v.as_str()).unwrap_or("experience").to_string(),
                 content: data.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 summary: data.get("summary").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                context: data.get("context").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 entities_json: data.get("entities_json").and_then(|v| v.as_str()).unwrap_or("[]").to_string(),
                 confidence: data.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.8),
                 source_session_id: data.get("source_session_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),

@@ -1,0 +1,64 @@
+"""Tests for context tree feature (QMD parity)."""
+
+import json
+import pytest
+from unittest.mock import MagicMock
+
+
+class TestContextTree:
+    """Context tree — set/get context on workspaces and memories."""
+
+    def test_set_workspace_context(self, mock_client):
+        """set_workspace_context calls reducer with correct args."""
+        mock_client._call("set_workspace_context", ["ws-1", "Project docs about auth"])
+        mock_client._call.assert_called_with(
+            "set_workspace_context", ["ws-1", "Project docs about auth"]
+        )
+
+    def test_set_memory_context(self, mock_client):
+        """set_memory_context calls reducer with correct args."""
+        mock_client._call("set_memory_context", ["mem-1", "This memory describes the login flow"])
+        mock_client._call.assert_called_with(
+            "set_memory_context", ["mem-1", "This memory describes the login flow"]
+        )
+
+    def test_context_in_search_results(self, mock_client):
+        """Search results include context_json from hybrid_result."""
+        ctx = json.dumps({
+            "workspace_context": "Auth module docs",
+            "memory_context": "Login flow details",
+        })
+        mock_client._sql.return_value = [
+            {
+                "entity_id": "mem-1", "entity_type": "memory",
+                "score": 0.95, "query_hash": "abc123",
+                "workspace_id": "ws-1", "context_json": ctx,
+            }
+        ]
+        mock_client._embed.return_value = [0.1] * 384
+        mock_client._query.return_value = [{"id": "mem-1", "content": "login content"}]
+
+        results = mock_client.search("ws-1", "login", limit=10)
+        assert len(results) == 1
+        assert "context_json" in results[0]
+        parsed = json.loads(results[0]["context_json"])
+        assert parsed["workspace_context"] == "Auth module docs"
+        assert parsed["memory_context"] == "Login flow details"
+
+
+@pytest.fixture
+def mock_client():
+    """Client with mocked HTTP layer."""
+    from unittest.mock import MagicMock
+    from spacetime_memory import Client
+
+    c = Client.__new__(Client)
+    c._http = MagicMock()
+    c.database = "test"
+    c._identity_token = "test-token"
+    c._identity_established = True
+    c._call = MagicMock(return_value={"status": "ok"})
+    c._sql = MagicMock(return_value=[])
+    c._query = MagicMock(return_value=[])
+    c._embed = MagicMock(return_value=[0.1] * 384)
+    return c

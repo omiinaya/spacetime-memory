@@ -55,6 +55,7 @@ pub fn consolidate_memories(
         memory_type: String::from("consolidated"),
         content: target_content,
         summary: target_summary,
+        context: String::new(),
         entities_json: String::from("[]"),
         confidence: 1.0,
         source_session_id: String::new(),

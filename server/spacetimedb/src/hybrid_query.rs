@@ -30,6 +30,8 @@ pub struct HybridResult {
     pub score: f64,
     /// Which strategy produced this row: "semantic" | "keyword" | "graph" | "temporal"
     pub strategy: String,
+    /// JSON: {"workspace_context": "...", "memory_context": "..."}
+    pub context_json: String,
     pub created_at: i64,
 }
 
@@ -115,6 +117,15 @@ pub(crate) fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
 // Reducer: hybrid_search
 // ---------------------------------------------------------------------------
 
+/// Build a context_json string from workspace and memory contexts.
+fn make_context_json(workspace_context: &str, memory_context: &str) -> String {
+    format!(
+        "{{\"workspace_context\":{},\"memory_context\":{}}}",
+        serde_json::to_string(workspace_context).unwrap_or_else(|_| "\"\"".to_string()),
+        serde_json::to_string(memory_context).unwrap_or_else(|_| "\"\"".to_string()),
+    )
+}
+
 /// Run multiple retrieval strategies and store fused results into `HybridResult`.
 ///
 /// `strategies_json` is a JSON array of strategy names, e.g.
@@ -157,6 +168,15 @@ pub fn hybrid_search(
     // Clamp limit (default 10)
     let limit = if limit == 0 { 10 } else { limit };
 
+    // Pre-fetch workspace context for context_json population
+    let workspace_context = ctx
+        .db
+        .workspace()
+        .id()
+        .find(&workspace_id)
+        .map(|ws| ws.context)
+        .unwrap_or_default();
+
     // Dispatch each selected strategy
     for strategy in &strategies {
         match strategy.as_str() {
@@ -197,6 +217,15 @@ pub fn hybrid_search(
                     };
                     let score = base_score * (0.5 + trust * 0.5);
 
+                    let memory_context = if si.entity_type == "memory" {
+                        ctx.db.memory().id().find(&si.entity_id)
+                            .map(|m| m.context)
+                            .unwrap_or_default()
+                    } else {
+                        String::new()
+                    };
+                    let context_json = make_context_json(&workspace_context, &memory_context);
+
                     ctx.db.hybrid_result().insert(HybridResult {
                         id: uuid_v4(ctx),
                         workspace_id: workspace_id.clone(),
@@ -206,6 +235,7 @@ pub fn hybrid_search(
                         content: si.content.clone(),
                         score,
                         strategy: "semantic".to_string(),
+                        context_json,
                         created_at: now,
                     });
                     count += 1;
@@ -239,6 +269,7 @@ pub fn hybrid_search(
                     };
                     // Weight by trust_score
                     let score = base_score * (0.5 + m.trust_score * 0.5);
+                    let context_json = make_context_json(&workspace_context, &m.context);
 
                     ctx.db.hybrid_result().insert(HybridResult {
                         id: uuid_v4(ctx),
@@ -249,6 +280,7 @@ pub fn hybrid_search(
                         content: m.content.clone(),
                         score,
                         strategy: "keyword".to_string(),
+                        context_json,
                         created_at: now,
                     });
                     count += 1;
@@ -315,6 +347,7 @@ pub fn hybrid_search(
                             };
 
                         let score = edge.weight * 0.5;
+                        let context_json = make_context_json(&workspace_context, "");
 
                         ctx.db.hybrid_result().insert(HybridResult {
                             id: uuid_v4(ctx),
@@ -325,6 +358,7 @@ pub fn hybrid_search(
                             content,
                             score,
                             strategy: "graph".to_string(),
+                            context_json,
                             created_at: now,
                         });
                         count += 1;
@@ -333,6 +367,7 @@ pub fn hybrid_search(
                     // Also include the matching node itself
                     if count < limit {
                         if let Some(node) = ctx.db.kg_node().id().find(node_id) {
+                            let context_json = make_context_json(&workspace_context, "");
                             ctx.db.hybrid_result().insert(HybridResult {
                                 id: uuid_v4(ctx),
                                 workspace_id: workspace_id.clone(),
@@ -342,6 +377,7 @@ pub fn hybrid_search(
                                 content: format!("{}: {}", node.label, node.summary),
                                 score: 0.3,
                                 strategy: "graph".to_string(),
+                                context_json,
                                 created_at: now,
                             });
                             count += 1;
@@ -391,6 +427,7 @@ pub fn hybrid_search(
                     };
                     // Weight by trust_score
                     let score = base_score * (0.5 + m.trust_score * 0.5);
+                    let context_json = make_context_json(&workspace_context, &m.context);
 
                     ctx.db.hybrid_result().insert(HybridResult {
                         id: uuid_v4(ctx),
@@ -401,6 +438,7 @@ pub fn hybrid_search(
                         content: m.content.clone(),
                         score,
                         strategy: "temporal".to_string(),
+                        context_json,
                         created_at: now,
                     });
                     count += 1;

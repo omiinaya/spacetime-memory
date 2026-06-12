@@ -1026,6 +1026,33 @@ class Client:
                 return {"status": "ok", "note": "already deleted"}
             raise
 
+    def set_workspace_context(self, workspace_id: str, context: str) -> dict[str, Any]:
+        """Attach a context string to a workspace for QMD-style context trees."""
+        return self._call("set_workspace_context", [workspace_id, context])
+
+    def set_memory_context(self, memory_id: str, context: str) -> dict[str, Any]:
+        """Attach a context string to a memory for QMD-style context trees."""
+        return self._call("set_memory_context", [memory_id, context])
+
+    def get_context_chain(self, memory_id: str) -> dict[str, Any]:
+        """Return the context chain for a memory: workspace context + memory context."""
+        mems = self._query("memory", filter_dict={"id": memory_id}, columns=["id", "workspace_id", "context"])
+        if not mems:
+            return {"workspace_context": "", "memory_context": ""}
+        ws_id = mems[0].get("workspace_id", "")
+        mem_ctx = mems[0].get("context", "")
+
+        ws_ctx = ""
+        if ws_id:
+            wss = self._query("workspace", filter_dict={"id": ws_id}, columns=["context"])
+            if wss:
+                ws_ctx = wss[0].get("context", "")
+
+        return {
+            "workspace_context": ws_ctx,
+            "memory_context": mem_ctx,
+        }
+
     def reinforce(self, memory_id: str) -> dict[str, Any]:
         """Reinforce a memory (bump access_count + strength)."""
         return self._call("reinforce_memory", [memory_id])
