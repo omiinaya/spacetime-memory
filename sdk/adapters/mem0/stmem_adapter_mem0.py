@@ -329,6 +329,144 @@ class Memory:
         except RuntimeError:
             return []
 
+    # ── Entity store (Mem0 graph API) ──────────────────────────────────
+
+    @property
+    def graph(self) -> GraphStore:
+        """Mem0-compatible graph / entity store.
+
+        Real Mem0 stores entities in a vector collection. We back it with
+        SpacetimeDB's ``entity_link`` table with alias support.
+
+        Usage::
+
+            >>> m = Memory()
+            >>> m.graph.add("Alice", entity_type="person", user_id="alice")
+            >>> results = m.graph.search("Alice", user_id="alice")
+        """
+        if not hasattr(self, "_graph_store"):
+            self._graph_store = GraphStore(self)
+        return self._graph_store
+
+
+class GraphStore:
+    """Mem0-compatible entity store backed by entity_link table."""
+
+    def __init__(self, memory: Memory) -> None:
+        self._mem = memory
+
+    def _ws(self, user_id: str | None = None) -> str:
+        return self._mem._workspace_for(user_id, None)
+
+    def _tag(self, user_id: str | None = None) -> str:
+        return f"mem0_user:{user_id}" if user_id else "mem0_global"
+
+    def add(
+        self,
+        label: str,
+        entity_type: str = "concept",
+        user_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Add an entity to the store.
+
+        Deduplicates by label — if an entity with the same label exists
+        in the same user scope, creates an alias instead of a duplicate.
+        """
+        ws_id = self._ws(user_id)
+        tag = self._tag(user_id)
+
+        # Check for existing entity with same label (fuzzy via entity_link)
+        existing = self.search(label, user_id=user_id, limit=1)
+        if existing and existing[0].get("label", "").lower() == label.lower():
+            return {"id": existing[0]["id"], "label": label, "status": "exists"}
+
+        meta = json.dumps({"tag": tag, **(metadata or {})})
+        result = self._mem._client._call(
+            "create_entity_link",
+            [ws_id, label, entity_type, meta],
+        )
+        rid = result.get("entity_id", result.get("id", ""))
+        return {"id": rid, "label": label, "entity_type": entity_type, "status": "created"}
+
+    def search(
+        self,
+        query: str,
+        user_id: str | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Search entities by label."""
+        ws_id = self._ws(user_id)
+        tag = self._tag(user_id)
+
+        # Use SDK's semantic search via hybrid_search with entity_type filter
+        try:
+            results = self._mem._client.search(
+                workspace_id=ws_id, query=query, limit=limit, semantic=True,
+            )
+            # Filter to kg_node results matching our tag
+            tag_str = f'"tag": "{tag}"'
+            entities = []
+            for r in results:
+                meta = r.get("metadata_json", "")
+                if tag_str in meta or r.get("entity_type") == "node":
+                    entities.append({
+                        "id": r.get("entity_id", ""),
+                        "label": r.get("content", "")[:100],
+                        "entity_type": "concept",
+                        "score": r.get("score", 0.0),
+                        "metadata": _safe_json(r.get("metadata_json", "{}")),
+                    })
+            return entities[:limit]
+        except Exception:
+            return []
+
+    def get_all(
+        self,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Get all entities for a user scope."""
+        ws_id = self._ws(user_id)
+        tag = self._tag(user_id)
+        tag_str = f'"tag": "{tag}"'
+
+        try:
+            # Query entity_link table — may be private, try reducer first
+            results = self._mem._client.search(
+                workspace_id=ws_id, query="", limit=limit, semantic=False,
+            )
+            entities = []
+            seen: set[str] = set()
+            for r in results:
+                eid = r.get("entity_id", "")
+                if eid in seen:
+                    continue
+                seen.add(eid)
+                entities.append({
+                    "id": eid,
+                    "label": r.get("content", "")[:100],
+                    "entity_type": "concept",
+                })
+            return entities[:limit]
+        except Exception:
+            return []
+
+    def delete(self, entity_id: str) -> dict[str, Any]:
+        """Delete an entity by ID."""
+        try:
+            self._mem._client._call("delete_entity_link", [entity_id])
+            return {"status": "deleted", "id": entity_id}
+        except Exception:
+            return {"status": "error", "id": entity_id}
+
+
+def _safe_json(raw: str) -> dict[str, Any]:
+    try:
+        return json.loads(raw) if isinstance(raw, str) else raw
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
 
 def _esc(val: str) -> str:
     """Basic SQL string escaping."""

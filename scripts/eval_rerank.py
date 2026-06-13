@@ -34,7 +34,7 @@ for qi, q in enumerate(queries):
     relevant = set(q["relevant_ids"])
     
     t0 = time.time()
-    results = c.search(ws_id, query=query_text, limit=10, semantic=True, rerank=True)
+    results = c.search(ws_id, query=query_text, limit=5, semantic=True, rerank=True)
     elapsed = time.time() - t0
     total_time += elapsed
     
