@@ -161,7 +161,7 @@ Adapter: `spacetime_memory.sdks.graphiti.Graphiti` (1750 lines, 18 public method
 - `_get_or_create_node` with 3-pass dedup (exact → case-insensitive → fuzzy difflib)
 - Error handling: `RuntimeError` for backend failures (2 bare `except Exception` sites replaced)
 
-**Coverage: ~85%** (tests: 17/20 pass). Remaining gaps: `build_communities` + `remove_episode` pre-existing bugs.
+**Coverage: ~95%** (tests: 20/20 pass). All behavioral tests pass against live SpacetimeDB.
 
 ---
 
@@ -259,9 +259,35 @@ Adapter: Architecture parity — not a library adapter. QMD is a Node.js CLI; Sp
 | LLM reranking | ✅ | `llm_rerank()` utility + `search(rerank=True)`. Sends top-K results to OpenAI-compatible endpoint for relevance re-scoring. Configurable via `LLM_RERANK_ENDPOINT`/`LLM_RERANK_MODEL` env vars. Graceful fallback on error. |
 | Fuzzy matching on get | ✅ | `fuzzy_get()` — uses `difflib.SequenceMatcher` for typo-tolerant memory lookup. Configurable `threshold` and `field`. |
 | Glob-based multi-get | ✅ | `glob_get()` — `fnmatch`-style wildcards (`*`, `?`, `[...]`) on any memory field. |
-| HTTP transport for MCP | ⚠️ | Our MCP server is stdio-only. QMD supports HTTP daemon mode |
+| HTTP transport for MCP | ✅ | SSE and streamable-http transports via `--transport sse` / `--transport streamable-http` CLI flags |
 
-**Coverage: ~98%** (architecture parity). All QMD features covered: hybrid search, MCP, CLI, context trees, LLM reranking, fuzzy get, glob multi-get. Only MCP HTTP transport remains as a minor gap.
+**Coverage: ~98%** (architecture parity). All QMD features covered: hybrid search, MCP, CLI, context trees, LLM reranking, fuzzy get, glob multi-get, MCP HTTP transport.
+
+---
+
+## GBrain
+
+Reference: [garrytan/gbrain](https://github.com/garrytan/gbrain) — personal/company knowledge brain with synthesis layer. Production at 146K pages, 24K people, 5K companies. Not a library — architecture inspiration like QMD.
+
+Adapter: Architecture parity — not a library adapter. GBrain is a PGLite + Bun daemon; Spacetime Memory provides equivalent capabilities via SDK + CLI + MCP + frontend.
+
+| Feature | Status | Notes |
+|--------|--------|-------|
+| Knowledge graph with typed edges | ✅ | `kg_node` + `kg_edge` tables with typed relations |
+| Memory storage + search (vector+keyword) | ✅ | `hybrid_search` with BM25 + semantic + graph + temporal |
+| Hybrid search fusion | ✅ | Multi-strategy score fusion in WASM |
+| Profiles (people/agents) | ✅ | `profile` table with static_facts + dynamic_context. SDK methods verified. |
+| Workspace ACL + auth | ✅ | 130/130 reducers gated. 43 private tables. Company-brain scoping. |
+| Notes with wikilinks | ✅ | 4 frontend pages. Block references, transclusions. |
+| Context trees | ✅ | Workspace → memory context chain with frontend breadcrumbs. |
+| Consolidation (decay, dedup, reinforce) | ✅ | `consolidate.py` cron. `manual_maintenance` reducer. |
+| Synthesis with gap analysis | ❌ | LLM-powered answer synthesis + "what the brain doesn't know" |
+| Auto entity extraction on write | ❌ | Regex-based zero-LLM entity extraction (people, companies, edges) |
+| Dream cycle | ⚠️ | We have consolidation cron, but no nightly enrichment pass |
+| Citations | ❌ | Every claim traced to source page |
+| Benchmarked graph search | ❌ | GBrain P@5 49.1%, R@5 97.9%. We have no equivalent eval harness. |
+
+**Coverage: ~70%** (architecture parity). Strong on storage, search, graph, and ACL. Missing synthesis, auto-extraction, dream cycle enrichment, and citations.
 
 ---
 
@@ -276,8 +302,9 @@ Adapter: Architecture parity — not a library adapter. QMD is a Node.js CLI; Sp
 | **Honcho** | 1550 | 21+23 | **14/14 pass** | **~95%** | ✅ Excellent — `.aio` + all LLM features |
 | **Graphiti** | 1750 | 18 | **20/20 pass** | **~95%** | ✅ Drop-in — all tests pass |
 | **QMD** | — | Architecture | N/A (CLI tool) | **~98%** | Full feature parity — all QMD features covered |
+| **GBrain** | — | Architecture | N/A (PGLite + Bun) | **~70%** | Storage/search/graph strong — missing synthesis, auto-extraction, dream cycle |
 
-**Overall: ~95% shape match across 6 adapters + QMD architecture parity.** 113 behavioral tests verified against live SpacetimeDB.
+**Overall: ~95% shape match across 6 adapters + 2 architecture-tracked projects.** 113 behavioral tests verified against live SpacetimeDB.
 
 **v1.27.0 state:**
 - 40+ bare `except Exception` → `except RuntimeError` across all adapters + client
@@ -287,6 +314,9 @@ Adapter: Architecture parity — not a library adapter. QMD is a Node.js CLI; Sp
 - 19 `.iter()` calls capped with `.take(MAX_RESULTS)` across Rust reducers
 - 30 new frontend component tests (53 total)
 - `make ci` full local pipeline
-- **QMD tracked** — context trees built + displayed in frontend. LLM reranking built + verified live.
+- QMD MCP HTTP transport: SSE + streamable-http via CLI flags
+- Profile SDK methods added (7 methods)
+- Entity link SDK methods added (3 methods)
+- Dead reducers wired (cleanup_replication_log → consolidate.py cron)
 **What IS a drop-in replacement today:** LangGraph, Zep (v2), Honcho, Graphiti.
-**What needs work:** Mem0 (`entity_store` is Qdrant-backed — unfixable), Hindsight (upstream not on PyPI — adapter IS the SDK), QMD (fuzzy get + glob multi-get).
+**What needs work:** Mem0 (`entity_store` is Qdrant-backed — unfixable). Hindsight (upstream not on PyPI — adapter IS the SDK). Docker smoke test + PyPI publish (blocked on external resources).

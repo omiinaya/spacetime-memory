@@ -2431,6 +2431,69 @@ def restore(input_path: str, token: str | None) -> None:
 
 
 # ===================================================================
+# synthesize — GBrain-style query with gap analysis
+# ===================================================================
+
+
+@cli.command(name="synthesize")
+@click.argument("workspace_id")
+@click.argument("query")
+@click.option("--budget", default=4096, type=int, help="Token budget for context (default: 4096)")
+def synthesize_cmd(workspace_id: str, query: str, budget: int) -> None:
+    """Synthesize a grounded answer with gap analysis (GBrain-style).
+
+    Searches the workspace, finds relevant memories, and calls an LLM to
+    produce a structured answer that includes:
+
+    \b
+    - answer: synthesized answer grounded in found memories
+    - gaps: what the knowledge base does NOT contain
+    - sources: indices of source memories used
+    - confidence: 0.0-1.0
+
+    Requires OPENAI_API_KEY for LLM calls.
+
+    Example:
+        stmem synthesize my-workspace "What do we know about Alice Chen?"
+    """
+    from spacetime_memory.context_agent import ContextAgent
+
+    client = _sdk_client()
+    agent = ContextAgent(client)
+
+    with console.status("Synthesizing with gap analysis..."):
+        result = agent.synthesize(query, workspace_id=workspace_id, token_budget=budget)
+
+    if result.get("error"):
+        console.print(f"[red]{result['error']}[/red]")
+        return
+
+    answer = result.get("answer")
+    gaps = result.get("gaps", [])
+    sources = result.get("sources", [])
+    confidence = result.get("confidence", 0.0)
+
+    if answer:
+        console.print(f"\n[bold green]Answer[/bold green] (confidence: {confidence:.0%})")
+        console.print(f"[dim]{'─' * 60}[/dim]")
+        console.print(answer)
+    else:
+        console.print("\n[yellow]LLM unavailable — showing raw context entries.[/yellow]")
+        if "pack" in result:
+            pack = result["pack"]
+            console.print(f"  Pack: {pack.get('id', '')[:16]}...")
+
+    if gaps:
+        console.print(f"\n[bold yellow]Knowledge Gaps[/bold yellow] ({len(gaps)})")
+        console.print(f"[dim]{'─' * 60}[/dim]")
+        for i, gap in enumerate(gaps, 1):
+            console.print(f"  {i}. {gap}")
+
+    if sources:
+        console.print(f"\n[bold dim]Sources[/bold dim]: {' '.join(str(s) for s in sources)}")
+
+
+# ===================================================================
 # Entry point
 # ===================================================================
 
@@ -2464,6 +2527,136 @@ def main() -> None:
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(1)
 
+
+
+# ===================================================================
+# backup / restore
+# ===================================================================
+
+
+@cli.command(name="backup")
+@click.argument("workspace_id")
+@click.option("--output", "-o", default=None, help="Output file (default: ~/.hermes/backups/<ws>.jsonl)")
+@click.option("--tables", default="memory,session,message,profile,insight,note,kg_node,kg_edge",
+              help="Comma-separated tables to backup")
+def backup_cmd(workspace_id: str, output: str | None, tables: str) -> None:
+    """Backup all data for a workspace to a JSONL file."""
+    from pathlib import Path
+
+    table_list = [t.strip() for t in tables.split(",")]
+
+    if not output:
+        backup_dir = Path.home() / ".hermes" / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        output = str(backup_dir / f"{workspace_id[:16]}.jsonl")
+
+    client = _sdk_client()
+    total = 0
+
+    with open(output, "w") as f:
+        for table in table_list:
+            try:
+                rows = client._query(table, workspace_id=workspace_id)
+            except RuntimeError:
+                console.print(f"  [yellow]Skipping {table}[/yellow] (not accessible)")
+                continue
+            for row in rows:
+                f.write(json.dumps({"table": table, **row}) + "\n")
+                total += 1
+        console.print(f"  {total} rows from {len(table_list)} tables")
+
+    console.print(f"\n[green]Backup complete:[/green] {output}")
+    console.print(f"  {total} rows written")
+
+
+@cli.command(name="restore")
+@click.argument("workspace_id")
+@click.argument("backup_file", type=click.Path(exists=True))
+@click.option("--dry-run", is_flag=True, help="Print what would be restored without making changes")
+def restore_cmd(workspace_id: str, backup_file: str, dry_run: bool) -> None:
+    """Restore workspace data from a JSONL backup file."""
+    client = _sdk_client()
+    total = 0
+    errors = 0
+
+    with open(backup_file) as f:
+        for line_no, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                console.print(f"  [red]Line {line_no}: invalid JSON[/red]")
+                errors += 1
+                continue
+
+            table = row.pop("table", "")
+            if not table:
+                console.print(f"  [red]Line {line_no}: missing table field[/red]")
+                errors += 1
+                continue
+
+            if dry_run:
+                console.print(f"  [DRY] {table}: {json.dumps(row)[:80]}...")
+                total += 1
+                continue
+
+            try:
+                # Use store_memory for memory rows, generic _call for others
+                if table == "memory":
+                    client.store(
+                        workspace_id=workspace_id,
+                        content=row.get("content", ""),
+                        summary=row.get("summary", ""),
+                        memory_type=row.get("memory_type", "world_fact"),
+                        peer_id=row.get("peer_id", ""),
+                    )
+                elif table == "session":
+                    client._call("create_session", [
+                        workspace_id, row.get("id", ""), row.get("name", ""),
+                        row.get("summary", ""), row.get("participants_json", "[]"),
+                    ])
+                elif table == "kg_node":
+                    client._call("create_node", [
+                        workspace_id, row.get("label", ""), row.get("node_type", ""),
+                        row.get("summary", ""), row.get("metadata_json", "{}"),
+                    ])
+                elif table == "kg_edge":
+                    client._call("create_edge", [
+                        workspace_id, row.get("source_node_id", ""),
+                        row.get("target_node_id", ""), row.get("relation", ""),
+                        row.get("weight", 1.0), row.get("confidence", "EXTRACTED"),
+                        row.get("metadata_json", "{}"),
+                    ])
+                elif table == "profile":
+                    client._call("upsert_profile", [
+                        workspace_id, row.get("peer_id", ""),
+                        row.get("static_facts_json", "{}"),
+                        row.get("dynamic_context_json", "{}"),
+                    ])
+                elif table == "insight":
+                    client._call("create_insight", [
+                        workspace_id, row.get("source", "restore"),
+                        row.get("content", ""), row.get("insight_type", "observation"),
+                        row.get("entities_json", "[]"), row.get("confidence", 0.7),
+                    ])
+                elif table == "note":
+                    client._call("create_note", [
+                        workspace_id, row.get("title", ""), row.get("content", ""),
+                        row.get("tags_json", "[]"),
+                    ])
+                else:
+                    console.print(f"  [yellow]Skipping {table} (no restore handler)[/yellow]")
+                    continue
+
+                total += 1
+            except RuntimeError as e:
+                console.print(f"  [red]Line {line_no} ({table}): {e}[/red]")
+                errors += 1
+
+    mode = " [DRY-RUN]" if dry_run else ""
+    console.print(f"\n[green]Restore complete{mode}:[/green] {total} rows restored, {errors} errors")
 
 # ===================================================================
 # serve — MCP server

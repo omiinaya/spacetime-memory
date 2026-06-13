@@ -23,8 +23,11 @@ Environment variables:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient:
@@ -105,6 +108,7 @@ class LLMClient:
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
         except Exception:
+            logger.warning("LLM call failed, returning None")
             return None
 
     def summarize(self, text: str, instruction: str = "") -> str | None:
@@ -220,3 +224,54 @@ class LLMClient:
         )
 
         return self.summarize(prompt, instruction="Be concise. 2-4 sentences.")
+
+    def extract_entities_llm(
+        self,
+        text: str,
+    ) -> list[dict[str, Any]] | None:
+        """Extract named entities from text using LLM.
+
+        Returns a list of entity dicts with ``name``, ``entity_type``
+        (\"person\" | \"company\" | \"org\" | \"product\" | \"location\"), and
+        optional ``aliases`` and ``description``.  Falls back to None
+        when no API key is configured — callers should use regex
+        extraction as backup.
+
+        Args:
+            text: The text to extract entities from.
+
+        Returns:
+            List of entity dicts, or None if LLM not configured or call fails.
+        """
+        if not self.available:
+            return None
+
+        result = self.chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a named entity extraction engine. Extract all named "
+                        "entities from the text. Return ONLY valid JSON, no markdown. "
+                        "Schema: {\"entities\": [{\"name\": \"...\", \"entity_type\": "
+                        "\"person|company|org|product|location\", \"aliases\": [...], "
+                        "\"description\": \"...\"}]}"
+                    ),
+                },
+                {"role": "user", "content": text},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+        )
+        if not result:
+            return None
+
+        try:
+            data = json.loads(result)
+            entities = data.get("entities", data.get("items", []))
+            if isinstance(entities, list):
+                return entities
+            return []
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("LLM entity extraction returned non-JSON, returning None")
+            return None

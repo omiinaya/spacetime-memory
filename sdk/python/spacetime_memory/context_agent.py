@@ -22,8 +22,11 @@ Example::
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class ContextAgent:
@@ -57,7 +60,7 @@ class ContextAgent:
         """
         # 1. Generate the context pack
         self._client._call("generate_context_pack", [
-            workspace_id, query, token_budget, "context_agent", previous_pack_id,
+            workspace_id, query, token_budget, "", previous_pack_id,
         ])
 
         # 2. Read the pack
@@ -73,11 +76,20 @@ class ContextAgent:
         pack = packs[0]
         pack_id = pack.get("id", "")
 
-        # 3. Read entries
-        entries = self._client._query(
-            "context_entry", filter_dict={"pack_id": pack_id}
-        )
-        entries.sort(key=lambda e: e.get("rank", 0))
+        # 3. Read entries from the pack's serialized JSON
+        try:
+            pack_json = json.loads(pack.get("pack_json", "[]"))
+        except (json.JSONDecodeError, TypeError):
+            pack_json = []
+
+        if isinstance(pack_json, list):
+            entries = pack_json
+        elif isinstance(pack_json, dict):
+            entries = pack_json.get("entries", pack_json.get("memories", []))
+        else:
+            entries = []
+
+        entries.sort(key=lambda e: e.get("rank", e.get("score", 0)), reverse=True)
 
         result: dict[str, Any] = {
             "pack": pack,
@@ -108,7 +120,7 @@ class ContextAgent:
 
         Requires OPENAI_API_KEY env var.  Falls back to None if not set.
         """
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LITELLM_MASTER_KEY", "")
         if not api_key:
             return None
 
@@ -149,6 +161,125 @@ class ContextAgent:
             return data["choices"][0]["message"]["content"]
         except Exception as exc:
             return f"[LLM call failed: {exc}]"
+
+    def synthesize(
+        self,
+        query: str,
+        workspace_id: str,
+        token_budget: int = 4096,
+    ) -> dict[str, Any]:
+        """Synthesize an answer with gap analysis — GBrain-style.
+
+        Runs the context pipeline, then calls the LLM with a structured prompt
+        that asks for both a grounded answer AND identification of knowledge gaps.
+
+        Returns a dict with:
+          - answer: synthesised answer text
+          - gaps: list of identified knowledge gaps
+          - sources: list of source entry indices used
+          - confidence: float 0.0-1.0
+          - pack: the context_pack row
+        """
+        # Run context pipeline (same as ask())
+        self._client._call("generate_context_pack", [
+            workspace_id, query, token_budget, "", "",
+        ])
+        packs = self._client._query("context_pack", workspace_id=workspace_id)
+        packs.sort(key=lambda p: p.get("created_at", 0), reverse=True)
+        packs = packs[:1]
+        if not packs:
+            return {"error": "No context pack generated", "answer": None, "gaps": []}
+
+        pack = packs[0]
+        entries: list[dict[str, Any]] = []
+        try:
+            pack_json_data = json.loads(pack.get("pack_json", "[]"))
+        except (json.JSONDecodeError, TypeError):
+            pack_json_data = []
+        if isinstance(pack_json_data, list):
+            entries = pack_json_data
+        elif isinstance(pack_json_data, dict):
+            entries = pack_json_data.get("entries", pack_json_data.get("memories", []))
+        entries.sort(key=lambda e: e.get("rank", e.get("score", 0)), reverse=True)
+
+        result: dict[str, Any] = {"pack": pack}
+
+        # LLM call with gap analysis prompt
+        llm_result = self._call_llm_with_gaps(query, entries, pack)
+        if llm_result:
+            result.update(llm_result)
+        else:
+            result["answer"] = None
+            result["gaps"] = []
+            result["sources"] = []
+            result["confidence"] = 0.0
+
+        return result
+
+    def _call_llm_with_gaps(
+        self,
+        query: str,
+        entries: list[dict[str, Any]],
+        pack: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Call LLM with a structured gap-analysis prompt.
+
+        Returns parsed JSON dict with answer, gaps, sources, confidence, or None.
+        """
+        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LITELLM_MASTER_KEY", "")
+        if not api_key:
+            return None
+
+        base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
+        context_text = self.format_context(entries)
+
+        system_prompt = (
+            "You are a knowledge synthesis engine with gap analysis and citation tracking. "
+            "Answer the query based only on the context entries below. "
+            "For every factual claim in your answer, cite the source entry number in brackets [1][3]. "
+            "Then identify what the knowledge base does NOT contain — "
+            "specific questions, entities, or topics that are missing. "
+            "Return ONLY valid JSON with no markdown, no explanation, per this schema:\n"
+            '{"answer": "synthesised answer with [citations]", '
+            '"citations": [{"source": 1, "text": "quoted excerpt", "claim": "what claim this supports"}], '
+            '"gaps": ["gap 1", "gap 2"], '
+            '"sources": [1, 3], "confidence": 0.85}'
+        )
+
+        try:
+            import httpx
+            resp = httpx.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": (
+                            f"## Query\n{query}\n\n"
+                            f"## Context\n{context_text}\n\n"
+                            "Synthesize an answer and identify what's missing. "
+                            "Return JSON only."
+                        )},
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 2048,
+                    "response_format": {"type": "json_object"},
+                },
+                timeout=60,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"]
+            import json as _json
+            return _json.loads(content)
+        except Exception as exc:
+            logger.warning("LLM gap analysis call failed: %s", exc)
+            return None
 
     def format_context(self, entries: list[dict[str, Any]]) -> str:
         """Format context entries into a text block for an LLM prompt."""

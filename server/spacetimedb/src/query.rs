@@ -48,11 +48,13 @@ const ALLOWED_TABLES: &[&str] = &[
     "tour", "tour_stop",
     "connector_config",
     "context_pack", "context_directory", "directory_memory_link",
+    "context_entry",
     "context_delta_pack", // note: Rust struct is DeltaPack
     "consolidation_log", "merge_suggestion", "backup_entry",
     "memory_feedback", "workspace_config",
     "replication_peer", "replication_log",
     "hierarchy_cluster", "community_hierarchy",
+    "proxy_metrics_snapshot",
 ];
 
 /// Query a private table with auth + workspace enforcement.

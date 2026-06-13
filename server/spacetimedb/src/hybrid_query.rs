@@ -4,7 +4,9 @@ use crate::auth::require_admin;
 
 use crate::knowledge_graph::{kg_edge, kg_node};
 use crate::memory::memory;
-use crate::retrieval::search_index;
+use crate::retrieval::{
+    search_index, term_index, bm25_idf, bm25_score,
+};
 use crate::workspace::workspace;
 use crate::{now_micros, uuid_v4, MAX_RESULTS};
 
@@ -84,10 +86,33 @@ fn query_hash(query: &str) -> String {
     format!("{:016x}", hash)
 }
 
-/// Count how many of the given query terms appear in `text` (case-insensitive).
-fn term_match_count(text: &str, terms: &[&str]) -> usize {
-    let lower = text.to_lowercase();
-    terms.iter().filter(|t| lower.contains(*t)).count()
+/// Tokenize a query string for BM25 keyword search.
+///
+/// Mirrors `retrieval::tokenize` but preserves the original query terms
+/// as they appear (already lowercased by caller).  Filters stopwords and
+/// short tokens.
+fn tokenize_query(query: &str) -> Vec<String> {
+    let stopwords: &[&str] = &[
+        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+        "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
+        "being", "have", "has", "had", "do", "does", "did", "will", "would",
+        "could", "should", "may", "might", "can", "shall", "you", "your",
+        "yours", "he", "she", "it", "its", "they", "them", "their", "we",
+        "us", "our", "this", "that", "these", "those", "am", "not", "no",
+        "if", "then", "than", "so", "as", "just", "also", "very", "too",
+        "about", "into", "over", "after", "before", "between", "through",
+        "during", "above", "below", "up", "down", "out", "off", "here",
+        "there", "all", "each", "every", "both", "few", "more", "most",
+        "other", "some", "such", "only", "own", "same", "now", "when",
+        "where", "how", "which", "who", "whom", "what", "why",
+    ];
+
+    query
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(|w| w.to_lowercase())
+        .filter(|w| w.len() >= 3 && !stopwords.contains(&w.as_str()))
+        .collect()
 }
 
 /// Parse a JSON array of f64 values into a Vec<f64>.
@@ -188,7 +213,7 @@ pub fn hybrid_search(
                     continue;
                 }
                 let mut count: u32 = 0;
-                for si in ctx.db.search_index().iter() {
+                for si in ctx.db.search_index().iter().take(MAX_RESULTS) {
                     if count >= limit {
                         break;
                     }
@@ -243,41 +268,126 @@ pub fn hybrid_search(
             }
 
             "keyword" => {
+                // BM25-based keyword search using the inverted term index
+                let query_terms = tokenize_query(&query_lower);
+                if query_terms.is_empty() {
+                    continue;
+                }
+
+                // Collect all term index entries for the query terms in this workspace
+                // Build: entity_id → Vec<(term, tf, doc_len)>
+                use std::collections::HashMap;
+                let mut entity_terms: HashMap<String, Vec<(String, u32, u32)>> = HashMap::new();
+                let mut term_doc_freq: HashMap<String, usize> = HashMap::new();
+
+                for ti in ctx.db.term_index().iter().take(MAX_RESULTS) {
+                    if ti.workspace_id != workspace_id {
+                        continue;
+                    }
+                    if ti.entity_type != "memory" {
+                        continue;
+                    }
+                    let ti_term_lower = ti.term.to_lowercase();
+                    if !query_terms.contains(&ti_term_lower) {
+                        continue;
+                    }
+                    // Count distinct entities per term for IDF
+                    let _key = (ti.entity_id.clone(), ti_term_lower.clone());
+                    entity_terms
+                        .entry(ti.entity_id.clone())
+                        .or_default()
+                        .push((ti_term_lower.clone(), ti.term_frequency, ti.doc_length));
+                    *term_doc_freq.entry(ti_term_lower).or_insert(0) += 1;
+                }
+
+                if entity_terms.is_empty() {
+                    continue;
+                }
+
+                // Count total documents in workspace for IDF
+                let total_docs = ctx
+                    .db
+                    .term_index()
+                    .iter()
+                    .take(MAX_RESULTS)
+                    .filter(|ti| ti.workspace_id == workspace_id && ti.entity_type == "memory")
+                    .map(|ti| ti.entity_id.clone())
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    .max(1) as usize;
+
+                // Compute average doc length
+                let mut total_tokens: u64 = 0;
+                let mut doc_count: u64 = 0;
+                for ti in ctx.db.term_index().iter().take(MAX_RESULTS) {
+                    if ti.workspace_id == workspace_id && ti.entity_type == "memory" {
+                        total_tokens += ti.doc_length as u64;
+                        doc_count += 1;
+                    }
+                }
+                let avg_doc_len = if doc_count > 0 {
+                    total_tokens as f64 / doc_count as f64
+                } else {
+                    1.0
+                };
+
+                // Score each entity
+                let mut scored: Vec<(String, String, f64)> = Vec::new(); // (entity_id, content, bm25)
+                for (entity_id, term_infos) in &entity_terms {
+                    // Build IDF map: term → (doc_freq, total_docs)
+                    let mut idf_map: HashMap<String, (usize, usize)> = HashMap::new();
+                    for (term, _, _) in term_infos {
+                        let df = term_doc_freq.get(term).copied().unwrap_or(1);
+                        idf_map.insert(term.clone(), (df, total_docs));
+                    }
+
+                    // Sum BM25 score across query terms
+                    let mut total_score: f64 = 0.0;
+                    for (term, tf, doc_len) in term_infos {
+                        let df = term_doc_freq.get(term).copied().unwrap_or(1);
+                        let idf = bm25_idf(df, total_docs);
+                        let score = bm25_score(*tf, *doc_len, avg_doc_len);
+                        total_score += idf * score;
+                    }
+
+                    // Resolve content from memory table
+                    let content = ctx
+                        .db
+                        .memory()
+                        .id()
+                        .find(entity_id)
+                        .map(|m| m.content.clone())
+                        .unwrap_or_default();
+
+                    scored.push((entity_id.clone(), content, total_score));
+                }
+
+                // Sort by BM25 score descending and take top limit
+                scored.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
                 let mut count: u32 = 0;
-                for m in ctx.db.memory().iter() {
+                for (entity_id, content, bm25) in &scored {
                     if count >= limit {
                         break;
                     }
-                    if m.workspace_id != workspace_id {
-                        continue;
-                    }
-                    if !memory_type.is_empty() && m.memory_type != memory_type {
-                        continue;
-                    }
-                    if !tier.is_empty() && m.tier != tier {
-                        continue;
-                    }
-                    let content_lower = m.content.to_lowercase();
-                    if !query_terms.iter().any(|t| content_lower.contains(t)) {
-                        continue;
-                    }
-                    let matched = term_match_count(&m.content, &query_terms);
-                    let base_score = if !query_terms.is_empty() {
-                        matched as f64 / query_terms.len() as f64
-                    } else {
-                        0.0
-                    };
-                    // Weight by trust_score
-                    let score = base_score * (0.5 + m.trust_score * 0.5);
-                    let context_json = make_context_json(&workspace_context, &m.context);
+                    // Cap score to [0, 1] range
+                    let score = bm25.max(0.0).min(1.0);
+
+                    let memory_context = ctx
+                        .db
+                        .memory()
+                        .id()
+                        .find(entity_id)
+                        .map(|m| m.context)
+                        .unwrap_or_default();
+                    let context_json = make_context_json(&workspace_context, &memory_context);
 
                     ctx.db.hybrid_result().insert(HybridResult {
                         id: uuid_v4(ctx),
                         workspace_id: workspace_id.clone(),
                         query_hash: qhash.clone(),
                         entity_type: "memory".to_string(),
-                        entity_id: m.id.clone(),
-                        content: m.content.clone(),
+                        entity_id: entity_id.clone(),
+                        content: content.clone(),
                         score,
                         strategy: "keyword".to_string(),
                         context_json,
@@ -292,7 +402,7 @@ pub fn hybrid_search(
                 let matching_node_ids: Vec<String> = ctx
                     .db
                     .kg_node()
-                    .iter()
+                    .iter().take(MAX_RESULTS)
                     .filter(|n| {
                         if n.workspace_id != workspace_id {
                             return false;
@@ -447,6 +557,71 @@ pub fn hybrid_search(
 
             _ => {
                 return Err(format!("Unknown strategy '{}'", strategy));
+            }
+        }
+    }
+
+    // ── Result Fusion ────────────────────────────────────────────────
+    // Normalize each strategy's scores to [0,1] and combine with weights.
+    // Without this, strategies with inherently different score scales
+    // (temporal 0.5-1.0 vs semantic 0.0-1.0 vs graph 0.0-0.5) are
+    // incomparable when sorted together.
+    {
+        // Collect all results for this query hash
+        let all_rows: Vec<_> = ctx
+            .db
+            .hybrid_result()
+            .iter()
+            .take(MAX_RESULTS)
+            .filter(|r| r.query_hash == qhash && r.workspace_id == workspace_id)
+            .collect();
+
+        if all_rows.len() >= 2 {
+            // Strategy weights (configurable via env, hardcoded defaults)
+            let weights: std::collections::HashMap<&str, f64> = [
+                ("semantic", 0.35),
+                ("keyword", 0.25),
+                ("graph", 0.20),
+                ("temporal", 0.20),
+            ]
+            .iter()
+            .cloned()
+            .collect();
+
+            // Compute min/max per strategy
+            let mut strat_min: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+            let mut strat_max: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+            for row in &all_rows {
+                let e = strat_min.entry(row.strategy.clone()).or_insert(f64::MAX);
+                *e = e.min(row.score);
+                let e = strat_max.entry(row.strategy.clone()).or_insert(f64::MIN);
+                *e = e.max(row.score);
+            }
+
+            // Normalize and compute fused scores, grouped by entity_id
+            use std::collections::HashMap;
+            let mut fused: HashMap<String, f64> = HashMap::new(); // entity_id → fused_score
+            for row in &all_rows {
+                let strat_key = row.strategy.as_str();
+                let weight = weights.get(strat_key).copied().unwrap_or(0.15);
+                let min_s = strat_min.get(&row.strategy).copied().unwrap_or(0.0);
+                let max_s = strat_max.get(&row.strategy).copied().unwrap_or(1.0);
+                let range = max_s - min_s;
+                let normalized = if range > 1e-10 {
+                    (row.score - min_s) / range
+                } else {
+                    0.5 // All scores identical for this strategy
+                };
+                let contrib = normalized * weight;
+                *fused.entry(row.entity_id.clone()).or_insert(0.0) += contrib;
+            }
+
+            // Update each result row with the fused score
+            for mut row in all_rows {
+                if let Some(&fused_score) = fused.get(&row.entity_id) {
+                    row.score = fused_score.max(0.0).min(1.0);
+                    ctx.db.hybrid_result().id().update(row);
+                }
             }
         }
     }
@@ -674,36 +849,6 @@ mod tests {
     fn test_query_hash_empty() {
         let h = query_hash("");
         assert_eq!(h.len(), 16);
-    }
-
-    #[test]
-    fn test_term_match_count_all_match() {
-        let count = term_match_count("the quick brown fox", &["the", "quick", "fox"]);
-        assert_eq!(count, 3);
-    }
-
-    #[test]
-    fn test_term_match_count_some_match() {
-        let count = term_match_count("hello world", &["hello", "missing", "world"]);
-        assert_eq!(count, 2);
-    }
-
-    #[test]
-    fn test_term_match_count_none() {
-        let count = term_match_count("hello world", &["foo", "bar"]);
-        assert_eq!(count, 0);
-    }
-
-    #[test]
-    fn test_term_match_count_case_insensitive() {
-        let count = term_match_count("HELLO WORLD", &["hello"]);
-        assert_eq!(count, 1);
-    }
-
-    #[test]
-    fn test_term_match_count_empty_terms() {
-        let count = term_match_count("hello", &[]);
-        assert_eq!(count, 0);
     }
 
     #[test]

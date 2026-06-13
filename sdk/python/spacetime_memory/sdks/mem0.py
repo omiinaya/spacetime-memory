@@ -54,8 +54,9 @@ class _GraphStore:
     """Mem0-compatible graph / entity store.
 
     Real Mem0 stores entities in a separate vector-store collection.
-    We back it with SpacetimeDB's ``kg_node`` table — a real knowledge
-    graph with typed nodes, edges, and community detection.
+    We back it with SpacetimeDB's ``entity_link`` table for canonical
+    entity resolution with alias support, falling back to ``kg_node``
+    when the entity_link table is not available.
 
     The API shape matches Mem0's ``Memory.graph`` attribute so callers
     can use the same patterns::
@@ -83,6 +84,34 @@ class _GraphStore:
         """Build a tag suffix used to scope entities to a user."""
         return f"mem0_user:{user_id}" if user_id else "mem0_global"
 
+    def _tag_filter(self, rows: list[dict[str, Any]], tag: str) -> list[dict[str, Any]]:
+        """Filter entity rows by tag, matching both entity_link and kg_node formats.
+
+        For entity_link rows, the tag is stored in the ``description`` field.
+        For kg_node rows, it's in ``metadata_json``.
+        """
+        tag_str = f'"tag": "{tag}"'
+        return [
+            r for r in rows
+            if (
+                r.get("metadata_json", "").endswith(tag_str)
+                or r.get("metadata_json", "") == ""
+                or (r.get("description", "") and tag in r.get("description", ""))
+            )
+        ]
+
+    def _entity_link_to_dict(self, row: dict[str, Any], tag: str) -> dict[str, Any]:
+        """Convert an entity_link row to the standard graph entity dict shape."""
+        return {
+            "id": row.get("id", ""),
+            "label": row.get("entity_name", ""),
+            "node_type": row.get("entity_type", "concept"),
+            "entity_type": row.get("entity_type", "concept"),
+            "summary": row.get("entity_name", ""),
+            "metadata_json": row.get("description", json.dumps({"tag": tag})),
+            "created_at": row.get("created_at", 0),
+        }
+
     # ------------------------------------------------------------------
     # Mem0 graph API
     # ------------------------------------------------------------------
@@ -95,36 +124,128 @@ class _GraphStore:
         agent_id: str | None = None,
         metadata: dict | None = None,
     ) -> dict[str, Any]:
-        """Add an entity to the graph.
+        """Add an entity to the graph with vector-based dedup.
+
+        Embeds the entity name and searches for similar existing entities
+        (matching real Mem0's Qdrant-backed dedup).  If a close match is
+        found, the existing entity is updated with the new alias.  Falls
+        back gracefully when the embedder is unavailable.
 
         Args:
-            text: Entity label / name (e.g. ``"Alice"``, ``"Python"``).
-            entity_type: Semantic type (e.g. ``"person"``, ``"language"``,
-                ``"concept"``).  Default ``"concept"``.
-            user_id: Owner user (scopes the node to a workspace).
+            text: Entity label / name (e.g. ``\"Alice\"``, ``\"Python\"``).
+            entity_type: Semantic type (e.g. ``\"person\"``, ``\"language\"``).
+            user_id: Owner user.
             agent_id: Optional agent scope.
-            metadata: Optional extra properties stored in the node's
-                ``metadata_json``.
+            metadata: Optional extra properties.
 
         Returns:
-            Dict with the created node info.
+            Dict with the created or updated entity info.
 
         Raises:
             ValueError: If ``text`` is empty.
         """
         if not text or not text.strip():
             raise ValueError("graph.add() requires non-empty text")
+        cleaned = text.strip()
         ws_id = self._ws(user_id)
         meta = dict(metadata or {})
         if agent_id:
             meta["agent_id"] = agent_id
-        meta["tag"] = self._tag(user_id)
+        tag = self._tag(user_id)
+        meta["tag"] = tag
+
+        # Vector-based dedup: search for similar existing entities
+        try:
+            semantic_rows = self._memory._client.search(
+                workspace_id=ws_id,
+                query=cleaned,
+                limit=5,
+                semantic=True,
+            )
+            node_rows = [
+                r for r in semantic_rows
+                if r.get("entity_type") == "node"
+            ]
+            for r in node_rows:
+                score = r.get("score", 0.0)
+                if score < 0.85:
+                    continue
+                nid = r.get("entity_id", "")
+                if not nid:
+                    continue
+                # Found a close match — resolve existing entity and add alias
+                rows = self._memory._client._query(
+                    "kg_node", filter_dict={"id": nid},
+                )
+                if not rows:
+                    continue
+                existing = rows[0]
+                existing_name = existing.get("label", "")
+                # Look up entity_link ID for this node
+                try:
+                    el_rows = self._memory._client._query(
+                        "entity_link", workspace_id=ws_id,
+                        filter_dict={"entity_name": existing_name},
+                    )
+                    if el_rows:
+                        el_id = el_rows[0]["id"]
+                        self._memory._client.add_alias(el_id, cleaned)
+                except RuntimeError:
+                    pass  # alias already exists or entity_link not available
+                logger.debug(
+                    "graph.add: merged '%s' into existing '%s' (cos=%.3f)",
+                    cleaned, existing_name, score,
+                )
+                return {
+                    "id": nid,
+                    "label": existing_name,
+                    "entity_type": existing.get("node_type", entity_type),
+                    "summary": existing.get("summary", ""),
+                    "metadata_json": existing.get("metadata_json", json.dumps(meta)),
+                    "created_at": existing.get("created_at", 0),
+                    "merged": True,
+                }
+        except RuntimeError:
+            pass  # Embedder down → fall through to exact match
+
+        # No vector match found (or embedder down) — create via exact dedup
+        return self._add_exact(cleaned, entity_type, ws_id, meta, tag)
+
+    def _add_exact(
+        self,
+        text: str,
+        entity_type: str,
+        ws_id: str,
+        meta: dict,
+        tag: str,
+    ) -> dict[str, Any]:
+        """Create entity via entity_link (exact-name dedup) or kg_node fallback."""
+        # Try entity_link first — canonical entity resolution with aliases
+        try:
+            self._memory._client.create_entity_link(
+                workspace_id=ws_id,
+                canonical_name=text,
+                entity_type=entity_type,
+                description=json.dumps(meta),
+            )
+            rows = self._memory._client._query(
+                "entity_link", workspace_id=ws_id,
+                filter_dict={"entity_name": text},
+            )
+            if rows:
+                return self._entity_link_to_dict(rows[0], tag)
+            return {"status": "ok", "id": ""}
+        except RuntimeError:
+            logger.debug(
+                "entity_link unavailable for graph.add, falling back to kg_node"
+            )
+
         result = self._call(
             "create_node",
             workspace_id=ws_id,
-            label=text.strip(),
+            label=text,
             node_type=entity_type,
-            summary=text.strip(),
+            summary=text,
             metadata_json=json.dumps(meta),
         )
         return result if isinstance(result, dict) else {"status": "ok", "id": str(result)}
@@ -137,18 +258,87 @@ class _GraphStore:
     ) -> list[dict[str, Any]]:
         """Search graph entities by label.
 
+        When the embedder sidecar is available, uses vector/semantic search
+        via ``hybrid_search`` for relevance-ranked results (matches real
+        Mem0's vector-backed entity_store).  Falls back to substring matching
+        when the embedder is unavailable.
+
         Args:
-            query: Text to search for (label substring match).
+            query: Text to search for.
             user_id: Scope results to this user's workspace.
             limit: Max results (default 10).
 
         Returns:
-            List of matching ``kg_node`` records.
+            List of matching entity records.
         """
         ws_id = self._ws(user_id)
-        rows = self._call("query_graph", workspace_id=ws_id, query=query)
         tag = self._tag(user_id)
-        filtered = [r for r in rows if r.get("metadata_json", "").endswith(f'"tag": "{tag}"') or r.get("metadata_json", "") == ""]
+
+        # Try vector search first (Mem0 entity_store behavior)
+        try:
+            semantic_rows = self._memory._client.search(
+                workspace_id=ws_id,
+                query=query,
+                limit=limit,
+                semantic=True,
+            )
+            # Filter to node-type results only
+            node_rows = [
+                r for r in semantic_rows
+                if r.get("entity_type") == "node"
+            ]
+            if node_rows:
+                results = []
+                for r in node_rows[:limit]:
+                    nid = r.get("entity_id", "")
+                    if not nid:
+                        continue
+                    rows = self._memory._client._query(
+                        "kg_node", filter_dict={"id": nid},
+                    )
+                    if rows:
+                        n = rows[0]
+                        results.append({
+                            "id": n.get("id", ""),
+                            "label": n.get("label", ""),
+                            "node_type": n.get("node_type", "entity"),
+                            "entity_type": n.get("node_type", "entity"),
+                            "summary": n.get("summary", ""),
+                            "metadata_json": n.get("metadata_json", "{}"),
+                            "created_at": n.get("created_at", 0),
+                            "score": r.get("score", 0.0),
+                        })
+                if results:
+                    return self._tag_filter(results, tag)[:limit]
+        except RuntimeError:
+            pass  # Embedder down or hybrid_search fails → fallback
+
+        # Fallback: substring match on entity_link or kg_node
+        # Try entity_link path
+        try:
+            try:
+                self._memory._client.resolve_entity(ws_id, query)
+            except RuntimeError:
+                pass
+
+            rows = self._memory._client._query("entity_link", workspace_id=ws_id)
+            q = query.lower()
+            matched = [
+                r for r in rows
+                if q in r.get("entity_name", "").lower()
+            ]
+            filtered = self._tag_filter(matched, tag)
+            return [
+                self._entity_link_to_dict(r, tag)
+                for r in filtered[:limit]
+            ]
+        except RuntimeError:
+            logger.debug(
+                "entity_link unavailable for graph.search, falling back to kg_node"
+            )
+
+        rows = self._call("query_graph", workspace_id=ws_id, query=query)
+        filtered = self._tag_filter(rows, tag)
         return filtered[:limit]
 
     def get_all(
@@ -158,24 +348,46 @@ class _GraphStore:
     ) -> list[dict[str, Any]]:
         """List all graph entities for a user.
 
+        Queries the ``entity_link`` table.  Falls back to ``query_graph``
+        (kg_node) if entity_link is not available.
+
         Args:
             user_id: Owner user.
             limit: Max results (default 100).
 
         Returns:
-            List of node records.
+            List of entity records.
         """
         ws_id = self._ws(user_id)
-        rows = self._call("query_graph", workspace_id=ws_id, query="")
         tag = self._tag(user_id)
-        filtered = [r for r in rows if r.get("metadata_json", "").endswith(f'"tag": "{tag}"') or r.get("metadata_json", "") == ""]
+
+        # Try entity_link first
+        try:
+            rows = self._memory._client._query("entity_link", workspace_id=ws_id)
+            filtered = self._tag_filter(rows, tag)
+            return [
+                self._entity_link_to_dict(r, tag)
+                for r in filtered[:limit]
+            ]
+        except RuntimeError:
+            # Graceful fallback to kg_node
+            logger.debug(
+                "entity_link unavailable for graph.get_all, falling back to kg_node"
+            )
+
+        rows = self._call("query_graph", workspace_id=ws_id, query="")
+        filtered = self._tag_filter(rows, tag)
         return filtered[:limit]
 
     def delete(self, entity_id: str) -> dict[str, Any]:
         """Delete a graph entity by node ID.
 
+        Deletes via ``delete_node`` (kg_node).  Entity link deletion is
+        not yet supported by the server-side reducer; entity_link rows
+        are left in place for now.
+
         Args:
-            entity_id: The ``kg_node`` UUID to remove.
+            entity_id: The UUID to remove.
 
         Returns:
             Operation status dict.
@@ -486,19 +698,41 @@ class Memory:
 
         try:
             if isinstance(messages, list):
+                # Format conversation for LLM extraction
+                conversation = "\n".join(
+                    f"{m.get('role', 'user')}: {m.get('content', '')}"
+                    for m in messages if m.get('content')
+                )
+
+                # Try LLM memory extraction from conversation (real Mem0 behavior)
+                extracted_memories = None
                 if infer:
-                    # infer=True with list: concatenate message contents only
+                    try:
+                        llm = self._resolve_llm_for(user_id)
+                        if llm and llm.available:
+                            extracted_memories = llm.extract_facts(conversation)
+                    except RuntimeError as exc:
+                        logger.warning("LLM memory extraction from conversation failed: %s", exc)
+
+                if extracted_memories and len(extracted_memories) > 0:
+                    # Store each extracted memory individually (Mem0 behavior)
+                    all_results = []
+                    for fact in extracted_memories:
+                        r = self.add(
+                            fact, user_id=user_id, agent_id=agent_id,
+                            run_id=run_id, infer=False,  # No recursion
+                        )
+                        all_results.extend(r.get("results", []))
+                    return {"results": all_results, "relation_events": []}
+
+                # Fallback: concatenate (original behavior)
+                if infer:
                     content = " ".join(
-                        m.get("content", "")
-                        for m in messages
-                        if m.get("content")
+                        m.get("content", "") for m in messages if m.get("content")
                     )
                     summary = ""
                 else:
-                    content = "\n".join(
-                        f"{m.get('role', 'user')}: {m.get('content', '')}"
-                        for m in messages
-                    )
+                    content = conversation
                     summary = content[:200]
             else:
                 content = str(messages)

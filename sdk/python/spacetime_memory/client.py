@@ -714,13 +714,14 @@ class Client:
     # -----------------------------------------------------------------------
 
     def create_workspace(self, name: str, description: str = "", id: str | None = None) -> dict[str, Any]:
-        """Create a new workspace. Returns reducer status.
+        """Create a new workspace. Returns reducer status plus the workspace id.
         If *id* is omitted, generates a UUID client-side matching the reducer's
         UUID v4 format so callers can discover it immediately via list_workspaces.
         """
         import uuid
         ws_id = id if id else uuid.uuid4().hex[:32]
-        return self._call("create_workspace", [name, description, ws_id])
+        self._call("create_workspace", [name, description, ws_id])
+        return {"status": "ok", "id": ws_id}
 
     def list_workspaces(self) -> list[dict[str, Any]]:
         """List all workspaces."""
@@ -789,10 +790,18 @@ class Client:
                               filter_dict={"peer_id": peer_id},
                               columns=["id"])
             if mems:
+                memory_id = mems[-1]["id"]
                 self._call("index_entity", [
-                    workspace_id, "memory", mems[-1]["id"],
+                    workspace_id, "memory", memory_id,
                     content, json.dumps(emb),
                 ])
+                # Populate BM25 inverted index
+                self._call("index_terms", [
+                    workspace_id, "memory", memory_id, content,
+                ])
+
+                # Entity extraction: LLM first, fall back to regex
+                self._extract_and_store_entities(workspace_id, memory_id, content)
 
         if tier and tier in ("L0", "L1", "L2"):
             mems = self._query("memory", workspace_id=workspace_id,
@@ -802,6 +811,54 @@ class Client:
                 self._call("update_memory_tier", [mems[-1]["id"], tier])
 
         return result
+
+    def _extract_and_store_entities(
+        self,
+        workspace_id: str,
+        memory_id: str,
+        content: str,
+    ) -> None:
+        """Extract entities from content and store in entity_link/kg_node.
+
+        Tries LLM extraction first (requires OPENAI_API_KEY), falls back
+        to the regex-based ``extract_entities`` reducer.
+        """
+        from .llm import LLMClient
+
+        llm = LLMClient()
+        entities = llm.extract_entities_llm(content)
+
+        if entities:
+            for ent in entities:
+                name = ent.get("name", "")
+                if not name or len(name) < 2:
+                    continue
+                etype = ent.get("entity_type", "unknown")
+                aliases = ent.get("aliases", [])
+                description = ent.get("description", name)
+
+                try:
+                    self._call("create_entity_link", [
+                        workspace_id, name, etype,
+                        json.dumps(aliases[:10] if aliases else []),
+                        description,
+                    ])
+                except RuntimeError:
+                    pass
+
+                # Link entity to the source memory
+                try:
+                    self._call("link_entity_to_memory", [
+                        name, memory_id, etype,
+                    ])
+                except RuntimeError:
+                    pass
+        else:
+            # Fall back to regex-based extraction (no LLM key or LLM failed)
+            try:
+                self._call("extract_entities", [workspace_id, content])
+            except RuntimeError:
+                pass
 
     def store_batch(
         self,
@@ -892,6 +949,14 @@ class Client:
                         workspace_id, "memory", mems[0]["id"],
                         item["content"], _json.dumps(emb),
                     ])
+                    # Populate BM25 inverted index
+                    self._call("index_terms", [
+                        workspace_id, "memory", mems[0]["id"], item["content"],
+                    ])
+                    # Entity extraction
+                    self._extract_and_store_entities(
+                        workspace_id, mems[0]["id"], item["content"],
+                    )
 
         return [{"status": "ok"} for _ in clean_items]
 
@@ -923,7 +988,29 @@ class Client:
         if semantic:
             emb = self._embed(query)
             emb_json = json.dumps(emb) if emb else "[]"
-            strategies = json.dumps(["semantic", "keyword", "graph", "temporal"])
+
+            # Check embedder health — if down, exclude semantic strategy and warn
+            embedder_down = not emb
+            if not embedder_down and emb:
+                # Double-check: try a health ping
+                try:
+                    health = self._http.get(
+                        f"{self.embedder_url}/health", timeout=2.0,
+                    )
+                    embedder_down = health.status_code >= 400
+                except Exception:
+                    embedder_down = True
+
+            strategies_list = ["keyword", "graph", "temporal"]
+            if not embedder_down:
+                strategies_list.insert(0, "semantic")
+            else:
+                logger.warning(
+                    "Embedder sidecar unreachable — semantic search disabled. "
+                    "Using keyword+graph+temporal only."
+                )
+            strategies = json.dumps(strategies_list)
+
             self._call("hybrid_search", [
                 workspace_id, query, emb_json,
                 memory_type, tier, limit, strategies,
@@ -964,7 +1051,7 @@ class Client:
                     endpoint=rerank_endpoint,
                     model=rerank_model,
                     api_key=rerank_api_key,
-                    top_k=min(10, limit),
+                    top_k=min(10, len(rows)),
                 )
             return rows[:limit]
 
@@ -1511,26 +1598,73 @@ class Client:
         return rows
 
     # -----------------------------------------------------------------------
-    # Profile
+    # Profiles
     # -----------------------------------------------------------------------
-
-    def get_profile(self, peer_id: str) -> list[dict[str, Any]]:
-        """Get a peer's profile."""
-        return self._query("profile", filter_dict={"peer_id": peer_id})
 
     def upsert_profile(
         self,
         peer_id: str,
-        static_facts_json: str = "[]",
-        dynamic_context_json: str = "[]",
-        preferences_json: str = "{}",
-        tags_json: str = "[]",
+        static_facts: str = "",
+        dynamic_context: str = "",
+        preferences: str = "",
+        tags: str = "",
     ) -> dict[str, Any]:
-        """Create or update a peer profile."""
+        """Create or update a peer profile.
+
+        Args:
+            peer_id: The peer ID.
+            static_facts: JSON-encoded list of fact strings.
+            dynamic_context: JSON-encoded list of context strings.
+            preferences: JSON-encoded object of key-value preferences.
+            tags: JSON-encoded list of tag strings.
+        """
         return self._call("upsert_profile", [
-            peer_id, static_facts_json, dynamic_context_json,
-            preferences_json, tags_json,
+            peer_id, static_facts, dynamic_context, preferences, tags,
         ])
+
+    def add_profile_fact(self, peer_id: str, fact: str) -> dict[str, Any]:
+        """Add a fact to a peer's profile (appended to static_facts_json array)."""
+        return self._call("add_profile_fact", [peer_id, fact])
+
+    def add_dynamic_context(self, peer_id: str, context: str) -> dict[str, Any]:
+        """Add dynamic context to a peer's profile."""
+        return self._call("add_dynamic_context", [peer_id, context])
+
+    def get_profile(self, peer_id: str) -> dict[str, Any] | None:
+        """Get a peer's profile by peer_id."""
+        rows = self._query("profile", filter_dict={"peer_id": peer_id})
+        return rows[0] if rows else None
+
+    def list_profiles(self, workspace_id: str) -> list[dict[str, Any]]:
+        """List all profiles in a workspace (via peers → profiles)."""
+        peers = self._query("peer", filter_dict={"workspace_id": workspace_id})
+        peer_ids = [p["id"] for p in peers if p.get("id")]
+        if not peer_ids:
+            return []
+        profiles = []
+        for pid in peer_ids:
+            p = self.get_profile(pid)
+            if p:
+                profiles.append(p)
+        return profiles
+
+    def search_profiles(self, workspace_id: str, query: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Search profiles by static_facts or dynamic_context (client-side filter)."""
+        profiles = self.list_profiles(workspace_id)
+        if query:
+            q = query.lower()
+            profiles = [
+                r for r in profiles
+                if q in r.get("static_facts_json", "").lower()
+                or q in r.get("dynamic_context_json", "").lower()
+            ]
+        return profiles[:limit]
+
+    def get_profile_context(self, peer_id: str) -> dict[str, Any] | None:
+        """Get profile context result for a peer (calls get_profile_context reducer)."""
+        self._call("get_profile_context", [peer_id])
+        rows = self._sql(f"SELECT * FROM profile_context_result WHERE peer_id = '{_esc(peer_id)}'")
+        return rows[0] if rows else None
 
     # -----------------------------------------------------------------------
     # Knowledge Graph — additional queries
@@ -1800,6 +1934,30 @@ class Client:
         self._call("delete_tour", [tour_id])
 
     # -------------------------------------------------------------------
+    # Entity Linking
+    # -------------------------------------------------------------------
+
+    def create_entity_link(
+        self,
+        workspace_id: str,
+        canonical_name: str,
+        entity_type: str,
+        description: str = "",
+    ) -> None:
+        """Create a canonical entity link for Mem0-style entity resolution."""
+        self._call("create_entity_link", [
+            workspace_id, canonical_name, "[]", entity_type, description,
+        ])
+
+    def add_alias(self, entity_link_id: str, alias: str) -> None:
+        """Add an alias to an existing entity link."""
+        self._call("add_alias", [entity_link_id, alias])
+
+    def resolve_entity(self, workspace_id: str, name: str) -> None:
+        """Resolve an entity name within a workspace."""
+        self._call("resolve_entity", [workspace_id, name])
+
+    # -------------------------------------------------------------------
     # Backup & Restore
     # -------------------------------------------------------------------
 
@@ -2006,7 +2164,7 @@ def llm_rerank(
     model: str | None = None,
     api_key: str | None = None,
     top_k: int = 10,
-    timeout: int = 15,
+    timeout: int = 30,
 ) -> list[dict[str, Any]]:
     """Rerank search results using an LLM (QMD-style).
 
@@ -2024,7 +2182,7 @@ def llm_rerank(
         model: Model name (default: env ``LLM_RERANK_MODEL`` or ``gpt-4o-mini``).
         api_key: API key (default: env ``LLM_RERANK_API_KEY`` or ``OPENAI_API_KEY``).
         top_k: Number of results to send for reranking (default 10).
-        timeout: HTTP timeout in seconds (default 15).
+        timeout: HTTP timeout in seconds (default 30).
     """
     if not results:
         return results
@@ -2053,7 +2211,7 @@ def llm_rerank(
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.0,
-                "max_tokens": 1024,
+                "max_tokens": 2048,
             },
             headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
             timeout=timeout,
@@ -2066,7 +2224,46 @@ def llm_rerank(
         if content.startswith("```"):
             content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
-        scores: list[dict] = json.loads(content)
+        # Robust JSON parsing — LLMs sometimes return malformed JSON
+        scores: list[dict] = []
+        parse_ok = False
+        errors = []
+
+        # Strategy 1: Direct parse
+        try:
+            scores = json.loads(content)
+            if isinstance(scores, list):
+                parse_ok = True
+        except json.JSONDecodeError as e:
+            errors.append(f"direct: {e}")
+
+        # Strategy 2: Find JSON array boundaries
+        if not parse_ok:
+            import re
+            m = re.search(r'\[.*\]', content, re.DOTALL)
+            if m:
+                try:
+                    scores = json.loads(m.group())
+                    if isinstance(scores, list):
+                        parse_ok = True
+                except json.JSONDecodeError as e:
+                    errors.append(f"array: {e}")
+
+        # Strategy 3: Strict=False, try to salvage partial
+        if not parse_ok:
+            try:
+                decoder = json.JSONDecoder()
+                scores, _ = decoder.raw_decode(content)
+                # Might be a single dict, wrap in list
+                if isinstance(scores, dict):
+                    scores = [scores]
+                if isinstance(scores, list):
+                    parse_ok = True
+            except json.JSONDecodeError as e:
+                errors.append(f"strict_false: {e}")
+
+        if not parse_ok:
+            raise ValueError(f"JSON parse failed after 3 strategies: {'; '.join(errors[-2:])}")
 
         # Merge LLM scores back into original results
         score_map: dict[int, tuple[float, str]] = {}

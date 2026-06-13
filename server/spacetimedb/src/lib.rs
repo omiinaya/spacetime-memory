@@ -10,6 +10,7 @@ pub mod profile;
 pub mod profile_query;
 pub mod tag;
 pub mod entity_linking;
+pub mod entity_extraction;
 pub mod insight;
 pub mod retrieval;
 pub mod auth;
@@ -25,6 +26,7 @@ pub mod tour;
 pub mod replication;
 pub mod query;
 pub mod user;
+pub mod proxy_metrics;
 
 /// Maximum number of rows any read reducer will return.
 /// This caps all `.iter()` scans to prevent OOM/timeout on large tables.

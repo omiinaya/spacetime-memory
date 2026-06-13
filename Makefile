@@ -77,6 +77,9 @@ bench:  ## Run performance benchmark (needs live STDB + embedder)
 	fi
 	PYTHONPATH=sdk/python python3 sdk/python/scripts/quick-bench.py
 
+smoke:  ## Run end-to-end smoke test (needs live STDB on :3001)
+	@PYTHONPATH=$(CURDIR)/sdk/python python3 $(CURDIR)/sdk/python/tests/smoke_test.py
+
 ci: build-module  ## Full local CI: Rust + Python + TypeScript + adapters
 	@echo "=== Rust tests ===" && \
 	cd server/spacetimedb && cargo test --lib 2>&1 | grep "test result" && \

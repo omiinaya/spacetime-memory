@@ -14,123 +14,189 @@ import sys
 import time
 from typing import Any
 
-import httpx
+# Allow running from project root or cron (hermes/scripts)
+for prefix in (".", "..", "/home/user/spacetime-memory"):
+    sdk_path = os.path.join(prefix, "sdk/python")
+    if os.path.isdir(sdk_path):
+        sys.path.insert(0, sdk_path)
+        break
+
+from spacetime_memory import Client
 
 # ── Config ──────────────────────────────────────────────────────────
 HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
-DB = os.environ.get("SPACETIMEDB_DB", "spacetime-memory")
-EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://localhost:9090")
+DB = os.environ.get("SPACETIMEDB_DB",
+                     "c200f8da0f062b67001165d9379b9e2125dd73a7be4a0b1a1e4374d00cbcc079")
 
-SQL_URL = f"http://{HOST}:{PORT}/v1/database/{DB}/sql"
-CALL_URL = f"http://{HOST}:{PORT}/v1/database/{DB}/call"
-
-_http = httpx.Client(timeout=60)
+_client: Client | None = None
 
 
-# ── Helpers ─────────────────────────────────────────────────────────
-
-def _sql(query: str) -> list[dict[str, Any]]:
-    resp = _http.post(SQL_URL, content=query, headers={"Content-Type": "text/plain"})
-    if resp.status_code >= 400:
-        print(f"  SQL error ({resp.status_code}): {resp.text[:120]}")
-        return []
-    return _parse_sql_response(resp.text)
+_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cron_identity_token")
 
 
-def _call(reducer: str, args: list[Any]) -> bool:
-    resp = _http.post(f"{CALL_URL}/{reducer}", content=json.dumps(args),
-                      headers={"Content-Type": "application/json"})
-    ok = resp.status_code < 400
-    if not ok:
-        print(f"  Reducer '{reducer}' error ({resp.status_code}): {resp.text[:120]}")
-    return ok
+def _c() -> Client:
+    global _client
+    if _client is None:
+        _client = Client(host=HOST, port=PORT, database=DB)
 
+        # Reuse identity token across runs to avoid per-tick account creation
+        if os.path.exists(_TOKEN_FILE):
+            try:
+                with open(_TOKEN_FILE) as f:
+                    _client._identity_token = f.read().strip()
+                    _client._identity_established = True
+            except Exception:
+                pass
 
-def _parse_sql_response(raw: str) -> list[dict[str, Any]]:
-    if not raw.strip():
-        return []
-    try:
-        tables = json.loads(raw)
-        rows: list[dict[str, Any]] = []
-        for table in tables:
-            cols = [e["name"]["some"] for e in table["schema"]["elements"]]
-            for row in table.get("rows", []):
-                r: dict[str, Any] = {}
-                for i, col in enumerate(cols):
-                    r[_to_camel(col)] = row[i]
-                rows.append(r)
-        return rows
-    except (json.JSONDecodeError, KeyError, IndexError) as e:
-        print(f"  Parse error: {e}")
-        return []
-
-
-def _to_camel(s: str) -> str:
-    parts = s.split("_")
-    return parts[0] + "".join(p.capitalize() for p in parts[1:])
-
-
-def _esc(s: str) -> str:
-    return s.replace("'", "''")
+        if not getattr(_client, "_identity_established", False):
+            # First run: register and save token
+            import uuid as _uuid
+            user = f"cron_{_uuid.uuid4().hex[:8]}"
+            try:
+                _client._call("register", [user, "Cron", "cronpass123"])
+            except RuntimeError:
+                pass
+            try:
+                my_id = _client._whoami()
+                _client._call("set_initial_admin", [my_id])
+            except RuntimeError:
+                pass
+            # Persist identity token for next run
+            if getattr(_client, "_identity_token", None):
+                try:
+                    with open(_TOKEN_FILE, "w") as f:
+                        f.write(_client._identity_token)
+                except Exception:
+                    pass
+    return _client
 
 
 # ── Operations ──────────────────────────────────────────────────────
 
 def decay_weak(workspace_id: str) -> bool:
-    """Deactivate memories below 0.2 strength, not recently updated.
-    The reducer handles cutoff logic internally."""
-    return _call("decay_weak_memories", [workspace_id, 0.2])
+    try:
+        _c()._call("decay_weak_memories", [workspace_id, 0.2])
+        return True
+    except RuntimeError:
+        return False
 
 
 def reinforce_recent(workspace_id: str) -> int:
-    """Bump strength on memories accessed in the last 24h."""
     cutoff = int(time.time() * 1000) - 24 * 3_600_000
-    rows = _sql(
-        "SELECT id FROM memory WHERE "
-        f"workspace_id = '{_esc(workspace_id)}' AND "
-        f"is_active = TRUE AND "
-        f"updated_at > {cutoff}"
-    )
+    rows = _c()._query("memory", filter_dict={
+        "workspace_id": workspace_id,
+        "is_active": "true",
+    }, columns=["id", "updated_at"])
     count = 0
     for row in rows:
-        if _call("reinforce_memory", [row["id"]]):
-            count += 1
+        if row.get("updated_at", 0) > cutoff:
+            try:
+                _c()._call("reinforce_memory", [row["id"]])
+                count += 1
+            except RuntimeError:
+                pass
     return count
 
 
-def run_consolidation(workspace_id: str) -> bool:
-    """Run maintenance: expire memories, decay weak, dedup."""
-    return _call("manual_maintenance", [])
+def backfill_embeddings(workspace_id: str) -> int:
+    """Embed memories that have no search_index entry yet.
+
+    Queries for active memories missing from search_index, calls the
+    embedder sidecar, and populates the index.  Rate-limited to 50 per
+    tick to avoid overwhelming the embedder.
+    """
+    MAX_PER_TICK = 50
+    try:
+        all_mems = _c()._query("memory", workspace_id=workspace_id)
+    except RuntimeError:
+        return 0
+
+    # Find memories without index entries
+    indexed = set()
+    try:
+        idx_rows = _c()._query("search_index", workspace_id=workspace_id)
+        indexed = {r.get("entity_id", "") for r in idx_rows if r.get("entity_type") == "memory"}
+    except RuntimeError:
+        pass
+
+    need_embedding = [
+        m for m in all_mems
+        if m.get("id", "") not in indexed and m.get("is_active", True)
+    ][:MAX_PER_TICK]
+
+    if not need_embedding:
+        return 0
+
+    import json
+    contents = [m.get("content", "") for m in need_embedding]
+    mem_ids = [m["id"] for m in need_embedding]
+
+    try:
+        emb_result = _c()._embed_batch(contents)
+    except Exception:
+        emb_result = []
+        for content in contents:
+            emb_result.append(_c()._embed(content))
+
+    count = 0
+    for i, mem_id in enumerate(mem_ids):
+        emb = emb_result[i] if i < len(emb_result) else None
+        if not emb:
+            continue
+        try:
+            _c()._call("index_entity", [
+                workspace_id, "memory", mem_id,
+                need_embedding[i].get("content", ""),
+                json.dumps(emb),
+            ])
+            count += 1
+        except RuntimeError:
+            pass
+
+    return count
+
+
+def run_consolidation(_ws: str) -> bool:
+    try:
+        _c()._call("manual_maintenance", [])
+        return True
+    except RuntimeError:
+        return False
 
 
 def update_god_nodes(workspace_id: str) -> bool:
-    """Recalculate top-degree nodes in the knowledge graph.
-    The reducer handles edge counting in-WASM."""
-    return _call("compute_god_nodes", [workspace_id, 50])
+    try:
+        _c()._call("compute_god_nodes", [workspace_id, 50])
+        return True
+    except RuntimeError:
+        return False
 
 
 def detect_communities(workspace_id: str) -> bool:
-    """Run community detection (Leiden-style clustering) on KG nodes."""
-    return _call("detect_communities", [workspace_id])
+    try:
+        _c()._call("detect_communities", [workspace_id])
+        return True
+    except RuntimeError:
+        return False
 
 
 def run_all(workspace_id: str | None = None) -> dict[str, Any]:
-    """Run all consolidation operations for one or all workspaces."""
     if workspace_id:
         ws_list = [{"id": workspace_id}]
     else:
-        ws_list = _sql("SELECT id FROM workspace")
+        ws_list = _c()._query("workspace", columns=["id"])
 
     results: dict[str, Any] = {
         "workspaces": len(ws_list),
         "decayed": 0, "reinforced": 0,
         "consolidated": 0, "god_nodes": 0, "communities": 0,
+        "replication_cleaned": 0, "embeddings_backfilled": 0,
     }
 
     for ws in ws_list:
         wid = ws["id"]
-        print(f"  Worskpace {wid[:16]}...")
+        print(f"  Workspace {wid[:16]}...")
 
         if decay_weak(wid):
             results["decayed"] += 1
@@ -146,6 +212,17 @@ def run_all(workspace_id: str | None = None) -> dict[str, Any]:
         if detect_communities(wid):
             results["communities"] += 1
 
+        try:
+            _c()._call("cleanup_replication_log", [wid])
+            results["replication_cleaned"] += 1
+        except RuntimeError:
+            pass
+
+        bf_count = backfill_embeddings(wid)
+        results["embeddings_backfilled"] += bf_count
+        if bf_count > 0:
+            print(f"    Embeddings backfilled: {bf_count}")
+
     return results
 
 
@@ -157,4 +234,6 @@ if __name__ == "__main__":
           f"{results['decayed']} decay ticks, {results['reinforced']} reinforced, "
           f"{results['consolidated']} consolidations, "
           f"{results['god_nodes']} god-node updates, "
-          f"{results['communities']} community detections")
+          f"{results['communities']} community detections, "
+          f"{results['replication_cleaned']} replication log cleanups, "
+          f"{results['embeddings_backfilled']} embeddings backfilled")

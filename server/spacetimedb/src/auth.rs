@@ -657,11 +657,7 @@ mod tests {
         let t_600k = start.elapsed();
 
         let ratio = t_600k.as_micros() as f64 / t_100k.as_micros().max(1) as f64;
-        println!("\nPBKDF2 benchmark:");
-        println!("  100K iterations: {:?}", t_100k);
-        println!("  600K iterations: {:?}", t_600k);
-        println!("  Ratio: {:.1}x", ratio);
-        println!("  Host target: x86_64 (WASM will be slower)");
+        log::info!("PBKDF2 benchmark: 100K={:?} 600K={:?} ratio={:.1}x", t_100k, t_600k, ratio);
 
         // Just verify both produce output
         assert_eq!(output.len(), 32);

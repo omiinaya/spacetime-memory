@@ -96,5 +96,158 @@ pub fn remove_from_index(
         ctx.db.search_index().id().delete(&si.id);
     }
 
+    // Also clean up term index entries
+    let terms_to_delete: Vec<String> = ctx
+        .db
+        .term_index()
+        .iter()
+        .filter(|ti| ti.entity_type == entity_type && ti.entity_id == entity_id)
+        .map(|ti| ti.id.clone())
+        .collect();
+    for tid in terms_to_delete {
+        ctx.db.term_index().id().delete(&tid);
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// BM25 Inverted Index
+// ---------------------------------------------------------------------------
+
+/// Inverted index entry for BM25 keyword search.
+///
+/// One row per (term, entity) pair.  Populated by `index_terms` and
+/// cleared by `remove_from_index`.  Queried by `hybrid_search` keyword
+/// strategy.
+#[table(accessor = term_index)]
+#[derive(Debug, Clone)]
+pub struct TermIndex {
+    #[primary_key]
+    pub id: String,
+    /// Normalised to lowercase
+    pub term: String,
+    pub workspace_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    /// How many times `term` appears in this entity's content
+    pub term_frequency: u32,
+    /// Total token count of the source document
+    pub doc_length: u32,
+}
+
+/// Tokenize content into lowercase terms, filtering stopwords and
+/// short tokens.
+fn tokenize(content: &str) -> Vec<String> {
+    let stopwords: &[&str] = &[
+        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+        "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
+        "being", "have", "has", "had", "do", "does", "did", "will", "would",
+        "could", "should", "may", "might", "can", "shall", "you", "your",
+        "yours", "he", "she", "it", "its", "they", "them", "their", "we",
+        "us", "our", "this", "that", "these", "those", "am", "not", "no",
+        "if", "then", "than", "so", "as", "just", "also", "very", "too",
+        "about", "into", "over", "after", "before", "between", "through",
+        "during", "above", "below", "up", "down", "out", "off", "here",
+        "there", "all", "each", "every", "both", "few", "more", "most",
+        "other", "some", "such", "only", "own", "same", "now", "when",
+        "where", "how", "which", "who", "whom", "what", "why",
+    ];
+
+    content
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(|w| w.to_lowercase())
+        .filter(|w| w.len() >= 3 && !stopwords.contains(&w.as_str()))
+        .collect()
+}
+
+/// Compute BM25 score for a set of documents given query terms.
+///
+/// `idf_map`: term → (doc_freq, total_docs)
+/// `doc`: (tf, doc_len)
+/// k1 = 1.2, b = 0.75
+pub(crate) fn bm25_score(
+    tf: u32,
+    doc_len: u32,
+    avg_doc_len: f64,
+) -> f64 {
+    let k1: f64 = 1.2;
+    let b: f64 = 0.75;
+
+    let tf_f = tf as f64;
+    let dl_f = doc_len as f64;
+
+    // Standard BM25 term saturation
+    let numerator = tf_f * (k1 + 1.0);
+    let denominator = tf_f + k1 * (1.0 - b + b * dl_f / avg_doc_len.max(1.0));
+    numerator / denominator.max(1e-10)
+}
+
+/// Compute IDF for a term: ln((N - df + 0.5) / (df + 0.5) + 1)
+pub(crate) fn bm25_idf(doc_freq: usize, total_docs: usize) -> f64 {
+    if doc_freq == 0 || total_docs == 0 {
+        return 0.0;
+    }
+    let n = total_docs as f64;
+    let df = doc_freq as f64;
+    ((n - df + 0.5) / (df + 0.5) + 1.0).ln()
+}
+
+/// Populate `TermIndex` entries for an entity from its content.
+///
+/// Tokenizes `content`, counts term frequencies, computes doc length,
+/// and inserts one `TermIndex` row per unique term.  Called by SDK
+/// after `index_entity`.
+#[reducer]
+pub fn index_terms(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    entity_type: String,
+    entity_id: String,
+    content: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+
+    // Remove any existing term index entries for this entity
+    let old: Vec<String> = ctx
+        .db
+        .term_index()
+        .iter()
+        .filter(|ti| ti.entity_type == entity_type && ti.entity_id == entity_id)
+        .map(|ti| ti.id.clone())
+        .collect();
+    for id in old {
+        ctx.db.term_index().id().delete(&id);
+    }
+
+    let terms = tokenize(&content);
+    if terms.is_empty() {
+        return Ok(());
+    }
+
+    let doc_length = terms.len() as u32;
+
+    // Count term frequencies
+    use std::collections::HashMap;
+    let mut freq: HashMap<String, u32> = HashMap::new();
+    for t in &terms {
+        *freq.entry(t.clone()).or_insert(0) += 1;
+    }
+
+    // Insert one TermIndex row per unique term
+    for (term, tf) in freq {
+        let id = format!("ti:{}:{}:{}", workspace_id, entity_id, term);
+        ctx.db.term_index().insert(TermIndex {
+            id,
+            term,
+            workspace_id: workspace_id.clone(),
+            entity_type: entity_type.clone(),
+            entity_id: entity_id.clone(),
+            term_frequency: tf,
+            doc_length,
+        });
+    }
+
     Ok(())
 }
