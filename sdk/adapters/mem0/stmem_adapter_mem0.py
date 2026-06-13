@@ -119,32 +119,20 @@ class Memory:
             )
 
     def _workspace_for(self, user_id: str | None, agent_id: str | None) -> str:
-        """Get or create a workspace for a (user_id, agent_id) pair.
+        """Get or create a workspace for a user_id.
 
-        Includes the caller identity in the workspace key to avoid
-        conflicts when multiple JWT identities use the same adapter.
+        Maps by user_id only — agent_id is stored as the memory's peer_id.
+        Matches the SDK adapter's behavior.
         """
-        caller_key = "anon"
-        try:
-            # Derive a stable key from the JWT identity
-            # (only available if a token is set on the client)
-            if self._client.token:
-                import hashlib as _hl
-                caller_key = _hl.sha256(self._client.token.encode()).hexdigest()[:12]
-        except Exception:
-            pass
-        ws_name = f"mem0-{caller_key}-user-{user_id or 'none'}-agent-{agent_id or 'none'}"
-        # Truncate to avoid overly long names
-        ws_name = ws_name[:80]
-        # Try to find existing workspace
+        if not user_id:
+            return "mem0-default"
+        ws_name = f"mem0-{user_id}"
         workspaces = self._client.list_workspaces()
         for ws in workspaces:
             if ws.get("name") == ws_name:
                 return ws["id"]
-        # Create new workspace
         result = self._client.create_workspace(ws_name)
         if result.get("status") != "ok":
-            # Fallback: get the workspace again (may have been created by another call)
             workspaces = self._client.list_workspaces()
             for ws in workspaces:
                 if ws.get("name") == ws_name:
@@ -225,19 +213,20 @@ class Memory:
             if mem_result.get("status") == "ok":
                 # Set user_scope if provided
                 if user_id:
-                    mems_before = self._client._sql(
-                        "SELECT id FROM memory WHERE "
-                        f"workspace_id = '{_esc(ws_id)}' AND "
-                        f"content = '{_esc(text[:200])}' "
+                    mems_before = self._client._query(
+                        "memory",
+                        workspace_id=ws_id,
+                        filter_dict={"content": text[:200]},
+                        columns=["id"],
                     )
                     if mems_before:
                         latest = mems_before[-1]
                         self._client._call("set_memory_scope", [latest["id"], user_id])
                 # Read back the stored memory
-                mems = self._client._sql(
-                    "SELECT * FROM memory WHERE "
-                    f"workspace_id = '{_esc(ws_id)}' AND "
-                    f"content = '{_esc(text[:200])}' "
+                mems = self._client._query(
+                    "memory",
+                    workspace_id=ws_id,
+                    filter_dict={"content": text[:200]},
                 )
                 mems.sort(key=lambda r: r.get("created_at", 0), reverse=True)
                 if mems:
@@ -285,7 +274,7 @@ class Memory:
 
     def get(self, memory_id: str) -> dict[str, Any] | None:
         """Get a specific memory by ID."""
-        rows = self._client._sql(f"SELECT * FROM memory WHERE id = '{_esc(memory_id)}'")
+        rows = self._client._query("memory", filter_dict={"id": memory_id})
         if not rows:
             return None
         return _to_mem0_memory(rows[0])
@@ -298,10 +287,10 @@ class Memory:
     ) -> list[dict[str, Any]]:
         """Get all memories for a user/agent pair."""
         ws_id = self._workspace_for(user_id, agent_id)
-        rows = self._client._sql(
-            "SELECT * FROM memory WHERE "
-            f"workspace_id = '{_esc(ws_id)}' AND "
-            "is_active = true"
+        rows = self._client._query(
+            "memory",
+            workspace_id=ws_id,
+            filter_dict={"is_active": True},
         )
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         return [_to_mem0_memory(r) for r in rows[:limit]]
@@ -328,9 +317,11 @@ class Memory:
         Note: Mem0 removes all memories permanently. We deactivate them.
         """
         ws_id = self._workspace_for(user_id, agent_id)
-        mems = self._client._sql(
-            "SELECT id FROM memory WHERE "
-            f"workspace_id = '{_esc(ws_id)}' AND is_active = true"
+        mems = self._client._query(
+            "memory",
+            workspace_id=ws_id,
+            filter_dict={"is_active": True},
+            columns=["id"],
         )
         count = 0
         for mem in mems:
@@ -348,8 +339,9 @@ class Memory:
         Returns empty list if version tracking isn't enabled in the module.
         """
         try:
-            rows = self._client._sql(
-                f"SELECT * FROM memory_version WHERE memory_id = '{_esc(memory_id)}'"
+            rows = self._client._query(
+                "memory_version",
+                filter_dict={"memory_id": memory_id},
             )
             rows.sort(key=lambda r: r.get("version", 0), reverse=True)
             return [_to_mem0_memory(r) for r in rows]
