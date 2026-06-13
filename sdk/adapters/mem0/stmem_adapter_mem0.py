@@ -169,6 +169,9 @@ class Memory:
         Args:
             messages: A single text string, or a list of message dicts
                 (``[{"role": "user", "content": "..."}]``).
+                When a list is provided, attempts LLM fact extraction to
+                store individual memories (real Mem0 behavior), falling
+                back to concatenation if no LLM is available.
             user_id: User identifier.
             agent_id: Agent identifier.
             run_id: Run/thread identifier.
@@ -179,11 +182,35 @@ class Memory:
         """
         ws_id = self._workspace_for(user_id, agent_id)
 
-        # Normalize input
-        if isinstance(messages, str):
-            texts = [messages]
+        # If messages is a conversation list, try LLM fact extraction (Mem0 behavior)
+        if isinstance(messages, list):
+            conversation = "\n".join(
+                f"{m.get('role', 'user')}: {m.get('content', '')}"
+                for m in messages if m.get('content')
+            )
+            # Try LLM extraction
+            extracted = None
+            try:
+                from spacetime_memory.llm import LLMClient
+                llm = LLMClient()
+                if llm.available:
+                    extracted = llm.extract_facts(conversation)
+            except Exception:
+                pass
+
+            if extracted and len(extracted) > 0:
+                results = []
+                for fact in extracted:
+                    results.extend(self.add(
+                        fact, user_id=user_id, agent_id=agent_id,
+                        run_id=run_id, metadata=metadata,
+                    ))
+                return results
+
+            # Fallback: concatenate message contents
+            texts = [conversation]
         else:
-            texts = [m.get("content", str(m)) if isinstance(m, dict) else str(m) for m in messages]
+            texts = [messages]
 
         results = []
         for text in texts:
