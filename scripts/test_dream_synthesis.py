@@ -18,7 +18,7 @@ HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get(
     "SPACETIMEDB_DB",
-    "c200f8da0f062b67001165d9379b9e2125dd73a7be4a0b1a1e4374d00cbcc079",
+    "c20012b2679f860fd6caf3f6fc1274e8552ed2e8f99084eefad95516b61d1f72",
 )
 
 passed = 0
