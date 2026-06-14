@@ -33,11 +33,11 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-HF_REPO_ID = "Xenova/all-MiniLM-L6-v2"
+HF_REPO_ID = "Xenova/bge-large-en-v1.5"
 HF_MODEL_FILENAME = "onnx/model.onnx"
-DEFAULT_MODEL_FILENAME = "all-MiniLM-L6-v2.onnx"
-MODEL_DIMENSION = 384
-TOKENIZER_ID = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL_FILENAME = "bge-large-en-v1.5.onnx"
+MODEL_DIMENSION = 1024
+TOKENIZER_ID = "BAAI/bge-large-en-v1.5"
 
 
 def _get_default_model_dir() -> Path:

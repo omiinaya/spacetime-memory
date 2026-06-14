@@ -1,28 +1,26 @@
 #!/usr/bin/env bash
-# Download the all-MiniLM-L6-v2 ONNX model for the Rust embedder sidecar.
+# Download the bge-large-en-v1.5 ONNX model for the Rust embedder sidecar.
 # Run from the repository root: ./scripts/download-model.sh
 set -euo pipefail
 
 MODEL_DIR="server/embedder/model"
-MODEL_NAME="all-MiniLM-L6-v2"
+MODEL_NAME="bge-large-en-v1.5"
 mkdir -p "$MODEL_DIR"
 
 echo "Downloading $MODEL_NAME ONNX model to $MODEL_DIR/..."
 
 python3 -c "
 from huggingface_hub import hf_hub_download
-import os
+import os, shutil
 
 path = hf_hub_download(
-    repo_id='Xenova/all-MiniLM-L6-v2',
+    repo_id='Xenova/bge-large-en-v1.5',
     filename='onnx/model.onnx',
 )
 
-# Copy to expected location
-import shutil
-dst = 'server/embedder/model/all-MiniLM-L6-v2.onnx'
+dst = 'server/embedder/model/bge-large-en-v1.5.onnx'
 shutil.copy2(path, dst)
 print(f'Model saved to {dst} ({os.path.getsize(dst) // 1024 // 1024} MB)')
 "
 
-echo "Done. Run the embedder with: env MODEL_PATH=server/embedder/model/all-MiniLM-L6-v2.onnx server/embedder/target/release/embedder"
+echo "Done. Run with: env MODEL_PATH=server/embedder/model/bge-large-en-v1.5.onnx server/embedder/target/release/embedder"

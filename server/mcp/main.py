@@ -36,6 +36,19 @@ DB = os.environ.get("SPACETIMEDB_DB", "spacetime-memory")
 EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://localhost:9090")
 MCP_API_KEY = os.environ.get("MCP_API_KEY", "")
 
+# Load reranker credentials from Hermes .env (same pattern as eval_harness.py)
+_hermes_env = os.path.expanduser("~/.hermes/.env")
+if os.path.exists(_hermes_env):
+    with open(_hermes_env) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line.startswith("LITELLM_MASTER_KEY="):
+                _, _key = _line.split("=", 1)
+                os.environ.setdefault("LLM_RERANK_API_KEY", _key.strip().strip('"').strip("'"))
+                break
+os.environ.setdefault("LLM_RERANK_ENDPOINT", "http://192.168.1.111:4000/v1")
+os.environ.setdefault("LLM_RERANK_MODEL", "ds-deepseek-v4-flash")
+
 # ---------------------------------------------------------------------------
 # Auth helpers
 # ---------------------------------------------------------------------------
@@ -253,8 +266,11 @@ def search_memories(
     memory_type: str = "",
     tier: str = "",
     limit: int = 50,
+    rerank: bool = False,
 ) -> list[dict[str, Any]]:
-    """Search memories via keyword with optional filters."""
+    """Search memories via keyword with optional filters.
+
+    Set rerank=True to enable LLM reranking for improved precision."""
     return get_client().search(
         workspace_id=workspace_id,
         query=query_text,
@@ -262,6 +278,7 @@ def search_memories(
         tier=tier,
         limit=limit,
         semantic=True,
+        rerank=rerank,
     )
 
 
@@ -274,8 +291,11 @@ def hybrid_search(
     tier: str = "",
     limit: int = 20,
     strategies: str = "semantic,keyword,graph,temporal",
+    rerank: bool = True,
 ) -> list[dict[str, Any]]:
-    """Multi-strategy hybrid search across memories, KG nodes, and temporal data."""
+    """Multi-strategy hybrid search across memories, KG nodes, and temporal data.
+
+    Uses LLM reranking by default for improved precision (P@5=29% vs 23% baseline)."""
     return get_client().search(
         workspace_id=workspace_id,
         query=query_text,
@@ -283,6 +303,7 @@ def hybrid_search(
         tier=tier,
         limit=limit,
         semantic=True,
+        rerank=rerank,
     )
 
 

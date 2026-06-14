@@ -1,0 +1,55 @@
+{"query": "Who is the CEO of Acme AI", "description": "CEO identity", "relevant_ids": ["441f0969-c78c-4d8f-8917-4e8f47e3", "0d2633be-549f-4acd-837d-d337f993"]}
+{"query": "Acme AI leadership team", "description": "Leadership roster", "relevant_ids": ["441f0969-c78c-4d8f-8917-4e8f47e3", "61c8f28a-9c3a-4f99-afef-e78ac28d", "67fcc4b2-e419-493b-a74b-5df5b0fd", "d5d1f356-ba52-4ae4-9289-42bc616a", "b326e9c6-7101-433b-bca7-9367df4e"]}
+{"query": "Alice Chen background education", "description": "CEO background", "relevant_ids": ["441f0969-c78c-4d8f-8917-4e8f47e3", "0d2633be-549f-4acd-837d-d337f993"]}
+{"query": "who runs engineering at Acme AI", "description": "VP Eng", "relevant_ids": ["61c8f28a-9c3a-4f99-afef-e78ac28d", "67fcc4b2-e419-493b-a74b-5df5b0fd", "5e08b256-1106-40ae-941b-7487b40b"]}
+{"query": "Acme AI funding rounds history", "description": "Funding timeline", "relevant_ids": ["e0ac1d5b-1dbe-4456-a7d2-c9b7550a", "1e857729-e049-4b1f-9b51-559b2df8", "77015ada-669e-459b-b15c-f492d5d1", "65e5b77e-8bb5-4f69-aede-c5c0ee44", "96c85a9f-901a-4aa3-97fe-aa0584a7"]}
+{"query": "who invested in Acme AI", "description": "Investors", "relevant_ids": ["1e857729-e049-4b1f-9b51-559b2df8", "77015ada-669e-459b-b15c-f492d5d1", "33c6e05b-b7c4-48b3-b819-09c1b74c", "96c85a9f-901a-4aa3-97fe-aa0584a7"]}
+{"query": "Acme AI valuation Series B", "description": "Valuation", "relevant_ids": ["e0ac1d5b-1dbe-4456-a7d2-c9b7550a", "65e5b77e-8bb5-4f69-aede-c5c0ee44"]}
+{"query": "Acme AI revenue ARR financials", "description": "Financial metrics", "relevant_ids": ["213257e9-6a92-4f9b-ac59-bb4181d6", "889bf60d-46d3-42fe-8f4d-ccd29451", "b7622e7e-371f-42b3-b027-440ac314"]}
+{"query": "Acme AI burn rate runway", "description": "Runway", "relevant_ids": ["17e0ac29-ff85-4623-97cd-3deca2f5"]}
+{"query": "Acme AI acquisition offer Salesforce", "description": "Acquisition", "relevant_ids": ["e7bf56be-57df-4a13-a31a-6d57f4e1"]}
+{"query": "Acme AI gross margin target", "description": "Margins", "relevant_ids": ["b7622e7e-371f-42b3-b027-440ac314"]}
+{"query": "Y Combinator Acme AI batch", "description": "YC history", "relevant_ids": ["96c85a9f-901a-4aa3-97fe-aa0584a7"]}
+{"query": "what is FlowForge product", "description": "Product identity", "relevant_ids": ["29327add-61fa-499e-a2ef-328babfe", "ce6fc9f3-fb9b-47a8-8b0a-777f4005", "368883c2-08c8-46c8-bd82-53e100a7", "4198a5bf-13a0-49bb-8d29-c926456c"]}
+{"query": "FlowForge integrations connectors", "description": "Integrations", "relevant_ids": ["ce6fc9f3-fb9b-47a8-8b0a-777f4005", "429fe80b-2101-4a76-8da9-de376c86"]}
+{"query": "FlowForge AI assistant capabilities", "description": "AI features", "relevant_ids": ["621335a2-032b-4b22-afe5-44df3290", "c479f4cf-307f-4d3c-8249-f21bbf29", "15b4f802-7a26-4279-92e8-c2882e60"]}
+{"query": "FlowForge security certifications compliance", "description": "Compliance", "relevant_ids": ["0ee287ef-0214-43e5-8c65-6839ec19", "348532cc-9b86-403d-bfaf-58efb6ca", "72d5ed49-75c2-4c92-bed2-2d37b904"]}
+{"query": "FlowForge free tier users conversion", "description": "Free tier", "relevant_ids": ["7cb6d69b-c5ec-4013-b1a6-cf90d195"]}
+{"query": "FlowForge G2 rating reviews", "description": "Reviews", "relevant_ids": ["991624b5-80cf-4c21-98e2-0fd522c8"]}
+{"query": "FlowForge mobile app beta", "description": "Mobile", "relevant_ids": ["4d6b6d6d-c853-4be9-8f7c-2424cc18"]}
+{"query": "Acme AI technology stack architecture", "description": "Tech stack", "relevant_ids": ["87b39a1c-84d5-47e9-8082-b30a1854", "5b855a49-9410-4eca-9a2a-1c181208", "9fe3cf2e-65fe-4755-9e7c-d12052f7", "e177a2c5-6452-41c8-a4c8-75a17e84"]}
+{"query": "Acme AI infrastructure cloud Kubernetes", "description": "Infra", "relevant_ids": ["5b855a49-9410-4eca-9a2a-1c181208", "e17d7cb8-da7e-42b9-a844-4b417ae3", "56cf8981-60b7-4111-9a2d-6c04374b"]}
+{"query": "Acme AI ML models training fine-tuning", "description": "ML", "relevant_ids": ["bba3d06b-ab4c-4275-b249-5a0547de", "ac3e233a-c15e-4118-a794-c9372977"]}
+{"query": "Acme AI monitoring observability", "description": "Observability", "relevant_ids": ["73bf3744-7eac-4855-bc2f-debf6b73", "874a55fd-f946-475f-8ce3-fffa5b77"]}
+{"query": "Acme AI database tier storage", "description": "Databases", "relevant_ids": ["e177a2c5-6452-41c8-a4c8-75a17e84", "bba3d06b-ab4c-4275-b249-5a0547de"]}
+{"query": "Acme AI open source MIT license", "description": "OSS", "relevant_ids": ["e17d7cb8-da7e-42b9-a844-4b417ae3"]}
+{"query": "Acme AI secrets management Vault", "description": "Secrets", "relevant_ids": ["56cf8981-60b7-4111-9a2d-6c04374b"]}
+{"query": "Acme AI load testing k6 staging", "description": "Load testing", "relevant_ids": ["fd9018fb-47e4-435b-bf71-134e6d55"]}
+{"query": "what companies use Acme AI customers", "description": "Customer list", "relevant_ids": ["c62075c4-1137-49c7-8e99-bf76853d", "0be2d19a-e29b-4df0-8dcb-d1647ee0", "83815617-9ef0-4aff-88d4-20c8eacd", "0d9cd82e-341a-4951-86ad-5cedbfe3", "6446fe3e-d217-4d11-a782-5a910cb7"]}
+{"query": "Stripe FlowForge use case billing", "description": "Stripe case study", "relevant_ids": ["0be2d19a-e29b-4df0-8dcb-d1647ee0"]}
+{"query": "Acme AI largest customer contract", "description": "Largest deal", "relevant_ids": ["c62681d6-bc22-499f-8ff1-43399ded"]}
+{"query": "Acme AI customer NPS renewal rate", "description": "Satisfaction", "relevant_ids": ["0d09c443-5359-4647-8e1b-90baf39a", "a33bd894-16cd-47bb-a53f-51e5d95e"]}
+{"query": "enterprise customer time to value onboarding", "description": "Onboarding", "relevant_ids": ["b8f864d8-1803-4beb-ba32-1466912c", "b7535da0-4493-4f6c-bcaf-21702acb"]}
+{"query": "Figma FlowForge design tokens", "description": "Figma case study", "relevant_ids": ["0d9cd82e-341a-4951-86ad-5cedbfe3"]}
+{"query": "Acme AI healthcare HIPAA customer", "description": "Healthcare", "relevant_ids": ["f15a18e6-67a9-47cb-bd27-14dc15b8"]}
+{"query": "insurance claims processing FlowForge", "description": "Insurance case study", "relevant_ids": ["abfdc4cb-f5fd-41e9-a832-f958267f"]}
+{"query": "Acme AI competitors market", "description": "Competitors", "relevant_ids": ["2e2b0b92-130e-495d-a812-eac5b3bc", "dd3ef595-78b7-4f4d-9594-b4851a6e", "32c26513-0f45-49af-bd06-17701a5c", "4bae4e01-39fc-475a-8f8e-3f207326"]}
+{"query": "Acme AI competitive win rate", "description": "Win rates", "relevant_ids": ["4d89a2c1-6987-4fcf-8583-b3197fb8"]}
+{"query": "iPaaS automation market size growth", "description": "Market size", "relevant_ids": ["4332804b-a65b-4988-85b1-3de4604a", "810d4343-dbad-46b9-85b6-9e15ee83"]}
+{"query": "Forrester Gartner analyst ranking FlowForge", "description": "Analyst", "relevant_ids": ["c4148737-9565-4245-8940-20daf291", "7728de33-0b92-48d4-bcd1-e37050be"]}
+{"query": "Acme AI AWS partnership marketplace", "description": "AWS partnership", "relevant_ids": ["d4b9b09d-476c-40a1-9e18-f60dd3b0"]}
+{"query": "Acme AI SOC 2 compliance audit", "description": "SOC 2", "relevant_ids": ["fec2977e-3a39-4ce8-b70f-2644ad2e", "f5454b22-838f-447b-b29a-19ec2c04"]}
+{"query": "Acme AI penetration testing security", "description": "Pentest", "relevant_ids": ["6c427996-6bdc-4a56-a193-e50d957a"]}
+{"query": "Acme AI encryption data protection", "description": "Encryption", "relevant_ids": ["e777f087-01bd-4c56-a161-41e7efc8"]}
+{"query": "Acme AI GDPR data residency", "description": "GDPR", "relevant_ids": ["8c39378d-df75-48af-829f-8b0618e4"]}
+{"query": "Acme AI HackerOne bug bounty", "description": "Bug bounty", "relevant_ids": ["11be92b3-7caa-4a29-952a-2f497dd3"]}
+{"query": "office amenities perks", "description": "Office perks (negative)", "relevant_ids": ["dec0fc0d-14e4-4c1f-96ad-34f4f2b3", "8c764e4d-464c-42cc-8935-35e42abb", "77f3ced2-ee1b-4b19-b825-74491428", "f2a405c4-3874-4fd0-bbc5-18e0d5a6"]}
+{"query": "team events culture activities", "description": "Culture (negative)", "relevant_ids": ["f0d2cff6-e794-4c58-be0a-975f6f61", "f66359b8-732a-49a3-b644-e7e86fdd", "6ad421ae-9e94-44e0-ad40-3e287f78", "32acf491-b30a-4f30-b6df-919afc51", "d8bce805-d3fd-45f2-9796-24f0d88d"]}
+{"query": "coffee espresso machine office", "description": "Coffee (negative)", "relevant_ids": ["dec0fc0d-14e4-4c1f-96ad-34f4f2b3", "cd14b3fa-d162-45ef-8ce0-25e0dbeb"]}
+{"query": "employee wellness gym stipend", "description": "Wellness (negative)", "relevant_ids": ["f66359b8-732a-49a3-b644-e7e86fdd", "ac4cdba8-307b-4c77-ad2a-0ecd46fe", "f2a405c4-3874-4fd0-bbc5-18e0d5a6"]}
+{"query": "holiday party napa winery", "description": "Party (negative)", "relevant_ids": ["4f62112d-738c-4ce5-844c-35408427"]}
+{"query": "Acme AI complete company overview", "description": "Full overview", "relevant_ids": ["441f0969-c78c-4d8f-8917-4e8f47e3", "6653f764-1175-4d82-a49f-7ed3f205", "e0ac1d5b-1dbe-4456-a7d2-c9b7550a", "213257e9-6a92-4f9b-ac59-bb4181d6", "29327add-61fa-499e-a2ef-328babfe", "c62075c4-1137-49c7-8e99-bf76853d", "dd3ef595-78b7-4f4d-9594-b4851a6e"]}
+{"query": "Acme AI from founding to Series B timeline", "description": "Company timeline", "relevant_ids": ["6653f764-1175-4d82-a49f-7ed3f205", "e0ac1d5b-1dbe-4456-a7d2-c9b7550a", "1e857729-e049-4b1f-9b51-559b2df8", "77015ada-669e-459b-b15c-f492d5d1", "65e5b77e-8bb5-4f69-aede-c5c0ee44", "96c85a9f-901a-4aa3-97fe-aa0584a7"]}
+{"query": "Acme AI product FlowForge technical architecture", "description": "Architecture deep dive", "relevant_ids": ["368883c2-08c8-46c8-bd82-53e100a7", "4198a5bf-13a0-49bb-8d29-c926456c", "e39ec072-0b24-4ce9-aaa9-5739aa21", "429fe80b-2101-4a76-8da9-de376c86", "87b39a1c-84d5-47e9-8082-b30a1854", "5b855a49-9410-4eca-9a2a-1c181208", "9fe3cf2e-65fe-4755-9e7c-d12052f7", "e177a2c5-6452-41c8-a4c8-75a17e84"]}
+{"query": "Acme AI enterprise sales motion and go-to-market", "description": "GTM", "relevant_ids": ["c62681d6-bc22-499f-8ff1-43399ded", "b8f864d8-1803-4beb-ba32-1466912c", "d4b9b09d-476c-40a1-9e18-f60dd3b0", "cb8343c5-2510-4f7d-8cad-cbf86583", "ccc4b5c5-fa24-45de-8e0c-b3c3f7c7"]}
+{"query": "Acme AI engineering team structure and practices", "description": "Engineering org", "relevant_ids": ["61c8f28a-9c3a-4f99-afef-e78ac28d", "67fcc4b2-e419-493b-a74b-5df5b0fd", "5e08b256-1106-40ae-941b-7487b40b", "5b855a49-9410-4eca-9a2a-1c181208", "9fe3cf2e-65fe-4755-9e7c-d12052f7", "e17d7cb8-da7e-42b9-a844-4b417ae3", "73bf3744-7eac-4855-bc2f-debf6b73"]}

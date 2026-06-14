@@ -78,7 +78,28 @@ for i in $(seq 1 15); do
 done || true  # set -e guard
 
 # --------------------------------------------------------------------------
-# 4  Start a trivial static HTTP server for the frontend
+# 4  Start the Tantivy BM25 sidecar in the background
+# --------------------------------------------------------------------------
+echo "==> Starting Tantivy BM25 sidecar ..."
+tantivy-sidecar &
+TANTIVY_PID=$!
+
+# Wait for Tantivy to become ready
+echo "==> Waiting for Tantivy ..."
+for i in $(seq 1 10); do
+    if curl -sf http://localhost:9091/health > /dev/null 2>&1; then
+        echo "==> Tantivy BM25 is ready."
+        break
+    fi
+    if [ "$i" -eq 10 ]; then
+        echo "ERROR: Tantivy sidecar failed to start within 10 seconds."
+        exit 1
+    fi
+    sleep 1
+done || true  # set -e guard
+
+# --------------------------------------------------------------------------
+# 5  Start a trivial static HTTP server for the frontend
 # --------------------------------------------------------------------------
 if [ -f /app/frontend/index.html ]; then
     echo "==> Starting frontend on http://0.0.0.0:5173 ..."
@@ -99,6 +120,7 @@ echo "║          Spacetime Memory is RUNNING                    ║"
 echo "╠══════════════════════════════════════════════════════════╣"
 echo "║  SpacetimeDB  ➜  http://localhost:3001                  ║"
 echo "║  Embedder     ➜  http://localhost:9090                  ║"
+echo "║  Tantivy BM25 ➜  http://localhost:9091                  ║"
 echo "║  Frontend     ➜  http://localhost:5173                  ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
@@ -110,6 +132,7 @@ cleanup() {
     echo ""
     echo "==> Shutting down all services ..."
     [ -n "$FRONTEND_PID" ] && kill "$FRONTEND_PID" 2>/dev/null && echo "    frontend stopped."
+    [ -n "$TANTIVY_PID" ] && kill "$TANTIVY_PID" 2>/dev/null && echo "    Tantivy BM25 stopped."
     kill "$EMBEDDER_PID" 2>/dev/null && echo "    embedder stopped."
     kill "$SPACETIME_PID" 2>/dev/null && echo "    SpacetimeDB stopped."
     wait

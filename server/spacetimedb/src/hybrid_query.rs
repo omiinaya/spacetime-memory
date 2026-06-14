@@ -111,7 +111,7 @@ fn tokenize_query(query: &str) -> Vec<String> {
         .split(|c: char| !c.is_alphanumeric())
         .filter(|w| !w.is_empty())
         .map(|w| w.to_lowercase())
-        .filter(|w| w.len() >= 3 && !stopwords.contains(&w.as_str()))
+        .filter(|w| w.len() >= 2 && !stopwords.contains(&w.as_str()))
         .collect()
 }
 
@@ -193,6 +193,20 @@ pub fn hybrid_search(
     // Clamp limit (default 10)
     let limit = if limit == 0 { 10 } else { limit };
 
+    // ── Clear previous results for this (workspace, query_hash) ──
+    // Each search call gets fresh results.  This avoids stale row
+    // accumulation across repeated calls for the same query.
+    let old: Vec<_> = ctx
+        .db
+        .hybrid_result()
+        .iter()
+        .take(MAX_RESULTS)
+        .filter(|r| r.workspace_id == workspace_id && r.query_hash == qhash)
+        .collect();
+    for r in old {
+        ctx.db.hybrid_result().id().delete(r.id);
+    }
+
     // Pre-fetch workspace context for context_json population
     let workspace_context = ctx
         .db
@@ -213,13 +227,10 @@ pub fn hybrid_search(
                     continue;
                 }
                 let mut count: u32 = 0;
-                for si in ctx.db.search_index().iter().take(MAX_RESULTS) {
-                    if count >= limit {
-                        break;
-                    }
-                    if si.workspace_id != workspace_id {
-                        continue;
-                    }
+                for si in ctx.db.search_index().iter()
+                    .filter(|si| si.workspace_id == workspace_id)
+                    .take(MAX_RESULTS)
+                {
                     let stored_emb = parse_embedding_json(&si.embedding_json);
                     if stored_emb.is_empty() {
                         continue;
@@ -280,7 +291,7 @@ pub fn hybrid_search(
                 let mut entity_terms: HashMap<String, Vec<(String, u32, u32)>> = HashMap::new();
                 let mut term_doc_freq: HashMap<String, usize> = HashMap::new();
 
-                for ti in ctx.db.term_index().iter().take(MAX_RESULTS) {
+                for ti in ctx.db.term_index().iter() {
                     if ti.workspace_id != workspace_id {
                         continue;
                     }
@@ -309,7 +320,6 @@ pub fn hybrid_search(
                     .db
                     .term_index()
                     .iter()
-                    .take(MAX_RESULTS)
                     .filter(|ti| ti.workspace_id == workspace_id && ti.entity_type == "memory")
                     .map(|ti| ti.entity_id.clone())
                     .collect::<std::collections::HashSet<_>>()
@@ -319,7 +329,7 @@ pub fn hybrid_search(
                 // Compute average doc length
                 let mut total_tokens: u64 = 0;
                 let mut doc_count: u64 = 0;
-                for ti in ctx.db.term_index().iter().take(MAX_RESULTS) {
+                for ti in ctx.db.term_index().iter() {
                     if ti.workspace_id == workspace_id && ti.entity_type == "memory" {
                         total_tokens += ti.doc_length as u64;
                         doc_count += 1;
@@ -402,11 +412,10 @@ pub fn hybrid_search(
                 let matching_node_ids: Vec<String> = ctx
                     .db
                     .kg_node()
-                    .iter().take(MAX_RESULTS)
+                    .iter()
+                    .filter(|n| n.workspace_id == workspace_id)
+                    .take(MAX_RESULTS)
                     .filter(|n| {
-                        if n.workspace_id != workspace_id {
-                            return false;
-                        }
                         let label_lower = n.label.to_lowercase();
                         let summary_lower = n.summary.to_lowercase();
                         query_terms
@@ -500,11 +509,10 @@ pub fn hybrid_search(
                 let mut memories: Vec<_> = ctx
                     .db
                     .memory()
-                    .iter().take(crate::MAX_RESULTS)
+                    .iter()
+                    .filter(|m| m.workspace_id == workspace_id)
+                    .take(crate::MAX_RESULTS)
                     .filter(|m| {
-                        if m.workspace_id != workspace_id {
-                            return false;
-                        }
                         if !memory_type.is_empty() && m.memory_type != memory_type {
                             return false;
                         }
@@ -610,7 +618,7 @@ pub fn hybrid_search(
                 let normalized = if range > 1e-10 {
                     (row.score - min_s) / range
                 } else {
-                    0.5 // All scores identical for this strategy
+                    1.0 // Single result gets full credit
                 };
                 let contrib = normalized * weight;
                 *fused.entry(row.entity_id.clone()).or_insert(0.0) += contrib;

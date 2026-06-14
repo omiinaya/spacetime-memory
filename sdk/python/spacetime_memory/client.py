@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+from .query_expansion import expand_query  # noqa: E402 — intentional late import
+
 # ---------------------------------------------------------------------------
 # Error message mapping (human-readable)
 # ---------------------------------------------------------------------------
@@ -175,6 +177,9 @@ class Client:
         self.embedder_url = (
             embedder_url
             or os.environ.get("EMBEDDER_URL", "http://localhost:9090")
+        )
+        self.tantivy_url = os.environ.get(
+            "TANTIVY_URL", "http://localhost:9091"
         )
         self.embedder_type = (
             embedder_type
@@ -506,6 +511,38 @@ class Client:
                 "Check EMBEDDER_URL and OPENAI_API_KEY."
             )
 
+    # ── model detection ────────────────────────────────────────────────
+    _bge_model_cache: bool | None = None
+    _e5_model_cache: bool | None = None
+
+    def _is_bge_model(self) -> bool:
+        """Check if the embedder is running a BGE-family model (needs query instruction prefix)."""
+        if self._bge_model_cache is not None:
+            return self._bge_model_cache
+        try:
+            resp = self._http.get(f"{self.embedder_url}/health", timeout=2.0)
+            if resp.status_code < 400:
+                model = resp.json().get("model", "").lower()
+                self._bge_model_cache = "bge" in model and "reranker" not in model
+                return self._bge_model_cache
+        except Exception:
+            pass
+        return False
+
+    def _is_e5_model(self) -> bool:
+        """Check if the embedder is running an E5-family model (needs 'query: ' prefix)."""
+        if self._e5_model_cache is not None:
+            return self._e5_model_cache
+        try:
+            resp = self._http.get(f"{self.embedder_url}/health", timeout=2.0)
+            if resp.status_code < 400:
+                model = resp.json().get("model", "").lower()
+                self._e5_model_cache = "e5" in model
+                return self._e5_model_cache
+        except Exception:
+            pass
+        return False
+
     def _embed_local(self, text: str) -> list[float]:
         """Get an embedding vector via the Rust ONNX sidecar."""
         try:
@@ -544,13 +581,21 @@ class Client:
             logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
             return []
         try:
+            base_url = os.environ.get(
+                "OPENAI_BASE_URL",
+                "https://api.openai.com/v1"
+            ).rstrip("/")
             resp = self._http.post(
-                "https://api.openai.com/v1/embeddings",
+                f"{base_url}/embeddings",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
-                json={"input": text, "model": "text-embedding-ada-002"},
+                json={
+                    "input": text,
+                    "model": os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large"),
+                    "dimensions": int(os.environ.get("EMBEDDING_DIMENSIONS", "3072")),
+                },
                 timeout=30,
             )
             resp.raise_for_status()
@@ -634,13 +679,21 @@ class Client:
             logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
             return []
         try:
+            base_url = os.environ.get(
+                "OPENAI_BASE_URL",
+                "https://api.openai.com/v1"
+            ).rstrip("/")
             resp = self._http.post(
-                "https://api.openai.com/v1/embeddings",
+                f"{base_url}/embeddings",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
-                json={"input": texts, "model": "text-embedding-ada-002"},
+                json={
+                    "input": texts,
+                    "model": os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large"),
+                    "dimensions": int(os.environ.get("EMBEDDING_DIMENSIONS", "3072")),
+                },
                 timeout=60,
             )
             resp.raise_for_status()
@@ -666,6 +719,58 @@ class Client:
             return {"status": "error", "code": resp.status_code, "reachable": True}
         except Exception as e:
             return {"status": "error", "message": str(e), "reachable": False}
+
+    # ── Tantivy BM25 keyword search sidecar ──
+
+    def _tantivy_index(
+        self,
+        workspace_id: str,
+        entity_id: str,
+        content: str,
+        entity_type: str = "memory",
+    ) -> bool:
+        """Index a document into the Tantivy BM25 sidecar."""
+        try:
+            resp = self._http.post(
+                f"{self.tantivy_url}/index",
+                json={
+                    "workspace_id": workspace_id,
+                    "entity_id": entity_id,
+                    "content": content,
+                    "entity_type": entity_type,
+                },
+                timeout=5.0,
+            )
+            return resp.status_code < 400
+        except Exception:
+            return False
+
+    def _tantivy_search(
+        self,
+        workspace_id: str,
+        query: str,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Search Tantivy BM25 index and return scored results.
+
+        Returns list of dicts with keys: entity_id, score, content, entity_type.
+        Scores are raw BM25 — already in a useful range (typically 0-20+).
+        """
+        try:
+            resp = self._http.post(
+                f"{self.tantivy_url}/search",
+                json={
+                    "workspace_id": workspace_id,
+                    "query": query,
+                    "limit": limit,
+                },
+                timeout=5.0,
+            )
+            if resp.status_code >= 400:
+                return []
+            return resp.json()
+        except Exception:
+            return []
 
     def ping(self) -> dict[str, Any]:
         """Quick connectivity check against SpacetimeDB.
@@ -786,19 +891,28 @@ class Client:
         # Auto-index
         emb = self._embed(content)
         if emb:
+            # Resolve the memory ID by content match — more reliable than
+            # peer_id query which can return a different concurrent store.
             mems = self._query("memory", workspace_id=workspace_id,
-                              filter_dict={"peer_id": peer_id},
-                              columns=["id"])
-            if mems:
-                memory_id = mems[-1]["id"]
+                              filter_dict={},
+                              columns=["id", "content"])
+            memory_id = ""
+            for m in reversed(mems):
+                if m.get("content", "") == content:
+                    memory_id = m["id"]
+                    break
+            if memory_id:
                 self._call("index_entity", [
                     workspace_id, "memory", memory_id,
                     content, json.dumps(emb),
                 ])
-                # Populate BM25 inverted index
+                # Populate BM25 inverted index (legacy STDB term_index)
                 self._call("index_terms", [
                     workspace_id, "memory", memory_id, content,
                 ])
+
+                # Index into Tantivy BM25 sidecar (real Okapi BM25)
+                self._tantivy_index(workspace_id, memory_id, content, "memory")
 
                 # Entity extraction: LLM first, fall back to regex
                 self._extract_and_store_entities(workspace_id, memory_id, content)
@@ -972,6 +1086,8 @@ class Client:
         rerank_endpoint: str | None = None,
         rerank_model: str | None = None,
         rerank_api_key: str | None = None,
+        cross_encoder: bool = False,
+        query_expansion: bool = False,
     ) -> list[dict[str, Any]]:
         """Search memories.  When *semantic* is True uses hybrid search.
 
@@ -984,9 +1100,28 @@ class Client:
                     (default: ``LLM_RERANK_MODEL`` env var).
             rerank_api_key: API key for reranker
                     (default: ``LLM_RERANK_API_KEY`` or ``OPENAI_API_KEY`` env var).
+            cross_encoder: If True, passes top results through a local ONNX
+                    cross-encoder (ms-marco-MiniLM-L-6-v2) before LLM rerank.
+            query_expansion: If True, expands the query with synonyms and
+                    related terms via LLM before searching.
         """
         if semantic:
-            emb = self._embed(query)
+            # ── Query expansion (pre-search) ──
+            search_query = query
+            if query_expansion and query:
+                search_query = expand_query(query)
+                # If expansion returned gibberish, fall back
+                if not search_query or len(search_query.strip()) < 3:
+                    search_query = query
+
+            # BGE models need query instruction prefix for asymmetric search.
+            # E5 models need "query: " prefix.
+            query_text = search_query
+            if self._is_bge_model():
+                query_text = f"Represent this sentence for searching relevant passages: {search_query}"
+            elif self._is_e5_model():
+                query_text = f"query: {search_query}"
+            emb = self._embed(query_text)
             emb_json = json.dumps(emb) if emb else "[]"
 
             # Check embedder health — if down, exclude semantic strategy and warn
@@ -1011,17 +1146,127 @@ class Client:
                 )
             strategies = json.dumps(strategies_list)
 
+            # ── Over-fetch (Mem0 pattern): fetch a large candidate pool ──
+            # The cross-encoder needs plenty of candidates.  Min-max fusion
+            # breaks on huge sets (all low scores collapse to same range),
+            # so we fuse on a managed subset and let the cross-encoder handle
+            # the rest.
+            fetch_limit = max(limit * 4, 60)
+            fusion_limit = max(limit * 3, 20)
+
             self._call("hybrid_search", [
-                workspace_id, query, emb_json,
-                memory_type, tier, limit, strategies,
+                workspace_id, search_query, emb_json,
+                memory_type, tier, fetch_limit, strategies,
             ])
-            qhash = _query_hash(query)
+            qhash = _query_hash(search_query)
             rows = self._sql(
                 "SELECT * FROM hybrid_result "
                 f"WHERE workspace_id = '{_esc(workspace_id)}' "
                 f"  AND query_hash = '{_esc(qhash)}' "
             )
-            rows.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+
+            # ── Weighted min-max fusion ──
+            # Normalize each strategy to [0,1] via min-max, then weighted sum.
+            # Semantic (0.65): strongest signal — now backed by bge-large-en-v1.5
+            #   (1024-dim, +4 MTEB over MiniLM).
+            # Keyword (0.25): Tantivy's real Okapi BM25 with stemming + IDF.
+            # Graph (0.05), temporal (0.05): supporting signals — low weight
+            #   because graph is substring-matching and temporal is recency-only.
+            STRATEGY_WEIGHTS = {
+                "semantic": 0.65,
+                "keyword": 0.25,
+                "graph": 0.05,
+                "temporal": 0.05,
+            }
+
+            # ── Fetch Tantivy keyword results ──
+            tantivy_hits = self._tantivy_search(workspace_id, search_query, limit=fetch_limit)
+            # Convert Tantivy hits to the same shape as STDB hybrid_result rows
+            tantivy_rows: list[dict[str, Any]] = []
+            for th in tantivy_hits:
+                tantivy_rows.append({
+                    "entity_id": th.get("entity_id", ""),
+                    "entity_type": th.get("entity_type", "memory"),
+                    "content": th.get("content", ""),
+                    "score": float(th.get("score", 0.0)),
+                    "strategy": "keyword",
+                    "workspace_id": workspace_id,
+                })
+
+            # Compute min/max per strategy — but only on a capped subset.
+            # Over-fetching dumps hundreds of low-score keyword matches
+            # (0.125 per single-word hit) that collapse the min-max range.
+            per_strat: dict[str, list[dict]] = {
+                "keyword": [],  # Tantivy rows go here
+                "semantic": [], "graph": [], "temporal": [],
+            }
+
+            # Sort Tantivy rows by score desc, take top fusion_limit
+            tantivy_rows.sort(key=lambda r: r["score"], reverse=True)
+            per_strat["keyword"] = tantivy_rows[:fusion_limit]
+
+            # Add STDB rows for semantic, graph, temporal (plus legacy keyword
+            # as fallback — any row not in Tantivy still participates)
+            for r in rows:
+                s = r.get("strategy", "")
+                if s in per_strat and len(per_strat[s]) < fusion_limit:
+                    per_strat[s].append(r)
+
+            strat_min: dict[str, float] = {}
+            strat_max: dict[str, float] = {}
+            for s, s_rows in per_strat.items():
+                for r in s_rows:
+                    sc = float(r.get("score", 0.0))
+                    strat_min[s] = min(strat_min.get(s, float("inf")), sc)
+                    strat_max[s] = max(strat_max.get(s, float("-inf")), sc)
+
+            # Fuse: take the BEST normalized score per strategy per entity,
+            # then weighted sum.  (Don't sum all rows — an entity can appear
+            # in many keyword rows for different term matches.)
+            best_per_strat: dict[str, dict[str, float]] = {
+                "semantic": {}, "keyword": {}, "graph": {}, "temporal": {},
+            }
+            best_row: dict[str, dict] = {}
+            # Include both STDB rows and Tantivy keyword rows in normalization
+            all_rows = list(rows)
+            for tr in tantivy_rows:
+                # Only add Tantivy row if entity not already covered by STDB
+                eid = tr.get("entity_id", "")
+                if eid not in best_row:
+                    all_rows.append(tr)
+            for r in all_rows:
+                s = r.get("strategy", "")
+                if s not in best_per_strat:
+                    continue
+                sc = float(r.get("score", 0.0))
+                eid = r.get("entity_id", "")
+                rng = strat_max.get(s, 1.0) - strat_min.get(s, 0.0)
+                normalized = ((sc - strat_min.get(s, 0.0)) / rng) if rng > 1e-10 else 1.0
+                if eid not in best_per_strat[s] or normalized > best_per_strat[s][eid]:
+                    best_per_strat[s][eid] = normalized
+                if eid not in best_row or sc > float(best_row[eid].get("score", 0)):
+                    best_row[eid] = dict(r)
+
+            # Weighted sum of best per-strategy normalized scores
+            fused: dict[str, float] = {}
+            for eid in set().union(*(d.keys() for d in best_per_strat.values())):
+                total = 0.0
+                for s, w in STRATEGY_WEIGHTS.items():
+                    total += best_per_strat[s].get(eid, 0.0) * w
+                fused[eid] = total
+
+            # Deduplicate: keep best row per entity, tag with fused score
+            seen: dict[str, dict] = {}
+            for r in all_rows:
+                eid = r.get("entity_id", "")
+                fs = fused.get(eid, 0.0)
+                r["fused_score"] = fs
+                if eid not in seen or fs > seen[eid].get("fused_score", float("-inf")):
+                    seen[eid] = r
+
+            rows = list(seen.values())
+            rows.sort(key=lambda r: r.get("fused_score", 0.0), reverse=True)
+
             # Look up content from source tables in Python
             mem_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "memory"]
             node_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "node"]
@@ -1045,13 +1290,18 @@ class Client:
                     r["memory_content"] = node_map.get(eid, "")
                 else:
                     r["memory_content"] = ""
+                # Surface fused_score as the canonical score for consumers
+                r["score"] = r.get("fused_score", r.get("score", 0.0))
+            if cross_encoder:
+                from .cross_encoder import cross_encoder_rerank
+                rows = cross_encoder_rerank(query, rows, top_k=len(rows))
             if rerank:
                 rows = llm_rerank(
                     query, rows,
                     endpoint=rerank_endpoint,
                     model=rerank_model,
                     api_key=rerank_api_key,
-                    top_k=min(10, len(rows)),
+                    top_k=min(20, len(rows)),
                 )
             return rows[:limit]
 
@@ -2202,23 +2452,43 @@ def llm_rerank(
     prompt = _RERANK_PROMPT.format(query=query, candidates=candidates_text)
 
     try:
-        resp = httpx.post(
-            f"{endpoint.rstrip('/')}/chat/completions",
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": "You are a search reranker. Return only JSON."},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.0,
-                "max_tokens": 2048,
-            },
-            headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
-            timeout=timeout,
-        )
-        resp.raise_for_status()
+        # Retry with backoff for rate limits
+        import time as _time
+        for attempt in range(3):
+            resp = httpx.post(
+                f"{endpoint.rstrip('/')}/chat/completions",
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "You are a search reranker. Return only JSON."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 2048,
+                },
+                headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+                timeout=timeout,
+            )
+            if resp.status_code == 429:
+                wait = 2 ** attempt
+                logger.warning("LLM rerank rate-limited, retrying in %ds (attempt %d/3)", wait, attempt + 1)
+                _time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            break
+        else:
+            raise httpx.HTTPStatusError("429 rate limit after 3 retries", request=resp.request, response=resp)
         data = resp.json()
-        content = data["choices"][0]["message"]["content"].strip()
+        msg = data["choices"][0]["message"]
+        content = (msg.get("content") or "").strip()
+
+        # Reasoning models (DeepSeek-R1, o1, etc.) put their output in
+        # reasoning_content and leave content empty.  Fall back so the
+        # JSON parser still has something to work with.
+        if not content:
+            reasoning = msg.get("reasoning_content") or ""
+            if reasoning:
+                content = reasoning.strip()
 
         # Strip markdown code fences if present
         if content.startswith("```"):
@@ -2261,6 +2531,37 @@ def llm_rerank(
                     parse_ok = True
             except json.JSONDecodeError as e:
                 errors.append(f"strict_false: {e}")
+
+        # Strategy 4: Aggressive salvage — strip trailing commas, fix unquoted keys
+        if not parse_ok:
+            import re as _re
+            cleaned = content
+            # Remove trailing commas before closing brackets/braces
+            cleaned = _re.sub(r',\s*([}\]])', r'\1', cleaned)
+            # Try to extract any JSON array
+            m = _re.search(r'\[.*\]', cleaned, _re.DOTALL)
+            if m:
+                try:
+                    scores = json.loads(m.group())
+                    if isinstance(scores, dict):
+                        scores = [scores]
+                    if isinstance(scores, list):
+                        parse_ok = True
+                except json.JSONDecodeError as e:
+                    errors.append(f"salvage_array: {e}")
+            
+            if not parse_ok:
+                # Last resort: try to find any JSON object and wrap it
+                m = _re.search(r'\{.*?\}.*?\"score\"', cleaned, _re.DOTALL)
+                if m:
+                    try:
+                        # Try parsing as a dict directly
+                        obj = json.loads(m.group().rstrip('"score"').rstrip(','))
+                        if isinstance(obj, dict):
+                            scores = [obj]
+                            parse_ok = True
+                    except json.JSONDecodeError:
+                        pass
 
         if not parse_ok:
             raise ValueError(f"JSON parse failed after 3 strategies: {'; '.join(errors[-2:])}")

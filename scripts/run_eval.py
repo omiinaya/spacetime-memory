@@ -5,7 +5,7 @@ sys.path.insert(0, "/home/user/spacetime-memory/sdk/python")
 from spacetime_memory import Client
 from spacetime_memory.auth import generate_token
 
-DB = "c20012b2679f860fd6caf3f6fc1274e8552ed2e8f99084eefad95516b61d1f72"
+DB = "c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff"
 token = generate_token("/tmp/stdb-data/jwt_priv_pk8.pem")
 c = Client(host="localhost", port=3001, database=DB, token=token)
 c._call("login", ["seed_eval", "seedpass123"])

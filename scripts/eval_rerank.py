@@ -13,7 +13,7 @@ os.environ["LLM_RERANK_API_KEY"] = prov["api_key"]
 os.environ["LLM_RERANK_MODEL"] = "go-deepseek-v4-flash"
 
 token = generate_token("/tmp/stdb-data/jwt_priv_pk8.pem")
-c = Client(host="localhost", port=3001, database="c20012b2679f860fd6caf3f6fc1274e8552ed2e8f99084eefad95516b61d1f72", token=token)
+c = Client(host="localhost", port=3001, database="c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff", token=token)
 c._call("login", ["seed_eval", "seedpass123"])
 
 with open("data/eval_workspace_id.txt") as f:

@@ -39,7 +39,7 @@ HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get(
     "SPACETIMEDB_DB",
-    "c20012b2679f860fd6caf3f6fc1274e8552ed2e8f99084eefad95516b61d1f72",
+    "c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff",
 )
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")

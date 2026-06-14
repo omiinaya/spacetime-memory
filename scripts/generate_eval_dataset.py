@@ -15,6 +15,8 @@ import os
 import sys
 import uuid
 
+import httpx
+
 for prefix in (".", "..", "/home/user/spacetime-memory"):
     sdk_path = os.path.join(prefix, "sdk/python")
     if os.path.isdir(sdk_path):
@@ -27,7 +29,7 @@ HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get(
     "SPACETIMEDB_DB",
-    "c20012b2679f860fd6caf3f6fc1274e8552ed2e8f99084eefad95516b61d1f72",
+    "c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff",
 )
 
 # ── Test data: 50 memories across 5 topic clusters ──────────────────────
@@ -284,19 +286,38 @@ def main() -> None:
 
     client = Client(host=HOST, port=PORT, database=DB)
 
-    # Register if needed
+    # Register with a unique identity — capture token from response
+    ident = f"eval_gen_{uuid.uuid4().hex[:8]}"
+    token_ok = False
     try:
-        client._call("register", ["eval_generator", "Eval Generator", "evalpass"])
-    except RuntimeError:
+        resp = httpx.post(
+            f"http://{HOST}:{PORT}/v1/database/{DB}/call/register",
+            content=json.dumps([ident, "Eval Generator", "evalpass"]),
+            headers={"Content-Type": "application/json"},
+            timeout=10.0,
+        )
+        token = resp.headers.get("spacetime-identity-token", "")
+        if token:
+            client._identity_token = token
+            client._identity_established = True
+            token_ok = True
+    except Exception:
         pass
+
+    if not token_ok:
+        print("ERROR: Could not register identity")
+        sys.exit(1)
+
+    # Save identity token so eval harness can reuse it
+    _token_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cron_identity_token")
+    with open(_token_file, "w") as f:
+        f.write(token)
 
     ws_id = args.workspace_id
     if not ws_id:
         ws_id = f"eval-{uuid.uuid4().hex[:12]}"
-        try:
-            client._call("create_workspace", ["eval_benchmark", "auto", ws_id])
-        except RuntimeError:
-            pass
+    # Always create fresh workspace with this identity
+    client._call("create_workspace", ["eval_benchmark", "auto", ws_id])
 
     memory_ids: list[str] = []
     if args.populate and not args.skip_populate:
@@ -306,7 +327,7 @@ def main() -> None:
                 workspace_id=ws_id,
                 content=text,
                 memory_type=mtype,
-                peer_id="eval_generator",
+                peer_id=ident,
             )
             # Get the memory ID from the stored result
             mems = client._query("memory", workspace_id=ws_id,
@@ -343,6 +364,9 @@ def main() -> None:
 
     print(f"Wrote {len(queries)} queries to {args.output}")
     print(f"Workspace ID: {ws_id}")
+    # Save workspace ID so eval harness can auto-detect
+    with open("/tmp/eval_workspace.txt", "w") as f:
+        f.write(ws_id)
     if args.populate and not args.skip_populate:
         print(f"\nRun eval with:")
         print(f"  python3 scripts/eval_harness.py --workspace-id {ws_id} --queries-file {args.output}")

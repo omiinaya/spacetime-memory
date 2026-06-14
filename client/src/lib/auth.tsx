@@ -89,15 +89,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (a: AccountRow) => a.id.toLowerCase() === myIdentity && a.is_active
     );
 
-    if (myAccount) {
-      setStatus({ type: 'authenticated', account: myAccount });
-    } else if (accounts && accounts.length === 0) {
-      // First run — no accounts exist
-      setStatus({ type: 'needs_account' });
-    } else {
-      // Accounts exist but current identity isn't linked
-      setStatus({ type: 'login' });
-    }
+    setStatus(prev => {
+      const next: AuthStatus = myAccount
+        ? { type: 'authenticated', account: myAccount }
+        : accounts && accounts.length === 0
+          ? { type: 'needs_account' }
+          : { type: 'login' };
+      // Only update if status actually changed
+      if (prev.type === next.type) return prev;
+      return next;
+    });
   }, [accounts, myIdentity]);
 
   const register = useCallback(async (username: string, displayName: string, password: string) => {

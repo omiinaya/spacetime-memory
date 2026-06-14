@@ -158,7 +158,7 @@ fn tokenize(content: &str) -> Vec<String> {
         .split(|c: char| !c.is_alphanumeric())
         .filter(|w| !w.is_empty())
         .map(|w| w.to_lowercase())
-        .filter(|w| w.len() >= 3 && !stopwords.contains(&w.as_str()))
+        .filter(|w| w.len() >= 2 && !stopwords.contains(&w.as_str()))
         .collect()
 }
 

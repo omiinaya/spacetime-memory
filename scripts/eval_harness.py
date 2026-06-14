@@ -32,11 +32,25 @@ for prefix in (".", "..", "/home/user/spacetime-memory"):
 
 from spacetime_memory import Client
 
+# Load reranker credentials from Hermes .env (avoids shell escaping issues)
+# Load reranker credentials from Hermes .env (avoids shell escaping issues)
+_env_path = os.path.expanduser("~/.hermes/.env")
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line.startswith("LITELLM_MASTER_KEY="):
+                _, _key = _line.split("=", 1)
+                os.environ["LLM_RERANK_API_KEY"] = _key.strip().strip('"').strip("'")
+                break
+os.environ.setdefault("LLM_RERANK_ENDPOINT", "http://192.168.1.111:4000/v1")
+os.environ.setdefault("LLM_RERANK_MODEL", "ds-deepseek-v4-flash")
+
 HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get(
     "SPACETIMEDB_DB",
-    "c20012b2679f860fd6caf3f6fc1274e8552ed2e8f99084eefad95516b61d1f72",
+    "c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff",
 )
 
 # GBrain-hardcoded benchmark queries (simulated — real eval needs labeled data)
@@ -82,10 +96,19 @@ def run_hybrid_search(
     workspace_id: str,
     query: str,
     k: int = 5,
+    cross_encoder: bool = False,
+    rerank: bool = False,
+    query_expansion: bool = False,
 ) -> list[dict[str, Any]]:
     """Run hybrid search via the SDK client (handles embedding + strategy dispatch)."""
     try:
-        results = client.search(workspace_id, query=query, limit=k, semantic=True)
+        results = client.search(
+            workspace_id, query=query, limit=k,
+            semantic=True,
+            cross_encoder=cross_encoder,
+            rerank=rerank,
+            query_expansion=query_expansion,
+        )
         return results[:k]
     except Exception as e:
         print(f"  Search error: {e}")
@@ -134,6 +157,9 @@ def run_eval(
     workspace_id: str,
     queries: list[dict[str, Any]],
     k: int = 5,
+    cross_encoder: bool = False,
+    rerank: bool = False,
+    query_expansion: bool = False,
 ) -> dict[str, Any]:
     """Run full eval harness against a workspace."""
     p_at_k: list[float] = []
@@ -146,7 +172,11 @@ def run_eval(
         relevant_ids = set(q.get("relevant_ids", []))
         description = q.get("description", "")
 
-        search_results = run_hybrid_search(client, workspace_id, query_text, k=k)
+        search_results = run_hybrid_search(
+            client, workspace_id, query_text, k=k,
+            cross_encoder=cross_encoder, rerank=rerank,
+            query_expansion=query_expansion,
+        )
 
         p = evaluate_precision_at_k(search_results, relevant_ids, k)
         r = evaluate_recall_at_k(search_results, relevant_ids, k)
@@ -192,6 +222,12 @@ def main() -> None:
         help="JSONL file with queries and relevant_ids",
     )
     parser.add_argument("--k", type=int, default=5, help="K for P@K and R@K")
+    parser.add_argument("--cross-encoder", action="store_true",
+                        help="Enable local cross-encoder reranker")
+    parser.add_argument("--rerank", action="store_true",
+                        help="Enable LLM reranker (after cross-encoder if both)")
+    parser.add_argument("--query-expansion", action="store_true",
+                        help="Expand queries with LLM synonyms before search")
     args = parser.parse_args()
 
     client = _c()
@@ -210,7 +246,9 @@ def main() -> None:
     print(f"Workspace: {args.workspace_id[:16]}...")
     print()
 
-    results = run_eval(client, args.workspace_id, queries, k=args.k)
+    results = run_eval(client, args.workspace_id, queries, k=args.k,
+                       cross_encoder=args.cross_encoder, rerank=args.rerank,
+                       query_expansion=args.query_expansion)
 
     # Save results
     out_path = f"/tmp/eval_results_{int(time.time())}.json"

@@ -18,7 +18,7 @@
 // ---------------------------------------------------------------------------
 
 const WS_URI = (import.meta as any).env?.VITE_SPACETIMEDB_WS ?? 'ws://localhost:3001';
-const DB_NAME = (import.meta as any).env?.VITE_SPACETIMEDB_DB ?? 'c200f381695ed98be9b3fa689dd298cddff6212d35c46ae2a01999f921b88c82';
+const DB_NAME = (import.meta as any).env?.VITE_SPACETIMEDB_DB ?? 'c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff';
 const HTTP_HOST = (import.meta as any).env?.VITE_SPACETIMEDB_HOST ?? 'localhost:3001';
 
 // ---------------------------------------------------------------------------
