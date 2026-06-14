@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-"""Generate LARGE labeled eval dataset — 120+ memories, 55+ queries.
+"""Generate XL labeled eval dataset — 200+ memories, all 55 original + 20 new queries.
 
-Scale target: stable metrics that don't swing 10% per sample.
+Extends `generate_eval_dataset_large.py` with additional clusters:
+  - Pricing & Plans (12 memories)
+  - Partnerships & Ecosystem (14 memories)
+  - Future Roadmap (10 memories)
+  - Internal Operations (12 memories)
+  - Expanded negative (8 office/perk memories) — now 36 total negative
+  - +6 new cross-cluster/specific queries
+
+Total: 128 + 56 = 184 memories. If mem count < 200, expand existing clusters.
 """
 
 from __future__ import annotations
@@ -23,12 +31,12 @@ HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get(
     "SPACETIMEDB_DB",
-    "c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff",
+    "c200f381695ed98be9b3fa689dd298cddff6212d35c46ae2a01999f921b88c82",
 )
 
-# ── 128 memories across 8 topic clusters ────────────────────────────────
+# ── Original 128 memories (indices 0–127) ────────────────────────────────
 
-MEMORIES = [
+MEMORIES_ORIG = [
     # ── Cluster 0: Company/People (indices 0–11) ──
     ("Alice Chen is the CEO and co-founder of Acme AI, a SaaS platform for enterprise automation.", "world_fact"),
     ("Bob Smith is the CTO of Acme AI and previously worked at Google for 8 years.", "world_fact"),
@@ -52,11 +60,12 @@ MEMORIES = [
     ("The company's burn rate is approximately $3M per month with 24 months of runway.", "world_fact"),
     ("Andreessen Horowitz expressed interest in leading a potential Series C in 2026.", "world_fact"),
     ("Acme AI rejected a $200M acquisition offer from Salesforce in November 2025.", "world_fact"),
-    ("Y Combinator was Acme AI's first investor in the W23 batch.", "world_fact"),
-    ("Revenue growth is primarily driven by enterprise contracts over $100K annually.", "world_fact"),
-    ("The company's revenue grew 300% year-over-year to $12M ARR.", "world_fact"),
-    ("Acme AI achieved cash-flow positivity in Q4 2025, two quarters ahead of plan.", "world_fact"),
-    ("The finance team uses Mercury and QuickBooks for treasury and accounting.", "world_fact"),
+    ("The company was in Y Combinator's Winter 2023 batch alongside 200 other startups.", "world_fact"),
+    ("Seed round of $3M was raised in March 2023 from YC, a16z scout, and angel investors.", "world_fact"),
+    ("ARR reached $22M in Q1 2026, up from $8M in Q1 2025.", "world_fact"),
+    ("Monthly recurring revenue is $1.9M with 98% gross dollar retention.", "world_fact"),
+    ("The company has 340 paying customers across Free, Pro, and Enterprise plans.", "world_fact"),
+    ("Average contract value is $65K for Pro and $350K for Enterprise.", "world_fact"),
     ("R&D spending is $1.8M per month, primarily on GPU compute and engineering salaries.", "world_fact"),
     ("Acme AI has a $5M line of credit with Silicon Valley Bank.", "world_fact"),
     ("The company's gross margin is 78% with a target of 85% by Q4 2026.", "world_fact"),
@@ -174,7 +183,88 @@ MEMORIES = [
     ("A company-wide hackathon runs twice a year with prizes for top projects.", "world_fact"),
 ]
 
-# ── 55 labeled queries ──────────────────────────────────────────────────
+# ── NEW: Cluster 8: Pricing & Plans (indices 128–139) ──
+MEMORIES_NEW_PRICING = [
+    ("FlowForge pricing: Free plan includes 100 automation steps/month and 5 connectors.", "world_fact"),
+    ("FlowForge Pro plan costs $49/user/month with unlimited steps and 50 connectors.", "world_fact"),
+    ("FlowForge Enterprise plan starts at $5K/month for custom connectors and dedicated support.", "world_fact"),
+    ("The Free-to-Pro conversion funnel has a 12% conversion rate within 90 days.", "world_fact"),
+    ("Enterprise plan includes a dedicated customer success manager and 99.9% uptime SLA.", "world_fact"),
+    ("Volume discounts are available for 50+ seats on the Pro plan at 20% off.", "world_fact"),
+    ("Annual billing on Pro saves 17% compared to monthly billing.", "world_fact"),
+    ("The Enterprise plan includes SSO, audit logs, and custom data retention policies.", "world_fact"),
+    ("A new Startup plan at $19/user/month launched in Q1 2026 for companies under 20 employees.", "world_fact"),
+    ("FlowForge offers a 30-day free trial of the Pro plan with no credit card required.", "world_fact"),
+    ("Enterprise plan pricing is usage-based above 10K automation steps per day.", "world_fact"),
+    ("Non-profit organizations receive a 50% discount on all FlowForge plans.", "world_fact"),
+]
+
+# ── NEW: Cluster 9: Partnerships & Ecosystem (indices 140–153) ──
+MEMORIES_NEW_PARTNERSHIPS = [
+    ("Acme AI partners with AWS as an Advanced Technology Partner in the APN.", "world_fact"),
+    ("A strategic partnership with Snowflake enables FlowForge to trigger workflows from data pipelines.", "world_fact"),
+    ("Datadog partnership provides native FlowForge dashboards for monitoring automation health.", "world_fact"),
+    ("The company has a reseller agreement with CDW for government and education sectors.", "world_fact"),
+    ("Acme AI joined the Microsoft for Startups program with $150K in Azure credits.", "world_fact"),
+    ("A partnership with Okta enables seamless SSO provisioning for enterprise customers.", "world_fact"),
+    ("The Zapier integration is bidirectional — FlowForge can both trigger and be triggered by Zaps.", "world_fact"),
+    ("Acme AI sponsors the AI Engineer Summit and React Conf annually.", "world_fact"),
+    ("A technology alliance with Anthropic provides early access to Claude models for FlowForge AI features.", "world_fact"),
+    ("The company has 15 certified implementation partners across North America and Europe.", "world_fact"),
+    ("System integrator partners include Accenture, Deloitte Digital, and Slalom.", "world_fact"),
+    ("A developer advocacy program with 200+ community ambassadors drives grassroots adoption.", "world_fact"),
+    ("Acme AI contributes to the OpenAPI, CloudEvents, and AsyncAPI open standards.", "world_fact"),
+    ("The company co-hosts a monthly webinar series with AWS on enterprise automation patterns.", "world_fact"),
+]
+
+# ── NEW: Cluster 10: Future Roadmap (indices 154–163) ──
+MEMORIES_NEW_ROADMAP = [
+    ("FlowForge Q3 2026 roadmap includes a visual canvas editor with drag-and-drop workflow building.", "world_fact"),
+    ("Planned Q4 2026: multi-agent AI workflows where multiple LLM agents collaborate on automation tasks.", "world_fact"),
+    ("Acme AI is exploring a FlowForge Marketplace for community-built connector plugins.", "world_fact"),
+    ("The company plans to open a London office in 2027 to serve EMEA enterprise customers.", "world_fact"),
+    ("FlowForge mobile app is planned for general availability in Q3 2026 on iOS and Android.", "world_fact"),
+    ("Acme AI is researching RAG-based workflows that can ingest enterprise documents for context-aware automation.", "world_fact"),
+    ("A planned acquisition of a small AI observability startup will add ML monitoring to FlowForge.", "world_fact"),
+    ("The engineering team is evaluating WebAssembly runtime support for custom connector sandboxing.", "world_fact"),
+    ("A FlowForge CLI tool for CI/CD pipeline integration is on the 2027 roadmap.", "world_fact"),
+    ("The company is exploring a HIPAA-compliant dedicated hosting option for healthcare customers.", "world_fact"),
+]
+
+# ── NEW: Cluster 11: Internal Operations (indices 164–175) ──
+MEMORIES_NEW_OPS = [
+    ("Acme AI uses Rippling for HRIS, payroll, and device management across 120 employees.", "world_fact"),
+    ("The finance team uses Brex for corporate cards and Mercury for business banking.", "world_fact"),
+    ("Internal documentation lives in Notion with a mandatory RFC process for architectural decisions.", "world_fact"),
+    ("The recruiting pipeline sources 60% of engineering hires from employee referrals.", "world_fact"),
+    ("Acme AI has a formal leveling framework with levels E1 through E7 for engineering.", "world_fact"),
+    ("The engineering onboarding program is 4 weeks with a dedicated mentor and starter project.", "world_fact"),
+    ("Performance reviews happen twice yearly with 360-degree feedback from peers and reports.", "world_fact"),
+    ("All-company meetings are every Monday at 9am Pacific with remote dial-in via Zoom.", "world_fact"),
+    ("The company uses Linear for issue tracking and Notion for product specs.", "world_fact"),
+    ("Engineering compensation includes base salary, equity (4-year vest, 1-year cliff), and performance bonuses.", "world_fact"),
+    ("Diversity stats: 42% women in leadership, 35% underrepresented minorities in engineering.", "world_fact"),
+    ("Acme AI has an internal mobility program allowing engineers to rotate teams every 12 months.", "world_fact"),
+]
+
+# ── NEW: Expanded negative (indices 176–183) ──
+MEMORIES_NEW_NEGATIVE = [
+    ("The office dog policy allows employees to bring well-behaved dogs on Wednesdays and Fridays.", "world_fact"),
+    ("There is a rooftop garden where employees grow tomatoes, basil, and peppers in raised beds.", "world_fact"),
+    ("The company sponsors a local Little League team called the Acme Automators.", "world_fact"),
+    ("Every Halloween the office holds a costume contest with categories for best group and most creative.", "world_fact"),
+    ("The kitchen has three types of oat milk: Oatly, Califia, and Minor Figures.", "world_fact"),
+    ("There's a weekly chess club that meets in the library corner on Wednesday lunch breaks.", "world_fact"),
+    ("Employees can expense up to $50/month for books related to their professional development.", "world_fact"),
+    ("The office has a nap pod room with two zero-gravity chairs and blackout curtains.", "world_fact"),
+]
+
+# ── Assemble all memories ─────────────────────────────────────────────────
+
+MEMORIES = MEMORIES_ORIG + MEMORIES_NEW_PRICING + MEMORIES_NEW_PARTNERSHIPS + \
+           MEMORIES_NEW_ROADMAP + MEMORIES_NEW_OPS + MEMORIES_NEW_NEGATIVE
+
+# ── All 55 original queries ───────────────────────────────────────────────
 
 QUERIES = [
     # ── CEO / Leadership ──
@@ -236,7 +326,7 @@ QUERIES = [
     {"query": "Acme AI GDPR data residency", "description": "GDPR", "relevant_indices": [96]},
     {"query": "Acme AI HackerOne bug bounty", "description": "Bug bounty", "relevant_indices": [97]},
 
-    # ── Negative queries (should match only office/culture content) ──
+    # ── Negative queries ──
     {"query": "office amenities perks", "description": "Office perks (negative)", "relevant_indices": [100, 105, 111, 118]},
     {"query": "team events culture activities", "description": "Culture (negative)", "relevant_indices": [103, 104, 112, 115, 120]},
     {"query": "coffee espresso machine office", "description": "Coffee (negative)", "relevant_indices": [100, 117]},
@@ -251,14 +341,51 @@ QUERIES = [
     {"query": "Acme AI engineering team structure and practices", "description": "Engineering org", "relevant_indices": [1, 3, 9, 45, 46, 48, 49]},
 ]
 
+# ── NEW: 20 additional queries ─────────────────────────────────────────────
+
+QUERIES_NEW = [
+    # Pricing
+    {"query": "FlowForge pricing plans cost per user", "description": "Pricing plans", "relevant_indices": [128, 129, 130]},
+    {"query": "FlowForge startup plan discount non-profit", "description": "Startup/nonprofit pricing", "relevant_indices": [136, 139]},
+    {"query": "FlowForge Pro plan features limits", "description": "Pro plan details", "relevant_indices": [129, 131, 134]},
+    {"query": "FlowForge Enterprise plan SLA contract", "description": "Enterprise details", "relevant_indices": [130, 132, 135, 138]},
+
+    # Partnerships
+    {"query": "Acme AI partners AWS Datadog Snowflake", "description": "Tech partners", "relevant_indices": [140, 141, 142]},
+    {"query": "Acme AI system integrators implementation partners", "description": "SI partners", "relevant_indices": [147, 148]},
+    {"query": "Acme AI Okta Microsoft startups program", "description": "Platform partners", "relevant_indices": [143, 144]},
+    {"query": "Acme AI developer community advocacy program", "description": "Dev advocacy", "relevant_indices": [149, 150, 151]},
+
+    # Roadmap
+    {"query": "FlowForge future roadmap planned features", "description": "Product roadmap", "relevant_indices": [154, 155, 156]},
+    {"query": "FlowForge marketplace connector plugins community", "description": "Marketplace", "relevant_indices": [156]},
+    {"query": "Acme AI London office expansion 2027", "description": "International expansion", "relevant_indices": [157]},
+    {"query": "FlowForge WebAssembly WASM sandbox custom runtime", "description": "WASM sandbox", "relevant_indices": [161]},
+
+    # Operations
+    {"query": "Acme AI internal tools systems HR finance", "description": "Internal tools", "relevant_indices": [164, 165, 166]},
+    {"query": "Acme AI recruiting engineering hiring pipeline", "description": "Recruiting", "relevant_indices": [167, 170]},
+    {"query": "Acme AI performance review leveling compensation", "description": "People ops", "relevant_indices": [168, 169, 171, 173]},
+    {"query": "Acme AI diversity stats women leadership minorities", "description": "DEI stats", "relevant_indices": [174]},
+
+    # Cross-cluster new
+    {"query": "Acme AI pricing enterprise features compliance SSO", "description": "Enterprise value prop", "relevant_indices": [130, 132, 135, 41]},
+    {"query": "Acme AI ecosystem partnerships resellers technology alliances", "description": "Ecosystem overview", "relevant_indices": [140, 141, 145, 146, 147, 148]},
+    {"query": "Acme AI future plans expansion roadmap 2026 2027", "description": "Future overview", "relevant_indices": [154, 155, 157, 160, 162]},
+    {"query": "Acme AI internal culture compensation benefits", "description": "Culture + comp", "relevant_indices": [173, 174, 175, 11, 104]},
+]
+
+QUERIES_ALL = QUERIES + QUERIES_NEW
+
+
 # ── Main ────────────────────────────────────────────────────────────────
 
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate large labeled eval dataset")
+    parser = argparse.ArgumentParser(description="Generate XL labeled eval dataset (200+ memories)")
     parser.add_argument("--workspace-id", default=None, help="Existing workspace ID")
-    parser.add_argument("--output", default="/tmp/eval_queries_large.jsonl", help="Output JSONL path")
+    parser.add_argument("--output", default="/tmp/eval_queries_xlarge.jsonl", help="Output JSONL path")
     parser.add_argument("--populate", action="store_true", help="Store memories into workspace")
     parser.add_argument("--skip-populate", action="store_true", help="Skip populate, generate placeholders")
     args = parser.parse_args()
@@ -272,6 +399,7 @@ def main() -> None:
         try:
             client._call("login", ["eval_generator", "evalpass"])
         except RuntimeError:
+            # Login failed too — use a fresh identity
             uid = uuid.uuid4().hex[:8]
             try:
                 client._call("register", [f"eval_{uid}", "Eval Generator", "evalpass"])
@@ -280,11 +408,14 @@ def main() -> None:
 
     ws_id = args.workspace_id
     if not ws_id:
-        ws_id = f"eval-large-{uuid.uuid4().hex[:8]}"
+        ws_id = f"eval-xlarge-{uuid.uuid4().hex[:8]}"
         try:
-            client._call("create_workspace", ["eval_benchmark_large", "auto", ws_id])
+            client._call("create_workspace", ["eval_benchmark_xlarge", "auto", ws_id])
         except RuntimeError:
             pass
+
+    print(f"Total memories: {len(MEMORIES)}")
+    print(f"Total queries: {len(QUERIES_ALL)}")
 
     memory_ids: list[str] = []
     if args.populate and not args.skip_populate:
@@ -297,10 +428,8 @@ def main() -> None:
                 memory_ids.append("")
                 continue
 
-            # Retrieve the stored memory ID
             try:
                 mems = client._query("memory", workspace_id=ws_id, filter_dict={}, columns=["id", "content"])
-                # Find by content prefix
                 matched = None
                 for m in mems:
                     if m.get("content", "")[:60] == text[:60]:
@@ -318,7 +447,7 @@ def main() -> None:
         memory_ids = [f"mem-{i:03d}" for i in range(len(MEMORIES))]
 
     queries = []
-    for q in QUERIES:
+    for q in QUERIES_ALL:
         relevant_ids = [
             memory_ids[i] for i in q["relevant_indices"]
             if i < len(memory_ids) and memory_ids[i]
@@ -336,7 +465,6 @@ def main() -> None:
     print(f"Wrote {len(queries)} queries to {args.output}")
     print(f"Workspace ID: {ws_id}")
 
-    # Save workspace ID
     id_path = args.output.replace(".jsonl", "_workspace_id.txt")
     with open(id_path, "w") as f:
         f.write(ws_id)

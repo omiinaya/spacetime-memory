@@ -461,6 +461,13 @@ class Client:
                 )
             friendly = self._map_reducer_error(error_text)
             raise RuntimeError(friendly)
+
+        # Capture updated identity token from response (e.g. after register/login)
+        new_token = resp.headers.get("spacetime-identity-token", "")
+        if new_token and new_token != self._identity_token:
+            self._identity_token = new_token
+            self._identity_established = True
+
         return {"status": "ok"}
 
     @staticmethod

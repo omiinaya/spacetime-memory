@@ -80,14 +80,21 @@ DEFAULT_QUERIES = [
 
 def _c() -> Client:
     client = Client(host=HOST, port=PORT, database=DB)
-    token_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cron_identity_token")
-    if os.path.exists(token_file):
+
+    # Login first — workspace was created by a previous session's identity
+    try:
+        client._call("login", ["eval_generator", "evalpass"])
+    except RuntimeError:
         try:
-            with open(token_file) as f:
-                client._identity_token = f.read().strip()
-                client._identity_established = True
-        except Exception:
-            pass
+            client._call("register", ["eval_generator", "Eval Generator", "evalpass"])
+        except RuntimeError:
+            import uuid
+            uid = uuid.uuid4().hex[:8]
+            try:
+                client._call("register", [f"eval_{uid}", "Eval Harness", "evalpass"])
+            except RuntimeError:
+                pass
+
     return client
 
 
