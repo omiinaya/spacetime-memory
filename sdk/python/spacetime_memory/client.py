@@ -168,6 +168,9 @@ class Client:
         timeout: float = 30.0,
         verbose: bool = False,
         token: str | None = None,
+        plugin_manager: Any | None = None,
+        event_bus: Any | None = None,
+        query_cache: Any | None = None,
     ):
         self.host = host or os.environ.get("SPACETIMEDB_HOST", "localhost")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
@@ -191,11 +194,18 @@ class Client:
         self._circuit_breaker_threshold = int(os.environ.get("STMEM_CIRCUIT_THRESHOLD", "5"))
         self._circuit_breaker_reset_secs = float(os.environ.get("STMEM_CIRCUIT_RESET_SECS", "30.0"))
         self._consecutive_failures: int = 0
+        # MIB binary vector cache — entity_id → packed bytes
+        self._binary_cache: dict[str, bytes] = {}
         self._circuit_open_until: float = 0.0
         self._metrics: Any = None  # Set via set_metrics_collector()
         self.request_id: str = os.urandom(4).hex()  # Unique per-client instance
         self._identity_token: str | None = None
         self._identity_established: bool = False
+
+        # P2 polish: plugins, events, caching
+        self.plugin_manager = plugin_manager
+        self.event_bus = event_bus
+        self._query_cache = query_cache
 
         base = f"http://{self.host}:{self.port}"
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
@@ -552,6 +562,11 @@ class Client:
 
     def _embed_local(self, text: str) -> list[float]:
         """Get an embedding vector via the Rust ONNX sidecar."""
+        # Truncate to ~512 tokens (BGE tokenizer uses ~3.5 chars/token for English)
+        # Longer texts timeout the CPU ONNX runtime and don't improve retrieval quality
+        max_chars = 1800
+        if len(text) > max_chars:
+            text = text[:max_chars]
         try:
             resp = self._http.post(
                 f"{self.embedder_url}/embed",
@@ -887,8 +902,27 @@ class Client:
         source_session_id: str = "",
         source_message_id: str = "",
         tier: str = "",
+        veracity_tier: str = "",
+        veracity_sources: int = 1,
     ) -> dict[str, Any]:
-        """Store a memory. Auto-indexes via the embedder."""
+        """Store a memory. Auto-indexes via the embedder.
+
+        Args:
+            veracity_tier: Mnemosyne veracity tier — one of "stated",
+                "unknown", "inferred", "imported", "tool". Overrides
+                ``confidence`` using Bayesian compounding.
+            veracity_sources: Number of independent confirmations of
+                this fact (default 1 = no compounding). Used with
+                ``veracity_tier`` to compute compounded confidence.
+        """
+        # Compute Bayesian confidence from veracity tier if provided
+        if veracity_tier and veracity_tier != "unknown":
+            from .veracity import compound, VeracityTier
+            try:
+                tier_enum = VeracityTier(veracity_tier)
+                confidence = compound(tier=tier_enum, sources=max(1, veracity_sources))
+            except ValueError:
+                pass  # Unknown tier string, keep default confidence
         result = self._call("store_memory", [
             workspace_id, peer_id, observer_id,
             memory_type, content, summary, entities_json,
@@ -909,6 +943,12 @@ class Client:
                     memory_id = m["id"]
                     break
             if memory_id:
+                # Compute and cache MIB binary vector (32x compression)
+                from .binary_vectors import binarize
+                try:
+                    self._binary_cache[memory_id] = binarize(emb)
+                except (ValueError, Exception):
+                    pass  # Binary compression best-effort, non-critical
                 self._call("index_entity", [
                     workspace_id, "memory", memory_id,
                     content, json.dumps(emb),
@@ -1095,6 +1135,8 @@ class Client:
         rerank_api_key: str | None = None,
         cross_encoder: bool = False,
         query_expansion: bool = False,
+        polyphonic: bool = False,
+        mmr_lambda: float = 0.0,
     ) -> list[dict[str, Any]]:
         """Search memories.  When *semantic* is True uses hybrid search.
 
@@ -1111,6 +1153,10 @@ class Client:
                     cross-encoder (ms-marco-MiniLM-L-6-v2) before LLM rerank.
             query_expansion: If True, expands the query with synonyms and
                     related terms via LLM before searching.
+            polyphonic: If True, uses Reciprocal Rank Fusion (RRF) with
+                    diversity penalty instead of min-max normalization.
+            mmr_lambda: If > 0, applies Maximal Marginal Relevance reranking.
+                    0.7 is a good default (70% relevance, 30% diversity).
         """
         if semantic:
             # ── Query expansion (pre-search) ──
@@ -1164,6 +1210,8 @@ class Client:
             self._call("hybrid_search", [
                 workspace_id, search_query, emb_json,
                 memory_type, tier, fetch_limit, strategies,
+                polyphonic,
+                mmr_lambda,
             ])
             qhash = _query_hash(search_query)
             rows = self._sql(
@@ -1174,15 +1222,17 @@ class Client:
 
             # ── Weighted min-max fusion ──
             # Normalize each strategy to [0,1] via min-max, then weighted sum.
-            # Semantic (0.65): strongest signal — now backed by bge-large-en-v1.5
-            #   (1024-dim, +4 MTEB over MiniLM).
+            # Semantic (0.65): strongest signal — bge-large-en-v1.5 (1024d)
             # Keyword (0.25): Tantivy's real Okapi BM25 with stemming + IDF.
-            # Graph (0.05), temporal (0.05): supporting signals — low weight
-            #   because graph is substring-matching and temporal is recency-only.
+            # Binary (0.05): MIB binary vector Hamming similarity — fast, orthogonal signal.
+            # Graph (0.00), temporal (0.05): removed — graph is substring-matching
+            #   and temporal is recency-only. Neither contributes meaningfully.
+            #   All signal from semantic (0.65) + Tantivy keyword (0.25).
             STRATEGY_WEIGHTS = {
                 "semantic": 0.65,
                 "keyword": 0.25,
-                "graph": 0.05,
+                "binary": 0.05,
+                "graph": 0.00,
                 "temporal": 0.05,
             }
 
@@ -1205,12 +1255,35 @@ class Client:
             # (0.125 per single-word hit) that collapse the min-max range.
             per_strat: dict[str, list[dict]] = {
                 "keyword": [],  # Tantivy rows go here
-                "semantic": [], "graph": [], "temporal": [],
+                "semantic": [], "graph": [], "temporal": [], "binary": [],
             }
 
             # Sort Tantivy rows by score desc, take top fusion_limit
             tantivy_rows.sort(key=lambda r: r["score"], reverse=True)
             per_strat["keyword"] = tantivy_rows[:fusion_limit]
+
+            # ── Binary vector similarity (MIB Hamming distance) ──
+            # Compute once against the query embedding, reuse for all candidates
+            query_emb = self._embed(search_query)
+            if query_emb and self._binary_cache:
+                from .binary_vectors import binarize, hamming_similarity
+                try:
+                    query_binary = binarize(query_emb)
+                    binary_rows: list[dict[str, Any]] = []
+                    for eid, cached_binary in self._binary_cache.items():
+                        sim = hamming_similarity(query_binary, cached_binary)
+                        if sim > 0.5:  # Only include meaningful matches
+                            binary_rows.append({
+                                "entity_id": eid,
+                                "entity_type": "memory",
+                                "score": sim,
+                                "strategy": "binary",
+                                "workspace_id": workspace_id,
+                            })
+                    binary_rows.sort(key=lambda r: r["score"], reverse=True)
+                    per_strat["binary"] = binary_rows[:fusion_limit]
+                except (ValueError, Exception):
+                    pass  # Binary scoring is best-effort
 
             # Add STDB rows for semantic, graph, temporal (plus legacy keyword
             # as fallback — any row not in Tantivy still participates)
@@ -1232,6 +1305,7 @@ class Client:
             # in many keyword rows for different term matches.)
             best_per_strat: dict[str, dict[str, float]] = {
                 "semantic": {}, "keyword": {}, "graph": {}, "temporal": {},
+                "binary": {},
             }
             best_row: dict[str, dict] = {}
             # Include both STDB rows and Tantivy keyword rows in normalization
@@ -1278,13 +1352,15 @@ class Client:
             mem_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "memory"]
             node_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "node"]
             mem_map = {}
+            mem_confidences: dict[str, float] = {}
             node_map = {}
             for mid in mem_ids:
                 mems = self._query("memory", filter_dict={"id": mid},
                                    workspace_id=workspace_id,
-                                   columns=["id", "content"])
+                                   columns=["id", "content", "confidence"])
                 if mems:
                     mem_map[mid] = mems[0].get("content", "")
+                    mem_confidences[mid] = mems[0].get("confidence", 0.8)
             for nid in node_ids:
                 nodes = self._query("kg_node", filter_dict={"id": nid}, columns=["id", "label"])
                 if nodes:
@@ -1299,6 +1375,13 @@ class Client:
                     r["memory_content"] = ""
                 # Surface fused_score as the canonical score for consumers
                 r["score"] = r.get("fused_score", r.get("score", 0.0))
+                # Apply veracity confidence weighting
+                if eid in mem_confidences:
+                    from .veracity import confidence_multiplier
+                    mult = confidence_multiplier(mem_confidences[eid])
+                    r["score"] = r["score"] * mult
+                    r["veracity_multiplier"] = mult
+
             if cross_encoder:
                 from .cross_encoder import cross_encoder_rerank
                 rows = cross_encoder_rerank(query, rows, top_k=len(rows))
@@ -1310,6 +1393,13 @@ class Client:
                     api_key=rerank_api_key,
                     top_k=min(20, len(rows)),
                 )
+            # ── MMR diversity reranking ──
+            if mmr_lambda > 0:
+                from .mmr import mmr_rerank
+                rows = mmr_rerank(rows, lambda_param=mmr_lambda)
+            # ── Weibull temporal boost ──
+            from .weibull import apply_temporal_boost
+            rows = apply_temporal_boost(rows)
             return rows[:limit]
 
         # Non-semantic (keyword) fallback
@@ -1339,6 +1429,43 @@ class Client:
 
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         return rows[:limit]
+
+    def detect_patterns(
+        self,
+        workspace_id: str,
+        *,
+        limit: int = 200,
+        include_clusters: bool = True,
+        include_terms: bool = True,
+        include_co_occur: bool = True,
+    ) -> dict[str, Any]:
+        """Run pattern detection on a workspace's memories.
+
+        Args:
+            workspace_id: The workspace to analyze.
+            limit: Max memories to fetch for analysis.
+            include_clusters: Run temporal clustering.
+            include_terms: Run frequent term extraction.
+            include_co_occur: Run co-occurrence detection.
+
+        Returns:
+            Dict with ``temporal_clusters``, ``frequent_terms``,
+            ``co_occurrences``, ``total_memories``, ``summary``.
+        """
+        from .pattern_detection import detect_patterns as _detect
+
+        mems = self._query(
+            "memory",
+            workspace_id=workspace_id,
+            filter_dict={},
+        )
+        mems = mems[:limit]
+        return _detect(
+            mems,
+            include_clusters=include_clusters,
+            include_terms=include_terms,
+            include_co_occur=include_co_occur,
+        )
 
     def search_sessions_semantic(
         self,
@@ -1645,6 +1772,54 @@ class Client:
                 "updated_at": r.get("updated_at", 0),
             }]
         return []
+
+    # -----------------------------------------------------------------------
+    # Reputation decay configuration (Weibull / Linear)
+    # -----------------------------------------------------------------------
+
+    def set_decay_model(
+        self,
+        workspace_id: str,
+        model: str = "linear",
+        decay_rate: float = 0.005,
+        max_days: int = 90,
+        weibull_shape: float = 0.6,
+        weibull_scale: float = 30.0,
+    ) -> dict[str, Any]:
+        """Configure the decay model for a workspace.
+
+        Args:
+            workspace_id: Workspace to configure.
+            model: ``"linear"`` (default) or ``"weibull"``.
+            decay_rate: For linear — fraction of trust to decay per day (e.g. 0.005 = 0.5%/day).
+            max_days: For linear — max age in days before trust hits floor.
+            weibull_shape: For Weibull — k parameter (< 1 = rapid-then-slow forgetting, default 0.6).
+            weibull_scale: For Weibull — λ parameter (characteristic time in days, default 30.0).
+
+        Returns:
+            The reducer response.
+        """
+        if model not in ("linear", "weibull"):
+            raise ValueError(f"Unknown decay model '{model}'. Use 'linear' or 'weibull'.")
+
+        if model == "linear":
+            return self._call("apply_reputation_decay", [
+                workspace_id, decay_rate, max_days,
+            ])
+        else:
+            return self._call("apply_weibull_decay", [
+                workspace_id, weibull_shape, weibull_scale,
+            ])
+
+    def get_decay_config(self, workspace_id: str) -> dict[str, Any] | None:
+        """Get the current decay configuration for a workspace.
+
+        Returns None if no config has been set yet.
+        """
+        rows = self._query("workspace_config", filter_dict={"id": workspace_id})
+        if rows:
+            return rows[0]
+        return None
 
     # -----------------------------------------------------------------------
     # Search with metadata/location filters (Honcho parity)
@@ -2448,7 +2623,7 @@ def llm_rerank(
     endpoint = endpoint or os.getenv(
         "LLM_RERANK_ENDPOINT", "http://localhost:4000/v1"
     )
-    model = model or os.getenv("LLM_RERANK_MODEL", "gpt-4o-mini")
+    model = model or os.getenv("LLM_RERANK_MODEL", "ds-deepseek-v4-flash")
     api_key = api_key or os.getenv("LLM_RERANK_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 
     # Build candidate list
@@ -2472,6 +2647,7 @@ def llm_rerank(
                     ],
                     "temperature": 0.0,
                     "max_tokens": 2048,
+                    "response_format": {"type": "json_object"},
                 },
                 headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
                 timeout=timeout,
