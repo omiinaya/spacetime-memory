@@ -36,6 +36,7 @@ class QueryCache:
             ttl: Time-to-live in seconds (default 5 minutes).
         """
         self._cache: OrderedDict[str, tuple[float, list[dict[str, Any]]]] = OrderedDict()
+        self._ws_keys: dict[str, set[str]] = {}  # workspace_id → set of cache keys
         self._maxsize = maxsize
         self._ttl = ttl
         self._lock = threading.Lock()
@@ -48,7 +49,7 @@ class QueryCache:
         raw = f"{workspace_id}|{query}|{limit}|{strategies}"
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
-    def get(self, key: str) -> list[dict[str, Any]] | None:
+    def get(self, key: str, workspace_id: str = "") -> list[dict[str, Any]] | None:
         """Retrieve cached results. Returns None on miss or expiry."""
         with self._lock:
             if key not in self._cache:
@@ -64,12 +65,15 @@ class QueryCache:
             self._hits += 1
             return results
 
-    def set(self, key: str, results: list[dict[str, Any]]):
+    def set(self, key: str, results: list[dict[str, Any]], workspace_id: str = ""):
         """Store results in the cache."""
         with self._lock:
             if key in self._cache:
                 self._cache.move_to_end(key)
             self._cache[key] = (time.time(), results)
+            # Track workspace→key mapping for invalidation
+            if workspace_id:
+                self._ws_keys.setdefault(workspace_id, set()).add(key)
             while len(self._cache) > self._maxsize:
                 self._cache.popitem(last=False)  # evict least recently used
 
@@ -78,18 +82,17 @@ class QueryCache:
         with self._lock:
             if workspace_id is None:
                 self._cache.clear()
+                self._ws_keys.clear()
             else:
-                to_remove = [
-                    k for k in self._cache
-                    if workspace_id in k  # partial match on workspace_id in key hash
-                ]
-                for k in to_remove:
-                    del self._cache[k]
+                keys = self._ws_keys.pop(workspace_id, set())
+                for k in keys:
+                    self._cache.pop(k, None)
 
     def clear(self):
         """Clear the entire cache."""
         with self._lock:
             self._cache.clear()
+            self._ws_keys.clear()
 
     @property
     def stats(self) -> dict[str, Any]:

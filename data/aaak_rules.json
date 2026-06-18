@@ -1,0 +1,176 @@
+{
+  "source": "mnemosyne/core/aaak.py",
+  "design_principle": "Lossless shorthand that LLMs parse efficiently without a formal decoder",
+  "decoder_provided": false,
+  "decoder_note": "Mnemosyne provides REV_CATEGORY and REV_PHRASE reverse maps but no decode() function. No reverse map exists for STRUCTURAL_REPLACEMENTS, parentheses compaction, or trailing compactions. The AAAK design intentionally relies on LLM-native comprehension of compressed text rather than a formal decompressor.",
+  "categories": {
+    "PREFERENCE": "PREF",
+    "TRAIT": "TRAIT",
+    "STATUS": "STAT",
+    "INSTRUCTION": "INST",
+    "PROJECT": "PROJ",
+    "LOCATION": "LOC",
+    "FAMILY": "FAM",
+    "OCCUPATION": "OCC",
+    "DECISION": "DEC",
+    "EVENT": "EVT",
+    "TOOL": "TOOL",
+    "FACT": "FACT",
+    "OPINION": "OPN"
+  },
+  "phrase_table": {
+    "User asked ": "ASK ",
+    "User wants ": "WANT ",
+    "User prefers ": "PREF ",
+    "User likes ": "LIKE ",
+    "User dislikes ": "DISLIKE ",
+    "User is ": "IS ",
+    "User has ": "HAS ",
+    "User built ": "BUILT ",
+    "User asked for ": "ASK ",
+    "User requested ": "REQ ",
+    "Married to ": "MARRIED→",
+    "Email: ": "@",
+    "GitHub: ": "GH:",
+    "Location: ": "LOC:",
+    "Phone: ": "PH:",
+    "User email is ": "@",
+    "User voice message ": "VM ",
+    "User stack: ": "STACK|",
+    "Full-stack developer": "FSDEV",
+    "Software Developer": "SDEV",
+    "AI Systems Engineer": "AIENG",
+    "real-time": "RT",
+    "Real-time": "RT",
+    "bilingual": "bi",
+    "Bilingual": "bi",
+    "self-hosted": "selfhost",
+    "automation": "auto",
+    "transcription": "transc",
+    "translation": "transl"
+  },
+  "structural": [
+    {
+      "match": " - ",
+      "replace": " | ",
+      "description": "Convert sentence/phrase separators to pipes"
+    },
+    {
+      "match": " -- ",
+      "replace": " | ",
+      "description": "Convert long dash separators to pipes"
+    },
+    {
+      "match": " | ",
+      "replace": " | ",
+      "description": "Normalize existing pipe spacing"
+    },
+    {
+      "match": ", ",
+      "replace": " | ",
+      "description": "Convert comma-separated lists to pipe-delimited"
+    },
+    {
+      "match": " and ",
+      "replace": "+",
+      "description": "Conjunction 'and' → +"
+    },
+    {
+      "match": " or ",
+      "replace": "/",
+      "description": "Conjunction 'or' → /"
+    },
+    {
+      "match": " for ",
+      "replace": "→",
+      "description": "Directional 'for' → →"
+    },
+    {
+      "match": " to ",
+      "replace": "→",
+      "description": "Directional 'to' → →"
+    },
+    {
+      "match": " with ",
+      "replace": " w/ ",
+      "description": "Relational 'with' → w/"
+    },
+    {
+      "match": " over ",
+      "replace": ">",
+      "description": "Relational 'over' → >"
+    },
+    {
+      "match": " instead of ",
+      "replace": "!>",
+      "description": "Relational 'instead of' → !>"
+    },
+    {
+      "match": " because of ",
+      "replace": "∵",
+      "description": "Causal 'because of' → ∵"
+    },
+    {
+      "match": " due to ",
+      "replace": "∵",
+      "description": "Causal 'due to' → ∵"
+    },
+    {
+      "match": " using ",
+      "replace": "→",
+      "description": "Container 'using' → →"
+    },
+    {
+      "match": " built ",
+      "replace": "→",
+      "description": "Container 'built' → →"
+    },
+    {
+      "match": " in ",
+      "replace": ":",
+      "description": "Container 'in' → :"
+    },
+    {
+      "match": " at ",
+      "replace": "@",
+      "description": "Locator 'at' → @"
+    },
+    {
+      "match": " on ",
+      "replace": "@",
+      "description": "Locator 'on' → @"
+    },
+    {
+      "match": " from ",
+      "replace": "<-",
+      "description": "Source 'from' → <-"
+    }
+  ],
+  "parentheses_compaction": {
+    "enabled": true,
+    "rule": "Remove spaces inside parentheses",
+    "implementation": "re.sub(r'\\(\\s*', '(', text).replace(' )', ')')"
+  },
+  "trailing_compactions": {
+    "working correctly": "OK",
+    "working": "OK",
+    "complete": "DONE",
+    "completed": "DONE"
+  },
+  "strip_patterns": [],
+  "compression_pipeline": [
+    "1. _apply_category_prefixes: PREFERENCE: X → PREF|X (only at start of text)",
+    "2. _apply_phrases: longest-match-first phrase substitution",
+    "3. _apply_structural: sequential text-level replacements",
+    "4. _compact_parens: strip spaces inside parentheses",
+    "5. trailing_compactions: 'working correctly'→'OK', 'complete'→'DONE', etc."
+  ],
+  "skip_condition": "If text already contains '|' and has ≤3 space-delimited words, it is assumed already-AAAK-compressed and returned unchanged",
+  "reverse_maps_provided": {
+    "REV_CATEGORY": true,
+    "REV_PHRASE": true,
+    "REV_STRUCTURAL": false,
+    "REV_TRAILING": false,
+    "REV_PARENS": false
+  }
+}

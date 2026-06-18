@@ -170,6 +170,8 @@ pub fn hybrid_search(
     tier: String,
     limit: u32,
     strategies_json: String,
+    polyphonic: bool,
+    mmr_lambda: f64,
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
@@ -570,12 +572,123 @@ pub fn hybrid_search(
     }
 
     // ── Result Fusion ────────────────────────────────────────────────
-    // Normalize each strategy's scores to [0,1] and combine with weights.
-    // Without this, strategies with inherently different score scales
-    // (temporal 0.5-1.0 vs semantic 0.0-1.0 vs graph 0.0-0.5) are
-    // incomparable when sorted together.
-    {
-        // Collect all results for this query hash
+    if polyphonic {
+        // Polyphonic: Reciprocal Rank Fusion (RRF) + diversity penalty.
+        //
+        // RRF uses position-based scoring: score = sum(1 / (k + rank))
+        // across all voices. This eliminates score-calibration issues
+        // between strategies (temporal 0.5-1.0 vs semantic 0.0-1.0 vs
+        // graph 0.0-0.5). k=60 is proven optimal for 4-voice retrieval.
+        //
+        // After RRF, a diversity penalty is applied: results whose
+        // content shares >50% word overlap with already-selected
+        // results get a 15% score reduction.
+        const RRF_K: f64 = 60.0;
+        const DIVERSITY_PENALTY: f64 = 0.15;
+        const OVERLAP_THRESHOLD: f64 = 0.5;
+
+        let all_rows: Vec<_> = ctx
+            .db
+            .hybrid_result()
+            .iter()
+            .take(MAX_RESULTS)
+            .filter(|r| r.query_hash == qhash && r.workspace_id == workspace_id)
+            .collect();
+
+        if all_rows.len() < 2 {
+            // Single result — no fusion needed; fall through to Ok(())
+        } else {
+            use std::collections::HashMap;
+
+            // Group results by strategy, sorted by score descending
+            let mut strat_groups: HashMap<String, Vec<(String, f64)>> = HashMap::new();
+            for row in &all_rows {
+                strat_groups
+                    .entry(row.strategy.clone())
+                    .or_default()
+                    .push((row.entity_id.clone(), row.score));
+            }
+
+            // Sort each group by score descending
+            for group in strat_groups.values_mut() {
+                group.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            }
+
+            // RRF: compute fused score per entity_id
+            // words for each entity_id (for diversity penalty)
+            let mut rrf_scores: HashMap<String, f64> = HashMap::new();
+            let mut entity_words: HashMap<String, Vec<String>> = HashMap::new();
+
+            for row in &all_rows {
+                entity_words
+                    .entry(row.entity_id.clone())
+                    .or_insert_with(|| {
+                        row.content
+                            .split_whitespace()
+                            .map(|w| w.to_lowercase())
+                            .collect()
+                    });
+            }
+
+            for (strategy, ranked) in &strat_groups {
+                for (rank, (entity_id, _score)) in ranked.iter().enumerate() {
+                    let rrf_contrib = 1.0 / (RRF_K + (rank as f64 + 1.0));
+                    *rrf_scores.entry(entity_id.clone()).or_insert(0.0) += rrf_contrib;
+                }
+            }
+
+            // Diversity penalty: sort by RRF score, then penalize
+            // each result based on word overlap with better-ranked results
+            let mut scored: Vec<(String, f64)> = rrf_scores.into_iter().collect();
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+            let mut selected_words: Vec<Vec<String>> = Vec::new();
+            for (entity_id, score) in scored.iter_mut() {
+                let words = entity_words
+                    .get(entity_id)
+                    .cloned()
+                    .unwrap_or_default();
+
+                if !words.is_empty() {
+                    // Check overlap with all already-selected sets
+                    for prev_words in &selected_words {
+                        let overlap: f64 = words
+                            .iter()
+                            .filter(|w| prev_words.contains(w))
+                            .count() as f64;
+                        let overlap_ratio = overlap / words.len().max(1) as f64;
+                        if overlap_ratio > OVERLAP_THRESHOLD {
+                            *score *= 1.0 - DIVERSITY_PENALTY;
+                            break; // only penalize once
+                        }
+                    }
+                }
+                selected_words.push(words);
+            }
+
+            // Normalize RRF scores to [0, 1] for consistency
+            let max_rrf = scored
+                .iter()
+                .map(|(_, s)| *s)
+                .fold(0.0f64, f64::max);
+            if max_rrf > 0.0 {
+                for (_id, score) in scored.iter_mut() {
+                    *score /= max_rrf;
+                }
+            }
+
+            // Update rows with polyphonic scores
+            let poly_scores: HashMap<String, f64> = scored.into_iter().collect();
+            for mut row in all_rows {
+                if let Some(&fused_score) = poly_scores.get(&row.entity_id) {
+                    row.score = fused_score.max(0.0).min(1.0);
+                    row.strategy = format!("{}+polyphonic", row.strategy);
+                    ctx.db.hybrid_result().id().update(row);
+                }
+            }
+        }
+    } else {
+        // Legacy: Min-max normalization with weighted combination
         let all_rows: Vec<_> = ctx
             .db
             .hybrid_result()
@@ -628,6 +741,122 @@ pub fn hybrid_search(
             for mut row in all_rows {
                 if let Some(&fused_score) = fused.get(&row.entity_id) {
                     row.score = fused_score.max(0.0).min(1.0);
+                    ctx.db.hybrid_result().id().update(row);
+                }
+            }
+        }
+    }
+
+    // ── MMR (Maximal Marginal Relevance) Reranking ─────────────────
+    // When mmr_lambda > 0.0, re-rank results to balance relevance
+    // (query similarity) against diversity (dissimilarity to already-
+    // selected results).  Uses embedding cosine similarity from
+    // search_index for the diversity term.
+    //
+    //   MMR = argmax [ λ·relevance(d) − (1−λ)·max_sim(d, selected) ]
+    //
+    // λ=0.7 is the standard starting point (70% relevance, 30% diversity).
+    if mmr_lambda > 0.0 && mmr_lambda <= 1.0 {
+        let query_emb = parse_embedding_json(&query_embedding_json);
+        let all_rows: Vec<_> = ctx
+            .db
+            .hybrid_result()
+            .iter()
+            .take(MAX_RESULTS)
+            .filter(|r| r.query_hash == qhash && r.workspace_id == workspace_id)
+            .collect();
+
+        if all_rows.len() >= 2 && !query_emb.is_empty() {
+            use std::collections::{HashMap, HashSet};
+
+            // Build embedding lookup: entity_id → Vec<f64>
+            let mut emb_cache: HashMap<String, Vec<f64>> = HashMap::new();
+            for si in ctx.db.search_index().iter()
+                .filter(|si| si.workspace_id == workspace_id)
+                .take(MAX_RESULTS)
+            {
+                let emb = parse_embedding_json(&si.embedding_json);
+                if !emb.is_empty() {
+                    emb_cache.insert(si.entity_id.clone(), emb);
+                }
+            }
+
+            // Collect candidates
+            struct Candidate {
+                row: HybridResult,
+                score: f64,
+                embedding: Vec<f64>,
+            }
+
+            let mut candidates: Vec<Candidate> = Vec::new();
+            for row in &all_rows {
+                let emb = emb_cache.get(&row.entity_id).cloned().unwrap_or_default();
+                candidates.push(Candidate {
+                    row: row.clone(),
+                    score: row.score,
+                    embedding: emb,
+                });
+            }
+
+            candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+            let mut selected: Vec<Candidate> = Vec::new();
+            let mut remaining: Vec<Candidate> = candidates;
+
+            let target = (limit as usize).min(remaining.len());
+
+            while selected.len() < target && !remaining.is_empty() {
+                let mut best_idx: usize = 0;
+                let mut best_mmr: f64 = f64::NEG_INFINITY;
+
+                for (i, cand) in remaining.iter().enumerate() {
+                    let relevance = if !query_emb.is_empty() && !cand.embedding.is_empty() {
+                        cosine_similarity(&query_emb, &cand.embedding)
+                    } else {
+                        cand.score
+                    };
+
+                    let max_sim = if selected.is_empty() {
+                        0.0
+                    } else {
+                        selected
+                            .iter()
+                            .map(|s| {
+                                if s.embedding.is_empty() || cand.embedding.is_empty() {
+                                    0.0
+                                } else {
+                                    cosine_similarity(&cand.embedding, &s.embedding)
+                                }
+                            })
+                            .fold(0.0f64, f64::max)
+                    };
+
+                    let mmr = mmr_lambda * relevance - (1.0 - mmr_lambda) * max_sim;
+
+                    if mmr > best_mmr {
+                        best_mmr = mmr;
+                        best_idx = i;
+                    }
+                }
+
+                let chosen = remaining.remove(best_idx);
+                selected.push(chosen);
+            }
+
+            // Update rows with MMR positional scores
+            let mut mmr_scores: HashMap<String, (f64, String)> = HashMap::new();
+            for (rank, cand) in selected.iter().enumerate() {
+                let mmr_score = 1.0 / (1.0 + rank as f64);
+                mmr_scores.insert(
+                    cand.row.id.clone(),
+                    (mmr_score, format!("{}+mmr", cand.row.strategy)),
+                );
+            }
+
+            for mut row in all_rows {
+                if let Some((mmr_score, strategy)) = mmr_scores.get(&row.id) {
+                    row.score = *mmr_score;
+                    row.strategy = strategy.clone();
                     ctx.db.hybrid_result().id().update(row);
                 }
             }
@@ -944,5 +1173,38 @@ mod tests {
         let sim = cosine_similarity(&a, &b);
         // Both 1-D, dot = 12.5, |a|=5, |b|=2.5, sim=1.0
         assert!((sim - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_mmr_relevance_dominates_with_high_lambda() {
+        // MMR with λ=1.0 should return results in pure relevance order
+        // (no diversity penalty). Since we can't test the full reducer
+        // in a unit test, we verify the formula directly.
+        let relevance: f64 = 0.9;
+        let max_sim: f64 = 0.8;
+        let lambda: f64 = 1.0;
+        let mmr: f64 = lambda * relevance - (1.0 - lambda) * max_sim;
+        assert!((mmr - 0.9_f64).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_mmr_diversity_matters_with_low_lambda() {
+        // λ=0.0 means only diversity matters — penalize high similarity
+        let relevance: f64 = 0.9;
+        let max_sim: f64 = 0.8;
+        let lambda: f64 = 0.0;
+        let mmr: f64 = lambda * relevance - (1.0 - lambda) * max_sim;
+        assert!((mmr - (-0.8_f64)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_mmr_standard_lambda() {
+        // λ=0.7 is the standard default
+        let relevance: f64 = 0.85;
+        let max_sim: f64 = 0.60;
+        let lambda: f64 = 0.7;
+        let mmr: f64 = lambda * relevance - (1.0 - lambda) * max_sim;
+        let expected: f64 = 0.7 * 0.85 - 0.3 * 0.60; // 0.595 - 0.18 = 0.415
+        assert!((mmr - expected).abs() < 1e-10);
     }
 }

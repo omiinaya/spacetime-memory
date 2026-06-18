@@ -525,11 +525,16 @@ def memory_store(
 @click.option("--limit", default=50, type=int, help="Max results")
 @click.option("--semantic/--no-semantic", default=True,
               help="Use semantic (embedding) search")
+@click.option("--polyphonic/--no-polyphonic", default=False,
+              help="Use polyphonic recall (RRF + diversity penalty)")
+@click.option("--mmr-lambda", type=float, default=0.0,
+              help="MMR diversity reranking (0.7 default: 70% relevance, 30% diversity)")
 @click.option("--watch", "-w", is_flag=True, help="Watch for changes (poll every 5s)")
 @click.pass_context
 def memory_search(ctx: click.Context, workspace_id: str, query: str,
                   memory_type: str | None, tier: str | None, limit: int,
-                  semantic: bool, watch: bool) -> None:
+                  semantic: bool, polyphonic: bool, watch: bool,
+                  mmr_lambda: float) -> None:
     """Search memories in a workspace."""
     client = _sdk_client()
 
@@ -542,6 +547,8 @@ def memory_search(ctx: click.Context, workspace_id: str, query: str,
                 tier=tier or "",
                 limit=limit,
                 semantic=semantic,
+                polyphonic=polyphonic,
+                mmr_lambda=mmr_lambda,
             )
 
     def _display(rows: list[dict[str, Any]]) -> None:
@@ -770,6 +777,152 @@ def memory_history(memory_id: str) -> None:
         rows = client.get_memory_history(memory_id)
     print_table(rows, title=f"Memory History ({memory_id[:16]}...)")
 
+
+
+# ===================================================================
+# decay commands
+# ===================================================================
+
+
+@cli.group()
+def decay() -> None:
+    """Manage reputation decay configuration."""
+
+
+@decay.command(name="set-linear")
+@click.argument("workspace_id")
+@click.option("--rate", default=0.005, type=float, help="Decay rate per day (default: 0.005 = 0.5%%)")
+@click.option("--max-days", default=90, type=int, help="Max days before floor (default: 90)")
+def decay_set_linear(workspace_id: str, rate: float, max_days: int) -> None:
+    """Set linear decay model for a workspace."""
+    client = _sdk_client()
+    with console.status(f"Applying linear decay to workspace '{workspace_id[:12]}...'..."):
+        client.set_decay_model(workspace_id, model="linear", decay_rate=rate, max_days=max_days)
+    _quiet_print(f"[green]Linear decay configured: {rate:.3f}/day, max {max_days} days[/green]")
+
+
+@decay.command(name="set-weibull")
+@click.argument("workspace_id")
+@click.option("--shape", "-k", default=0.6, type=float,
+              help="Weibull shape k (< 1 = rapid-then-slow, default: 0.6)")
+@click.option("--scale", "-l", default=30.0, type=float,
+              help="Weibull scale λ in days (default: 30)")
+def decay_set_weibull(workspace_id: str, shape: float, scale: float) -> None:
+    """Set Weibull decay model for a workspace.
+
+    Weibull formula: trust = initial * exp(-(t/λ)^k)
+
+    At t=λ, trust ≈ 37% of initial.
+    At t=3λ, trust ≈ 5%.
+    """
+    client = _sdk_client()
+    with console.status(f"Applying Weibull decay to workspace '{workspace_id[:12]}...'..."):
+        client.set_decay_model(workspace_id, model="weibull",
+                               weibull_shape=shape, weibull_scale=scale)
+    _quiet_print(f"[green]Weibull decay configured: k={shape}, λ={scale} days[/green]")
+
+
+@decay.command(name="show")
+@click.argument("workspace_id")
+def decay_show(workspace_id: str) -> None:
+    """Show current decay configuration for a workspace."""
+    client = _sdk_client()
+    config = client.get_decay_config(workspace_id)
+    if config:
+        from rich.table import Table
+        from rich import box
+        table = Table(title=f"Decay Config ({workspace_id[:12]}...)", box=box.ROUNDED)
+        table.add_column("Field", style="cyan")
+        table.add_column("Value")
+        for k, v in config.items():
+            table.add_row(k, str(v))
+        console.print(table)
+    else:
+        console.print("[yellow]No decay config set (defaults: linear, 0.5%/day, 90 day max)[/yellow]")
+
+
+@decay.command(name="run")
+@click.argument("workspace_id")
+def decay_run(workspace_id: str) -> None:
+    """Run one decay cycle for a workspace using current config."""
+    client = _sdk_client()
+    config = client.get_decay_config(workspace_id)
+    model = (config or {}).get("decay_model", "linear")
+    with console.status(f"Running {model} decay on workspace '{workspace_id[:12]}...'..."):
+        if model == "weibull":
+            k = (config or {}).get("weibull_shape", 0.6)
+            lmbda = (config or {}).get("weibull_scale", 30.0)
+            client.set_decay_model(workspace_id, model="weibull", weibull_shape=k, weibull_scale=lmbda)
+        else:
+            rate = (config or {}).get("decay_rate", 0.005)
+            max_days = (config or {}).get("max_decay_days", 90)
+            client.set_decay_model(workspace_id, model="linear", decay_rate=rate, max_days=max_days)
+    _quiet_print(f"[green]{model} decay cycle complete[/green]")
+
+
+# ===================================================================
+# recommend command
+# ===================================================================
+
+
+@cli.command(name="recommend")
+@click.argument("workspace_id")
+@click.option("--limit", default=20, type=int, help="Max recommendations")
+@click.option("--min-urgency", default=0.3, type=float,
+              help="Minimum urgency threshold (0.0-1.0)")
+@click.pass_context
+def recommend(ctx: click.Context, workspace_id: str, limit: int,
+              min_urgency: float) -> None:
+    """Recommend memories needing attention (review/reinforce/discard)."""
+
+    def _run() -> list[dict[str, Any]]:
+        with console.status("Analyzing memories..."):
+            return _sdk_client().recommend_memories(
+                workspace_id, limit=limit, min_urgency=min_urgency,
+            )
+
+    rows = _run()
+    if rows:
+        # Color by action
+        action_colors = {"discard": "red", "reinforce": "yellow", "review": "cyan"}
+        for r in rows:
+            action = r.get("action", "review")
+            color = action_colors.get(action, "white")
+            urgency = r.get("urgency", 0.0)
+            content = (r.get("content", "") or "")[:120]
+            console.print(
+                f"[{color}][{action.upper():>9}][/{color}] "
+                f"[dim]urgency={urgency:.2f}[/dim] "
+                f"trust={r.get('trust_score', 0):.2f} "
+                f"fb={r.get('feedback_count', 0)} "
+                f"[italic]{content}[/italic]"
+            )
+        if ctx.obj.get("output") == "json":
+            print_json(rows)
+    else:
+        console.print("[green]No memories need attention — all clear![/green]")
+
+
+@cli.command(name="peer-reputation")
+@click.argument("peer_id")
+def peer_reputation(peer_id: str) -> None:
+    """Show reputation stats for a peer."""
+    client = _sdk_client()
+    with console.status(f"Fetching reputation for '{peer_id[:16]}...'..."):
+        rep = client.get_peer_reputation(peer_id)
+    if rep:
+        from rich.table import Table
+        from rich import box
+        table = Table(title=f"Peer Reputation ({peer_id[:16]}...)", box=box.ROUNDED)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value")
+        table.add_row("Reputation", f"{rep.get('reputation_score', 0):.3f}")
+        table.add_row("Helpful", str(rep.get("helpful_count", 0)))
+        table.add_row("Unhelpful", str(rep.get("unhelpful_count", 0)))
+        table.add_row("Total", str(rep.get("total_feedback", 0)))
+        console.print(table)
+    else:
+        console.print(f"[yellow]No reputation data for peer '{peer_id[:16]}...'[/yellow]")
 
 
 # ===================================================================
@@ -1116,6 +1269,59 @@ def kg_neighbors(node_id: str) -> None:
     print_table(rows, title=f"Neighbors of node '{node_id}'")
 
 
+@kg.command(name="bridges")
+@click.argument("workspace_id")
+@click.option("--limit", default=20, type=int, help="Max bridge nodes")
+@click.option("--min-communities", default=2, type=int,
+              help="Minimum communities to qualify as bridge (default: 2)")
+@click.pass_context
+def kg_bridges(ctx: click.Context, workspace_id: str, limit: int,
+               min_communities: int) -> None:
+    """Detect bridge nodes — concepts connecting multiple communities."""
+    with console.status("Detecting bridge nodes..."):
+        rows = _sdk_client().detect_bridge_nodes(
+            workspace_id, limit=limit, min_communities=min_communities,
+        )
+    if rows:
+        for r in rows:
+            score = r.get("bridge_score", 0.0)
+            bar = "█" * int(score * 20)
+            label = r.get("node_label", r.get("node_id", ""))[:60]
+            console.print(
+                f"[cyan]{bar}[/cyan] "
+                f"score={score:.2f} "
+                f"communities={r.get('community_count', 0)} "
+                f"[bold]{label}[/bold]"
+            )
+        if ctx.obj.get("output") == "json":
+            print_json(rows)
+    else:
+        console.print("[yellow]No bridge nodes found.[/yellow]")
+
+
+@kg.command(name="stats")
+@click.argument("workspace_id")
+def kg_stats(workspace_id: str) -> None:
+    """Show knowledge graph statistics."""
+    with console.status("Computing graph statistics..."):
+        stats = _sdk_client().compute_kg_stats(workspace_id)
+    if stats:
+        from rich.table import Table
+        from rich import box
+        table = Table(title=f"KG Stats ({workspace_id[:12]}...)", box=box.ROUNDED)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value")
+        table.add_row("Nodes", str(stats.get("node_count", 0)))
+        table.add_row("Edges", str(stats.get("edge_count", 0)))
+        table.add_row("Communities", str(stats.get("community_count", 0)))
+        table.add_row("Avg Degree", f"{stats.get('avg_degree', 0):.1f}")
+        table.add_row("Unassigned (no community)", str(stats.get("unassigned_nodes", 0)))
+        table.add_row("Orphans (no edges)", str(stats.get("orphan_nodes", 0)))
+        console.print(table)
+    else:
+        console.print("[yellow]No knowledge graph data — add some nodes first.[/yellow]")
+
+
 # ===================================================================
 # session commands
 # ===================================================================
@@ -1285,6 +1491,51 @@ def connector_start(db_poll: int) -> None:
 
 
         sys.exit(1)
+
+
+# ===================================================================
+# shmr — self-harmonizing memory reasoning
+# ===================================================================
+
+
+@cli.group()
+def shmr() -> None:
+    """Self-Harmonizing Memory Reasoning — resonance & belief convergence."""
+
+
+@shmr.command(name="resonate")
+@click.argument("workspace_id")
+@click.option("--days", default=7, type=int, help="Days of memories to consider")
+@click.option("--iterations", default=3, type=int, help="Max resonance rounds")
+@click.option("--threshold", default=0.7, type=float,
+              help="Cosine similarity threshold for clustering")
+@click.option("--dry-run", is_flag=True, help="Print without storing")
+def shmr_resonate_cmd(workspace_id: str, days: int, iterations: int,
+                      threshold: float, dry_run: bool) -> None:
+    """Run SHMR resonance on a workspace — cluster memories, resolve
+    contradictions, converge on stable beliefs."""
+    from spacetime_memory.shmr import shmr_resonate
+    client = _sdk_client()
+
+    with console.status(f"Resonating workspace {workspace_id[:16]}..."):
+        result = shmr_resonate(
+            client,
+            workspace_id,
+            days=days,
+            max_iterations=iterations,
+            similarity_threshold=threshold,
+            dry_run=dry_run,
+        )
+
+    mode = " [DRY-RUN]" if dry_run else ""
+    console.print(f"\n[bold]SHMR Resonance{mode}:[/bold]")
+    console.print(f"  Clusters found:       {result.clusters_found}")
+    console.print(f"  Beliefs generated:    {result.beliefs_generated}")
+    console.print(f"  Contradictions:       {result.contradictions_resolved}")
+    console.print(f"  Harmony score avg:    {result.harmony_score_avg:.2f}")
+    console.print(f"  Duration:             {result.duration_ms}ms")
+    if result.errors:
+        console.print(f"  [yellow]Errors: {result.errors}[/yellow]")
 
 
 # ===================================================================
@@ -2713,6 +2964,187 @@ def serve(transport: str, host: str | None, port: int | None, api_key: str | Non
     except Exception as e:
         console.print(f"[red]Error:[/red] MCP server failed: {e}")
         sys.exit(1)
+
+
+# ── Veracity ────────────────────────────────────────────────────────────────
+
+@cli.group()
+def veracity() -> None:
+    """Veracity tiers — Bayesian confidence scoring for memory trustworthiness.
+
+    Mnemosyne-style 5-tier system: stated (1.0), unknown (0.8),
+    inferred (0.7), imported (0.6), tool (0.5).
+
+    Examples:
+      stmem veracity compound --tier stated --sources 3
+      stmem veracity calc --tier inferred --sources 5
+    """
+
+
+@veracity.command(name="compound")
+@click.option("--tier", "-t", required=True,
+              type=click.Choice(["stated", "unknown", "inferred", "imported", "tool"]),
+              help="Veracity tier")
+@click.option("--sources", "-s", type=int, default=1, help="Number of independent sources (default 1)")
+def veracity_compound_cmd(tier: str, sources: int) -> None:
+    """Compute Bayesian compounded confidence for a veracity tier."""
+    from spacetime_memory.veracity import VeracityTier, compound, format_veracity
+
+    t = VeracityTier(tier)
+    conf = compound(tier=t, sources=sources)
+    base = t.base_confidence
+
+    table = Table(title="Veracity Compounding", box=box.ROUNDED)
+    table.add_column("Parameter", style="cyan")
+    table.add_column("Value")
+    table.add_row("Tier", format_veracity(t, conf, sources))
+    table.add_row("Base confidence", f"{base:.2f}")
+    table.add_row("Sources", str(sources))
+    table.add_row("Formula", f"1 - (1-{base:.2f})^{sources}")
+    table.add_row("Compounded", f"[bold green]{conf:.4f}[/bold green]")
+    table.add_row("Score multiplier", f"{0.5 + conf * 0.5:.2f}x")
+    console.print(table)
+
+
+@veracity.command(name="calc")
+@click.option("--tier", "-t",
+              type=click.Choice(["stated", "unknown", "inferred", "imported", "tool"]),
+              help="Veracity tier to look up base confidence for")
+@click.option("--base", "-b", type=float, help="Custom base confidence (0.0-1.0)")
+@click.option("--sources", "-s", type=int, default=1, help="Number of sources for compounding")
+def veracity_calc_cmd(tier: str | None, base: float | None, sources: int) -> None:
+    """Calculate confidence with custom parameters."""
+    from spacetime_memory.veracity import VeracityTier, compound, confidence_multiplier
+
+    if tier:
+        t = VeracityTier(tier)
+        conf = compound(tier=t, sources=sources)
+    elif base is not None:
+        conf = compound(base=base, sources=sources)
+    else:
+        console.print("[red]Error:[/red] provide --tier or --base")
+        sys.exit(1)
+
+    console.print(f"Confidence: [bold green]{conf:.4f}[/bold green] "
+                  f"(× [cyan]{confidence_multiplier(conf):.2f}[/cyan] search multiplier)")
+
+
+@veracity.command(name="list")
+def veracity_list_cmd() -> None:
+    """List all veracity tiers with base confidences."""
+    from spacetime_memory.veracity import VeracityTier, TIER_LABELS, TIER_SYMBOLS
+
+    table = Table(title="Veracity Tiers", box=box.ROUNDED)
+    table.add_column("Symbol", style="bold")
+    table.add_column("Tier", style="cyan")
+    table.add_column("Label")
+    table.add_column("Base", justify="right")
+
+    for tier in VeracityTier:
+        table.add_row(
+            TIER_SYMBOLS[tier],
+            tier.value,
+            TIER_LABELS[tier],
+            f"{tier.base_confidence:.2f}",
+        )
+
+    console.print(table)
+    console.print("\n[dim]Formula: confidence = 1 - (1 - base)^sources[/dim]")
+
+
+# ── AAAK Compression ────────────────────────────────────────────────────────
+
+@cli.group()
+def aaak() -> None:
+    """AAAK compression — lossless LLM context shorthand.
+
+    Compresses text using the Mnemosyne AAAK dialect so LLMs
+    consume fewer tokens without losing meaning.
+
+    Examples:
+      stmem aaak compress "PREFERENCE: User asked for dark mode"
+      stmem aaak ratio memory_id ...
+    """
+
+
+@aaak.command(name="compress")
+@click.argument("text", required=False)
+@click.option("--file", "-f", type=click.Path(exists=True), help="Read text from file")
+@click.option("--pipe", "-p", is_flag=True, help="Read from stdin")
+def aaak_compress_cmd(text: str | None, file: str | None, pipe: bool) -> None:
+    """Compress text using AAAK shorthand."""
+    from spacetime_memory.aaak import aaak_compress as _compress, aaak_ratio
+
+    if pipe or (not text and not file and sys.stdin.isatty() is False):
+        text = sys.stdin.read().strip()
+    elif file:
+        text = Path(file).read_text().strip()
+    elif not text:
+        console.print("[red]Error:[/red] provide text, --file, or pipe input")
+        sys.exit(1)
+
+    compressed = _compress(text)
+    ratio = aaak_ratio(text)
+
+    if pipe or file:
+        # Machine-readable output for piping
+        console.print(compressed, highlight=False)
+    else:
+        table = Table(title="AAAK Compression", box=box.ROUNDED)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value")
+        table.add_row("Original", text[:200] + ("..." if len(text) > 200 else ""))
+        table.add_row("Compressed", compressed[:200] + ("..." if len(compressed) > 200 else ""))
+        table.add_row("Ratio", f"{ratio:.1%} ({len(text)} → {len(compressed)} chars)")
+        table.add_row("Savings", f"{len(text) - len(compressed)} chars ({1-ratio:.0%})")
+        console.print(table)
+
+
+@aaak.command(name="decompress")
+@click.argument("text", required=False)
+@click.option("--file", "-f", type=click.Path(exists=True), help="Read compressed text from file")
+@click.option("--pipe", "-p", is_flag=True, help="Read from stdin")
+def aaak_decompress_cmd(text: str | None, file: str | None, pipe: bool) -> None:
+    """Partially decompress AAAK shorthand (categories + phrases only)."""
+    from spacetime_memory.aaak import aaak_decompress as _decompress
+
+    if pipe or (not text and not file and sys.stdin.isatty() is False):
+        text = sys.stdin.read().strip()
+    elif file:
+        text = Path(file).read_text().strip()
+    elif not text:
+        console.print("[red]Error:[/red] provide text, --file, or pipe input")
+        sys.exit(1)
+
+    decompressed = _decompress(text)
+    if pipe or file:
+        console.print(decompressed, highlight=False)
+    else:
+        console.print(f"[bold]Original:[/bold] {text}")
+        console.print(f"[bold]Decompressed:[/bold] {decompressed}")
+
+
+@aaak.command(name="ratio")
+@click.argument("text", required=False)
+@click.option("--file", "-f", type=click.Path(exists=True), help="Read text from file")
+@click.option("--pipe", "-p", is_flag=True, help="Read from stdin")
+def aaak_ratio_cmd(text: str | None, file: str | None, pipe: bool) -> None:
+    """Show AAAK compression ratio for text."""
+    from spacetime_memory.aaak import aaak_ratio as _ratio
+
+    if pipe or (not text and not file and sys.stdin.isatty() is False):
+        text = sys.stdin.read().strip()
+    elif file:
+        text = Path(file).read_text().strip()
+    elif not text:
+        console.print("[red]Error:[/red] provide text, --file, or pipe input")
+        sys.exit(1)
+
+    ratio = _ratio(text)
+    compressed_len = int(len(text) * ratio)
+    console.print(f"AAAK ratio: [cyan]{ratio:.1%}[/cyan] "
+                  f"({len(text)} → {compressed_len} chars, "
+                  f"[green]{len(text) - compressed_len}[/green] saved)")
 
 
 if __name__ == "__main__":

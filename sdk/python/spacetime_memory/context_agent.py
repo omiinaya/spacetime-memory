@@ -50,13 +50,23 @@ class ContextAgent:
         workspace_id: str,
         token_budget: int = 4096,
         previous_pack_id: str = "",
+        aaak: bool = False,
     ) -> dict[str, Any]:
         """Run the context pipeline and return the result.
+
+        Args:
+            query: Natural-language question.
+            workspace_id: Workspace to search.
+            token_budget: Max tokens for the context pack.
+            previous_pack_id: If set, compute a delta from this pack.
+            aaak: If True, compress entry content with AAAK shorthand
+                  before returning (reduces context size ~30-50%).
 
         Returns a dict with:
           - pack: the ``context_pack`` row
           - entries: list of ``context_entry`` rows
           - delta: (if previous_pack_id provided) list of ``context_delta`` rows
+          - llm_answer: (if LLM available) synthesised answer
         """
         # 1. Generate the context pack
         self._client._call("generate_context_pack", [
@@ -91,6 +101,17 @@ class ContextAgent:
 
         entries.sort(key=lambda e: e.get("rank", e.get("score", 0)), reverse=True)
 
+        # Apply AAAK compression to entry content if requested
+        if aaak:
+            from .aaak import aaak_compress
+            for entry in entries:
+                content = entry.get("content", "")
+                if content:
+                    entry["content"] = aaak_compress(content)
+                summary = entry.get("summary", "")
+                if summary:
+                    entry["summary"] = aaak_compress(summary)
+
         result: dict[str, Any] = {
             "pack": pack,
             "entries": entries,
@@ -118,11 +139,12 @@ class ContextAgent:
     ) -> str | None:
         """Call an LLM with the context entries to produce a grounded answer.
 
-        Requires OPENAI_API_KEY env var.  Falls back to None if not set.
+        Requires OPENAI_API_KEY env var. Falls back to LocalLLM if available.
         """
         api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("LITELLM_MASTER_KEY", "")
         if not api_key:
-            return None
+            # ── Fallback to local LLM ──
+            return self._call_local_llm(query, entries)
 
         base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
         model = os.environ.get("LLM_MODEL", "gpt-4o-mini")
@@ -202,6 +224,17 @@ class ContextAgent:
             entries = pack_json_data.get("entries", pack_json_data.get("memories", []))
         entries.sort(key=lambda e: e.get("rank", e.get("score", 0)), reverse=True)
 
+        # Apply AAAK compression to entry content if requested
+        if aaak:
+            from .aaak import aaak_compress
+            for entry in entries:
+                content = entry.get("content", "")
+                if content:
+                    entry["content"] = aaak_compress(content)
+                summary = entry.get("summary", "")
+                if summary:
+                    entry["summary"] = aaak_compress(summary)
+
         result: dict[str, Any] = {"pack": pack}
 
         # LLM call with gap analysis prompt
@@ -279,6 +312,27 @@ class ContextAgent:
             return _json.loads(content)
         except Exception as exc:
             logger.warning("LLM gap analysis call failed: %s", exc)
+            return None
+
+    def _call_local_llm(
+        self,
+        query: str,
+        entries: list[dict[str, Any]],
+    ) -> str | None:
+        """Fallback to a local GGUF model when no cloud API key is available."""
+        from .local_llm import LocalLLM
+        llm = LocalLLM.auto()
+        if not llm.available:
+            return None
+        context_text = self.format_context(entries)
+        prompt = (
+            "Answer the question based only on the context below. "
+            "If the context doesn't contain enough information, say so.\n\n"
+            f"## Query\n{query}\n\n## Context\n{context_text}\n\nAnswer:"
+        )
+        try:
+            return llm.generate(prompt, max_tokens=512, temperature=0.3)
+        except Exception:
             return None
 
     def format_context(self, entries: list[dict[str, Any]]) -> str:

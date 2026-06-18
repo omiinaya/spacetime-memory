@@ -291,6 +291,42 @@ Adapter: Architecture parity — not a library adapter. GBrain is a PGLite + Bun
 
 ---
 
+## Mnemosyne
+
+Reference: [AxDSan/mnemosyne](https://github.com/AxDSan/mnemosyne) — zero-dependency SQLite-backed AI memory system with BEAM architecture. v3.7.0, 1,121 stars. Holds #1 on LongMemEval (98.9% Recall@All@5) and 65.2% on BEAM 100K end-to-end QA.
+
+Adapter: Architecture parity — not a library adapter. Mnemosyne is a pure Python + SQLite agent memory system; Spacetime Memory provides equivalent capabilities via SDK + MCP + SpacetimeDB.
+
+| Feature | Status | Notes |
+|--------|--------|-------|
+| Core memory CRUD (remember/recall/forget) | ✅ | `store_memory` + `search` + `deactivate_memory` |
+| Hybrid search (vector + keyword + graph + temporal) | ✅ | 4-strategy fusion in WASM |
+| Knowledge Graph (nodes, edges, communities) | ✅ | `kg_node` + `kg_edge` + `kg_community` tables |
+| Entity extraction | ✅ | Regex-based `extract_entities` reducer |
+| MCP Server | ✅ | 15+ tools, stdio + SSE + streamable-http |
+| CLI tool | ✅ | 17+ command groups |
+| Working memory (TTL-based hot context) | ⚠️ | Sessions provide similar concept, no auto-TTL eviction |
+| Sleep/Consolidation (LLM summarization) | ⚠️ | `consolidate_memories` exists but no LLM-driven summarization or AAAK fallback |
+| Temporal KG (version chains, as_of queries) | ⚠️ | Edges have temporal versioning; no `as_of` historical query API |
+| Memory banks (per-domain isolation) | ⚠️ | Workspaces provide similar isolation, not domain-named |
+| Veracity tiers (Bayesian confidence) | ❌ | No 5-tier confidence scoring with compounding |
+| MIB binary vectors (32x compression) | ❌ | Full float32 only. No information-theoretic binarization |
+| SHMR resonance reasoning | ❌ | No embedding clustering + contradiction detection |
+| Polyphonic recall (4-voice parallel) | ⚠️ | 4-strategy fusion but no voice-based re-ranking with diversity penalty |
+| AAAK compression (lossless shorthand) | ❌ | No custom compression dialect |
+| Sync with client-side encryption | N/A | SpacetimeDB inherently multi-user; sync/encryption is a different deployment model |
+| Local LLM consolidation (MiniCPM5-1B) | ❌ | No bundled local model |
+| Pattern detection | ❌ | No statistical pattern analysis |
+| MMR reranking | ❌ | No Maximal Marginal Relevance diversity reranking |
+| Streaming events | ❌ | No event-driven delta stream |
+| Query cache | ❌ | No LRU cache for repeated queries |
+| Hermes plugin (23 tools, 3 hooks) | ⚠️ | Hermes MCP tools exist; no pre_llm_call/on_session_start lifecycle hooks |
+| Shared multi-agent surface | ✅ | Workspace ACL + auth = multi-agent isolation |
+
+**Coverage: ~55-60%** (architecture parity). Strong on core memory, search, graph, and MCP/CLI. Mnemosyne's key differentiators — AAAK compression, SHMR reasoning, veracity tiers, MIB binary vectors, polyphonic recall — are largely absent. The two projects are complementary: Mnemosyne excels at deep single-agent reasoning, Spacetime Memory at multi-user infrastructure with wide API compatibility. Full assessment at `docs/mnemosyne-parity-assessment.md`.
+
+---
+
 ## Summary
 
 | Adapter | Lines | Methods | Tests (live STDB) | Shape Match | Production Quality |
@@ -303,8 +339,9 @@ Adapter: Architecture parity — not a library adapter. GBrain is a PGLite + Bun
 | **Graphiti** | 1750 | 18 | **20/20 pass** | **~95%** | ✅ Drop-in — all tests pass |
 | **QMD** | — | Architecture | N/A (CLI tool) | **~98%** | Full feature parity — all QMD features covered |
 | **GBrain** | — | Architecture | N/A (PGLite + Bun) | **~70%** | Storage/search/graph strong — missing synthesis, auto-extraction, dream cycle |
+| **Mnemosyne** | — | Architecture | N/A (SQLite) | **~55-60%** | Core memory/search/KG strong — missing AAAK, SHMR, veracity, MIB, polyphonic recall |
 
-**Overall: ~95% shape match across 6 adapters + 2 architecture-tracked projects.** 113 behavioral tests verified against live SpacetimeDB.
+**Overall: ~95% shape match across 6 adapters + 3 architecture-tracked projects.** 113 behavioral tests verified against live SpacetimeDB.
 
 **v1.27.0 state:**
 - 40+ bare `except Exception` → `except RuntimeError` across all adapters + client

@@ -643,7 +643,10 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
     const DEFAULT_DECAY_RATE: f64 = 0.005;
     const DEFAULT_MAX_DAYS: i64 = 90;
     for ws in ctx.db.workspace().iter() {
-        if let Err(e) = memory_feedback::apply_decay_inner(ctx, &ws.id, DEFAULT_DECAY_RATE, DEFAULT_MAX_DAYS) {
+        if let Err(e) = memory_feedback::apply_decay_inner(
+            ctx, &ws.id, DEFAULT_DECAY_RATE, DEFAULT_MAX_DAYS,
+            "linear", 0.6, 30.0,
+        ) {
             // Log but don't halt maintenance on decay error
             ctx.db.consolidation_log().insert(ConsolidationLog {
                 id: uuid_v4(ctx),

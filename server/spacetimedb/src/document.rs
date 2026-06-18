@@ -70,6 +70,8 @@ pub fn create_document(
         }
     }
 
+    let doc_content = content.clone();
+
     let doc = Document {
         id: id.clone(),
         workspace_id,
@@ -89,7 +91,65 @@ pub fn create_document(
     };
 
     ctx.db.document().insert(doc);
+
+    // ── Auto-chunk on create ────────────────────────────────────
+    // If content is non-trivial (≥100 chars), split into overlapping
+    // chunks of ~500 chars. Chunks get stored in doc_chunk but NOT
+    // auto-indexed (embeddings require the embedder sidecar).
+    // The SDK can call index_chunks() later to add embeddings.
+    if doc_content.len() >= 100 {
+        let chunks = chunk_text(&doc_content, 500, 50);
+        for (i, chunk_text) in chunks.iter().enumerate() {
+            let chunk = DocChunk {
+                id: uuid_v4(ctx),
+                document_id: id.clone(),
+                content: chunk_text.clone(),
+                chunk_index: i as u32,
+                embedding_json: String::from("[]"), // no embedding yet
+                created_at: now,
+            };
+            ctx.db.doc_chunk().insert(chunk);
+        }
+        // Update chunk count
+        if let Some(mut d) = ctx.db.document().id().find(&id) {
+            d.chunk_count = chunks.len() as u32;
+            ctx.db.document().id().update(d);
+        }
+    }
+
     Ok(())
+}
+
+/// Split text into overlapping chunks of `chunk_size` chars
+/// with `overlap` chars between consecutive chunks.
+fn chunk_text(text: &str, chunk_size: usize, overlap: usize) -> Vec<String> {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() <= chunk_size {
+        return vec![text.to_string()];
+    }
+
+    let step = chunk_size.saturating_sub(overlap).max(1);
+    let mut chunks = Vec::new();
+    let mut start = 0;
+    while start < chars.len() {
+        let end = (start + chunk_size).min(chars.len());
+        // Try to break at sentence boundary (., !, ?, newline)
+        let mut break_at = end;
+        if end < chars.len() {
+            for i in ((start + chunk_size / 2).max(start)..end).rev() {
+                if chars[i] == '.' || chars[i] == '!' || chars[i] == '?' || chars[i] == '\n' {
+                    break_at = i + 1;
+                    break;
+                }
+            }
+        }
+        let chunk: String = chars[start..break_at].iter().collect();
+        if !chunk.trim().is_empty() {
+            chunks.push(chunk);
+        }
+        start = break_at.saturating_sub(overlap).max(start + 1);
+    }
+    chunks
 }
 
 #[reducer]
@@ -151,6 +211,66 @@ pub fn delete_document(ctx: &ReducerContext, id: String) -> Result<(), String> {
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &doc.workspace_id, &caller, "editor")?;
 
+    // Cascade-delete all chunks belonging to this document
+    let chunks: Vec<_> = ctx
+        .db
+        .doc_chunk()
+        .iter()
+        .filter(|c| c.document_id == id)
+        .collect();
+    for c in chunks {
+        ctx.db.doc_chunk().id().delete(&c.id);
+    }
+
     ctx.db.document().id().delete(&id);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chunk_text_short_content() {
+        let chunks = chunk_text("hello world", 500, 50);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "hello world");
+    }
+
+    #[test]
+    fn test_chunk_text_long_content() {
+        let text = "A".repeat(1200);
+        let chunks = chunk_text(&text, 500, 50);
+        assert!(chunks.len() >= 2, "expected at least 2 chunks, got {}", chunks.len());
+        // Each chunk should be roughly 500 chars (except last)
+        for (i, c) in chunks.iter().enumerate() {
+            if i < chunks.len() - 1 {
+                assert!(c.len() <= 510, "chunk {} too long: {}", i, c.len());
+            }
+        }
+    }
+
+    #[test]
+    fn test_chunk_text_sentence_boundary() {
+        let text = format!(
+            "{}. {}! {}? {}\n{}",
+            "A".repeat(300), "B".repeat(300), "C".repeat(300), "D".repeat(300), "E".repeat(100)
+        );
+        let chunks = chunk_text(&text, 500, 50);
+        assert!(chunks.len() >= 2, "expected at least 2 chunks, got {}", chunks.len());
+        // First chunk should end with a sentence boundary
+        let first = &chunks[0];
+        assert!(
+            first.ends_with('.') || first.ends_with('!') || first.ends_with('?') || first.ends_with('\n'),
+            "first chunk should end at sentence boundary, got: ...{}",
+            &first[first.len().saturating_sub(20)..]
+        );
+    }
+
+    #[test]
+    fn test_chunk_text_empty() {
+        let chunks = chunk_text("", 500, 50);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "");
+    }
 }

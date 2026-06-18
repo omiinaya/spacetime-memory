@@ -171,6 +171,7 @@ class Client:
         plugin_manager: Any | None = None,
         event_bus: Any | None = None,
         query_cache: Any | None = None,
+        local_llm: Any | None = None,
     ):
         self.host = host or os.environ.get("SPACETIMEDB_HOST", "localhost")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
@@ -202,10 +203,11 @@ class Client:
         self._identity_token: str | None = None
         self._identity_established: bool = False
 
-        # P2 polish: plugins, events, caching
+        # P2 polish: plugins, events, caching, local LLM
         self.plugin_manager = plugin_manager
         self.event_bus = event_bus
         self._query_cache = query_cache
+        self.local_llm = local_llm
 
         base = f"http://{self.host}:{self.port}"
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
@@ -221,6 +223,18 @@ class Client:
         if auth_token:
             headers["Authorization"] = f"Bearer {auth_token}"
         return headers
+
+    def _emit_event(
+        self, event_type: str, data: dict[str, Any], workspace_id: str = ""
+    ) -> None:
+        """Emit a memory lifecycle event to the configured event bus."""
+        if self.event_bus is not None:
+            from .streaming import MemoryEvent
+            self.event_bus.emit(MemoryEvent(
+                event_type=event_type,
+                data=data,
+                workspace_id=workspace_id,
+            ))
 
     def _ensure_identity(self) -> None:
         """Establish a consistent identity with SpacetimeDB.
@@ -923,13 +937,35 @@ class Client:
                 confidence = compound(tier=tier_enum, sources=max(1, veracity_sources))
             except ValueError:
                 pass  # Unknown tier string, keep default confidence
+
+        # ── Plugin dispatch: on_store ──
+        metadata: dict[str, Any] = {
+            "memory_type": memory_type,
+            "confidence": confidence,
+            "tier": tier,
+            "veracity_tier": veracity_tier,
+        }
+        if self.plugin_manager is not None:
+            content, metadata = self.plugin_manager.dispatch_store(content, metadata)
+
         result = self._call("store_memory", [
             workspace_id, peer_id, observer_id,
             memory_type, content, summary, entities_json,
             confidence, source_session_id, source_message_id,
         ])
+        # ── Invalidate query cache for this workspace ──
+        if self._query_cache is not None:
+            self._query_cache.invalidate(workspace_id=workspace_id)
 
-        # Auto-index
+        # ── Emit memory.created event ──
+        self._emit_event("memory.created", {
+            "content": content[:200],
+            "summary": summary,
+            "memory_type": memory_type,
+            "workspace_id": workspace_id,
+        }, workspace_id=workspace_id)
+
+        # If the embedder is reachable, index embeddings in the sidecar
         emb = self._embed(content)
         if emb:
             # Resolve the memory ID by content match — more reliable than
@@ -987,7 +1023,7 @@ class Client:
         from .llm import LLMClient
 
         llm = LLMClient()
-        entities = llm.extract_entities_llm(content)
+        entities = llm.extract_entities_llm(content) if llm.available else None
 
         if entities:
             for ent in entities:
@@ -1159,6 +1195,16 @@ class Client:
                     0.7 is a good default (70% relevance, 30% diversity).
         """
         if semantic:
+            # ── Query cache check ──
+            cache_key: str | None = None
+            if self._query_cache is not None:
+                cache_key = self._query_cache.make_key(
+                    workspace_id, query, limit, "semantic"
+                )
+                cached = self._query_cache.get(cache_key)
+                if cached is not None:
+                    return cached
+
             # ── Query expansion (pre-search) ──
             search_query = query
             if query_expansion and query:
@@ -1400,7 +1446,19 @@ class Client:
             # ── Weibull temporal boost ──
             from .weibull import apply_temporal_boost
             rows = apply_temporal_boost(rows)
-            return rows[:limit]
+            results = rows[:limit]
+            # ── Plugin dispatch: on_search ──
+            if self.plugin_manager is not None:
+                _, results = self.plugin_manager.dispatch_search(query, results)
+            # ── Query cache store ──
+            if self._query_cache is not None and cache_key is not None:
+                self._query_cache.set(cache_key, results, workspace_id=workspace_id)
+            # ── Emit search.performed event ──
+            self._emit_event("search.performed", {
+                "query": query,
+                "result_count": len(results),
+            }, workspace_id=workspace_id)
+            return results
 
         # Non-semantic (keyword) fallback
         # SpacetimeDB SQL doesn't support LIKE, so we fetch all and filter client-side
@@ -1418,17 +1476,40 @@ class Client:
                 filt[key] = val
         rows = self._query("memory", workspace_id=workspace_id, filter_dict=filt)
 
-        # Client-side keyword filter (SpacetimeDB doesn't support LIKE)
+        # Client-side keyword filter — split query into words, remove stopwords, OR-match
         if query:
-            q = query.lower()
-            rows = [
-                r for r in rows
-                if q in r.get("content", "").lower()
-                or q in r.get("summary", "").lower()
+            _STOPWORDS = {
+                "a", "an", "the", "is", "are", "was", "were", "be", "been",
+                "who", "what", "where", "when", "why", "how", "which", "do",
+                "does", "did", "has", "have", "had", "can", "will", "would",
+                "tell", "me", "about", "of", "in", "on", "at", "to", "for",
+                "with", "and", "or", "not", "we", "our", "us", "i", "you",
+                "they", "it", "its", "s", "that", "this", "there", "from",
+            }
+            keywords = [
+                w.lower().rstrip("?,.:;!\"'")
+                for w in query.split()
+                if len(w.rstrip("?,.:;!\"'")) > 1
+                and w.lower().rstrip("?,.:;!\"'") not in _STOPWORDS
             ]
+            if keywords:
+                rows = [
+                    r for r in rows
+                    if any(
+                        kw in r.get("content", "").lower()
+                        or kw in r.get("summary", "").lower()
+                        for kw in keywords
+                    )
+                ]
 
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
-        return rows[:limit]
+        results = rows[:limit]
+        # ── Emit search.performed event ──
+        self._emit_event("search.performed", {
+            "query": query,
+            "result_count": len(results),
+        }, workspace_id=workspace_id)
+        return results
 
     def detect_patterns(
         self,
@@ -1603,8 +1684,25 @@ class Client:
 
     def delete_memory(self, memory_id: str) -> dict[str, Any]:
         """Deactivate a memory. Idempotent — succeeds if already deleted."""
+        # ── Look up workspace_id for cache invalidation ──
+        ws_id: str | None = None
+        if self._query_cache is not None:
+            rows = self._sql(
+                f"SELECT workspace_id FROM memory WHERE id = '{_esc(memory_id)}'"
+            )
+            if rows:
+                ws_id = str(rows[0].get("workspace_id", ""))
+
         try:
-            return self._call("deactivate_memory", [memory_id])
+            result = self._call("deactivate_memory", [memory_id])
+            # ── Invalidate query cache ──
+            if self._query_cache is not None and ws_id:
+                self._query_cache.invalidate(workspace_id=ws_id)
+            # ── Emit memory.deleted event ──
+            self._emit_event("memory.deleted", {
+                "memory_id": memory_id,
+            }, workspace_id=ws_id or "")
+            return result
         except RuntimeError as e:
             if "not found" in str(e).lower():
                 return {"status": "ok", "note": "already deleted"}
@@ -1817,6 +1915,129 @@ class Client:
         Returns None if no config has been set yet.
         """
         rows = self._query("workspace_config", filter_dict={"id": workspace_id})
+        if rows:
+            return rows[0]
+        return None
+
+    def recommend_memories(
+        self,
+        workspace_id: str,
+        limit: int = 20,
+        min_urgency: float = 0.3,
+    ) -> list[dict[str, Any]]:
+        """Recommend memories that need attention (review, reinforce, discard).
+
+        Returns memories sorted by urgency — low-trust, decaying, or
+        consistently-poor memories that need human attention.
+
+        Args:
+            workspace_id: Target workspace.
+            limit: Max recommendations (default 20).
+            min_urgency: Minimum urgency threshold 0.0–1.0 (default 0.3).
+        """
+        self._call("recommend_memories", [
+            workspace_id, limit, min_urgency,
+        ])
+        return self._query("memory_recommendation",
+                          filter_dict={"workspace_id": workspace_id})
+
+    def get_peer_reputation(self, peer_id: str) -> dict[str, Any] | None:
+        """Get reputation stats for a peer.
+
+        Returns None if the peer has no feedback history.
+        """
+        rows = self._query("peer_reputation", filter_dict={"id": peer_id})
+        if rows:
+            return rows[0]
+        return None
+
+    # -----------------------------------------------------------------------
+    # Document management (Supermemory parity)
+    # -----------------------------------------------------------------------
+
+    def create_document(
+        self,
+        workspace_id: str,
+        title: str,
+        content: str = "",
+        content_type: str = "text",
+        file_path: str = "",
+        source_url: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a document with auto-chunking.
+
+        Documents with content ≥ 100 chars are automatically split into
+        overlapping ~500-char chunks (sentence-boundary-aware).
+
+        Args:
+            workspace_id: Target workspace.
+            title: Document title.
+            content: Document body text. Auto-chunked if ≥ 100 chars.
+            content_type: ``"text"``, ``"pdf"``, ``"image"``, ``"video"``, ``"code"``, or ``"url"``.
+            file_path: Optional file path reference.
+            source_url: Optional source URL.
+            metadata: Optional metadata dict (serialized to JSON).
+        """
+        import json
+        meta_json = json.dumps(metadata or {})
+        return self._call("create_document", [
+            workspace_id, title, content, content_type,
+            file_path, source_url, meta_json,
+        ])
+
+    def get_document(self, doc_id: str) -> dict[str, Any] | None:
+        """Get a document by ID."""
+        rows = self._query("document", filter_dict={"id": doc_id})
+        if rows:
+            return rows[0]
+        return None
+
+    def list_documents(self, workspace_id: str) -> list[dict[str, Any]]:
+        """List all documents in a workspace."""
+        return self._query("document",
+                          filter_dict={"workspace_id": workspace_id})
+
+    def get_document_chunks(self, doc_id: str) -> list[dict[str, Any]]:
+        """Get all chunks for a document, ordered by chunk_index."""
+        rows = self._query("doc_chunk",
+                          filter_dict={"document_id": doc_id})
+        rows.sort(key=lambda r: r.get("chunk_index", 0))
+        return rows
+
+    def delete_document(self, doc_id: str) -> dict[str, Any]:
+        """Delete a document and all its chunks (cascading)."""
+        return self._call("delete_document", [doc_id])
+
+    # -----------------------------------------------------------------------
+    # Knowledge graph pattern detection
+    # -----------------------------------------------------------------------
+
+    def detect_bridge_nodes(
+        self,
+        workspace_id: str,
+        limit: int = 20,
+        min_communities: int = 2,
+    ) -> list[dict[str, Any]]:
+        """Detect bridge nodes — concepts that connect multiple communities.
+
+        Returns nodes sorted by bridge score (higher = more integrative).
+        """
+        self._call("detect_bridge_nodes", [
+            workspace_id, limit, min_communities,
+        ])
+        return self._query("bridge_result",
+                          filter_dict={"workspace_id": workspace_id})
+
+    def compute_kg_stats(self, workspace_id: str) -> dict[str, Any] | None:
+        """Compute knowledge graph statistics for a workspace.
+
+        Returns a single stats row with node_count, edge_count,
+        community_count, orphan_nodes, avg_degree, etc.
+        """
+        self._call("compute_kg_stats", [workspace_id])
+        rows = self._query("kg_stats_result",
+                          filter_dict={"workspace_id": workspace_id})
         if rows:
             return rows[0]
         return None
@@ -2459,6 +2680,14 @@ class Client:
             },
         }
 
+        # ── Plugin dispatch: on_export ──
+        if self.plugin_manager is not None:
+            # Convert manifest to flat list for plugin filtering
+            all_rows: list[dict[str, Any]] = []
+            for rows in manifest.values():
+                all_rows.extend(rows)
+            self.plugin_manager.dispatch_export(all_rows)
+
         with open(output_path, "w") as f:
             json.dump(payload, f, indent=2, default=str)
 
@@ -2484,6 +2713,13 @@ class Client:
         manifest = payload.get("tables", {})
         total_restored = 0
         restored = []
+
+        # ── Plugin dispatch: on_import ──
+        if self.plugin_manager is not None:
+            all_rows: list[dict[str, Any]] = []
+            for rows in manifest.values():
+                all_rows.extend(rows)
+            self.plugin_manager.dispatch_import(all_rows)
 
         for table, rows in manifest.items():
             if not rows:
@@ -2739,15 +2975,51 @@ def llm_rerank(
                 if m:
                     try:
                         # Try parsing as a dict directly
-                        obj = json.loads(m.group().rstrip('"score"').rstrip(','))
+                        obj = json.loads(m.group().rstrip('\"score\"').rstrip(','))
                         if isinstance(obj, dict):
                             scores = [obj]
                             parse_ok = True
                     except json.JSONDecodeError:
                         pass
 
+        # Strategy 5: Dict wrapper — LLM returned {"scores": [...]} or similar
         if not parse_ok:
-            raise ValueError(f"JSON parse failed after 3 strategies: {'; '.join(errors[-2:])}")
+            import re as _re2
+            m = _re2.search(r'\{.*\}', content, _re2.DOTALL)
+            if m:
+                try:
+                    obj = json.loads(m.group())
+                    if isinstance(obj, dict):
+                        for key in ("scores", "results", "rankings", "items", "data"):
+                            if key in obj and isinstance(obj[key], list):
+                                scores = obj[key]
+                                parse_ok = True
+                                break
+                        # Single-item dict with index/score/reason keys
+                        if not parse_ok and "index" in obj:
+                            scores = [obj]
+                            parse_ok = True
+                except json.JSONDecodeError as e:
+                    errors.append(f"dict_wrapper: {e}")
+
+        # Strategy 6: Line-by-line extraction — LLM returned one JSON object per line
+        if not parse_ok and content.strip():
+            lines = [l.strip() for l in content.split("\n") if l.strip().startswith("{")]
+            if lines:
+                extracted = []
+                for line in lines:
+                    try:
+                        obj = json.loads(line.rstrip(","))
+                        if isinstance(obj, dict) and "index" in obj:
+                            extracted.append(obj)
+                    except json.JSONDecodeError:
+                        continue
+                if extracted:
+                    scores = extracted
+                    parse_ok = True
+
+        if not parse_ok:
+            raise ValueError(f"JSON parse failed after 6 strategies: {'; '.join(errors[-2:])}")
 
         # Merge LLM scores back into original results
         score_map: dict[int, tuple[float, str]] = {}

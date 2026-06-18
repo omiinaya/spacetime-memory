@@ -577,6 +577,7 @@ class ZepClient:
         limit: int = 10,
         score_threshold: float = 0.0,
         min_score: float | None = None,
+        search_type: str = "similarity",
     ) -> list[MemorySearchResult]:
         """Search memory messages within a session.
 
@@ -586,6 +587,8 @@ class ZepClient:
             limit: Max results (default 10).
             score_threshold: Minimum similarity score (default 0.0).
             min_score: Alias for ``score_threshold`` (Zep Cloud compat).
+            search_type: ``"similarity"`` (default) or ``"mmr"`` for
+                    Maximal Marginal Relevance reranking.
 
         Returns:
             A list of ``MemorySearchResult`` objects.
@@ -608,11 +611,14 @@ class ZepClient:
             min_score if min_score is not None else score_threshold
         )
 
+        mmr_lambda = 0.7 if search_type == "mmr" else 0.0
+
         rows = self._client.search(
             workspace_id=ws_id,
             query=query,
             limit=limit,
             semantic=True,
+            mmr_lambda=mmr_lambda,
         )
         results: list[MemorySearchResult] = []
         for r in rows or []:
@@ -1537,6 +1543,7 @@ class _MemoryProxy:
         limit: int = 10,
         score_threshold: float = 0.0,
         min_score: float | None = None,
+        search_type: str = "similarity",
     ) -> list[MemorySearchResult]:
         return self._c.search_memory(
             session_id,
@@ -1544,6 +1551,7 @@ class _MemoryProxy:
             limit=limit,
             score_threshold=score_threshold,
             min_score=min_score,
+            search_type=search_type,
         )
 
     # -- Facts ---------------------------------------------------------------
@@ -1822,6 +1830,7 @@ class AsyncZepClient:
         limit: int = 10,
         score_threshold: float = 0.0,
         min_score: float | None = None,
+        search_type: str = "similarity",
     ) -> list[MemorySearchResult]:
         return await asyncio.to_thread(
             self._sync.search_memory,
@@ -1830,6 +1839,7 @@ class AsyncZepClient:
             limit=limit,
             score_threshold=score_threshold,
             min_score=min_score,
+            search_type=search_type,
         )
 
     # ------------------------------------------------------------------
@@ -2043,6 +2053,7 @@ class _AsyncMemoryProxy:
         limit: int = 10,
         score_threshold: float = 0.0,
         min_score: float | None = None,
+        search_type: str = "similarity",
     ) -> list[MemorySearchResult]:
         return await self._c.search_memory(
             session_id,
@@ -2050,6 +2061,7 @@ class _AsyncMemoryProxy:
             limit=limit,
             score_threshold=score_threshold,
             min_score=min_score,
+            search_type=search_type,
         )
 
     async def add_fact(
@@ -2308,7 +2320,7 @@ class SearchType:
     """Stub for ``zep_python.types.SearchType`` enum.
 
     ``SIMILARITY`` — vector / semantic search.
-    ``MMR`` — max-marginal-relevance search (not yet implemented).
+    ``MMR`` — max-marginal-relevance search (uses MMR λ=0.7 reranking).
     """
 
     SIMILARITY = "similarity"

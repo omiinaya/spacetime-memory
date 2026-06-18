@@ -188,17 +188,15 @@ class CrossEncoderReranker:
                 )
                 scored.append((r, r.get("score", 0.0)))
 
-        # ── Pass-through (no-op) ──
-        # CE is not used in the default pipeline.
-        # LLM reranker alone (29.0% P@5) beats CE+LLM (30.0%)
-        # without the regressions CE introduces.
-        # CE remains available via the module-level singleton for
-        # experimental use but is not wired into client.search().
-        # Tag each candidate with ce_score=0 so consumers can see
-        # CE was not applied.
+        # ── Re-rank by cross-encoder score ──
+        # Sort scored candidates by CE score descending and update
+        # the 'score' field so downstream consumers (LLM reranker,
+        # client.search() result ordering) use CE-scored ranking.
+        scored.sort(key=lambda x: x[1], reverse=True)
         result = []
         for r, ce_score in scored:
-            r["ce_score"] = 0.0
+            r["ce_score"] = ce_score
+            r["score"] = ce_score  # replace fusion score with CE score
             result.append(r)
         return result
 

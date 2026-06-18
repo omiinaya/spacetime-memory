@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import httpx
 from spacetime_memory import Client
 
-DB = "c200bd2c4073807f98d79813c26afd931482f2f422a3a860d78d91298ddaa816"
+DB = "c200e6dac0c27d57edf72c2068c3b23d35462f418337fa4ac8f3fbfea2469193"
 EMB = os.environ.get("EMBEDDER_URL", "http://localhost:9092")
 TANTIVY = "http://localhost:9091"
 

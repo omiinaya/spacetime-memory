@@ -33,9 +33,77 @@ HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get("SPACETIMEDB_DB", "spacetime-memory")
 
-CALL_URL = f"http://{HOST}:{PORT}/v1/database/{DB}/call"
+# Read token from env, cli.toml, or default path
+TOKEN = os.environ.get("SPACETIMEDB_TOKEN")
+if not TOKEN:
+    # Try CLI config (spacetimedb_token from cli.toml)
+    _cli_toml = os.path.expanduser("~/.config/spacetime/cli.toml")
+    if os.path.isfile(_cli_toml):
+        try:
+            import tomllib
+            with open(_cli_toml, "rb") as _f:
+                _cfg = tomllib.load(_f)
+            TOKEN = _cfg.get("spacetimedb_token", "")
+        except (ImportError, Exception):
+            pass
+if not TOKEN:
+    _token_path = os.path.expanduser("~/.config/spacetime/identity_token")
+    if not os.path.isfile(_token_path):
+        _token_path = os.path.expanduser("~/.spacetime/token")
+    if os.path.isfile(_token_path):
+        TOKEN = open(_token_path).read().strip()
 
+_headers = {"Content-Type": "application/json"}
+if TOKEN:
+    _headers["Authorization"] = f"Bearer {TOKEN}"
+
+# We need _http for auto-detect and for the reducer calls
 _http = httpx.Client(timeout=30)
+
+# Auto-detect DB identity if using default name "spacetime-memory"
+# The local server has a *different* database registered under that name;
+# our module (owned by the CLI identity) has no name.  Look it up.
+_DB_AUTO_DETECTED = False
+if DB in ("spacetime-memory", "") and TOKEN:
+    try:
+        # Decode identity from JWT
+        import base64
+        _payload_b64 = TOKEN.split(".")[1]
+        _padding = 4 - len(_payload_b64) % 4
+        if _padding != 4:
+            _payload_b64 += "=" * _padding
+        _payload = json.loads(base64.urlsafe_b64decode(_payload_b64))
+        _owner_hex = _payload.get("hex_identity", "")
+        if _owner_hex:
+            # Query the server for databases owned by this identity
+            _resp = httpx.get(
+                f"http://{HOST}:{PORT}/v1/identity/{_owner_hex}/databases",
+                timeout=5,
+            )
+            if _resp.status_code == 200:
+                _data = _resp.json()
+                _db_ids = _data.get("identities", []) if isinstance(_data, dict) else _data
+                for _db_id in _db_ids:
+                    if not _db_id or not _db_id.startswith("c200"):
+                        continue
+                    # Describe it (cheap) and check for the reducer
+                    _desc_resp = httpx.get(
+                        f"http://{HOST}:{PORT}/v1/database/{_db_id}/describe",
+                        timeout=5,
+                    )
+                    if _desc_resp.status_code == 200:
+                        _desc = _desc_resp.json()
+                        for _r in _desc.get("reducers", []):
+                            if _r.get("name") == "push_proxy_metrics":
+                                DB = _db_id
+                                _DB_AUTO_DETECTED = True
+                                break
+                    if _DB_AUTO_DETECTED:
+                        break
+    except Exception:
+        pass
+
+CALL_URL = f"http://{HOST}:{PORT}/v1/database/{DB}/call"
 
 
 # ── Prometheus Parser ───────────────────────────────────────────────
@@ -121,7 +189,7 @@ def push_metrics(raw_text: str) -> bool:
         resp = _http.post(
             f"{CALL_URL}/push_proxy_metrics",
             content=json.dumps(args),
-            headers={"Content-Type": "application/json"},
+            headers=_headers,
         )
         if resp.status_code >= 400:
             print(

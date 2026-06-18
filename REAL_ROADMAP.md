@@ -37,11 +37,11 @@ Dataset: 25 memories, 18 labeled queries. GBrain reference: P@5=49.1%, R@5=97.9%
 ### 1. Multi-user performance is unproven
 Every `hybrid_search` does full table scans in WASM with `.filter()` closures. Works at 100 memories. Will degrade at 10,000. STDB v2.4 doesn't support indexes or query planning. Workspace pre-filters and MAX_RESULTS caps help, but this is a structural limitation until STDB adds indexing.
 
-### 2. Eval dataset is tiny
-25 memories, 18 queries. The metrics are directionally correct but not comparable to GBrain's 146K-page benchmark. Need 100+ memories with diverse content for realistic measurement.
+### 2. Eval dataset expanded to 50 memories, 25 queries (June 2026)
+48 relevance judgments across diverse topics (people, architecture, incidents, products, finances, compliance). Evaluated at 3 config levels: BM25-only, +embeddings, +LLM reranking. Still not comparable to GBrain's 146K-page benchmark but much more realistic than the original 25-memory set.
 
-### 3. Reranker JSON parsing is 90% reliable
-2 out of 18 rerank calls still fail on JSON edge cases (unterminated strings, empty responses). The 3-strategy parser catches most but not all. The failures fall back to fusion scores gracefully.
+### 3. Reranker JSON parsing — 6 strategies (fixed June 2026)
+All 6 strategies tested on 8 edge cases (direct array, dict-wrapped `{"scores": [...]}`, bare object, line-by-line, markdown-wrapped, empty content). Strategies: direct parse → regex array extraction → raw_decode → trailing-comma salvage → dict-wrapper unwrap → line-by-line fallback. Previously 2/18 failed; now all known patterns handled.
 
 ### 4. Adapters are API-compatible, not wire-compatible
 Mem0/Zep/Graphiti adapters accept the same method signatures and return the same shapes. Your existing code won't crash. But search ranking, entity extraction quality, and scaling characteristics differ from the originals. This is inherent — different backends, different algorithms.

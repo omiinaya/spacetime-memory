@@ -1,0 +1,252 @@
+[
+  {
+    "id": "mem-01",
+    "content": "Alice Chen is the VP of Engineering at Acme AI. She joined in 2022 after 6 years at Google Brain. She leads a team of 45 engineers across ML infra, data, and product.",
+    "type": "experience"
+  },
+  {
+    "id": "mem-02",
+    "content": "Bob Martinez is the CTO and co-founder of Acme AI. Previously founded DataForge (acquired by Snowflake). PhD in distributed systems from MIT. Lives in San Francisco.",
+    "type": "experience"
+  },
+  {
+    "id": "mem-03",
+    "content": "Carol Xu runs the ML platform team. Her team built the internal feature store serving 10M predictions/day. Previously at Stripe building fraud detection models.",
+    "type": "experience"
+  },
+  {
+    "id": "mem-04",
+    "content": "Dave Kim joined as a senior ML engineer in Q3 2024. He's working on the RAG pipeline for the customer-facing chatbot. Previously at Anthropic working on Claude's retrieval system.",
+    "type": "experience"
+  },
+  {
+    "id": "mem-05",
+    "content": "Emily Park is the Head of Product. She defined the 2025 roadmap with three pillars: enterprise SSO, model evaluation dashboard, and multi-modal search. Background in PM at Notion.",
+    "type": "experience"
+  },
+  {
+    "id": "mem-06",
+    "content": "Migrated primary database from MongoDB to PostgreSQL in January 2025. Used pgvector for embedding storage, eliminating the need for a separate vector DB. Migration took 3 weeks with zero downtime.",
+    "type": "decision"
+  },
+  {
+    "id": "mem-07",
+    "content": "Chose LangChain over LlamaIndex for the agent framework because of better streaming support and tool integration. Decision made in Q4 2024 after a 2-week evaluation period.",
+    "type": "decision"
+  },
+  {
+    "id": "mem-08",
+    "content": "Settled on BGE-M3 as our default embedding model (1024 dimensions). 30% better on MTEB retrieval tasks than our previous all-MiniLM-L6-v2 (384 dims). Tradeoff: 3x memory per embedding.",
+    "type": "decision"
+  },
+  {
+    "id": "mem-09",
+    "content": "Decided against self-hosting LLMs in Q1 2025. GPU costs would be $18K/month for our inference load vs $4K/month via OpenRouter. Will revisit when we hit $10K/month on APIs.",
+    "type": "decision"
+  },
+  {
+    "id": "mem-10",
+    "content": "Adopted Temporal for workflow orchestration replacing Airflow. Retry semantics, visibility, and SDK ergonomics were the key factors. Migration still in progress for 30% of pipelines.",
+    "type": "decision"
+  },
+  {
+    "id": "mem-11",
+    "content": "Production outage February 12, 2025: embedding service went down for 47 minutes. Root cause was OOM on a single GPU node processing a batch of 50K documents. Fixed by adding sharding + circuit breaker. Postmortem: https://wiki.acme.ai/incidents/2025-02-12",
+    "type": "incident"
+  },
+  {
+    "id": "mem-12",
+    "content": "Rate limiting incident March 3, 2025: OpenRouter started returning 429s at 8K RPM instead of the documented 15K RPM limit. Added exponential backoff + client-side rate limiting. OpenRouter acknowledged a misconfiguration on their side.",
+    "type": "incident"
+  },
+  {
+    "id": "mem-13",
+    "content": "Data corruption bug discovered in the feature store March 18: integer overflow in the timestamp column caused events to be reordered. Affected 0.3% of predictions over a 6-hour window. Fixed same day with a schema migration.",
+    "type": "incident"
+  },
+  {
+    "id": "mem-14",
+    "content": "Launched model evaluation dashboard in beta April 2025. Supports A/B test analysis, regression detection, slice-based metrics. Built on top of W&B (Weights & Biases) API with a custom React frontend.",
+    "type": "feature"
+  },
+  {
+    "id": "mem-15",
+    "content": "Enterprise SSO launched March 2025. Supports SAML and OIDC. Integrated with Okta, Azure AD, and Google Workspace. 14 enterprise customers onboarded in the first month.",
+    "type": "feature"
+  },
+  {
+    "id": "mem-16",
+    "content": "Multi-modal search shipped February 2025. Supports text, image, and audio queries against a unified embedding space. Uses CLIP ViT-L/14 for images and Whisper large-v3 for audio transcription.",
+    "type": "feature"
+  },
+  {
+    "id": "mem-17",
+    "content": "Prompt Playground released January 2025. Internal tool for comparing prompt variants side-by-side with automated eval scoring. Reduced prompt iteration time from days to hours.",
+    "type": "feature"
+  },
+  {
+    "id": "mem-18",
+    "content": "RBAC (Role-Based Access Control) shipped Q1 2025. Supports custom roles with granular permissions on workspaces, models, and API keys. Built on SpiceDB (authzed) for relationship-based authorization.",
+    "type": "feature"
+  },
+  {
+    "id": "mem-19",
+    "content": "Largest customer is FinStack ($240K ARR). They use our RAG pipeline for their compliance chatbot processing 50K documents daily. Contract renews August 2025.",
+    "type": "experience"
+  },
+  {
+    "id": "mem-20",
+    "content": "Won the HealthTech deal against Anthropic in Q4 2024. Key differentiators were on-premise deployment option and our model evaluation dashboard. $180K first-year deal.",
+    "type": "experience"
+  },
+  {
+    "id": "mem-21",
+    "content": "Churn analysis for Q1 2025: 3 customers churned (2 small, 1 mid-market). Common reason: pricing for the enterprise tier. Mid-market customer (MedFlow) cited lack of FHIR/HL7 integration as a dealbreaker.",
+    "type": "analysis"
+  },
+  {
+    "id": "mem-22",
+    "content": "NPS survey results Q1 2025: overall NPS 42 (up from 35 in Q4). Developer experience scored highest (4.5/5). Documentation scored lowest (3.1/5) \u2014 action item: hire technical writer.",
+    "type": "analysis"
+  },
+  {
+    "id": "mem-23",
+    "content": "Our RAG architecture uses a hybrid retrieval approach: BM25 (Elasticsearch) for keyword matching + dense embeddings (BGE-M3) for semantic search. Fusion uses reciprocal rank fusion (RRF) with k=60. Reranker is Cohere Rerank v3.",
+    "type": "technical"
+  },
+  {
+    "id": "mem-24",
+    "content": "Fine-tuned Llama-3.1-8B on 12,000 internal support tickets for the support chatbot. Used QLoRA with rank 64. Improved resolution rate from 62% to 78% on common issues. Deployed via vLLM with continuous batching.",
+    "type": "technical"
+  },
+  {
+    "id": "mem-25",
+    "content": "Built a custom evaluation framework for our RAG pipeline. Uses RAGAS metrics (faithfulness, answer relevancy, context precision) plus custom business metrics. Runs on every PR via GitHub Actions.",
+    "type": "technical"
+  },
+  {
+    "id": "mem-26",
+    "content": "Implemented prompt caching for our chat API using Redis. Cache hit rate is 73% for system prompts, reducing median latency from 1.2s to 0.4s. Key insight: system prompts are 80% of token usage.",
+    "type": "technical"
+  },
+  {
+    "id": "mem-27",
+    "content": "Q1 2025 board meeting: approved Series B raise of $45M at $350M valuation. Lead investor: Greylock. Funds allocated: 40% engineering hiring, 30% go-to-market, 20% infrastructure, 10% reserve.",
+    "type": "meeting"
+  },
+  {
+    "id": "mem-28",
+    "content": "Strategy offsite March 2025: decided to pivot from horizontal AI platform to vertical focus on legal and healthcare. Rationale: higher willingness to pay, clearer ROI, less competition from OpenAI/Google.",
+    "type": "meeting"
+  },
+  {
+    "id": "mem-29",
+    "content": "Engineering all-hands April 2025: announced 4-day in-office policy starting June. 3 teams (ML Infra, Data, DevTools) will move to the new SOMA office. Remote exceptions require VP approval.",
+    "type": "meeting"
+  },
+  {
+    "id": "mem-30",
+    "content": "Experiment: speculative decoding for our LLM serving layer. Using a draft model (TinyLlama-1.1B) alongside Llama-3.1-70B. Achieved 2.1x throughput improvement at the cost of 1.15x GPU memory. P0 for Q2 deployment.",
+    "type": "experiment"
+  },
+  {
+    "id": "mem-31",
+    "content": "Experiment: GraphRAG vs standard RAG for complex multi-hop questions. GraphRAG (using Neo4j knowledge graph) improved accuracy from 58% to 74% on our internal benchmark of 200 multi-hop queries. 2.3x latency overhead though.",
+    "type": "experiment"
+  },
+  {
+    "id": "mem-32",
+    "content": "AB test results: Cohere Rerank v3 vs our fine-tuned cross-encoder on 10K queries. Cohere won on relevance (NDCG@10 0.74 vs 0.68) but our model was faster (15ms vs 120ms). Decision: use Cohere for premium tier, cross-encoder for standard.",
+    "type": "experiment"
+  },
+  {
+    "id": "mem-33",
+    "content": "Engineering all-hands Q1 2025: team grew from 32 to 45 engineers. 8 new hires in ML Infra, 3 in Data, 2 in DevTools. Diversity improved from 22% to 31% women in engineering.",
+    "type": "meeting"
+  },
+  {
+    "id": "mem-34",
+    "content": "Internal hackathon March 2025: winning project was 'Semantic Search for Code Review' \u2014 indexes all PR comments and finds similar past reviews. 12 teams participated, 3 projects got greenlit for production.",
+    "type": "experience"
+  },
+  {
+    "id": "mem-35",
+    "content": "On-call rotation restructured March 2025: moved from 4-person weekly rotation to 8-person with follow-the-sun coverage (US West, US East, EU). Reduced burnout complaints by 60%.",
+    "type": "decision"
+  },
+  {
+    "id": "mem-36",
+    "content": "Competitor analysis: Vercel AI SDK has 1.2M weekly npm downloads vs our 80K. Their advantage: tight Next.js integration and simpler API. Our advantage: better evaluation tools and enterprise features (SSO, RBAC, audit logs).",
+    "type": "analysis"
+  },
+  {
+    "id": "mem-37",
+    "content": "LangSmith (LangChain's observability platform) announced a competing eval product in March 2025. Priced at $0.50 per trace vs our $0.20. Their distribution advantage through LangChain ecosystem is significant.",
+    "type": "analysis"
+  },
+  {
+    "id": "mem-38",
+    "content": "OpenAI announced native RAG evaluation in their API March 2025. Initial assessment: limited to OpenAI models only, no custom metrics, no A/B testing. Not a near-term threat but signals where the market is heading.",
+    "type": "analysis"
+  },
+  {
+    "id": "mem-39",
+    "content": "SOC 2 Type II audit completed January 2025. Zero findings. Auditor: Vanta. Key controls: automated evidence collection, quarterly access reviews, encrypted data at rest (AES-256) and in transit (TLS 1.3).",
+    "type": "compliance"
+  },
+  {
+    "id": "mem-40",
+    "content": "GDPR compliance project: hired data protection officer (DPO) in February 2025. Implemented data subject access request (DSAR) workflow with 30-day SLA. Data Processing Agreement (DPA) available for all customers.",
+    "type": "compliance"
+  },
+  {
+    "id": "mem-41",
+    "content": "Signed partnership with Weaviate in Q1 2025. Our platform now supports Weaviate as a vector database option alongside pgvector. Joint go-to-market with webinar series and co-branded benchmarks.",
+    "type": "decision"
+  },
+  {
+    "id": "mem-42",
+    "content": "Integration partnership with Datadog for LLM observability. Launched a Datadog dashboard template that shows token usage, latency percentiles, and error rates by model. 200+ installs in the first month.",
+    "type": "feature"
+  },
+  {
+    "id": "mem-43",
+    "content": "Q1 2025 financials: $1.2M revenue (40% QoQ growth), $650K burn rate. Runway: 22 months at current burn with Series B closing in Q2. Gross margin improved from 72% to 78% by migrating to dedicated GPU instances.",
+    "type": "analysis"
+  },
+  {
+    "id": "mem-44",
+    "content": "Pricing change April 2025: introduced usage-based pricing alongside seats. Early data: 60% of customers opted for usage-based, average revenue per customer increased 25%. Enterprise tier ($5K/month) has 14 customers.",
+    "type": "decision"
+  },
+  {
+    "id": "mem-45",
+    "content": "Deep dive into our embedding pipeline: Ingestion starts with a Kafka topic processing 20K documents/hour. Documents go through cleaning (HTML stripping, dedup via MinHash), chunking (recursive character split with 512-token chunks, 10% overlap), embedding via BGE-M3 on 4xA10G GPUs, and indexing into pgvector with HNSW index (m=16, ef_construction=200). Average end-to-end latency: 3.2 seconds per document.",
+    "type": "technical"
+  },
+  {
+    "id": "mem-46",
+    "content": "Our ML training infrastructure runs on a Kubernetes cluster with 32 A100-80GB GPUs across 4 nodes. Training orchestration via Kubeflow Pipelines. Experiment tracking via W&B. Model registry on HuggingFace Hub with automated CI/CD for model deployment (GitHub Actions \u2192 Docker \u2192 K8s rolling update). Supports training Llama-3.1-70B with FSDP across all 32 GPUs.",
+    "type": "technical"
+  },
+  {
+    "id": "mem-47",
+    "content": "Monitoring stack: Prometheus for metrics (10K series), Grafana for dashboards (40 dashboards), Loki for logs (500GB/day), Tempo for distributed tracing. Alertmanager routes to PagerDuty with 4 severity levels. Mean time to detection (MTTD) dropped from 12 minutes to 3 minutes after implementing SLO-based alerting.",
+    "type": "technical"
+  },
+  {
+    "id": "mem-48",
+    "content": "Database architecture: Primary PostgreSQL cluster (3 nodes, 256GB RAM each) for transactional data. Read replicas (2 nodes) for analytics queries. pgvector extension for embeddings. Elasticsearch cluster (5 nodes) for full-text search and BM25. Redis cluster (3 nodes) for caching and rate limiting. Total data volume: 12TB.",
+    "type": "technical"
+  },
+  {
+    "id": "mem-49",
+    "content": "Company founded in December 2022 by Bob Martinez and two Stanford NLP PhDs. YC W23 batch. Initial product was an API for document Q&A, pivoted to evaluation platform in mid-2023 after customers kept asking 'how do I know if my RAG is working?'",
+    "type": "experience"
+  },
+  {
+    "id": "mem-50",
+    "content": "Early architecture (2023): single Node.js monolith with Pinecone for embeddings. Hit scaling limits at 100 concurrent users. Rewrote the ingestion pipeline in Go in Q3 2023, moved to pgvector in Q4. The Go rewrite improved throughput 10x and reduced infra costs 60%.",
+    "type": "experience"
+  }
+]

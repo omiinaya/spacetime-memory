@@ -23,6 +23,7 @@ import os
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 # Allow running from project root or cron
@@ -33,6 +34,7 @@ for prefix in (".", "..", "/home/user/spacetime-memory"):
         break
 
 from spacetime_memory import Client
+from spacetime_memory.auth import generate_token
 
 # ── Config ──────────────────────────────────────────────────────────
 HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
@@ -46,6 +48,9 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 LLM_MODEL = os.environ.get("LLM_MODEL", "gpt-4o-mini")
 
+_JWT_PRIVKEY = os.path.expanduser("~/.config/spacetime/id_ecdsa")
+_IDENTITY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cron_identity_hex")
+
 _client: Client | None = None
 _TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cron_identity_token")
 
@@ -56,26 +61,45 @@ _TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cron_id
 def _c() -> Client:
     global _client
     if _client is None:
-        _client = Client(host=HOST, port=PORT, database=DB)
-        # Reuse identity token across runs
-        if os.path.exists(_TOKEN_FILE):
+        token = ""
+        if os.path.exists(_JWT_PRIVKEY):
             try:
-                with open(_TOKEN_FILE) as f:
-                    _client._identity_token = f.read().strip()
-                    _client._identity_established = True
+                # Use a persistent identity so the same user/account
+                # survives across cron runs
+                identity_hex: str | None = None
+                if os.path.exists(_IDENTITY_FILE):
+                    try:
+                        identity_hex = Path(_IDENTITY_FILE).read_text().strip()
+                    except Exception:
+                        identity_hex = None
+
+                token = generate_token(_JWT_PRIVKEY, identity_hex=identity_hex)
+
+                # If this is a new identity, save it for next time
+                if identity_hex is None:
+                    import jwt as pyjwt
+                    claims = pyjwt.decode(token, options={"verify_signature": False})
+                    sub = claims.get("sub", "")
+                    if sub:
+                        Path(_IDENTITY_FILE).write_text(sub)
+                        identity_hex = sub
             except Exception:
-                pass
-        # Register if needed
-        if not _client._identity_established:
-            try:
-                import uuid
-                uname = f"cron_{uuid.uuid4().hex[:8]}"
-                _client._call("register", [uname, "Dream Cycle Cron", "cronpass123"])
-                with open(_TOKEN_FILE, "w") as f:
-                    f.write(_client._identity_token or "")
-            except Exception:
-                pass
-    return _client
+                token = ""
+        _client = Client(host=HOST, port=PORT, database=DB, token=token)
+        # The JWT token gives us a valid identity but we may not have
+        # an account yet in this database. Force a register attempt.
+        # The register reducer rejects "already exists" gracefully.
+        try:
+            import uuid
+            uname = f"dream_cron_{uuid.uuid4().hex[:8]}"
+            _client._call("register", [uname, "Dream Cycle Cron", "dr3@mc0ns0l1d8"])
+        except Exception:
+            # Already registered (expected on subsequent runs)
+            pass
+        # Mark identity as established — subsequent _ensure_identity()
+        # calls will find self.token and skip the handshake
+        _client._identity_established = True
+        return _client
 
 
 # ── LLM ─────────────────────────────────────────────────────────────
@@ -328,6 +352,7 @@ def generate_insights(
     summary = (
         f"Dream cycle processed {results.memories_processed} memories, "
         f"extracted {results.entities_extracted} entities, "
+        f"summarized {results.memories_summarized} chunks, "
         f"created {results.mental_models_created} mental model requests, "
         f"synthesized {results.mental_models_synthesized} mental models."
     )
@@ -355,6 +380,177 @@ def generate_insights(
             print(f"  Insight creation error: {e}")
 
     return 0
+
+
+# ── Chunked Summarization ───────────────────────────────────────────
+
+
+def chunk_memories_by_time(
+    memories: list[dict[str, Any]],
+    chunk_minutes: int = 30,
+    min_chunk_size: int = 3,
+) -> list[list[dict[str, Any]]]:
+    """Group memories into time-based chunks for summarization.
+
+    Memories within `chunk_minutes` of each other are grouped together.
+    Chunks smaller than `min_chunk_size` are discarded (not enough content
+    for meaningful summarization).
+    """
+    if not memories:
+        return []
+
+    # Sort by created_at ascending
+    sorted_mems = sorted(memories, key=lambda m: m.get("created_at", 0))
+    chunks: list[list[dict[str, Any]]] = []
+    current_chunk: list[dict[str, Any]] = [sorted_mems[0]]
+
+    chunk_window = chunk_minutes * 60 * 1000  # ms
+
+    for mem in sorted_mems[1:]:
+        prev_ts = current_chunk[-1].get("created_at", 0)
+        cur_ts = mem.get("created_at", 0)
+        if cur_ts - prev_ts <= chunk_window:
+            current_chunk.append(mem)
+        else:
+            if len(current_chunk) >= min_chunk_size:
+                chunks.append(current_chunk)
+            current_chunk = [mem]
+
+    if len(current_chunk) >= min_chunk_size:
+        chunks.append(current_chunk)
+
+    return chunks
+
+
+def summarize_chunk(
+    memories: list[dict[str, Any]],
+    dry_run: bool = False,
+) -> str | None:
+    """Summarize a chunk of memories using LLM, with AAAK fallback.
+
+    Returns the summary string, or None if the chunk is too small.
+    """
+    if len(memories) < 2:
+        return None
+
+    # Format memories for the prompt
+    formatted = []
+    for i, m in enumerate(memories, 1):
+        content = m.get("content", "")[:300]  # truncate long entries
+        mem_type = m.get("memory_type", "memory")
+        formatted.append(f"{i}. [{mem_type}] {content}")
+
+    prompt = (
+        "Summarize the following memories into a single concise paragraph "
+        "(2-4 sentences). Capture the key events, decisions, and people "
+        "mentioned. Be specific — use names, not pronouns.\n\n"
+        f"Memories:\n{chr(10).join(formatted)}\n\n"
+        "Summary:"
+    )
+
+    if dry_run:
+        return "[DRY] Would summarize chunk"
+
+    # Try LLM first
+    result = call_llm(
+        prompt,
+        system="You are a memory summarizer. Produce concise, factual summaries.",
+        temperature=0.2,
+    )
+
+    if result and len(result.strip()) >= 10:
+        return result.strip()
+
+    # AAAK fallback: compress the concatenated content
+    from spacetime_memory.aaak import aaak_compress
+
+    combined = " | ".join(m.get("content", "") for m in memories)
+    try:
+        compressed = aaak_compress(combined)
+        return f"[AAAK] {compressed}"
+    except Exception:
+        pass
+
+    # Last resort: just take first 500 chars
+    return combined[:500]
+
+
+def run_chunked_summarization(
+    client: Client,
+    workspace_id: str,
+    memories: list[dict[str, Any]],
+    dry_run: bool = False,
+    chunk_minutes: int = 30,
+) -> int:
+    """Run chunked LLM summarization on old memories.
+
+    Groups memories into time-based chunks, summarizes each via LLM
+    (with AAAK fallback), and stores the summaries.
+    """
+    chunks = chunk_memories_by_time(memories, chunk_minutes)
+    if not chunks:
+        return 0
+
+    print(f"    Time chunks: {len(chunks)} (>=3 memories per chunk)")
+    count = 0
+
+    for chunk in chunks:
+        summary = summarize_chunk(chunk, dry_run)
+        if not summary:
+            continue
+
+        # Extract proper nouns from the chunk for a descriptive title
+        all_content = " ".join(m.get("content", "") for m in chunk)
+        words = all_content.split()
+        proper_nouns = [
+            w.strip(".,;:!?)") for w in words
+            if len(w) > 2 and w[0].isupper() and w[0].isalpha()
+        ]
+        title = " ".join(proper_nouns[:4]) if proper_nouns else "Memory summary"
+
+        if dry_run:
+            print(f"    [DRY] Would store summary: {title} ({len(summary)} chars)")
+            count += 1
+            continue
+
+        try:
+            # Store summary as an episodic memory
+            source_ids = json.dumps([m["id"] for m in chunk])
+            client._call("store_memory", [
+                workspace_id, "", "",  # peer_id and source_peer auto-resolve
+                "experience",
+                summary,
+                title,
+                source_ids,
+                0.85,  # trust_score
+                f"dream_cycle_chunk_{int(time.time())}",
+                "",  # context
+            ])
+            count += 1
+            if count <= 3:  # Don't spam output for large batches
+                print(f"    [OK] Chunk summary: {title} ({len(summary)} chars)")
+        except Exception as e:
+            if count <= 3:
+                print(f"    Chunk summary error: {e}")
+
+    if count > 3:
+        print(f"    [OK] Stored {count} chunk summaries total")
+
+    return count
+
+
+# ── Dream Cycle Core ────────────────────────────────────────────────
+
+
+@dataclass
+class DreamResults:
+    memories_processed: int = 0
+    entities_extracted: int = 0
+    memories_summarized: int = 0
+    mental_models_created: int = 0
+    mental_models_synthesized: int = 0
+    insights_generated: int = 0
+    errors: int = 0
 
 
 def run_dream_cycle(
@@ -420,13 +616,19 @@ def run_dream_cycle(
         if entities:
             print(f"    Entities extracted: {entities}")
 
-        # 3. Cluster related memories
+        # 3. Chunked LLM summarization (with AAAK fallback)
+        summarized = run_chunked_summarization(client, wid, memories, dry_run)
+        results.memories_summarized += summarized
+        if summarized:
+            print(f"    Chunks summarized: {summarized}")
+
+        # 4. Cluster related memories
         clusters = cluster_memories(memories)
         if clusters:
             avg_size = sum(len(c) for c in clusters) // len(clusters)
             print(f"    Clusters: {len(clusters)} (avg size: {avg_size})")
 
-            # 4. Create mental model synthesis requests
+            # 5. Create mental model synthesis requests
             models = create_mental_models(client, wid, clusters, dry_run)
             results.mental_models_created += models
             if models:
@@ -475,6 +677,7 @@ def main() -> None:
         f"\n[{time.strftime('%H:%M:%S')}] Dream cycle complete{mode}:\n"
         f"  Memories processed:  {results.memories_processed}\n"
         f"  Entities extracted:  {results.entities_extracted}\n"
+        f"  Chunks summarized:   {results.memories_summarized}\n"
         f"  Mental models req'd: {results.mental_models_created}\n"
         f"  Models synthesized:  {results.mental_models_synthesized}\n"
         f"  Insights generated:  {results.insights_generated}\n"

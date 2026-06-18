@@ -271,9 +271,276 @@ pub fn get_neighbors(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Note: All functions in this file are SpacetimeDB reducers that require a
-// `&ReducerContext` parameter and access the database. They cannot be tested
-// with standard `cargo test` — integration tests requiring the SpacetimeDB
-// runtime are needed. No pure helper functions exist in this module.
+// ── Pattern Detection: Bridge Nodes ──────────────────────────
+
+/// A bridge node connects multiple communities — it's a cross-domain
+/// concept that spans knowledge boundaries. High bridge scores indicate
+/// important integrative concepts.
+#[table(accessor = bridge_result, public)]
+#[derive(Debug, Clone)]
+pub struct BridgeResult {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub node_id: String,
+    pub node_label: String,
+    pub node_type: String,
+    /// Number of distinct communities this node connects to
+    pub community_count: u32,
+    /// Bridge score 0.0–1.0: (community_count - 1) / total_communities
+    /// Normalized so single-community nodes score 0.0
+    pub bridge_score: f64,
+    /// JSON array of community IDs this node touches
+    pub community_ids_json: String,
+    pub created_at: i64,
+}
+
+/// Detect bridge nodes — nodes that connect multiple communities.
+///
+/// A bridge node has edges whose endpoints belong to different communities,
+/// or the node itself belongs to a different community than its neighbors.
+///
+/// * `workspace_id` — target workspace
+/// * `limit` — max results (default 20)
+/// * `min_communities` — minimum distinct communities to qualify (default 2)
+#[reducer]
+pub fn detect_bridge_nodes(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    limit: u32,
+    min_communities: u32,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let now = now_micros(ctx);
+    let limit = if limit == 0 { 20 } else { limit };
+    let min_communities = if min_communities == 0 { 2 } else { min_communities };
+
+    // Clear previous results
+    let old: Vec<_> = ctx.db.bridge_result().iter()
+        .filter(|r| r.workspace_id == workspace_id)
+        .collect();
+    for r in old {
+        ctx.db.bridge_result().id().delete(&r.id);
+    }
+
+    use std::collections::{HashMap, HashSet};
+
+    // Build node_id → community_id map
+    let node_community: HashMap<String, u64> = ctx
+        .db
+        .kg_node()
+        .iter()
+        .filter(|n| n.workspace_id == workspace_id)
+        .map(|n| (n.id.clone(), n.community_id))
+        .collect();
+
+    // Count total distinct communities (excluding 0 = unassigned)
+    let total_communities: u64 = node_community
+        .values()
+        .filter(|&&c| c > 0)
+        .collect::<HashSet<_>>()
+        .len() as u64;
+
+    if total_communities == 0 {
+        return Ok(()); // No communities to bridge
+    }
+
+    // For each node, collect community IDs of its neighbors
+    let mut node_communities: HashMap<String, HashSet<u64>> = HashMap::new();
+
+    for edge in ctx.db.kg_edge().iter()
+        .filter(|e| e.workspace_id == workspace_id)
+    {
+        let src_cid = node_community.get(&edge.source_node_id).copied().unwrap_or(0);
+        let tgt_cid = node_community.get(&edge.target_node_id).copied().unwrap_or(0);
+
+        if src_cid > 0 {
+            node_communities
+                .entry(edge.source_node_id.clone())
+                .or_default()
+                .insert(tgt_cid);
+            // Also include the node's own community
+            let own_cid = node_community.get(&edge.source_node_id).copied().unwrap_or(0);
+            if own_cid > 0 {
+                node_communities
+                    .entry(edge.source_node_id.clone())
+                    .or_default()
+                    .insert(own_cid);
+            }
+        }
+
+        if tgt_cid > 0 {
+            node_communities
+                .entry(edge.target_node_id.clone())
+                .or_default()
+                .insert(src_cid);
+            let own_cid = node_community.get(&edge.target_node_id).copied().unwrap_or(0);
+            if own_cid > 0 {
+                node_communities
+                    .entry(edge.target_node_id.clone())
+                    .or_default()
+                    .insert(own_cid);
+            }
+        }
+    }
+
+    // Score and filter bridge nodes
+    let mut bridges: Vec<(String, String, String, u32, f64, String)> = Vec::new();
+
+    for (node_id, communities) in &node_communities {
+        let count = communities.len() as u32;
+        if count < min_communities {
+            continue;
+        }
+
+        let bridge_score = if total_communities > 1 {
+            (count as f64 - 1.0) / (total_communities as f64 - 1.0)
+        } else {
+            0.0
+        };
+
+        let node = ctx.db.kg_node().id().find(node_id);
+        let label = node.as_ref().map(|n| n.label.clone()).unwrap_or_default();
+        let ntype = node.as_ref().map(|n| n.node_type.clone()).unwrap_or_default();
+
+        let cids: Vec<u64> = communities.iter().copied().collect();
+        let cids_json = serde_json::to_string(&cids).unwrap_or_else(|_| "[]".to_string());
+
+        bridges.push((
+            node_id.clone(),
+            label,
+            ntype,
+            count,
+            bridge_score,
+            cids_json,
+        ));
+    }
+
+    bridges.sort_by(|a, b| b.4.partial_cmp(&a.4).unwrap_or(std::cmp::Ordering::Equal));
+    bridges.truncate(limit as usize);
+
+    for (node_id, label, ntype, count, score, cids_json) in &bridges {
+        ctx.db.bridge_result().insert(BridgeResult {
+            id: uuid_v4(ctx),
+            workspace_id: workspace_id.clone(),
+            node_id: node_id.clone(),
+            node_label: label.clone(),
+            node_type: ntype.clone(),
+            community_count: *count,
+            bridge_score: *score,
+            community_ids_json: cids_json.clone(),
+            created_at: now,
+        });
+    }
+
+    Ok(())
+}
+
+// ── Knowledge Graph Statistics ───────────────────────────────
+
+/// Summary statistics for a workspace's knowledge graph.
+#[table(accessor = kg_stats_result, public)]
+#[derive(Debug, Clone)]
+pub struct KgStatsResult {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    /// Total node count
+    pub node_count: u64,
+    /// Total edge count
+    pub edge_count: u64,
+    /// Number of distinct communities (excluding 0 = unassigned)
+    pub community_count: u64,
+    /// Nodes with community_id == 0 (unassigned / orphans)
+    pub unassigned_nodes: u64,
+    /// Nodes with zero edges (true orphans — no connections)
+    pub orphan_nodes: u64,
+    /// Average edges per node (edge_count / node_count, or 0)
+    pub avg_degree: f64,
+    /// Timestamp micros
+    pub created_at: i64,
+}
+
+/// Compute summary statistics for a workspace's knowledge graph.
+#[reducer]
+pub fn compute_kg_stats(
+    ctx: &ReducerContext,
+    workspace_id: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let now = now_micros(ctx);
+
+    use std::collections::HashSet;
+
+    // Node stats
+    let nodes: Vec<_> = ctx
+        .db
+        .kg_node()
+        .iter()
+        .filter(|n| n.workspace_id == workspace_id)
+        .collect();
+
+    let node_count = nodes.len() as u64;
+
+    // Collect community IDs and unassigned count
+    let mut community_ids = HashSet::new();
+    let mut unassigned_nodes: u64 = 0;
+    for n in &nodes {
+        if n.community_id > 0 {
+            community_ids.insert(n.community_id);
+        } else {
+            unassigned_nodes += 1;
+        }
+    }
+
+    // Edge stats
+    let edges: Vec<_> = ctx
+        .db
+        .kg_edge()
+        .iter()
+        .filter(|e| e.workspace_id == workspace_id)
+        .collect();
+
+    let edge_count = edges.len() as u64;
+
+    // Node degree: count edges per node
+    let mut degree: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    for e in &edges {
+        *degree.entry(e.source_node_id.clone()).or_insert(0) += 1;
+        *degree.entry(e.target_node_id.clone()).or_insert(0) += 1;
+    }
+
+    // Orphan nodes: nodes that appear in kg_node but have 0 edges
+    let orphan_nodes = nodes.iter()
+        .filter(|n| !degree.contains_key(&n.id))
+        .count() as u64;
+
+    let avg_degree = if node_count > 0 {
+        (edge_count * 2) as f64 / node_count as f64
+    } else {
+        0.0
+    };
+
+    // Clear previous
+    let old: Vec<_> = ctx.db.kg_stats_result().iter()
+        .filter(|r| r.workspace_id == workspace_id)
+        .collect();
+    for r in old {
+        ctx.db.kg_stats_result().id().delete(&r.id);
+    }
+
+    ctx.db.kg_stats_result().insert(KgStatsResult {
+        id: uuid_v4(ctx),
+        workspace_id,
+        node_count,
+        edge_count,
+        community_count: community_ids.len() as u64,
+        unassigned_nodes,
+        orphan_nodes,
+        avg_degree,
+        created_at: now,
+    });
+
+    Ok(())
+}
 // ---------------------------------------------------------------------------

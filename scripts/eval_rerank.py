@@ -10,7 +10,7 @@ prov = config["custom_providers"][0]
 
 os.environ["LLM_RERANK_ENDPOINT"] = prov["base_url"]
 os.environ["LLM_RERANK_API_KEY"] = prov["api_key"]
-os.environ["LLM_RERANK_MODEL"] = "go-deepseek-v4-flash"
+os.environ["LLM_RERANK_MODEL"] = "ds-deepseek-v4-flash"
 
 token = generate_token("/tmp/stdb-data/jwt_priv_pk8.pem")
 c = Client(host="localhost", port=3001, database="c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff", token=token)

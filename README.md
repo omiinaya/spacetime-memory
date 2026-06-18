@@ -48,6 +48,7 @@ These adapters match the public API of their upstream library. You can swap the 
 | [Graphiti](https://github.com/getzep/graphiti) (v0.29.2) | `sdks.graphiti.Graphiti` | **20/20** | **~95%** — Entities, edges, episodes, communities. LLM extraction |
 | [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | **14/14** | **~95%** — Workspace/peer/session/message/search + `.aio` async accessor |
 | [QMD](https://github.com/tobi/qmd) | CLI + MCP tools | Architecture parity | **~98%** — BM25+vector+hybrid search ✅, MCP ✅, CLI ✅, context trees ✅, LLM reranking ✅, fuzzy get ✅, glob multi-get ✅ |
+| [Mnemosyne](https://github.com/AxDSan/mnemosyne) | Architecture parity | Assessment | **~55%** — Core memory ✅, KG ✅, hybrid search ✅. Missing: AAAK, SHMR, veracity tiers, polyphonic recall, MIB, sync |
 
 Additional features inspired by many projects (data model, schedules, CLI design — see Data Model table below).
 
