@@ -444,7 +444,7 @@ fn resolve_block_refs(ctx: &ReducerContext, note_id: &str, blocks: &[String], no
         for (target_block_id, is_embed) in find_block_refs(block_text) {
             let target_note_id = if target_block_id.contains(':') {
                 // Full ref: note_id:order
-                let colon = target_block_id.find(':').unwrap();
+                let colon = target_block_id.find(':').unwrap_or(0);
                 target_block_id[..colon].to_string()
             } else {
                 // Local ref: just order hex, same note

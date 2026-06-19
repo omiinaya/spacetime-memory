@@ -19,3 +19,4 @@ venv/
 .venv/
 .upstream-venv/
 build/
+.env

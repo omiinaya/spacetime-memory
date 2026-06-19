@@ -631,8 +631,12 @@ class Client:
                 json={
                     "input": text,
                     "model": os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large"),
-                    "dimensions": int(os.environ.get("EMBEDDING_DIMENSIONS", "3072")),
-                },
+                }
+                | (
+                    {}
+                    if not os.environ.get("EMBEDDING_DIMENSIONS")
+                    else {"dimensions": int(os.environ["EMBEDDING_DIMENSIONS"])}
+                ),
                 timeout=30,
             )
             resp.raise_for_status()
@@ -729,8 +733,12 @@ class Client:
                 json={
                     "input": texts,
                     "model": os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large"),
-                    "dimensions": int(os.environ.get("EMBEDDING_DIMENSIONS", "3072")),
-                },
+                }
+                | (
+                    {}
+                    if not os.environ.get("EMBEDDING_DIMENSIONS")
+                    else {"dimensions": int(os.environ["EMBEDDING_DIMENSIONS"])}
+                ),
                 timeout=60,
             )
             resp.raise_for_status()

@@ -269,7 +269,7 @@ class TestGraph:
             return rows[0]["id"] if rows else ""
         result = stdb_client._call("create_edge", [
             ws, _node_id("ConceptA"), _node_id("ConceptB"), "relates_to",
-            1.0, "EXTRACTED", "{}",
+            1.0, "EXTRACTED", "{}", "",
         ])
         assert result["status"] == "ok"
 
