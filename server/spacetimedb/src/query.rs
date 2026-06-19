@@ -97,7 +97,8 @@ pub fn query_table(
         return Err("filter_json must be a JSON object".to_string());
     }
 
-    let filter_obj = filter.as_object().unwrap();
+    let filter_obj = filter.as_object()
+        .ok_or_else(|| "filter must be a JSON object".to_string())?;
     let now = now_micros(ctx);
 
     // ── Route to table-specific query logic ──────────────────────────
@@ -158,11 +159,11 @@ fn filter_matches(row: &serde_json::Value, filter: &serde_json::Map<String, serd
         };
         // String equality for simple filters; JSON match for complex
         if expected.is_string() && actual.is_string() {
-            if expected.as_str().unwrap() != actual.as_str().unwrap() {
+            if expected.as_str() != actual.as_str() {
                 return false;
             }
         } else if expected.is_boolean() && actual.is_boolean() {
-            if expected.as_bool().unwrap() != actual.as_bool().unwrap() {
+            if expected.as_bool() != actual.as_bool() {
                 return false;
             }
         } else if expected.is_number() && actual.is_number() {
@@ -174,15 +175,15 @@ fn filter_matches(row: &serde_json::Value, filter: &serde_json::Map<String, serd
             }
         // Coerce string to boolean for SDK convenience (list_memories sends "true"/"false")
         } else if expected.is_string() && actual.is_boolean() {
-            let expected_bool = expected.as_str().unwrap().eq_ignore_ascii_case("true");
-            if expected_bool != actual.as_bool().unwrap() {
+            let expected_bool = expected.as_str().map(|s| s.eq_ignore_ascii_case("true")).unwrap_or(false);
+            if expected_bool != actual.as_bool().unwrap_or(false) {
                 return false;
             }
         // Coerce string to number for SDK convenience
         } else if expected.is_string() && actual.is_number() {
-            let expected_num: f64 = match expected.as_str().unwrap().parse() {
-                Ok(n) => n,
-                Err(_) => { if expected != actual { return false; } continue; },
+            let expected_num: f64 = match expected.as_str().and_then(|s| s.parse().ok()) {
+                Some(n) => n,
+                None => return false,
             };
             let actual_num = actual.as_f64().unwrap_or(0.0);
             if (expected_num - actual_num).abs() > f64::EPSILON {
