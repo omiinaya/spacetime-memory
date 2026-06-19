@@ -1182,6 +1182,7 @@ class Client:
         query_expansion: bool = False,
         polyphonic: bool = False,
         mmr_lambda: float = 0.0,
+        fusion_weights: dict[str, float] | None = None,
     ) -> list[dict[str, Any]]:
         """Search memories.  When *semantic* is True uses hybrid search.
 
@@ -1202,6 +1203,9 @@ class Client:
                     diversity penalty instead of min-max normalization.
             mmr_lambda: If > 0, applies Maximal Marginal Relevance reranking.
                     0.7 is a good default (70% relevance, 30% diversity).
+            fusion_weights: Optional dict of strategy weights for min-max fusion.
+                    Keys: ``"semantic"``, ``"keyword"``, ``"binary"``, ``"graph"``, ``"temporal"``.
+                    Values should sum to ~1.0. Omit or pass None to use defaults.
         """
         if semantic:
             # ── Query cache check ──
@@ -1283,7 +1287,7 @@ class Client:
             # Graph (0.00), temporal (0.05): removed — graph is substring-matching
             #   and temporal is recency-only. Neither contributes meaningfully.
             #   All signal from semantic (0.65) + Tantivy keyword (0.25).
-            STRATEGY_WEIGHTS = {
+            STRATEGY_WEIGHTS = fusion_weights or {
                 "semantic": 0.65,
                 "keyword": 0.25,
                 "binary": 0.05,

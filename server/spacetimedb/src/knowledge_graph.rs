@@ -846,10 +846,9 @@ pub fn compute_community_hierarchy(
 
     // Initialise: each community is its own cluster
     #[derive(Clone)]
-    #[allow(dead_code)]
     struct Cluster {
         id: String,
-        #[allow(dead_code)]
+        #[expect(dead_code, reason = "set during clustering, reserved for iterative refinement")]
         depth: u32,
         community_set: std::collections::HashSet<u64>,
     }
