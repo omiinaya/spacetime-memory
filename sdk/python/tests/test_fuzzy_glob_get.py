@@ -12,6 +12,8 @@ def mock_client():
 
     c = Client.__new__(Client)
     c._http = MagicMock()
+    c._http.get.return_value = MagicMock(status_code=200)
+    c._http.post.return_value = MagicMock(status_code=200, json=lambda: [])
     c.database = "test"
     c._identity_token = "test-token"
     c._identity_established = True

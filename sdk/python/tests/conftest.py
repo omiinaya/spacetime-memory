@@ -124,6 +124,12 @@ def mock_http_client():
     mock_http.post.return_value = Mock(
         status_code=200,
         text=json.dumps([]),
+        json=lambda: [],
+    )
+    # Embedder health endpoint: return 200 so _is_bge_model() doesn't crash
+    mock_http.get.return_value = Mock(
+        status_code=200,
+        json=lambda: {"model": "mock"},
     )
     client._http = mock_http
     yield client

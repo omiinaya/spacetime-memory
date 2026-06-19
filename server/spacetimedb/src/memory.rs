@@ -336,7 +336,7 @@ pub fn get_user_memories(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "viewer")?;
 
-    for mem in ctx.db.memory().iter() {
+    for mem in ctx.db.memory().iter().take(crate::MAX_RESULTS) {
         if mem.user_scope == user_scope && mem.workspace_id == workspace_id {
             ctx.db.user_memory_result().insert(UserMemoryResult {
                 id: uuid_v4(ctx),

@@ -293,7 +293,7 @@ pub fn hybrid_search(
                 let mut entity_terms: HashMap<String, Vec<(String, u32, u32)>> = HashMap::new();
                 let mut term_doc_freq: HashMap<String, usize> = HashMap::new();
 
-                for ti in ctx.db.term_index().iter() {
+                for ti in ctx.db.term_index().iter().take(crate::MAX_RESULTS) {
                     if ti.workspace_id != workspace_id {
                         continue;
                     }
@@ -331,7 +331,7 @@ pub fn hybrid_search(
                 // Compute average doc length
                 let mut total_tokens: u64 = 0;
                 let mut doc_count: u64 = 0;
-                for ti in ctx.db.term_index().iter() {
+                for ti in ctx.db.term_index().iter().take(crate::MAX_RESULTS) {
                     if ti.workspace_id == workspace_id && ti.entity_type == "memory" {
                         total_tokens += ti.doc_length as u64;
                         doc_count += 1;
@@ -922,7 +922,7 @@ pub fn compute_god_nodes(
     let mut degree_map: std::collections::HashMap<String, u64> =
         std::collections::HashMap::new();
 
-    for edge in ctx.db.kg_edge().iter() {
+    for edge in ctx.db.kg_edge().iter().take(crate::MAX_RESULTS) {
         if edge.workspace_id != workspace_id {
             continue;
         }
@@ -1009,7 +1009,7 @@ pub fn search_sessions_semantic(
     // (best_score, top_memory_id, top_memory_content, memory_count)
     let mut workspace_scores: HashMap<String, (f64, String, String, u32)> = HashMap::new();
 
-    for si in ctx.db.search_index().iter() {
+    for si in ctx.db.search_index().iter().take(crate::MAX_RESULTS) {
         if si.entity_type != "memory" {
             continue;
         }

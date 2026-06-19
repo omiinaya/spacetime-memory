@@ -140,7 +140,7 @@ fn ensure_entity(
 ) -> String {
     // Check existing entity_link by exact name match
     let mut link_id: Option<String> = None;
-    for existing in ctx.db.entity_link().iter() {
+    for existing in ctx.db.entity_link().iter().take(crate::MAX_RESULTS) {
         if existing.workspace_id == workspace_id && existing.entity_name == mention.name {
             link_id = Some(existing.id.clone());
             break;
@@ -148,7 +148,7 @@ fn ensure_entity(
     }
 
     // Check existing kg_node by label match
-    for existing in ctx.db.kg_node().iter() {
+    for existing in ctx.db.kg_node().iter().take(crate::MAX_RESULTS) {
         if existing.workspace_id == workspace_id && existing.label == mention.name {
             // Found existing node — ensure entity_link exists too
             if link_id.is_none() {

@@ -784,7 +784,7 @@ pub fn compute_community_hierarchy(
         u64,
         std::collections::HashSet<String>,
     > = std::collections::HashMap::new();
-    for node in ctx.db.kg_node().iter() {
+    for node in ctx.db.kg_node().iter().take(crate::MAX_RESULTS) {
         if node.workspace_id != workspace_id {
             continue;
         }
@@ -1061,7 +1061,7 @@ pub fn get_citations(
     check_space_access(ctx, &workspace_id, &caller, "reader")?;
     let qid = uuid_v4(ctx);
 
-    for c in ctx.db.citation().iter() {
+    for c in ctx.db.citation().iter().take(crate::MAX_RESULTS) {
         if c.entity_id == entity_id && c.entity_type == entity_type && c.workspace_id == workspace_id {
             ctx.db.citation_result().insert(CitationResult {
                 id: qid.clone(),

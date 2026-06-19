@@ -588,7 +588,7 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
 
     // 2. Decay weak, stale memories across all workspaces
     let stale_cutoff = now - 7 * 86_400_000_000; // 7 days ago in micros
-    for ws in ctx.db.workspace().iter() {
+    for ws in ctx.db.workspace().iter().take(crate::MAX_RESULTS) {
         let weak: Vec<_> = ctx
             .db
             .memory()
@@ -625,7 +625,7 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
     }
 
     // 3. Dedup near-duplicate memories per workspace
-    for ws in ctx.db.workspace().iter() {
+    for ws in ctx.db.workspace().iter().take(crate::MAX_RESULTS) {
         if let Err(e) = dedup_memories(ctx, ws.id.clone()) {
             // Log but don't halt maintenance on dedup error
             ctx.db.consolidation_log().insert(ConsolidationLog {
@@ -642,7 +642,7 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
     // 4. Apply reputation decay for all workspaces (default params)
     const DEFAULT_DECAY_RATE: f64 = 0.005;
     const DEFAULT_MAX_DAYS: i64 = 90;
-    for ws in ctx.db.workspace().iter() {
+    for ws in ctx.db.workspace().iter().take(crate::MAX_RESULTS) {
         if let Err(e) = memory_feedback::apply_decay_inner(
             ctx, &ws.id, DEFAULT_DECAY_RATE, DEFAULT_MAX_DAYS,
             "linear", 0.6, 30.0,
@@ -730,7 +730,7 @@ pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
     }
 
     // ── profile (no workspace_id field — export all) ──────────────────
-    for p in ctx.db.profile().iter() {
+    for p in ctx.db.profile().iter().take(crate::MAX_RESULTS) {
         let json = serde_json::to_string(&p)
             .map_err(|e| format!("Serialize profile: {}", e))?;
         insert_entry("profile", p.id.clone(), json);
@@ -765,7 +765,7 @@ pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
     }
 
     // ── note_block ────────────────────────────────────────────────────
-    for nb in ctx.db.note_block().iter() {
+    for nb in ctx.db.note_block().iter().take(crate::MAX_RESULTS) {
         // note_block doesn't have workspace_id — export all
         let json = serde_json::to_string(&nb)
             .map_err(|e| format!("Serialize note_block: {}", e))?;

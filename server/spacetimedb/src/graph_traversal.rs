@@ -235,7 +235,7 @@ pub fn get_neighbors(
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     seen.insert(node_id.clone());
 
-    for edge in ctx.db.kg_edge().iter() {
+    for edge in ctx.db.kg_edge().iter().take(crate::MAX_RESULTS) {
         if edge.workspace_id != workspace_id {
             continue;
         }

@@ -112,6 +112,7 @@ class TestMemorySearch:
             # SQL / reducer calls
             resp = Mock(status_code=200)
             resp.text = make_sql_response([])
+            resp.json = lambda: []
             return resp
 
         mock_http_client._http.post.side_effect = post_side_effect
@@ -153,6 +154,7 @@ class TestMemorySearch:
                 return emb_resp
             resp = Mock(status_code=200)
             resp.text = make_sql_response([])
+            resp.json = lambda: []
             return resp
 
         mock_http_client._http.post.side_effect = post_side_effect

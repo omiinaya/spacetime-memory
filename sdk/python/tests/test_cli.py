@@ -38,7 +38,11 @@ def mock_client():
         embedder_url="http://localhost:9090",
     )
     mock_http = MagicMock(spec=httpx.Client)
-    mock_http.post.return_value = Mock(status_code=200, text=json.dumps([]))
+    mock_http.post.return_value = Mock(status_code=200, text=json.dumps([]), json=lambda: [])
+    mock_http.get.return_value = Mock(
+        status_code=200,
+        json=lambda: {"model": "mock"},
+    )
     client._http = mock_http
     return client
 
@@ -166,6 +170,7 @@ class TestCliMemory:
                 return emb
             resp = Mock(status_code=200)
             resp.text = json.dumps([])
+            resp.json = lambda: []
             return resp
 
         mock_client._http.post.side_effect = side_effect

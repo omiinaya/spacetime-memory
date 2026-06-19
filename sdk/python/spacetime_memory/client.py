@@ -2961,22 +2961,29 @@ def llm_rerank(
     try:
         # Retry with backoff for rate limits
         import time as _time
+        resp = None
         for attempt in range(3):
-            resp = httpx.post(
-                f"{endpoint.rstrip('/')}/chat/completions",
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": "You are a search reranker. Return only JSON."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0.0,
-                    "max_tokens": 2048,
-                    "response_format": {"type": "json_object"},
-                },
-                headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
-                timeout=timeout,
-            )
+            try:
+                resp = httpx.post(
+                    f"{endpoint.rstrip('/')}/chat/completions",
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": "You are a search reranker. Return only JSON."},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "temperature": 0.0,
+                        "max_tokens": 2048,
+                        "response_format": {"type": "json_object"},
+                    },
+                    headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+                    timeout=timeout,
+                )
+            except (httpx.ConnectError, httpx.TimeoutException):
+                if attempt < 2:
+                    _time.sleep(2 ** attempt)
+                    continue
+                raise
             if resp.status_code == 429:
                 wait = 2 ** attempt
                 logger.warning("LLM rerank rate-limited, retrying in %ds (attempt %d/3)", wait, attempt + 1)

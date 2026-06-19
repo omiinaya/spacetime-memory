@@ -271,7 +271,7 @@ fn query_kg_community(
     ctx: &ReducerContext, query_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for c in ctx.db.kg_community().iter() {
+    for c in ctx.db.kg_community().iter().take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": c.id, "workspace_id": c.workspace_id,
             "name": c.name, "summary": c.summary,
@@ -307,7 +307,7 @@ fn query_message(
     ctx: &ReducerContext, query_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for msg in ctx.db.message().iter() {
+    for msg in ctx.db.message().iter().take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": msg.id, "session_id": msg.session_id,
             "sender_id": msg.sender_id, "content": msg.content,
@@ -348,7 +348,7 @@ fn query_note_backlink(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for nb in ctx.db.note_backlink().iter() {
+    for nb in ctx.db.note_backlink().iter().take(crate::MAX_RESULTS) {
         // Resolve source note to get workspace context
         let source_note = ctx.db.note().id().find(&nb.source_note_id);
         if let Some(ref sn) = source_note {
@@ -418,7 +418,7 @@ fn query_workspace(
     ctx: &ReducerContext, query_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for ws in ctx.db.workspace().iter() {
+    for ws in ctx.db.workspace().iter().take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": ws.id, "name": ws.name, "description": ws.description,
             "created_at": ws.created_at, "updated_at": ws.updated_at,
@@ -435,7 +435,7 @@ fn query_agent_step(
     ctx: &ReducerContext, query_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for step in ctx.db.agent_step().iter() {
+    for step in ctx.db.agent_step().iter().take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": step.id, "session_id": step.session_id,
             "workspace_id": step.workspace_id,
@@ -474,7 +474,7 @@ fn query_connector_config(
     ctx: &ReducerContext, query_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for cc in ctx.db.connector_config().iter() {
+    for cc in ctx.db.connector_config().iter().take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": cc.id, "name": cc.name, "connector_type": cc.connector_type,
             "config_json": cc.config_json, "workspace_id": cc.workspace_id,

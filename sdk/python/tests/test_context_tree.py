@@ -54,6 +54,8 @@ def mock_client():
 
     c = Client.__new__(Client)
     c._http = MagicMock()
+    c._http.get.return_value = MagicMock(status_code=200)
+    c._http.post.return_value = MagicMock(status_code=200, json=lambda: [])
     c.database = "test"
     c._identity_token = "test-token"
     c._identity_established = True
@@ -61,4 +63,12 @@ def mock_client():
     c._sql = MagicMock(return_value=[])
     c._query = MagicMock(return_value=[])
     c._embed = MagicMock(return_value=[0.1] * 384)
+    c._query_cache = None
+    c._bge_model_cache = False
+    c._e5_model_cache = False
+    c._binary_cache = {}
+    c.plugin_manager = None
+    c.event_bus = None
+    c.embedder_url = "http://localhost:9090"
+    c.tantivy_url = "http://localhost:9100"
     return c
