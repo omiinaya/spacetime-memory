@@ -6,7 +6,7 @@ use crate::insight::insight;
 use crate::memory::memory;
 use crate::profile::profile;
 use crate::session::session_participant;
-use crate::{now_micros, uuid_v4, MAX_RESULTS};
+use crate::{now_micros, uuid_v4};
 
 // ---------------------------------------------------------------------------
 // Result tables (client reads these after a reducer call)

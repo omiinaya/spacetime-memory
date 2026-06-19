@@ -46,7 +46,7 @@ pub struct HarmonicBelief {
 pub fn store_harmonic_beliefs(
     ctx: &ReducerContext,
     workspace_id: String,
-    peer_id: String,
+    _peer_id: String,
     beliefs_json: String,
     cluster_id: String,
     iteration: u32,
@@ -165,7 +165,7 @@ pub struct ResonanceLog {
 pub fn log_resonance_session(
     ctx: &ReducerContext,
     workspace_id: String,
-    peer_id: String,
+    _peer_id: String,
     cluster_count: u32,
     beliefs_generated: u32,
     contradictions_resolved: u32,

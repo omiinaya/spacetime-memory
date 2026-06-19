@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_admin;
 
-use crate::{now_micros, uuid_v4, MAX_RESULTS};
+use crate::{now_micros, uuid_v4};
 
 // Re-import table structs for direct manipulation in replicate_incoming
 use crate::memory::{memory, Memory};

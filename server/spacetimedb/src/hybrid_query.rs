@@ -228,7 +228,7 @@ pub fn hybrid_search(
                     // No query embedding provided — skip semantic strategy
                     continue;
                 }
-                let mut count: u32 = 0;
+                let mut _count: u32 = 0;
                 for si in ctx.db.search_index().iter()
                     .filter(|si| si.workspace_id == workspace_id)
                     .take(MAX_RESULTS)
@@ -276,7 +276,7 @@ pub fn hybrid_search(
                         context_json,
                         created_at: now,
                     });
-                    count += 1;
+                    _count += 1;
                 }
             }
 
@@ -376,9 +376,9 @@ pub fn hybrid_search(
 
                 // Sort by BM25 score descending and take top limit
                 scored.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
-                let mut count: u32 = 0;
+                let mut _count: u32 = 0;
                 for (entity_id, content, bm25) in &scored {
-                    if count >= limit {
+                    if _count >= limit {
                         break;
                     }
                     // Cap score to [0, 1] range
@@ -405,7 +405,7 @@ pub fn hybrid_search(
                         context_json,
                         created_at: now,
                     });
-                    count += 1;
+                    _count += 1;
                 }
             }
 
@@ -427,9 +427,9 @@ pub fn hybrid_search(
                     .map(|n| n.id.clone())
                     .collect();
 
-                let mut count: u32 = 0;
+                let mut _count: u32 = 0;
                 for node_id in &matching_node_ids {
-                    if count >= limit {
+                    if _count >= limit {
                         break;
                     }
                     // Find edges that touch this node
@@ -444,7 +444,7 @@ pub fn hybrid_search(
                         .collect();
 
                     for edge in &edges {
-                        if count >= limit {
+                        if _count >= limit {
                             break;
                         }
                         let neighbor_id = if edge.source_node_id == *node_id {
@@ -482,11 +482,11 @@ pub fn hybrid_search(
                             context_json,
                             created_at: now,
                         });
-                        count += 1;
+                        _count += 1;
                     }
 
                     // Also include the matching node itself
-                    if count < limit {
+                    if _count < limit {
                         if let Some(node) = ctx.db.kg_node().id().find(node_id) {
                             let context_json = make_context_json(&workspace_context, "");
                             ctx.db.hybrid_result().insert(HybridResult {
@@ -501,7 +501,7 @@ pub fn hybrid_search(
                                 context_json,
                                 created_at: now,
                             });
-                            count += 1;
+                            _count += 1;
                         }
                     }
                 }
@@ -528,9 +528,9 @@ pub fn hybrid_search(
                 // Most recent first
                 memories.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
-                let mut count: u32 = 0;
+                let mut _count: u32 = 0;
                 for m in &memories {
-                    if count >= limit {
+                    if _count >= limit {
                         break;
                     }
                     // Recency score: newer memories get higher scores
@@ -561,7 +561,7 @@ pub fn hybrid_search(
                         context_json,
                         created_at: now,
                     });
-                    count += 1;
+                    _count += 1;
                 }
             }
 
@@ -630,7 +630,7 @@ pub fn hybrid_search(
                     });
             }
 
-            for (strategy, ranked) in &strat_groups {
+            for (_strategy, ranked) in &strat_groups {
                 for (rank, (entity_id, _score)) in ranked.iter().enumerate() {
                     let rrf_contrib = 1.0 / (RRF_K + (rank as f64 + 1.0));
                     *rrf_scores.entry(entity_id.clone()).or_insert(0.0) += rrf_contrib;
@@ -767,7 +767,7 @@ pub fn hybrid_search(
             .collect();
 
         if all_rows.len() >= 2 && !query_emb.is_empty() {
-            use std::collections::{HashMap, HashSet};
+            use std::collections::HashMap;
 
             // Build embedding lookup: entity_id → Vec<f64>
             let mut emb_cache: HashMap<String, Vec<f64>> = HashMap::new();

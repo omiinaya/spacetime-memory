@@ -309,7 +309,7 @@ pub fn deactivate_api_key(ctx: &ReducerContext, id: String) -> Result<(), String
 #[reducer]
 pub fn list_api_keys(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
     let account = require_auth(ctx)?;
-    let caller = ctx.sender().to_hex().to_string();
+    let _caller = ctx.sender().to_hex().to_string();
 
     // Verify the caller has at least viewer access to this workspace.
     // Re-use the workspace module's access check (imported at the top).

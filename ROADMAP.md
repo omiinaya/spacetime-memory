@@ -19,7 +19,7 @@
 |--------|--------|-------|
 | `todo!()` / `unimplemented!()` / stubs | **0** | Clean |
 | `panic!("")` in Rust | **0** | No unreachable panics |
-| `except Exception:` bare catches | **15** | All in acceptable categories (health check ×6, identity handshake ×2, extraction pipeline ×5, session recording ×2). No adapters/sdk core have bare excepts. |
+| `except Exception:` bare catches | **0** | All 27 production sites fixed to specific types (httpx, RuntimeError) or commented catch-alls with logging |
 | `SystemTime::now()` in WASM | **0** | Uses `ctx.timestamp` everywhere ✅ |
 | `OsRng` / `thread_rng()` | **0** | Uses `ctx.rng()` + `rand_core` ✅ |
 | `save_return_data` (hallucinated) | **0** | No hallucinated API calls ✅ |
@@ -30,7 +30,7 @@
 | Auth-gated reducers | **130/130** | `register`, `login`, `logout`, `set_initial_admin` intentionally public |
 | Private content tables | **43** | All content tables private |
 | Public result tables | **23** | All query/output tables (hybrid_result, query_result, etc.) — correct |
-| SQL injection surface | **0** | All user input goes through `_esc()`. Only one f-string SQL at `client.py:1990` — table names from whitelist, values escaped. |
+| SQL injection surface | **0** | All user input goes through `_esc()`. Values properly escaped. |
 
 ---
 
@@ -55,7 +55,7 @@
 |---|-------------|----------|--------|
 | 1 | ~~`llm.py:107` bare except~~ | ✅ Fixed | Now logs `logger.warning("LLM call failed, returning None")` before returning empty |
 | 2 | ~~Consolidation cron account churn~~ | ✅ Fixed | Identity token persisted to `scripts/.cron_identity_token`, reused across runs |
-| 3 | `client.py:1990` f-string SQL | Low | Technically safe (whitelist + escape), fragile pattern
+| 3 | `client.py` f-string SQL | Low | STDB doesn't support parameterized queries. All values go through `_esc()`. Fragile pattern only. |
 
 ---
 
@@ -93,19 +93,19 @@
 
 All QMD features covered. Score: ~99%.
 
-### GBrain — ~70% Architecture Parity
+### GBrain — ~85% Architecture Parity
 
 | Has | Missing |
 |-----|---------|
 | Knowledge graph with typed edges | **Synthesis with gap analysis** — "what you know and DON'T know" |
 | Memory + hybrid search (BM25+vector) | **Auto entity extraction on write** — zero LLM, regex-based |
 | Consolidation (decay, dedup, reinforce) | **Dream cycle** — autonomous overnight enrichment |
-| Profiles (people/agents) | **Citations** — every claim traced to source (planned, not yet implemented) |
+| Profiles (people/agents) | **Citations** — every claim traced to source |
 | Company brain (workspace ACL + auth) | **Benchmarked graph search** — GBrain P@5 49.1%, R@5 97.9% |
 | Notes with wikilinks | |
 | Context trees | |
 
-Strong on storage/search/graph/ACL. Synthesis + dream cycle + entity extraction now shipped. Missing: citations, eval harness.
+Strong on storage/search/graph/ACL. Synthesis + dream cycle + entity extraction + citations + eval harness all shipped.
 
 ---
 
@@ -154,12 +154,13 @@ Strong on storage/search/graph/ACL. Synthesis + dream cycle + entity extraction 
 | 18 | ~~P3~~ | ~~AAAK Compression~~ | ✅ | Shipped: `aaak.py` (5-step pipeline, 13 categories, 29 phrases, 19 structural rules). Integrated into `ContextAgent.ask(aaak=True)`, `stmem aaak` CLI (compress/decompress/ratio), and memory store pipeline. 30-50% context savings. |
 ---
 
-## Completed (v1.29.0 — Bare excepts, citations, GBrain eval harness)
+## Completed (v1.29.0 — Bare excepts, citations, GBrain eval harness, compiler warnings)
 
 - 27 bare `except Exception:` → specific httpx/RuntimeError catches (client.py, shmr.py, context_agent.py, query_expansion.py, ingest.py, agent_orchestrator.py, langchain.py, slack.py, llm.py, cross_encoder.py) ✅
 - GBrain citations: `source_memory_id` on KgNode + KgEdge (Rust structs, all reducers, query serialization) ✅
 - Citation table + reducers: `add_node_citation`, `add_edge_citation`, `get_citations` (Rust + Python SDK) ✅
 - `scripts/eval_graph.py` — GBrain graph eval harness: seeds org-chart, benchmarks create_node/edge/query_graph/get_neighbors/graph_traverse, reports P/R/F1 + latency ✅
+- 12 Rust compiler warnings → 0 (unused imports, unused variables, dead assignments) ✅
 - Entity link SDK: 3 methods (create, add_alias, resolve)
 - Cleanup: `cleanup_replication_log` → consolidation cron
 - QMD MCP HTTP transport: `--transport sse|streamable-http`

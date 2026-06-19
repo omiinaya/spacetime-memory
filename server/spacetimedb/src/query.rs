@@ -375,7 +375,7 @@ fn query_note_backlink(
 }
 
 fn query_profile(
-    ctx: &ReducerContext, query_id: String, workspace_id: String,
+    ctx: &ReducerContext, query_id: String, _workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
     for p in ctx.db.profile().iter().take(crate::MAX_RESULTS) {
@@ -491,13 +491,13 @@ fn query_connector_config(
 /// Fallback for tables without a specialized query function.
 /// Only supports simple id/workspace_id filtering.
 fn query_generic(
-    ctx: &ReducerContext, query_id: &str, table_name: &str, workspace_id: String,
+    ctx: &ReducerContext, query_id: &str, table_name: &str, _workspace_id: String,
     _filter: &serde_json::Map<String, serde_json::Value>, _columns: &[String], now: i64,
 ) -> Result<(), String> {
     // For now, just return an empty result set for tables we haven't
     // specialized yet.  The SDK should use table-specific reducers for
     // these tables.
-    let _ = (ctx, query_id, table_name, workspace_id, now);
+    let _ = (ctx, query_id, table_name, _workspace_id, now);
     Ok(())
 }
 

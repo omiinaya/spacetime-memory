@@ -128,7 +128,7 @@ fn chunk_text(text: &str, chunk_size: usize, overlap: usize) -> Vec<String> {
         return vec![text.to_string()];
     }
 
-    let step = chunk_size.saturating_sub(overlap).max(1);
+    let _step = chunk_size.saturating_sub(overlap).max(1);
     let mut chunks = Vec::new();
     let mut start = 0;
     while start < chars.len() {

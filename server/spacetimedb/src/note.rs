@@ -1,6 +1,6 @@
 use spacetimedb::*;
 
-use crate::{now_micros, uuid_v4, MAX_RESULTS};
+use crate::{now_micros, uuid_v4};
 use crate::auth::require_auth;
 use crate::workspace::check_space_access;
 
