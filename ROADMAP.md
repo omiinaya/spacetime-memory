@@ -105,7 +105,7 @@ All QMD features covered. Score: ~99%.
 | Notes with wikilinks | |
 | Context trees | |
 
-Strong on storage/search/graph/ACL. Synthesis + dream cycle + entity extraction + citations + eval harness all shipped.
+Strong on storage/search/graph/ACL. Synthesis + dream cycle + entity extraction + citations + eval harness all shipped. GBrain baseline: query_graph P@K=0.857 R@K=1.000 F1=0.923, get_neighbors P@K=1.000 R@K=1.000, graph operations <20ms latency.
 
 ---
 

@@ -28,25 +28,24 @@ import uuid as _uuid
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "sdk", "python"))
 
 from spacetime_memory import Client
-from spacetime_memory.auth import generate_token
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-DB = "c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff"
-TOKEN_PATH = "/tmp/stdb-data/jwt_priv_pk8.pem"
+DB = "c200f72f394a2424f8cbcf7286d5a31e63af642264d46a61df26ba5c5eab9f5f"
+TOKEN_PATH = os.path.expanduser("~/.config/spacetime/identity_token")
 DEFAULT_BENCHMARK_ITERATIONS = 5
 
 # Known seed graph: small organisation.
 # Each entry: (label, summary, node_type)
 SEED_NODES: list[tuple[str, str, str]] = [
-    ("Alice", "CEO and co-founder of the company", "person"),
-    ("Bob", "CTO, leads engineering team", "person"),
-    ("Carol", "Senior engineer working on backend systems", "person"),
-    ("Dave", "Senior engineer working on infrastructure", "person"),
-    ("Eve", "Lead designer responsible for product design", "person"),
-    ("Frank", "Product manager coordinating cross-team work", "person"),
+    ("Alice", "CEO and co-founder of the company", "entity"),
+    ("Bob", "CTO, leads engineering team", "entity"),
+    ("Carol", "Senior engineer working on backend systems", "entity"),
+    ("Dave", "Senior engineer working on infrastructure", "entity"),
+    ("Eve", "Lead designer responsible for product design", "entity"),
+    ("Frank", "Product manager coordinating cross-team work", "entity"),
 ]
 
 # Each entry: (source_label, target_label, relation, fact)
@@ -93,7 +92,9 @@ def _now_ms() -> float:
 
 def _make_client() -> Client:
     """Create an authenticated client pointing at the STDB."""
-    token = generate_token(TOKEN_PATH)
+    # Read JWT identity token directly
+    with open(TOKEN_PATH) as f:
+        token = f.read().strip()
     c = Client(host="localhost", port=3001, database=DB, token=token)
     # Login if needed
     try:
@@ -133,8 +134,8 @@ def seed_graph(c: Client, ws_id: str) -> dict[str, str]:
                 node_type=node_type,
                 summary=summary,
             )
-        except RuntimeError as e:
-            print(f"    WARN: create_node({label}) failed: {e}")
+        except Exception as e:
+            print(f"    NOTE: create_node({label}) embed failed: {e} (node may still be created)")
         # Query back to get assigned ID
         rows = c._query("kg_node", workspace_id=ws_id,
                         filter_dict={"label": label}, columns=["id", "label"])
