@@ -967,8 +967,7 @@ class StmemChatMessageHistory:
 
         try:
             return messages_from_dict(message_dicts)
-        except Exception:
-            # Fallback: return raw dicts if deserialisation fails
+        except Exception:  # Any deserialization error: fallback to raw dicts
             return message_dicts
 
     def add_messages(self, messages: Sequence) -> None:
@@ -1003,7 +1002,7 @@ class StmemChatMessageHistory:
                 continue
             try:
                 msg_dict = message_to_dict(msg)
-            except Exception:
+            except Exception:  # Any serialization error: fallback to manual
                 # Fallback: manual serialisation
                 msg_dict = {
                     "type": getattr(msg, "type", "human"),

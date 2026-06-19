@@ -375,7 +375,7 @@ def shmr_resonate(
                 result.harmony_score_avg,
                 result.duration_ms,
             ])
-        except Exception:
+        except RuntimeError:
             pass
 
     return result
@@ -413,5 +413,5 @@ def _call_client_llm(client: Client, prompt: str) -> str | None:
         resp.raise_for_status()
         data = resp.json()
         return data["choices"][0]["message"]["content"]
-    except Exception:
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
         return None

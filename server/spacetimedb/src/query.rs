@@ -233,6 +233,7 @@ fn query_kg_node(
             "node_type": n.node_type, "metadata_json": n.metadata_json,
             "summary": n.summary, "community_id": n.community_id,
             "embedding_json": n.embedding_json,
+            "source_memory_id": n.source_memory_id,
             "created_at": n.created_at,
         });
         if filter_matches(&row, filter) {
@@ -257,6 +258,7 @@ fn query_kg_edge(
             "edge_group_id": e.edge_group_id,
             "version": e.version, "valid_at": e.valid_at, "invalid_at": e.invalid_at,
             "created_at": e.created_at,
+            "source_memory_id": e.source_memory_id,
         });
         if filter_matches(&row, filter) {
             insert_row(ctx, &query_id, "kg_edge", row_to_json(&row, columns), now);

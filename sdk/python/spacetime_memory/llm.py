@@ -107,7 +107,7 @@ class LLMClient:
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
-        except Exception:
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError, httpx.HTTPStatusError):
             logger.warning("LLM call failed, returning None")
             return None
 

@@ -277,7 +277,7 @@ class SlackConnector(Connector):
                 if data.get("ok"):
                     channel_info = data.get("channel", {})
                     return channel_info.get("name", channel_id)
-        except Exception:
+        except (ConnectionError, TimeoutError, OSError):
             pass
         return channel_id
 

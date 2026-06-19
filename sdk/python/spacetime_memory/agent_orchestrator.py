@@ -417,7 +417,7 @@ class AgentOrchestrator:
                             "source": "session_steps",
                         }
                     )
-            except Exception:
+            except RuntimeError:
                 logger.warning(
                     "Failed to get session steps for %s", session_id, exc_info=True
                 )
@@ -454,7 +454,7 @@ class AgentOrchestrator:
                     [session_id, pid, "collaborator"],
                 )
                 shared.append(pid)
-            except Exception:
+            except RuntimeError:
                 logger.warning(
                     "Failed to share session %s with peer %s",
                     session_id, pid, exc_info=True,

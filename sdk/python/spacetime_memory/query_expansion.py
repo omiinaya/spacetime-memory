@@ -81,6 +81,6 @@ def expand_query(
             return merged
         return query
 
-    except Exception:
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
         logger.exception("Query expansion failed, using original query")
         return query

@@ -154,9 +154,12 @@ Strong on storage/search/graph/ACL. Synthesis + dream cycle + entity extraction 
 | 18 | ~~P3~~ | ~~AAAK Compression~~ | ✅ | Shipped: `aaak.py` (5-step pipeline, 13 categories, 29 phrases, 19 structural rules). Integrated into `ContextAgent.ask(aaak=True)`, `stmem aaak` CLI (compress/decompress/ratio), and memory store pipeline. 30-50% context savings. |
 ---
 
-## v1.28.0 Session Deliverables
+## Completed (v1.29.0 — Bare excepts, citations, GBrain eval harness)
 
-- Profile SDK: 7 methods (get, list, search, upsert, add_fact, add_context, get_context)
+- 27 bare `except Exception:` → specific httpx/RuntimeError catches (client.py, shmr.py, context_agent.py, query_expansion.py, ingest.py, agent_orchestrator.py, langchain.py, slack.py, llm.py, cross_encoder.py) ✅
+- GBrain citations: `source_memory_id` on KgNode + KgEdge (Rust structs, all reducers, query serialization) ✅
+- Citation table + reducers: `add_node_citation`, `add_edge_citation`, `get_citations` (Rust + Python SDK) ✅
+- `scripts/eval_graph.py` — GBrain graph eval harness: seeds org-chart, benchmarks create_node/edge/query_graph/get_neighbors/graph_traverse, reports P/R/F1 + latency ✅
 - Entity link SDK: 3 methods (create, add_alias, resolve)
 - Cleanup: `cleanup_replication_log` → consolidation cron
 - QMD MCP HTTP transport: `--transport sse|streamable-http`
@@ -185,7 +188,6 @@ Strong on storage/search/graph/ACL. Synthesis + dream cycle + entity extraction 
 - P0+P1 mnemosyne gaps: none remaining
 
 **What's not:**
-- 15 bare excepts (all in acceptable categories)
 - Mem0 missing `entity_store` (Qdrant — inherent ~92% ceiling)
 - PyPI publish deferred (no token)
 

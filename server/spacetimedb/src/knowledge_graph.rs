@@ -18,6 +18,8 @@ pub struct KgNode {
     pub summary: String,
     /// JSON metadata blob
     pub metadata_json: String,
+    /// Memory ID that created this node (empty if created directly)
+    pub source_memory_id: String,
     /// Community membership (0 = unassigned)
     pub community_id: u64,
     /// JSON array of f64 embeddings
@@ -41,6 +43,8 @@ pub struct KgEdge {
     pub confidence: String,
     /// JSON metadata blob
     pub metadata_json: String,
+    /// Memory ID that created this edge (empty if created directly)
+    pub source_memory_id: String,
     pub created_at: i64,
     /// Temporal versioning (Graphiti parity)
     /// When this edge version became valid (micros)
@@ -78,6 +82,7 @@ pub fn create_node(
     node_type: String,
     summary: String,
     metadata_json: String,
+    source_memory_id: String,
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
@@ -107,6 +112,7 @@ pub fn create_node(
         } else {
             metadata_json
         },
+        source_memory_id,
         community_id: 0,
         embedding_json: String::from("[]"),
         created_at: now,
@@ -146,6 +152,7 @@ pub fn create_edge(
     weight: f64,
     confidence: String,
     metadata_json: String,
+    source_memory_id: String,
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
@@ -177,6 +184,7 @@ pub fn create_edge(
         } else {
             metadata_json
         },
+        source_memory_id,
         created_at: now,
         // Temporal fields — first version is valid immediately
         valid_at: now,
@@ -280,6 +288,7 @@ pub fn update_edge(
         } else {
             metadata_json
         },
+        source_memory_id: current.source_memory_id.clone(),
         created_at: now,
         valid_at: now,
         invalid_at: 0,
@@ -956,5 +965,113 @@ pub fn compute_community_hierarchy(
         });
     }
 
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Citation tracking — trace every graph entity to its source memory
+// ---------------------------------------------------------------------------
+
+/// A citation linking a KG entity (node or edge) to a source memory.
+#[table(accessor = citation)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Citation {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub entity_id: String,
+    pub entity_type: String,  // "node" or "edge"
+    pub source_memory_id: String,
+    pub description: String,
+    pub created_at: i64,
+}
+
+/// Result table for get_citations queries.
+#[table(accessor = citation_result, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CitationResult {
+    #[primary_key]
+    pub id: String,
+    pub entity_id: String,
+    pub entity_type: String,
+    pub source_memory_id: String,
+    pub description: String,
+    pub created_at: i64,
+}
+
+#[reducer]
+pub fn add_node_citation(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    node_id: String,
+    memory_id: String,
+    description: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
+    let now = now_micros(ctx);
+
+    ctx.db.citation().insert(Citation {
+        id: uuid_v4(ctx),
+        workspace_id,
+        entity_id: node_id,
+        entity_type: "node".to_string(),
+        source_memory_id: memory_id,
+        description,
+        created_at: now,
+    });
+    Ok(())
+}
+
+#[reducer]
+pub fn add_edge_citation(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    edge_id: String,
+    memory_id: String,
+    description: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "editor")?;
+    let now = now_micros(ctx);
+
+    ctx.db.citation().insert(Citation {
+        id: uuid_v4(ctx),
+        workspace_id,
+        entity_id: edge_id,
+        entity_type: "edge".to_string(),
+        source_memory_id: memory_id,
+        description,
+        created_at: now,
+    });
+    Ok(())
+}
+
+#[reducer]
+pub fn get_citations(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    entity_id: String,
+    entity_type: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex();
+    check_space_access(ctx, &workspace_id, &caller, "reader")?;
+    let qid = uuid_v4(ctx);
+
+    for c in ctx.db.citation().iter() {
+        if c.entity_id == entity_id && c.entity_type == entity_type && c.workspace_id == workspace_id {
+            ctx.db.citation_result().insert(CitationResult {
+                id: qid.clone(),
+                entity_id: c.entity_id.clone(),
+                entity_type: c.entity_type.clone(),
+                source_memory_id: c.source_memory_id.clone(),
+                description: c.description.clone(),
+                created_at: c.created_at,
+            });
+        }
+    }
     Ok(())
 }

@@ -182,7 +182,7 @@ class CrossEncoderReranker:
             try:
                 s = self._score_pair(query, content)
                 scored.append((r, s))
-            except Exception:
+            except Exception:  # Scoring failure — skip item (already logged)
                 logger.exception(
                     "Cross-encoder scoring failed for content len=%d", len(content)
                 )

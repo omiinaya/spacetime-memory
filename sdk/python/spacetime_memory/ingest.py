@@ -318,7 +318,7 @@ class CodebaseIngester:
                 workspace_id, file_label, "code",
                 summary=f"{lang_name} file: {rel_str}",
             )
-        except Exception:
+        except RuntimeError:
             logger.warning("Failed to create file node for %s", file_label, exc_info=True)
         file_id = self._resolve_node(workspace_id, file_label)
         file_nodes[fpath] = file_id or ""
@@ -374,7 +374,7 @@ class CodebaseIngester:
                             workspace_id, def_label, type_label,
                             summary=f"{type_label} {name} in {rel_str}",
                         )
-                    except Exception:
+                    except RuntimeError:
                         logger.warning(
                             "Failed to create def node for %s", def_label, exc_info=True
                         )
@@ -387,7 +387,7 @@ class CodebaseIngester:
                                 "contains", weight=1.0,
                             )
                             self._stats["edges"] += 1
-                        except Exception:
+                        except RuntimeError:
                             logger.warning(
                                 "Failed to create contains edge: %s -> %s",
                                 file_node_id, def_id, exc_info=True,
@@ -431,7 +431,7 @@ class CodebaseIngester:
                                         "calls", weight=1.0,
                                     )
                                     self._stats["edges"] += 1
-                                except Exception:
+                                except RuntimeError:
                                     logger.warning(
                                         "Failed to create call edge: %s -> %s",
                                         src_id, tgt_id, exc_info=True,
@@ -444,6 +444,6 @@ class CodebaseIngester:
             for r in rows:
                 if r.get("label") == label:
                     return r.get("id", "")
-        except Exception:
+        except RuntimeError:
             logger.warning("Failed to resolve node for label %s", label, exc_info=True)
         return ""

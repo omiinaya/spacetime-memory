@@ -254,7 +254,7 @@ class Client:
             if token:
                 self._identity_token = token
             self._identity_established = True
-        except Exception:
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
             # If the handshake fails, proceed without identity
             self._identity_established = True
 
@@ -268,7 +268,7 @@ class Client:
                 timeout=5.0,
             )
             return resp.headers.get("spacetime-identity", "")
-        except Exception:
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
             return ""
 
     # -------------------------------------------------------------------
@@ -556,7 +556,7 @@ class Client:
                 model = resp.json().get("model", "").lower()
                 self._bge_model_cache = "bge" in model and "reranker" not in model
                 return self._bge_model_cache
-        except Exception:
+        except (httpx.ConnectError, httpx.TimeoutException):
             pass
         return False
 
@@ -570,7 +570,7 @@ class Client:
                 model = resp.json().get("model", "").lower()
                 self._e5_model_cache = "e5" in model
                 return self._e5_model_cache
-        except Exception:
+        except (httpx.ConnectError, httpx.TimeoutException):
             pass
         return False
 
@@ -599,7 +599,7 @@ class Client:
             raise EmbedderUnavailableError(
                 f"Embedder connection refused at {self.embedder_url}. Is the sidecar running?"
             )
-        except Exception:
+        except Exception:  # Truly unexpected (JSON parse, etc.) — specific HTTP errors above
             logger.exception("Unexpected error in _embed for text (len=%d)", len(text))
             raise
 
@@ -640,7 +640,7 @@ class Client:
         except httpx.TimeoutException:
             logger.warning("OpenAI embedder timed out for text (len=%d)", len(text))
             return []
-        except Exception:
+        except Exception:  # Truly unexpected (JSON parse, etc.) — specific HTTP errors above
             logger.exception("OpenAI embedder failed for text (len=%d)", len(text))
             return []
 
@@ -689,7 +689,7 @@ class Client:
         except httpx.ConnectError:
             logger.warning("Embedder connection refused for batch (count=%d) — is the sidecar running?", len(texts))
             return []
-        except Exception:
+        except Exception:  # Truly unexpected (JSON parse, etc.) — specific HTTP errors above
             logger.exception("Unexpected error in _embed_batch (count=%d)", len(texts))
             return []
 
@@ -740,7 +740,7 @@ class Client:
         except httpx.TimeoutException:
             logger.warning("OpenAI embedder timed out for batch (count=%d)", len(texts))
             return []
-        except Exception:
+        except Exception:  # Truly unexpected (JSON parse, etc.) — specific HTTP errors above
             logger.exception("OpenAI embedder failed for batch (count=%d)", len(texts))
             return []
 
@@ -753,7 +753,7 @@ class Client:
                 embedder_status["reachable"] = True
                 return embedder_status
             return {"status": "error", "code": resp.status_code, "reachable": True}
-        except Exception as e:
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
             return {"status": "error", "message": str(e), "reachable": False}
 
     # ── Tantivy BM25 keyword search sidecar ──
@@ -778,7 +778,7 @@ class Client:
                 timeout=5.0,
             )
             return resp.status_code < 400
-        except Exception:
+        except (httpx.ConnectError, httpx.TimeoutException):
             return False
 
     def _tantivy_search(
@@ -805,7 +805,7 @@ class Client:
             if resp.status_code >= 400:
                 return []
             return resp.json()
-        except Exception:
+        except (httpx.ConnectError, httpx.TimeoutException):
             return []
 
     def ping(self) -> dict[str, Any]:
@@ -829,7 +829,7 @@ class Client:
                 "message": f"HTTP {resp.status_code}",
                 "latency_ms": round(elapsed * 1000, 1),
             }
-        except Exception as e:
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
             elapsed = time.monotonic() - start
             return {"status": "error", "message": str(e), "latency_ms": round(elapsed * 1000, 1)}
 
@@ -1232,7 +1232,7 @@ class Client:
                         f"{self.embedder_url}/health", timeout=2.0,
                     )
                     embedder_down = health.status_code >= 400
-                except Exception:
+                except (httpx.ConnectError, httpx.TimeoutException):
                     embedder_down = True
 
             strategies_list = ["keyword", "graph", "temporal"]
@@ -2085,10 +2085,21 @@ class Client:
         node_type: str = "concept",
         summary: str = "",
         metadata_json: str = "{}",
+        source_memory_id: str = "",
     ) -> dict[str, Any]:
-        """Create a knowledge-graph node and auto-index it."""
+        """Create a knowledge-graph node and auto-index it.
+
+        Args:
+            workspace_id: Target workspace.
+            label: Node label (used as display name).
+            node_type: Type category (default: "concept").
+            summary: Optional summary text.
+            metadata_json: Optional JSON metadata string.
+            source_memory_id: Optional memory record ID that supports this node.
+        """
         result = self._call("create_node", [
             workspace_id, label, node_type, summary, metadata_json,
+            source_memory_id,
         ])
         content = f"{label}: {summary}" if summary else label
         emb = self._embed(content)
@@ -2112,12 +2123,90 @@ class Client:
         weight: float = 1.0,
         confidence: str = "EXTRACTED",
         metadata_json: str = "{}",
+        source_memory_id: str = "",
     ) -> dict[str, Any]:
-        """Create a directed, typed edge between two KG nodes."""
+        """Create a directed, typed edge between two KG nodes.
+
+        Args:
+            workspace_id: Target workspace.
+            source_node_id: Source node ID.
+            target_node_id: Target node ID.
+            relation: Relationship type label.
+            weight: Edge weight (default: 1.0).
+            confidence: Confidence level (default: "EXTRACTED").
+            metadata_json: Optional JSON metadata string.
+            source_memory_id: Optional memory record ID that supports this edge.
+        """
         return self._call("create_edge", [
             workspace_id, source_node_id, target_node_id,
             relation, weight, confidence, metadata_json,
+            source_memory_id,
         ])
+
+    def add_node_citation(
+        self,
+        workspace_id: str,
+        node_id: str,
+        memory_id: str,
+        description: str = "",
+    ) -> dict[str, Any]:
+        """Add a citation linking a KG node to a source memory.
+
+        Args:
+            workspace_id: Target workspace.
+            node_id: The knowledge graph node ID.
+            memory_id: The memory record that supports this node.
+            description: Optional description of the citation relationship.
+        """
+        return self._call("add_node_citation", [
+            workspace_id, node_id, memory_id, description,
+        ])
+
+    def add_edge_citation(
+        self,
+        workspace_id: str,
+        edge_id: str,
+        memory_id: str,
+        description: str = "",
+    ) -> dict[str, Any]:
+        """Add a citation linking a KG edge to a source memory.
+
+        Args:
+            workspace_id: Target workspace.
+            edge_id: The knowledge graph edge ID.
+            memory_id: The memory record that supports this edge.
+            description: Optional description of the citation relationship.
+        """
+        return self._call("add_edge_citation", [
+            workspace_id, edge_id, memory_id, description,
+        ])
+
+    def get_citations(
+        self,
+        workspace_id: str,
+        entity_id: str,
+        entity_type: str = "node",
+    ) -> list[dict[str, Any]]:
+        """Get all citations for a KG entity (node or edge).
+
+        Args:
+            workspace_id: Target workspace.
+            entity_id: The node or edge ID.
+            entity_type: "node" (default) or "edge".
+
+        Returns:
+            List of citation records with source_memory_id, description, and timestamp.
+        """
+        self._call("get_citations", [
+            workspace_id, entity_id, entity_type,
+        ])
+        result_key = "citation_result"
+        rows = self._sql(
+            "SELECT * FROM citation_result WHERE "
+            f"entity_id = '{_esc(entity_id)}' "
+            f"  AND entity_type = '{_esc(entity_type)}' "
+        )
+        return rows
 
     def query_graph(
         self, workspace_id: str, query: str = ""
@@ -3042,7 +3131,7 @@ def llm_rerank(
             reverse=True,
         )
 
-    except Exception as exc:
+    except (json.JSONDecodeError, httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as exc:
         logger.warning("LLM rerank failed, returning original results: %s", exc)
 
     return results
