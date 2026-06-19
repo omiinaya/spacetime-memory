@@ -44,7 +44,7 @@ import json
 import logging
 from typing import Any, Callable
 
-from ..client import Client
+from ..client import Client, EmbedderUnavailableError
 from ..llm import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -87,18 +87,36 @@ class _GraphStore:
     def _tag_filter(self, rows: list[dict[str, Any]], tag: str) -> list[dict[str, Any]]:
         """Filter entity rows by tag, matching both entity_link and kg_node formats.
 
-        For entity_link rows, the tag is stored in the ``description`` field.
+        For entity_link rows, the tag is stored in the ``description`` field as JSON.
         For kg_node rows, it's in ``metadata_json``.
+
+        Uses proper JSON parsing to avoid fragility of string-based matching.
         """
-        tag_str = f'"tag": "{tag}"'
-        return [
-            r for r in rows
-            if (
-                r.get("metadata_json", "").endswith(tag_str)
-                or r.get("metadata_json", "") == ""
-                or (r.get("description", "") and tag in r.get("description", ""))
-            )
-        ]
+        def _has_tag(row: dict[str, Any], tag: str) -> bool:
+            # Try metadata_json first (kg_node format)
+            meta = row.get("metadata_json", "")
+            if meta:
+                try:
+                    parsed = json.loads(meta) if isinstance(meta, str) else meta
+                    if isinstance(parsed, dict) and parsed.get("tag") == tag:
+                        return True
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            # Try description field (entity_link format)
+            desc = row.get("description", "")
+            if desc:
+                try:
+                    parsed = json.loads(desc) if isinstance(desc, str) else desc
+                    if isinstance(parsed, dict) and parsed.get("tag") == tag:
+                        return True
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            # Empty metadata — allow (global/unscoped entries)
+            if not meta and not desc:
+                return True
+            return False
+
+        return [r for r in rows if _has_tag(r, tag)]
 
     def _entity_link_to_dict(self, row: dict[str, Any], tag: str) -> dict[str, Any]:
         """Convert an entity_link row to the standard graph entity dict shape."""
@@ -312,6 +330,57 @@ class _GraphStore:
                     return self._tag_filter(results, tag)[:limit]
         except RuntimeError:
             pass  # Embedder down or hybrid_search fails → fallback
+
+        # ── Tantivy BM25 search fallback (better than substring) ──
+        try:
+            tantivy_hits = self._memory._client._tantivy_search(
+                workspace_id=ws_id,
+                query=query,
+                limit=limit,
+            )
+            if tantivy_hits:
+                results = []
+                for th in tantivy_hits[:limit]:
+                    nid = th.get("entity_id", "")
+                    etype = th.get("entity_type", "node")
+                    if not nid:
+                        continue
+                    if etype == "node":
+                        rows = self._memory._client._query(
+                            "kg_node", filter_dict={"id": nid},
+                        )
+                        if rows:
+                            n = rows[0]
+                            results.append({
+                                "id": n.get("id", ""),
+                                "label": n.get("label", ""),
+                                "node_type": n.get("node_type", "entity"),
+                                "entity_type": n.get("node_type", "entity"),
+                                "summary": n.get("summary", ""),
+                                "metadata_json": n.get("metadata_json", "{}"),
+                                "created_at": n.get("created_at", 0),
+                                "score": th.get("score", 0.0),
+                            })
+                    elif etype == "memory":
+                        rows = self._memory._client._query(
+                            "memory", filter_dict={"id": nid},
+                        )
+                        if rows:
+                            m = rows[0]
+                            results.append({
+                                "id": m.get("id", ""),
+                                "label": m.get("content", "")[:80],
+                                "node_type": "memory",
+                                "entity_type": "memory",
+                                "summary": m.get("summary", ""),
+                                "metadata_json": "{}",
+                                "created_at": m.get("created_at", 0),
+                                "score": th.get("score", 0.0),
+                            })
+                if results:
+                    return self._tag_filter(results, tag)[:limit]
+        except RuntimeError:
+            pass
 
         # Fallback: substring match on entity_link or kg_node
         # Try entity_link path
@@ -842,6 +911,8 @@ class Memory:
             raise
         except ValueError:
             raise
+        except EmbedderUnavailableError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.add() failed: {exc}") from exc
 
@@ -880,6 +951,8 @@ class Memory:
         except RuntimeError:
             raise
         except ValueError:
+            raise
+        except EmbedderUnavailableError:
             raise
         except Exception as exc:
             raise RuntimeError(f"mem0.get('{memory_id}') failed: {exc}") from exc
@@ -994,6 +1067,8 @@ class Memory:
             raise
         except ValueError:
             raise
+        except EmbedderUnavailableError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.search('{query}') failed: {exc}") from exc
 
@@ -1070,6 +1145,8 @@ class Memory:
             raise
         except ValueError:
             raise
+        except EmbedderUnavailableError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.get_all(user_id='{user_id}') failed: {exc}") from exc
 
@@ -1110,6 +1187,8 @@ class Memory:
             raise
         except ValueError:
             raise
+        except EmbedderUnavailableError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.update('{memory_id}') failed: {exc}") from exc
 
@@ -1134,6 +1213,8 @@ class Memory:
         except RuntimeError:
             raise
         except ValueError:
+            raise
+        except EmbedderUnavailableError:
             raise
         except Exception as exc:
             raise RuntimeError(f"mem0.delete('{memory_id}') failed: {exc}") from exc
@@ -1177,6 +1258,8 @@ class Memory:
             raise
         except ValueError:
             raise
+        except EmbedderUnavailableError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"mem0.delete_all(user_id='{user_id}') failed: {exc}") from exc
 
@@ -1203,6 +1286,8 @@ class Memory:
         except RuntimeError:
             raise
         except ValueError:
+            raise
+        except EmbedderUnavailableError:
             raise
         except Exception as exc:
             raise RuntimeError(f"mem0.history('{memory_id}') failed: {exc}") from exc
