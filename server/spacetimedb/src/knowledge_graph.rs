@@ -1,9 +1,9 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 use crate::auth::require_admin;
-
-use crate::{now_micros, uuid_v4};
 use crate::workspace::check_space_access;
+use crate::change_event;
+use crate::{now_micros, uuid_v4};
 
 /// A node in the knowledge graph, representing a concept, entity, or document.
 #[table(accessor = kg_node)]
@@ -89,6 +89,7 @@ pub fn create_node(
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
+    let ws_id = workspace_id.clone();
 
     // Validate node_type
     match node_type.as_str() {
@@ -117,8 +118,11 @@ pub fn create_node(
         embedding_json: String::from("[]"),
         created_at: now,
     };
-
+    let node_json = change_event::record_to_json(&node);
     ctx.db.kg_node().insert(node);
+    change_event::log_change(
+        ctx, &ws_id, "kg_node", "insert", &id, &node_json,
+    );
     Ok(())
 }
 
@@ -135,6 +139,10 @@ pub fn delete_node(ctx: &ReducerContext, id: String) -> Result<(), String> {
     check_space_access(ctx, &node.workspace_id, &caller, "editor")?;
 
     ctx.db.kg_node().id().delete(&id);
+    change_event::log_change(
+        ctx, &node.workspace_id, "kg_node", "delete", &id,
+        &change_event::record_to_json(&node),
+    );
     Ok(())
 }
 
@@ -159,6 +167,7 @@ pub fn create_edge(
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
+    let ws_id = workspace_id.clone();
 
     // Validate confidence
     match confidence.as_str() {
@@ -193,7 +202,11 @@ pub fn create_edge(
         edge_group_id: uuid_v4(ctx),
     };
 
+    let edge_json = change_event::record_to_json(&edge);
     ctx.db.kg_edge().insert(edge);
+    change_event::log_change(
+        ctx, &ws_id, "kg_edge", "insert", &id, &edge_json,
+    );
     Ok(())
 }
 
@@ -210,6 +223,10 @@ pub fn delete_edge(ctx: &ReducerContext, id: String) -> Result<(), String> {
     check_space_access(ctx, &edge.workspace_id, &caller, "editor")?;
 
     ctx.db.kg_edge().id().delete(&id);
+    change_event::log_change(
+        ctx, &edge.workspace_id, "kg_edge", "delete", &id,
+        &change_event::record_to_json(&edge),
+    );
     Ok(())
 }
 
@@ -271,12 +288,19 @@ pub fn update_edge(
         .ok_or_else(|| format!("KgEdge '{}' not found", latest_edge_id))?;
 
     current.invalid_at = now;
+    let invalid_json = change_event::record_to_json(&current);
+    let ws_id = current.workspace_id.clone();
+    let invalid_id = current.id.clone();
     ctx.db.kg_edge().id().update(current.clone());
+
+    change_event::log_change(
+        ctx, &ws_id, "kg_edge", "update", &invalid_id, &invalid_json,
+    );
 
     // Create a new edge version
     let new_id = uuid_v4(ctx);
     let new_edge = KgEdge {
-        id: new_id,
+        id: new_id.clone(),
         workspace_id: current.workspace_id,
         source_node_id: current.source_node_id,
         target_node_id: current.target_node_id,
@@ -296,7 +320,11 @@ pub fn update_edge(
         edge_group_id: current.edge_group_id,
     };
 
+    let new_json = change_event::record_to_json(&new_edge);
     ctx.db.kg_edge().insert(new_edge);
+    change_event::log_change(
+        ctx, &ws_id, "kg_edge", "insert", &new_id, &new_json,
+    );
     Ok(())
 }
 

@@ -4,6 +4,7 @@ use crate::{now_micros, uuid_v4};
 use crate::auth::require_auth;
 use crate::auth::require_admin;
 use crate::workspace::check_space_access;
+use crate::change_event;
 
 /// A memory entry storing world facts, experiences, or mental models
 /// for an AI agent within a workspace.
@@ -94,8 +95,8 @@ pub fn store_memory_batch(
         check_space_access(ctx, &item.workspace_id, &caller, "editor")?;
         let id = uuid_v4(ctx);
         let mem = Memory {
-            id,
-            workspace_id: item.workspace_id,
+            id: id.clone(),
+            workspace_id: item.workspace_id.clone(),
             peer_id: item.peer_id,
             observer_id: item.observer_id,
             memory_type: item.memory_type,
@@ -121,7 +122,16 @@ pub fn store_memory_batch(
             feedback_count: 0,
             user_scope: String::new(),
         };
+        let mem_json = change_event::record_to_json(&mem);
         ctx.db.memory().insert(mem);
+        change_event::log_change(
+            ctx,
+            &item.workspace_id,
+            "memory",
+            "insert",
+            &id,
+            &mem_json,
+        );
     }
     Ok(())
 }
@@ -145,6 +155,7 @@ pub fn store_memory(
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
     let id = uuid_v4(ctx);
+    let ws_id = workspace_id.clone();
 
     let mem = Memory {
         id: id.clone(),
@@ -177,7 +188,11 @@ pub fn store_memory(
         user_scope: String::new(),
     };
 
+    let mem_json = change_event::record_to_json(&mem);
     ctx.db.memory().insert(mem);
+    change_event::log_change(
+        ctx, &ws_id, "memory", "insert", &id, &mem_json,
+    );
     Ok(())
 }
 
@@ -204,7 +219,13 @@ pub fn update_memory(
     mem.confidence = confidence;
     mem.updated_at = now_micros(ctx);
 
+    let ws_id = mem.workspace_id.clone();
+    let mem_id = mem.id.clone();
+    let mem_json = change_event::record_to_json(&mem);
     ctx.db.memory().id().update(mem);
+    change_event::log_change(
+        ctx, &ws_id, "memory", "update", &mem_id, &mem_json,
+    );
     Ok(())
 }
 
@@ -223,7 +244,13 @@ pub fn deactivate_memory(ctx: &ReducerContext, id: String) -> Result<(), String>
     mem.is_active = false;
     mem.updated_at = now_micros(ctx);
 
+    let ws_id = mem.workspace_id.clone();
+    let mem_id = mem.id.clone();
+    let mem_json = change_event::record_to_json(&mem);
     ctx.db.memory().id().update(mem);
+    change_event::log_change(
+        ctx, &ws_id, "memory", "update", &mem_id, &mem_json,
+    );
     Ok(())
 }
 
@@ -242,7 +269,13 @@ pub fn expire_memories(ctx: &ReducerContext) -> Result<(), String> {
     for mut mem in expired {
         mem.is_active = false;
         mem.updated_at = now;
+        let ws_id = mem.workspace_id.clone();
+        let mem_id = mem.id.clone();
+        let mem_json = change_event::record_to_json(&mem);
         ctx.db.memory().id().update(mem);
+        change_event::log_change(
+            ctx, &ws_id, "memory", "update", &mem_id, &mem_json,
+        );
     }
 
     Ok(())
@@ -293,7 +326,13 @@ pub fn set_memory_scope(
     mem.user_scope = user_scope;
     mem.updated_at = now_micros(ctx);
 
+    let ws_id = mem.workspace_id.clone();
+    let mem_id = mem.id.clone();
+    let mem_json = change_event::record_to_json(&mem);
     ctx.db.memory().id().update(mem);
+    change_event::log_change(
+        ctx, &ws_id, "memory", "update", &mem_id, &mem_json,
+    );
     Ok(())
 }
 
@@ -319,7 +358,13 @@ pub fn set_memory_context(
     mem.context = context_text;
     mem.updated_at = now_micros(ctx);
 
+    let ws_id = mem.workspace_id.clone();
+    let mem_id = mem.id.clone();
+    let mem_json = change_event::record_to_json(&mem);
     ctx.db.memory().id().update(mem);
+    change_event::log_change(
+        ctx, &ws_id, "memory", "update", &mem_id, &mem_json,
+    );
     Ok(())
 }
 

@@ -199,6 +199,7 @@ class Client:
         self._binary_cache: dict[str, bytes] = {}
         self._circuit_open_until: float = 0.0
         self._metrics: Any = None  # Set via set_metrics_collector()
+        self._delta_sync: Any = None  # Lazy DeltaSync instance
         self.request_id: str = os.urandom(4).hex()  # Unique per-client instance
         self._identity_token: str | None = None
         self._identity_established: bool = False
@@ -2846,6 +2847,21 @@ class Client:
             "tables": restored,
             "total_rows": total_restored,
         }
+
+    @property
+    def delta_sync(self):
+        """Lazy-initialised ``DeltaSync`` instance for change-event polling.
+
+        Usage::
+
+            client.delta_sync.on("memory", "insert", lambda e: print(e))
+            client.delta_sync.start()
+        """
+        if self._delta_sync is None:
+            from .delta_sync import DeltaSync
+
+            self._delta_sync = DeltaSync(self)
+        return self._delta_sync
 
 
 # ---------------------------------------------------------------------------
