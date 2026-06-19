@@ -316,7 +316,7 @@ pub fn detect_bridge_nodes(
     let min_communities = if min_communities == 0 { 2 } else { min_communities };
 
     // Clear previous results
-    let old: Vec<_> = ctx.db.bridge_result().iter()
+    let old: Vec<_> = ctx.db.bridge_result().iter().take(crate::MAX_RESULTS)
         .filter(|r| r.workspace_id == workspace_id)
         .collect();
     for r in old {
@@ -348,7 +348,7 @@ pub fn detect_bridge_nodes(
     // For each node, collect community IDs of its neighbors
     let mut node_communities: HashMap<String, HashSet<u64>> = HashMap::new();
 
-    for edge in ctx.db.kg_edge().iter()
+    for edge in ctx.db.kg_edge().iter().take(crate::MAX_RESULTS)
         .filter(|e| e.workspace_id == workspace_id)
     {
         let src_cid = node_community.get(&edge.source_node_id).copied().unwrap_or(0);
@@ -522,7 +522,7 @@ pub fn compute_kg_stats(
     };
 
     // Clear previous
-    let old: Vec<_> = ctx.db.kg_stats_result().iter()
+    let old: Vec<_> = ctx.db.kg_stats_result().iter().take(crate::MAX_RESULTS)
         .filter(|r| r.workspace_id == workspace_id)
         .collect();
     for r in old {

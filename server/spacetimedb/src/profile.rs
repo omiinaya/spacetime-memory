@@ -34,7 +34,7 @@ pub fn upsert_profile(
     let now = now_micros(ctx);
 
     // Attempt to find existing profile for this peer
-    let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
+    let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
 
     if let Some(mut p) = existing {
         p.static_facts_json = static_facts_json;
@@ -66,7 +66,7 @@ pub fn add_profile_fact(ctx: &ReducerContext, peer_id: String, fact: String) -> 
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
-    let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
+    let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
 
     if let Some(mut p) = existing {
         // Append fact to static_facts_json array — use serde_json for safety
@@ -103,7 +103,7 @@ pub fn add_dynamic_context(
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
 
-    let existing = ctx.db.profile().iter().find(|p| p.peer_id == peer_id);
+    let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
 
     if let Some(mut p) = existing {
         // Append context entry to dynamic_context_json — use serde_json for safety

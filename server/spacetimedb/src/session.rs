@@ -245,14 +245,14 @@ pub fn get_session_steps(
     let query_hash = format!("steps:{}", session_id);
 
     // Clear previous results for this hash
-    let old: Vec<_> = ctx.db.session_step_result().iter()
+    let old: Vec<_> = ctx.db.session_step_result().iter().take(crate::MAX_RESULTS)
         .filter(|r| r.query_hash == query_hash)
         .collect();
     for r in old {
         ctx.db.session_step_result().delete(r);
     }
 
-    let mut steps: Vec<_> = ctx.db.agent_step().iter()
+    let mut steps: Vec<_> = ctx.db.agent_step().iter().take(crate::MAX_RESULTS)
         .filter(|s| s.session_id == session_id)
         .collect();
     steps.sort_by_key(|s| s.created_at);
@@ -280,7 +280,7 @@ pub fn delete_session_steps(ctx: &ReducerContext, session_id: String) -> Result<
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     let _workspace_id = check_session_access(ctx, &session_id, &caller, "editor")?;
-    let to_delete: Vec<_> = ctx.db.agent_step().iter()
+    let to_delete: Vec<_> = ctx.db.agent_step().iter().take(crate::MAX_RESULTS)
         .filter(|s| s.session_id == session_id)
         .collect();
     for s in to_delete {

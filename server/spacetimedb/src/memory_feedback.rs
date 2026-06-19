@@ -425,7 +425,7 @@ pub fn recommend_memories(
     let min_urgency = if min_urgency == 0.0 { 0.3 } else { min_urgency };
 
     // Clear previous recommendations for this workspace
-    let old: Vec<_> = ctx.db.memory_recommendation().iter()
+    let old: Vec<_> = ctx.db.memory_recommendation().iter().take(crate::MAX_RESULTS)
         .filter(|r| r.workspace_id == workspace_id)
         .collect();
     for r in old {
@@ -434,7 +434,7 @@ pub fn recommend_memories(
 
     let mut recommendations: Vec<(String, String, f64, u32, String, f64)> = Vec::new();
 
-    for mem in ctx.db.memory().iter()
+    for mem in ctx.db.memory().iter().take(crate::MAX_RESULTS)
         .filter(|m| m.workspace_id == workspace_id && m.is_active)
     {
         let trust = mem.trust_score;

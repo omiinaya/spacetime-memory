@@ -243,7 +243,7 @@ pub fn check_space_access(
     let required_rank = rank(required);
 
     // Check if this peer has a direct permission for this workspace
-    let direct = ctx.db.space_permission().iter().find(
+    let direct = ctx.db.space_permission().iter().take(crate::MAX_RESULTS).find(
         |sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id,
     );
 
@@ -308,7 +308,7 @@ pub fn grant_space_access(
 
     // Only an existing owner or admin can grant access
     let is_admin_or_owner = auth::is_admin(&caller, ctx)
-        || ctx.db.space_permission().iter().any(|sp: SpacePermission| {
+        || ctx.db.space_permission().iter().take(crate::MAX_RESULTS).any(|sp: SpacePermission| {
             sp.workspace_id == workspace_id && sp.peer_id == caller && sp.permission == "owner"
         });
 
@@ -383,7 +383,7 @@ pub fn revoke_space_access(
     }
 
     // Find and delete the permission record
-    let existing = ctx.db.space_permission().iter()
+    let existing = ctx.db.space_permission().iter().take(crate::MAX_RESULTS)
         .find(|sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id)
         .ok_or_else(|| format!("Peer '{}' has no permission for workspace '{}'", peer_id, workspace_id))?;
 

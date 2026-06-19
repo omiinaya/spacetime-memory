@@ -997,7 +997,7 @@ pub fn search_sessions_semantic(
     let qhash = format!("sessions:{}", limit);
 
     // Clear previous results for this query hash
-    let old: Vec<_> = ctx.db.session_search_result().iter()
+    let old: Vec<_> = ctx.db.session_search_result().iter().take(crate::MAX_RESULTS)
         .filter(|r| r.query_hash == qhash)
         .collect();
     for r in old {

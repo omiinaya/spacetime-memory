@@ -508,7 +508,7 @@ pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<()
         .iter()
         .filter(|n| n.workspace_id == workspace_id && n.community_id == 0)
         .map(|n| {
-            let has_edge = ctx.db.kg_edge().iter().any(|e| {
+            let has_edge = ctx.db.kg_edge().iter().take(crate::MAX_RESULTS).any(|e| {
                 e.workspace_id == workspace_id
                     && (e.source_node_id == n.id || e.target_node_id == n.id)
             });

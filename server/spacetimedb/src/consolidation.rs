@@ -723,7 +723,7 @@ pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
     };
 
     // ── memory (filtered by workspace) ────────────────────────────────
-    for m in ctx.db.memory().iter().filter(|m| m.workspace_id == workspace_id) {
+    for m in ctx.db.memory().iter().take(crate::MAX_RESULTS).filter(|m| m.workspace_id == workspace_id) {
         let json = serde_json::to_string(&m)
             .map_err(|e| format!("Serialize memory: {}", e))?;
         insert_entry("memory", m.id.clone(), json);
@@ -737,28 +737,28 @@ pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
     }
 
     // ── kg_node ───────────────────────────────────────────────────────
-    for n in ctx.db.kg_node().iter().filter(|n| n.workspace_id == workspace_id) {
+    for n in ctx.db.kg_node().iter().take(crate::MAX_RESULTS).filter(|n| n.workspace_id == workspace_id) {
         let json = serde_json::to_string(&n)
             .map_err(|e| format!("Serialize kg_node: {}", e))?;
         insert_entry("kg_node", n.id.clone(), json);
     }
 
     // ── kg_edge ───────────────────────────────────────────────────────
-    for e in ctx.db.kg_edge().iter().filter(|e| e.workspace_id == workspace_id) {
+    for e in ctx.db.kg_edge().iter().take(crate::MAX_RESULTS).filter(|e| e.workspace_id == workspace_id) {
         let json = serde_json::to_string(&e)
             .map_err(|e| format!("Serialize kg_edge: {}", e))?;
         insert_entry("kg_edge", e.id.clone(), json);
     }
 
     // ── kg_community ──────────────────────────────────────────────────
-    for c in ctx.db.kg_community().iter().filter(|c| c.workspace_id == workspace_id) {
+    for c in ctx.db.kg_community().iter().take(crate::MAX_RESULTS).filter(|c| c.workspace_id == workspace_id) {
         let json = serde_json::to_string(&c)
             .map_err(|e| format!("Serialize kg_community: {}", e))?;
         insert_entry("kg_community", c.id.to_string(), json);
     }
 
     // ── note ──────────────────────────────────────────────────────────
-    for n in ctx.db.note().iter().filter(|n| n.workspace_id == workspace_id) {
+    for n in ctx.db.note().iter().take(crate::MAX_RESULTS).filter(|n| n.workspace_id == workspace_id) {
         let json = serde_json::to_string(&n)
             .map_err(|e| format!("Serialize note: {}", e))?;
         insert_entry("note", n.id.clone(), json);
@@ -773,14 +773,14 @@ pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
     }
 
     // ── directory_memory_link ─────────────────────────────────────────
-    for dl in ctx.db.directory_memory_link().iter().filter(|dl| dl.workspace_id == workspace_id) {
+    for dl in ctx.db.directory_memory_link().iter().take(crate::MAX_RESULTS).filter(|dl| dl.workspace_id == workspace_id) {
         let json = serde_json::to_string(&dl)
             .map_err(|e| format!("Serialize directory_memory_link: {}", e))?;
         insert_entry("directory_memory_link", dl.id.clone(), json);
     }
 
     // ── context_directory ─────────────────────────────────────────────
-    for cd in ctx.db.context_directory().iter().filter(|cd| cd.workspace_id == workspace_id) {
+    for cd in ctx.db.context_directory().iter().take(crate::MAX_RESULTS).filter(|cd| cd.workspace_id == workspace_id) {
         let json = serde_json::to_string(&cd)
             .map_err(|e| format!("Serialize context_directory: {}", e))?;
         insert_entry("context_directory", cd.id.clone(), json);

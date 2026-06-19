@@ -83,7 +83,7 @@ pub fn register(
     }
 
     // Check for existing accounts (first user = admin)
-    let existing_count = ctx.db.account().iter().count();
+    let existing_count = ctx.db.account().iter().take(crate::MAX_RESULTS).count();
     let role = if existing_count == 0 { "admin" } else { "user" };
 
     // Check if this identity already has an account
@@ -92,7 +92,7 @@ pub fn register(
     }
 
     // Check username uniqueness
-    let name_taken = ctx.db.account().iter()
+    let name_taken = ctx.db.account().iter().take(crate::MAX_RESULTS)
         .any(|a: Account| a.username.to_lowercase() == username.trim().to_lowercase());
     if name_taken {
         return Err("Username already taken".to_string());
@@ -122,7 +122,7 @@ pub fn register(
 pub fn login(ctx: &ReducerContext, username: String, password: String) -> Result<(), String> {
     let identity = ctx.sender().to_hex().to_string();
 
-    let account = ctx.db.account().iter()
+    let account = ctx.db.account().iter().take(crate::MAX_RESULTS)
         .find(|a: &Account| a.username.to_lowercase() == username.trim().to_lowercase() && a.is_active)
         .ok_or_else(|| "Invalid username or password".to_string())?;
 
@@ -319,7 +319,7 @@ pub fn list_api_keys(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
         .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
 
     // Clear previous results for this caller+workspace
-    let old: Vec<_> = ctx.db.api_key_result().iter()
+    let old: Vec<_> = ctx.db.api_key_result().iter().take(crate::MAX_RESULTS)
         .filter(|r: &ApiKeyResult| r.workspace_id == workspace_id && r.caller_identity == account.id && r.operation == "list")
         .collect();
     for r in old {
@@ -327,7 +327,7 @@ pub fn list_api_keys(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
     }
 
     // Insert fresh results — metadata only, no key_hash
-    for key in ctx.db.api_key().iter()
+    for key in ctx.db.api_key().iter().take(crate::MAX_RESULTS)
         .filter(|k: &ApiKey| k.workspace_id == workspace_id)
     {
         ctx.db.api_key_result().insert(ApiKeyResult {
@@ -460,7 +460,7 @@ pub fn demote_admin(ctx: &ReducerContext, target_identity: String) -> Result<(),
     }
 
     // Prevent demoting the last admin
-    let admin_count = ctx.db.account().iter()
+    let admin_count = ctx.db.account().iter().take(crate::MAX_RESULTS)
         .filter(|a: &Account| a.role == "admin" && a.is_active)
         .count();
     if admin_count <= 1 {
@@ -483,8 +483,8 @@ pub fn demote_admin(ctx: &ReducerContext, target_identity: String) -> Result<(),
 #[reducer]
 pub fn set_initial_admin(ctx: &ReducerContext, identity_hex: String) -> Result<(), String> {
     // Check that no admin exists yet
-    let existing_admin = ctx.db.account().iter()
-        .any(|a: Account| a.role == "admin" && a.is_active);
+    let existing_admin = ctx.db.account().iter().take(crate::MAX_RESULTS)
+        .any(|a| a.role == "admin" && a.is_active);
     if existing_admin {
         return Err("An admin account already exists. Use promote_admin instead.".to_string());
     }
@@ -523,7 +523,7 @@ pub fn list_admins(ctx: &ReducerContext) -> Result<(), String> {
     let _account = require_auth(ctx)?;
 
     let now = now_micros(ctx);
-    for account in ctx.db.account().iter().filter(|a: &Account| a.role == "admin" && a.is_active) {
+    for account in ctx.db.account().iter().take(crate::MAX_RESULTS).filter(|a: &Account| a.role == "admin" && a.is_active) {
         ctx.db.admin_list_result().insert(AdminListResult {
             id: uuid_v4(ctx),
             identity: account.id.clone(),

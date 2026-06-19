@@ -66,9 +66,9 @@ pub fn add_tour_stop(
         .ok_or_else(|| format!("Tour '{}' not found", tour_id))?;
 
     // Compute next stop_order
-    let max_order = ctx.db.tour_stop().iter()
-        .filter(|s| s.tour_id == tour_id)
-        .map(|s| s.stop_order)
+    let max_order = ctx.db.tour_stop().iter().take(crate::MAX_RESULTS)
+        .filter(|ts| ts.tour_id == tour_id)
+        .map(|ts| ts.stop_order)
         .max()
         .unwrap_or(0);
 
@@ -103,7 +103,7 @@ pub fn delete_tour(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     // Delete all stops
-    let stops: Vec<_> = ctx.db.tour_stop().iter()
+    let stops: Vec<_> = ctx.db.tour_stop().iter().take(crate::MAX_RESULTS)
         .filter(|s| s.tour_id == tour_id)
         .map(|s| s.id.clone())
         .collect();
