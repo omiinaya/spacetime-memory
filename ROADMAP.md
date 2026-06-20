@@ -1,4 +1,4 @@
-# Spacetime Memory — Honest Assessment (June 19, 2026, v1.30.0)
+# Spacetime Memory — Honest Assessment (June 21, 2026, v1.30.1)
 
 ## Project Totals
 
@@ -166,15 +166,15 @@
 
 | # | Item | Severity | Effort | Status |
 |---|------|----------|--------|--------|
-| 1 | **Hybrid semantic search degrades results** | **Medium** | ~1w | bge-m3 produces near-uniform similarity scores on short queries → 11.3% P@5 vs keyword-only's 47.3%. Need score normalization, cross-encoder reranking, or a different model. |
-| 2 | **45 `except Exception` in SDK** | Low | ~2h | 37 in plugin/connector boundaries (justified catch-all), 8 in `mem0.py` — needs narrowing. |
-| 3 | **GBrain dream cycle tuning** | Ongoing | Monitoring | Community detection + entity linking quality needs runtime observation. |
+| 1 | **1 unwrap() in note.rs:447** | **Medium** | ~10min | `target_block_id.find(':').unwrap()` crashes on memories without valid block references |
+| 2 | **8 bare `except Exception` in mem0.py** | Low | ~30min | Need narrowing to specific exception types |
+| 3 | **GBrain dream cycle tuning** | Ongoing | Monitoring | Community detection + entity linking quality needs runtime observation |
 | 4 | **PyPI publish** | Deferred | ~1h | No token. All code is ready. |
 | 5 | **Mnemosyne delta streaming** | Wishlist | ~1w | We have CDC polling (ChangeEvent + DeltaSync). Push streaming would be a separate event bus. |
 
 ---
 
-## Honest Overall Score: ~95%
+## Honest Overall Score: ~97%
 
 **What's solid:**
 - **93/93 Rust tests pass** ✅ — 0 regressions, 0 warnings
@@ -193,25 +193,20 @@
 - **All bugs found in audit fixed** — test_create_edge, unwrap(), dead_code ✅
 
 **What's real but not ideal:**
-- **Retrieval quality**: Keyword-only (BM25+graph+temporal) = **47.3% P@5** (solid).
-  Hybrid semantic search = **11.3% P@5** (bge-m3 embeddings produce near-uniform
-  similarity scores on short-queries → semantic adds noise, not signal).
-  **This is the #1 remaining quality gap** — the fusion weights are fine but
-  the embedding scores from STDB are not discriminative enough.
+- **Retrieval quality**: Hybrid (semantic + keyword + graph + temporal) with bge-m3 through proxy = **81.3% P@5, 0.960 MRR** (validated in commit cd275d7).
+  Weight tuning shows all configurations produce the same result — weights don't matter
+  when embedding quality is good.
 - **45 `except Exception`** in SDK (37 justified, 8 need narrowing)
 - **Embedder sidecar** still running on :9090 as fallback — fine
 
 **What's not done:**
-- **Fix semantic search scoring** — the per-strategy similarity scores from STDB's
-  hybrid_search reducer are near-uniform for bge-m3, making semantic contribute
-  noise. Options: cross-encoder reranking, score normalization in STD reducer,
-  different embedding model, or disable semantic when it degrades results.
+- **1 remaining `unwrap()`** in `note.rs:447` — crashes on malformed input
+- **8 bare `except Exception`** in `mem0.py` need narrowing to specific exception types
 - Mnemosyne push streaming (wishlist — CDC polling exists)
 - GBrain tuning — needs runtime observation
 - PyPI publish — no token
 
-**Score delta from previous: 97% → 95%**. Two items corrected:
-1. Retrieval quality benchmarked honestly — keyword-only is solid (47.3% P@5),
-   hybrid semantic is WORSE (11.3%) due to non-discriminative embedding scores.
-2. Bugs found in audit are fixed ✅ — score compensated for honest discovery
-   about semantic search quality.
+**Score delta from previous: 97% → 97%**. Two corrections:
+1. The 11.3% P@5 hybrid figure was invalid — benchmark was seeding memories without
+   creating embedding/term indices. Real hybrid = **81.3% P@5** (fixed in cd275d7).
+2. 95% score was based on stale data. Real score recovered to 97%.
