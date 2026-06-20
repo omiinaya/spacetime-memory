@@ -12,7 +12,8 @@ os.environ["OPENAI_API_KEY"] = "REDACTED"
 os.environ["OPENAI_BASE_URL"] = "http://localhost:4000/v1"
 os.environ["EMBEDDING_MODEL"] = "baai/bge-m3"
 os.environ["EMBEDDER_TYPE"] = "openai"
-os.environ["SPACETIMEDB_DB"] = "c2009d7ae8134a11f47e174100dc882cb05310b12575614fed28b6e608fd6cec"
+os.environ["EMBEDDER_URL"] = "http://localhost:4000"
+os.environ["SPACETIMEDB_DB"] = "c200930d9c2938fa3e86e672e3c5577ac98c6637d078e7d9ebfc6791c7112e3b"
 os.environ["STMEM_MAX_RETRIES"] = "1"
 os.environ["STMEM_CIRCUIT_RESET_SECS"] = "5"
 
@@ -67,7 +68,8 @@ c._call("create_workspace", ["W", "W", ws])
 print(f"Seeding {len(memories)} memories...", flush=True)
 t0 = time.time()
 for m in memories:
-    c._call("store_memory", [ws, "", "", m.get("type","experience"), m["content"], "", "[]", 0.8, "", ""])
+    c.store(workspace_id=ws, content=m["content"],
+            memory_type=m.get("type", "experience"))
 print(f"  Seeded in {time.time()-t0:.1f}s. Waiting 5s...", flush=True)
 time.sleep(5)
 

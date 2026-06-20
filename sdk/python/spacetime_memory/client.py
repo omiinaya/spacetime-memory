@@ -1178,7 +1178,7 @@ class Client:
         rerank_endpoint: str | None = None,
         rerank_model: str | None = None,
         rerank_api_key: str | None = None,
-        cross_encoder: bool = False,
+        cross_encoder: bool = True,
         query_expansion: bool = False,
         polyphonic: bool = False,
         mmr_lambda: float = 0.0,
@@ -1195,8 +1195,10 @@ class Client:
                     (default: ``LLM_RERANK_MODEL`` env var).
             rerank_api_key: API key for reranker
                     (default: ``LLM_RERANK_API_KEY`` or ``OPENAI_API_KEY`` env var).
-            cross_encoder: If True, passes top results through a local ONNX
-                    cross-encoder (ms-marco-MiniLM-L-6-v2) before LLM rerank.
+            cross_encoder: If True (default), passes top results through a local ONNX
+                    cross-encoder (ms-marco-MiniLM-L-6-v2) for discriminative
+                    relevance scoring. Falls back gracefully if model files are
+                    not available.
             query_expansion: If True, expands the query with synonyms and
                     related terms via LLM before searching.
             polyphonic: If True, uses Reciprocal Rank Fusion (RRF) with
@@ -1442,8 +1444,15 @@ class Client:
                     r["veracity_multiplier"] = mult
 
             if cross_encoder:
-                from .cross_encoder import cross_encoder_rerank
-                rows = cross_encoder_rerank(query, rows, top_k=len(rows))
+                try:
+                    from .cross_encoder import cross_encoder_rerank
+                    rows = cross_encoder_rerank(query, rows, top_k=len(rows))
+                except (FileNotFoundError, ImportError, ValueError) as ce_err:
+                    logger.warning(
+                        "Cross-encoder unavailable (%s). "
+                        "Install onnxruntime and download model files.",
+                        ce_err,
+                    )
             if rerank:
                 rows = llm_rerank(
                     query, rows,
@@ -2922,21 +2931,19 @@ def _parse_sql_response(raw: str) -> list[dict[str, Any]]:
 # LLM Reranking (QMD parity)
 # ---------------------------------------------------------------------------
 
-_RERANK_PROMPT = """You are a search result relevance judge. Given a query and \
-a list of candidate search results, assign each a relevance score from 1-10.
+_RERANK_PROMPT = """Score each search result for relevance to the query (1-10).
 
-Scoring:
-  10 — perfectly answers the query, exact match
-  7-9 — highly relevant, contains key information
-  4-6 — partially relevant, related concepts
-  1-3 — barely relevant, tangential mention
+10 — perfectly answers the query, exact match
+7-9 — highly relevant, contains key information
+4-6 — partially relevant, related concepts
+1-3 — barely relevant, tangential mention
 
 Query: {query}
 
 Candidates:
 {candidates}
 
-Return ONLY a JSON array in this exact format, no other text:
+Provide your scores as a JSON array in this exact format, no other text:
 [{{"index": 0, "score": 8, "reason": "contains exact match for 'auth'"}}, ...]
 
 JSON:"""
@@ -2997,12 +3004,10 @@ def llm_rerank(
                     json={
                         "model": model,
                         "messages": [
-                            {"role": "system", "content": "You are a search reranker. Return only JSON."},
                             {"role": "user", "content": prompt},
                         ],
                         "temperature": 0.0,
                         "max_tokens": 2048,
-                        "response_format": {"type": "json_object"},
                     },
                     headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
                     timeout=timeout,

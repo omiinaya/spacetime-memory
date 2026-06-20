@@ -572,123 +572,15 @@ pub fn hybrid_search(
     }
 
     // ── Result Fusion ────────────────────────────────────────────────
-    if polyphonic {
-        // Polyphonic: Reciprocal Rank Fusion (RRF) + diversity penalty.
-        //
-        // RRF uses position-based scoring: score = sum(1 / (k + rank))
-        // across all voices. This eliminates score-calibration issues
-        // between strategies (temporal 0.5-1.0 vs semantic 0.0-1.0 vs
-        // graph 0.0-0.5). k=60 is proven optimal for 4-voice retrieval.
-        //
-        // After RRF, a diversity penalty is applied: results whose
-        // content shares >50% word overlap with already-selected
-        // results get a 15% score reduction.
-        const RRF_K: f64 = 60.0;
-        const DIVERSITY_PENALTY: f64 = 0.15;
-        const OVERLAP_THRESHOLD: f64 = 0.5;
-
-        let all_rows: Vec<_> = ctx
-            .db
-            .hybrid_result()
-            .iter()
-            .take(MAX_RESULTS)
-            .filter(|r| r.query_hash == qhash && r.workspace_id == workspace_id)
-            .collect();
-
-        if all_rows.len() < 2 {
-            // Single result — no fusion needed; fall through to Ok(())
-        } else {
-            use std::collections::HashMap;
-
-            // Group results by strategy, sorted by score descending
-            let mut strat_groups: HashMap<String, Vec<(String, f64)>> = HashMap::new();
-            for row in &all_rows {
-                strat_groups
-                    .entry(row.strategy.clone())
-                    .or_default()
-                    .push((row.entity_id.clone(), row.score));
-            }
-
-            // Sort each group by score descending
-            for group in strat_groups.values_mut() {
-                group.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            }
-
-            // RRF: compute fused score per entity_id
-            // words for each entity_id (for diversity penalty)
-            let mut rrf_scores: HashMap<String, f64> = HashMap::new();
-            let mut entity_words: HashMap<String, Vec<String>> = HashMap::new();
-
-            for row in &all_rows {
-                entity_words
-                    .entry(row.entity_id.clone())
-                    .or_insert_with(|| {
-                        row.content
-                            .split_whitespace()
-                            .map(|w| w.to_lowercase())
-                            .collect()
-                    });
-            }
-
-            for (_strategy, ranked) in &strat_groups {
-                for (rank, (entity_id, _score)) in ranked.iter().enumerate() {
-                    let rrf_contrib = 1.0 / (RRF_K + (rank as f64 + 1.0));
-                    *rrf_scores.entry(entity_id.clone()).or_insert(0.0) += rrf_contrib;
-                }
-            }
-
-            // Diversity penalty: sort by RRF score, then penalize
-            // each result based on word overlap with better-ranked results
-            let mut scored: Vec<(String, f64)> = rrf_scores.into_iter().collect();
-            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-            let mut selected_words: Vec<Vec<String>> = Vec::new();
-            for (entity_id, score) in scored.iter_mut() {
-                let words = entity_words
-                    .get(entity_id)
-                    .cloned()
-                    .unwrap_or_default();
-
-                if !words.is_empty() {
-                    // Check overlap with all already-selected sets
-                    for prev_words in &selected_words {
-                        let overlap: f64 = words
-                            .iter()
-                            .filter(|w| prev_words.contains(w))
-                            .count() as f64;
-                        let overlap_ratio = overlap / words.len().max(1) as f64;
-                        if overlap_ratio > OVERLAP_THRESHOLD {
-                            *score *= 1.0 - DIVERSITY_PENALTY;
-                            break; // only penalize once
-                        }
-                    }
-                }
-                selected_words.push(words);
-            }
-
-            // Normalize RRF scores to [0, 1] for consistency
-            let max_rrf = scored
-                .iter()
-                .map(|(_, s)| *s)
-                .fold(0.0f64, f64::max);
-            if max_rrf > 0.0 {
-                for (_id, score) in scored.iter_mut() {
-                    *score /= max_rrf;
-                }
-            }
-
-            // Update rows with polyphonic scores
-            let poly_scores: HashMap<String, f64> = scored.into_iter().collect();
-            for mut row in all_rows {
-                if let Some(&fused_score) = poly_scores.get(&row.entity_id) {
-                    row.score = fused_score.max(0.0).min(1.0);
-                    row.strategy = format!("{}+polyphonic", row.strategy);
-                    ctx.db.hybrid_result().id().update(row);
-                }
-            }
-        }
-    } else {
-        // Legacy: Min-max normalization with weighted combination
+    // ── Score Normalization ────────────────────────────────────────
+    // Normalize each strategy's raw scores to [0, 1] range independently.
+    // The Python SDK handles the actual weighted fusion with its own
+    // configurable weights — don't fuse here or the client's per-strategy
+    // grouping will operate on already-combined scores.
+    //
+    // Polyphonic mode uses RRF which inherently normalizes via rank
+    // position — skip per-strategy min-max for that path.
+    if !polyphonic {
         let all_rows: Vec<_> = ctx
             .db
             .hybrid_result()
@@ -698,18 +590,6 @@ pub fn hybrid_search(
             .collect();
 
         if all_rows.len() >= 2 {
-            // Strategy weights (configurable via env, hardcoded defaults)
-            let weights: std::collections::HashMap<&str, f64> = [
-                ("semantic", 0.35),
-                ("keyword", 0.25),
-                ("graph", 0.20),
-                ("temporal", 0.20),
-            ]
-            .iter()
-            .cloned()
-            .collect();
-
-            // Compute min/max per strategy
             let mut strat_min: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
             let mut strat_max: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
             for row in &all_rows {
@@ -718,31 +598,16 @@ pub fn hybrid_search(
                 let e = strat_max.entry(row.strategy.clone()).or_insert(f64::MIN);
                 *e = e.max(row.score);
             }
-
-            // Normalize and compute fused scores, grouped by entity_id
-            use std::collections::HashMap;
-            let mut fused: HashMap<String, f64> = HashMap::new(); // entity_id → fused_score
-            for row in &all_rows {
-                let strat_key = row.strategy.as_str();
-                let weight = weights.get(strat_key).copied().unwrap_or(0.15);
+            for mut row in all_rows {
                 let min_s = strat_min.get(&row.strategy).copied().unwrap_or(0.0);
                 let max_s = strat_max.get(&row.strategy).copied().unwrap_or(1.0);
                 let range = max_s - min_s;
-                let normalized = if range > 1e-10 {
-                    (row.score - min_s) / range
+                if range > 1e-10 {
+                    row.score = ((row.score - min_s) / range).max(0.0).min(1.0);
                 } else {
-                    1.0 // Single result gets full credit
-                };
-                let contrib = normalized * weight;
-                *fused.entry(row.entity_id.clone()).or_insert(0.0) += contrib;
-            }
-
-            // Update each result row with the fused score
-            for mut row in all_rows {
-                if let Some(&fused_score) = fused.get(&row.entity_id) {
-                    row.score = fused_score.max(0.0).min(1.0);
-                    ctx.db.hybrid_result().id().update(row);
+                    row.score = 1.0; // Single result per strategy
                 }
+                ctx.db.hybrid_result().id().update(row);
             }
         }
     }

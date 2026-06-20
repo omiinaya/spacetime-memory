@@ -10,8 +10,9 @@ use tract_onnx::tract_core::plan::SimplePlan;
 
 #[derive(Deserialize)]
 struct EmbedRequest {
-    text: String,
+    text: Option<String>,
     texts: Option<Vec<String>>,
+    dimensions: Option<usize>,
 }
 
 #[derive(Serialize)]
@@ -27,6 +28,7 @@ struct HealthResponse {
     model: String,
     dimension: usize,
     embedding_count: u64,
+    dimensions_supported: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +137,7 @@ async fn health(state: axum::extract::State<SharedState>) -> Json<HealthResponse
         model: state.model_name.clone(),
         dimension: state.dimension,
         embedding_count: count,
+        dimensions_supported: true,
     })
 }
 
@@ -154,7 +157,14 @@ async fn embed(
         std::sync::atomic::Ordering::Relaxed,
     );
 
-    let dimension = state.dimension;
+    let requested_dim = req.dimensions.unwrap_or(state.dimension);
+    let clamped_dim = requested_dim.min(state.dimension);
+    // Truncate each embedding to the requested dimension
+    for vec in &mut all_embeddings {
+        vec.truncate(clamped_dim);
+    }
+
+    let dimension = clamped_dim;
     if all_embeddings.len() == 1 {
         Json(EmbedResponse {
             embedding: all_embeddings.into_iter().next().unwrap(),

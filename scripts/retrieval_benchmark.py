@@ -117,5 +117,6 @@ print("-" * 64)
 for label, m, _, _ in results_table:
     print(f"{label:<40} {m['P@5']:>7.1%} {m['R@5']:>7.1%} {m['MRR']:>7.3f}")
 print()
-print("Reference: keyword-only baseline (from earlier): P@5=19.0% R@5=72.2% MRR=0.206")
+print("Reference: hybrid (bge-m3 proxy) P@5=81.3% R@5=82.0% MRR=0.960 (validated Jun 20)")
+print("Reference: weight_tune.py 11.3% was INVALID — seeded via _call('store_memory') skipping index_entity")
 print("GBrain reference (146K pages): P@5=49.1% R@5=97.9%")
