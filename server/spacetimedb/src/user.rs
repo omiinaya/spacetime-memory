@@ -179,7 +179,7 @@ pub fn get_user_sessions(ctx: &ReducerContext, user_id: String) -> Result<(), St
 
     // Scan memory table for any session references tied to this user
     // (Memories with this user_id in peer_id or source_session_id)
-    for mem in ctx.db.memory().iter() {
+    for mem in ctx.db.memory().iter().take(crate::MAX_RESULTS * 4) {
         if count >= MAX_RESULTS {
             break;
         }
@@ -213,7 +213,7 @@ pub fn get_user_sessions(ctx: &ReducerContext, user_id: String) -> Result<(), St
     }
 
     // Also scan sessions table for any with matching metadata or name containing user_id
-    for sess in ctx.db.session().iter() {
+    for sess in ctx.db.session().iter().take(crate::MAX_RESULTS * 4) {
         if count >= MAX_RESULTS {
             break;
         }
