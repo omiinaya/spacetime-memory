@@ -186,8 +186,8 @@
 | 2 | **Adapter god functions** — `mem0.add()` 208L, `graphiti.add_episode()` 147L | P2 | 2-3h | ✅ **DONE** — `mem0.add()` 209L→146L, `graphiti.add_episode()` 149L→76L |
 | 3 | **STDB concurrency crashes** — ~2% fatal WASM errors under load, root cause unknown | P1 | 4-8h | ✅ **DONE** — UUID collision from deterministic RNG. Retry loop in store_memory + log_change. 30/30 throughput passes |
 | 4 | **user.rs unbounded scans** — lines 182,216 use `break` not `.take()` | P4 | 30min | ✅ **DONE** — `.take(MAX_RESULTS*4)` caps added. 93/93 Rust tests pass |
-| 5 | **10 silent `except ... pass`** — in graphiti.py + honcho.py (intentional but undocumented) | P4 | 1h | 🔴 Unstarted |
-| 6 | **Concurrency test flakes** — `test_throughput` ~15% failure rate | P3 | 2h | ✅ **DONE** — UUID collision fix eliminated the root cause. 30/30 passes. Error capture added |
+| 5 | **22 silent `except ... pass`** — in graphiti.py (21) + honcho.py (1), undocumented | P4 | 1h | ✅ **DONE** — all 22 now have inline comments explaining graceful degradation |
+| 6 | **Concurrency test flakes** — `test_throughput` ~15% failure rate | P3 | 2h | ✅ **DONE** — UUID collision fix eliminated the root cause. 30/30 passes |
 | 7 | **PyPI publish** | Deferred | ~1h | No token |
 
 ### Score Breakdown — Honest (June 22, 2026 Audit)
@@ -213,5 +213,5 @@
 3. ~~**P2**: Split `mem0.add()` and `graphiti.add_episode()`~~ ✅ DONE
 4. ~~**P4**: Replace `user.rs` break scans with `.take()`~~ ✅ DONE
 5. ~~**P6**: Fix concurrency test flakes~~ ✅ DONE — root cause was the UUID collision
-6. **P4**: Document all 10 silent `except ... pass` with comments
+6. ~~**P4**: Document all 22 silent `except ... pass`~~ ✅ DONE — context-aware comments added
 7. **Deferred**: PyPI publish
