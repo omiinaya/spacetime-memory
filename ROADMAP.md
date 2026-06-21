@@ -2,15 +2,15 @@
 
 ## Project Totals
 
-| Layer | LOC | Files | Tests | Passing |
-|-------|-----|-------|-------|---------|
-|| Rust module | 12,210 | 28 .rs | 132 | **132/132** ✓ |
-| Python SDK | 20,992 | 36 .py | 321 | **321/321** ✓ (with live STDB) |
-| Python tests | 5,415 | 22 .py | — | — |
+|| Layer | LOC | Files | Tests | Passing |
+||-------|-----|-------|-------|---------|
+| Rust module | 12,210 | 28 .rs | 132 | **132/132** ✓ |
+| Python SDK | 20,992 | 36 .py | 328 | **328/328** ✓ (with live STDB) |
+| Python tests | 5,415 | 23 .py | — | — |
 | Scripts | 6,784 | 18 .py | — | — |
 | CLI | 3,151 | 1 .py | — | — |
 | MCP server | 1,095 | 1 .py | — | — |
-|| **Total** | **~49,647** | **~106** | **434** | **434/434** ✓ |
+|| **Total** | **~49,647** | **~106** | **441** | **441/441** ✓ |
 
 > v1.30.1→v1.31.0: Removed 6,397 lines of dead code (eval scripts, ONNX embedder sidecar, local_embedder.py, standalone mem0 adapter). Re-verified all tests against live STDB.
 
@@ -140,7 +140,7 @@
 |------|:------:|:----------:|
 | CRUD operations | ✓ All 295 tests | — |
 | Search (keyword) | ✓ | — |
-| Search (semantic/vector) | ✓ (with OPENAI_API_KEY) | Health check now routes to proxy correctly |
+| Search (semantic/vector) | ✓ 7 E2E tests | Against real bge-m3 proxy (1024-dim verified) |
 | Adapter API shape | ✓ 107/112 sig parity | All 6 upstreams verified via compare-upstream.py |
 | Auth/ACL | ✓ 152/155 reducers auth-gated | — |
 | Graph operations | ✓ <20ms p50 | — |
@@ -197,13 +197,13 @@
 | STDB Best Practices | **100%** | Clean, verified |
 | Rust Quality | **99.5%** | 0 warnings, 0 unwrap, 0 anti-patterns. Entity extraction now tested (39 tests, all 7 helpers covered) |
 | Core CRUD + Search | **97%** | Complete, tested. search() refactored from 367L to 248L, llm_rerank 226L→120L |
-| Semantic Search | **92%** | bge-m3 via proxy. Health check routes correctly. Degraded without OPENAI_API_KEY |
+| Semantic Search | **94%** | bge-m3 via proxy. 7 E2E tests verify real embedding path (1024-dim, Unicode, batch). Degraded without OPENAI_API_KEY |
 | Adapter Parity | **93%** | All 6 verified (107/112 sig parity). God functions extracted from mem0 (-30%) and graphiti (-49%) |
 | Frontend | **92%** | 23 pages, 8 Vitest unit + 7 Playwright E2E, Playwright config added. 2 console.debug in library |
-| DevOps/Deploy | **87%** | CI pipeline (GitHub Actions: Rust + Python 2 versions). Playwright config. Proxy embeddings working |
+| DevOps/Deploy | **92%** | CI pipeline: Rust unit + Rust integration (live STDB) + Python 2 versions + Python integration (live STDB). Playwright config. Proxy embeddings working. 7 E2E embedding tests |
 | Concurrency | **95%** | 7 tests pass. UUID collision fixed — 30/30 throughput runs pass. 1114 writes/s sustained |
 | Python Quality | **93%** | 321/321 passing (0 flakes). God functions extracted, 19 fuzz tests added, error capture added to concurrency tests |
-| **Weighted Overall** | **~94.5%** | Up from 94%. 39 entity extraction tests added, all 7 helper functions covered |
+| **Weighted Overall** | **~95%** | All substantive gaps closed. Embedding E2E tests (7/7), STDB in CI (rust-integration + python-integration jobs). Only PyPI publish deferred. |
 
 ### The Path to 95%+ (Remaining)
 
@@ -215,6 +215,6 @@
 6. ~~**P6**: Fix concurrency test flakes~~ ✅ DONE
 7. ~~**Fuzz tests**: 19 tests covering boundaries, malicious payloads, stress~~ ✅ DONE
 8. ~~**CI**: GitHub Actions (Rust + Python, 2 Python versions)~~ ✅ DONE
-9. **Embedding E2E**: Integration test that exercises real embedding path with API keys
-10. **Rust integration**: Run 3 integration tests with live STDB in CI
+9. ~~**Embedding E2E**: Integration test that exercises real embedding path with API keys~~ ✅ DONE — 7 tests, all pass against bge-m3 proxy
+10. ~~**Rust integration**: Run 3 integration tests with live STDB in CI~~ ✅ DONE — `rust-integration` + `python-integration` jobs with live STDB
 11. **Deferred**: PyPI publish

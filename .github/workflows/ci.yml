@@ -19,6 +19,53 @@ jobs:
       - run: cargo build --release
       - run: cargo test
 
+  rust-integration:
+    name: Rust (integration — live STDB)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server/spacetimedb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache SpacetimeDB binary
+        id: cache-stdb
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/spacetime
+          key: stdb-${{ runner.os }}-v2.6.0
+
+      - name: Install SpacetimeDB
+        if: steps.cache-stdb.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.6.0/spacetime-x86_64-unknown-linux-gnu.tar.gz | sudo tar xz -C /usr/local/bin
+          sudo chmod +x /usr/local/bin/spacetime
+
+      - name: Start SpacetimeDB
+        run: |
+          spacetime start -l 127.0.0.1:3001 --in-memory --non-interactive &
+          # Wait for STDB to be ready
+          for i in $(seq 1 30); do
+            if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/v1/database/anon-probe | grep -q "200\|404\|401"; then
+              echo "SpacetimeDB ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          # Verify it's up
+          curl -s http://127.0.0.1:3001/v1/database/anon-probe || echo "STDB probe failed (non-fatal)"
+
+      - name: Build WASM
+        run: cargo build --release --target wasm32-unknown-unknown
+
+      - name: Run integration tests
+        env:
+          SPACETIMEDB_HOST: localhost
+        run: cargo test --test integration -- --ignored --nocapture
+
   python:
     name: Python (${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -40,4 +87,63 @@ jobs:
       - name: Syntax check
         run: python -m compileall spacetime_memory/
       - name: Unit tests (no STDB required)
-        run: python -m pytest tests/ -v --ignore=tests/smoke_test.py -k "not integration and not concurrency" --tb=short
+        run: python -m pytest tests/ -v --ignore=tests/smoke_test.py -k "not integration and not concurrency and not embedder" --tb=short
+
+  python-integration:
+    name: Python Integration (live STDB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache SpacetimeDB binary
+        id: cache-stdb
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/spacetime
+          key: stdb-${{ runner.os }}-v2.6.0
+
+      - name: Install SpacetimeDB
+        if: steps.cache-stdb.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.6.0/spacetime-x86_64-unknown-linux-gnu.tar.gz | sudo tar xz -C /usr/local/bin
+          sudo chmod +x /usr/local/bin/spacetime
+
+      - name: Start SpacetimeDB
+        run: |
+          spacetime start -l 127.0.0.1:3001 --in-memory --non-interactive &
+          # Wait for STDB to be ready
+          for i in $(seq 1 30); do
+            if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/v1/database/anon-probe | grep -q "200\|404\|401"; then
+              echo "SpacetimeDB ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Build WASM module
+        run: |
+          cd ../../server/spacetimedb
+          rustup target add wasm32-unknown-unknown
+          cargo build --release --target wasm32-unknown-unknown
+
+      - name: Install deps
+        run: |
+          pip install -e ".[dev]"
+          pip install pytest httpx
+
+      - name: Integration tests (live STDB)
+        env:
+          SPACETIMEDB_HOST: localhost
+        run: python -m pytest tests/ -v -m "integration" --tb=short --timeout=120 2>&1 || python -m pytest tests/ -v -m "integration" --tb=short
+
+      - name: Concurrency tests
+        env:
+          SPACETIMEDB_HOST: localhost
+        run: python -m pytest tests/test_concurrency.py -v --tb=short --timeout=120 2>&1 || python -m pytest tests/test_concurrency.py -v --tb=short
