@@ -127,6 +127,14 @@ class TestLocalLLMInit:
         # Reset side effect
         sys.modules["llama_cpp"].Llama.side_effect = None
 
+    def test_load_early_return_when_no_model_path(self):
+        """_load returns early when model_path is None (line 113)."""
+        llm = LocalLLM()  # model_path=None, _load not called in __init__
+        # Call _load directly — should hit the early return
+        llm._load()
+        assert llm._available is False
+        assert llm._llm is None
+
 
 # ── LocalLLM.auto() tests ──────────────────────────────────────────────
 
@@ -444,18 +452,19 @@ class TestDownloadModel:
             mock_retrieve.assert_not_called()
             assert result == str(existing)
 
-    def test_import_error_returns_none(self):
-        """If urllib.request cannot be imported, returns None."""
-        # Simulate missing urllib.request by removing it from sys.modules
-        # so the ``from urllib.request import urlretrieve`` inside
-        # download_model() raises ImportError.
-        saved = sys.modules.pop("urllib.request", None)
-        try:
-            result = LocalLLM.download_model("minicpm5-1b")
-            assert result is None
-        finally:
-            if saved is not None:
-                sys.modules["urllib.request"] = saved
+    def test_import_error_returns_none(self, monkeypatch):
+        """If urllib.request cannot be imported, returns None (line 280)."""
+        import builtins
+        _original_import = builtins.__import__
+
+        def blocking_import(name, *args, **kwargs):
+            if name == "urllib.request":
+                raise ImportError("Mocked import error for testing")
+            return _original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", blocking_import)
+        result = LocalLLM.download_model("minicpm5-1b")
+        assert result is None
 
     def test_download_exception_cleans_up(self, tmp_path):
         out_dir = tmp_path / "models"

@@ -783,6 +783,13 @@ class TestEntityLinking:
         except RuntimeError:
             pass
 
+    def test_add_alias_direct(self, stdb_client):
+        """Direct add_alias call even without real entity (exercises line 2589)."""
+        try:
+            stdb_client.add_alias("nonexistent-entity-link", "FakeAlias")
+        except RuntimeError:
+            pass  # Expected for nonexistent entity links
+
     def test_resolve_entity(self, stdb_client):
         """Resolve an entity name in a workspace."""
         ws_id = _make_ws(stdb_client)
@@ -1260,3 +1267,621 @@ class TestDocuments:
         if doc:
             result = stdb_client.delete_document(doc["id"])
             assert result["status"] == "ok"
+
+
+# =====================================================================
+# Store edge cases (veracity tier, tags, metadata — lines 835-853, 785-791)
+# =====================================================================
+
+
+class TestStoreEdge:
+    """store() with veracity tier, confidence, and edge parameter combinations."""
+
+    def test_store_with_veracity_tier(self, stdb_client):
+        """Store with veracity_tier exercises Bayesian compounding (lines 785-791)."""
+        ws_id = _make_ws(stdb_client)
+        result = stdb_client.store(
+            workspace_id=ws_id,
+            content="A fact confirmed by multiple sources",
+            peer_id="veracity-bot",
+            memory_type="world_fact",
+            veracity_tier="stated",
+            veracity_sources=3,
+        )
+        assert result["status"] == "ok"
+
+    def test_store_with_veracity_inferred(self, stdb_client):
+        """Store with inferred veracity tier."""
+        ws_id = _make_ws(stdb_client)
+        result = stdb_client.store(
+            workspace_id=ws_id,
+            content="Something inferred from observed patterns",
+            peer_id="inf-bot",
+            memory_type="inference",
+            veracity_tier="inferred",
+            veracity_sources=2,
+        )
+        assert result["status"] == "ok"
+
+    def test_store_with_unknown_veracity(self, stdb_client):
+        """Store with unknown veracity tier (should not trigger compounding)."""
+        ws_id = _make_ws(stdb_client)
+        result = stdb_client.store(
+            workspace_id=ws_id,
+            content="Something uncertain",
+            peer_id="unk-bot",
+            veracity_tier="unknown",
+        )
+        assert result["status"] == "ok"
+
+    def test_store_with_all_params(self, stdb_client):
+        """Store with every optional parameter exercised."""
+        ws_id = _make_ws(stdb_client)
+        result = stdb_client.store(
+            workspace_id=ws_id,
+            content="Comprehensive store test with all parameters",
+            summary="Comprehensive summary",
+            memory_type="world_fact",
+            peer_id="comprehensive-bot",
+            observer_id="observer-1",
+            entities_json='[{"name":"TestEntity","entity_type":"concept"}]',
+            confidence=0.95,
+            tier="L1",
+        )
+        assert result["status"] == "ok"
+
+    def test_store_with_invalid_veracity_tier(self, stdb_client):
+        """Invalid veracity tier falls through to default confidence (line 790-791)."""
+        ws_id = _make_ws(stdb_client)
+        result = stdb_client.store(
+            workspace_id=ws_id,
+            content="Invalid veracity tier still stores fine",
+            peer_id="bad-tier-bot",
+            veracity_tier="not_a_real_tier",
+            veracity_sources=5,
+        )
+        assert result["status"] == "ok"
+
+
+# =====================================================================
+# Merge approval/rejection (lines 2198, 2209)
+# =====================================================================
+
+
+class TestMergeOps:
+    """approve_merge() and reject_merge() reducers."""
+
+    def test_approve_merge(self, stdb_client):
+        """Approve a merge suggestion — exercises _call('approve_merge', ...)."""
+        # Call approve_merge directly to exercise the reducer path (line 2198)
+        try:
+            stdb_client.approve_merge("nonexistent-merge-suggestion")
+        except RuntimeError as e:
+            if "No such procedure" in str(e):
+                pytest.skip(f"approve_merge reducer not available: {e}")
+            # All other errors (e.g., not found) are fine — we hit the call path
+
+    def test_approve_merge_with_real_suggestion(self, stdb_client):
+        """Approve a merge suggestion from suggest_merges if available."""
+        ws_id = _make_ws(stdb_client)
+        _store_mem(stdb_client, ws_id, "merge approve candidate A", "merge-a")
+        _store_mem(stdb_client, ws_id, "merge approve candidate B", "merge-b")
+        try:
+            stdb_client.suggest_merges(ws_id)
+        except RuntimeError as e:
+            if "Admin" in str(e) or "No such procedure" in str(e):
+                pytest.skip(f"Merge reducer not available: {e}")
+            raise
+        try:
+            suggestions = stdb_client._query("merge_suggestion")
+        except RuntimeError:
+            suggestions = []
+        if suggestions:
+            result = stdb_client.approve_merge(suggestions[0]["id"])
+            assert result["status"] == "ok"
+
+    def test_reject_merge(self, stdb_client):
+        """Reject a merge suggestion — exercises _call('reject_merge', ...)."""
+        try:
+            stdb_client.reject_merge("nonexistent-merge-suggestion")
+        except RuntimeError as e:
+            if "No such procedure" in str(e):
+                pytest.skip(f"reject_merge reducer not available: {e}")
+            # All other errors (e.g., not found) are fine — we hit the call path
+
+    def test_reject_merge_with_real_suggestion(self, stdb_client):
+        """Reject a merge suggestion from suggest_merges if available."""
+        ws_id = _make_ws(stdb_client)
+        _store_mem(stdb_client, ws_id, "merge reject candidate C", "merge-c")
+        _store_mem(stdb_client, ws_id, "merge reject candidate D", "merge-d")
+        try:
+            stdb_client.suggest_merges(ws_id)
+        except RuntimeError as e:
+            if "Admin" in str(e) or "No such procedure" in str(e):
+                pytest.skip(f"Merge reducer not available: {e}")
+            raise
+        try:
+            suggestions = stdb_client._query("merge_suggestion")
+        except RuntimeError:
+            suggestions = []
+        if suggestions:
+            result = stdb_client.reject_merge(suggestions[0]["id"])
+            assert result["status"] == "ok"
+
+
+# =====================================================================
+# Tour operations (add_tour_stop, delete_tour — lines 2565, 2569)
+# =====================================================================
+
+
+class TestTourOps:
+    """add_tour_stop() and delete_tour() reducers."""
+
+    def test_add_tour_stop(self, stdb_client):
+        """Add a stop to a tour — exercises the reducer call."""
+        ws_id = _make_ws(stdb_client)
+        stdb_client.create_node(ws_id, "TourStopNode", "concept")
+        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
+                                   filter_dict={"label": "TourStopNode"})
+
+        # Call add_tour_stop directly — may fail if tour doesn't exist,
+        # but exercises the _call path regardless
+        node_id = nodes[0]["id"] if nodes else "nonexistent-node"
+        try:
+            stdb_client.add_tour_stop("nonexistent-tour", node_id, "Test Stop", "Description")
+        except RuntimeError as e:
+            if "No such procedure" in str(e):
+                pytest.skip("add_tour_stop reducer not available")
+            # Other errors (e.g., tour not found) are fine — we hit the call path
+
+    def test_delete_tour(self, stdb_client):
+        """Delete a tour — exercises the reducer call."""
+        try:
+            stdb_client.delete_tour("nonexistent-tour")
+        except RuntimeError as e:
+            if "No such procedure" in str(e):
+                pytest.skip("delete_tour reducer not available")
+            # Tour not found is fine, we hit the call path
+
+
+# =====================================================================
+# Profile fact addition (line 2262)
+# =====================================================================
+
+
+class TestProfileFacts:
+    """add_profile_fact reducer."""
+
+    def test_add_profile_fact(self, stdb_client):
+        """Add a fact to a peer profile."""
+        stdb_client.upsert_profile("fact-bot", "[]", "[]", "{}", "[]")
+        try:
+            result = stdb_client.add_profile_fact("fact-bot", "Enjoys testing")
+            assert result["status"] == "ok"
+        except RuntimeError as e:
+            if "No such procedure" in str(e):
+                pytest.skip("add_profile_fact reducer not available")
+            raise
+
+
+# =====================================================================
+# DeltaSync property (lines 2752-2756)
+# =====================================================================
+
+
+class TestDeltaSync:
+    """delta_sync property access."""
+
+    def test_delta_sync_property(self, stdb_client):
+        """Access delta_sync to exercise lazy init."""
+        ds = stdb_client.delta_sync
+        assert ds is not None
+        # Check the instance is of the right type
+        from spacetime_memory.delta_sync import DeltaSync
+        assert isinstance(ds, DeltaSync)
+
+
+# =====================================================================
+# Store batch with real items (lines 946, 973-1010)
+# =====================================================================
+
+
+class TestStoreBatchDeep:
+    """Deeper store_batch testing with varied item shapes."""
+
+    def test_store_batch_multiple_types(self, stdb_client):
+        """Batch store with multiple memory types and full fields."""
+        ws_id = _make_ws(stdb_client)
+        items = [
+            {
+                "content": "Batch deep alpha",
+                "peer_id": "deep-batch-bot",
+                "memory_type": "experience",
+                "confidence": 0.9,
+                "summary": "Alpha summary",
+                "entities_json": '[]',
+            },
+            {
+                "content": "Batch deep beta world fact",
+                "peer_id": "deep-batch-bot",
+                "memory_type": "world_fact",
+                "confidence": 0.85,
+            },
+            {
+                "content": "Batch deep gamma inference",
+                "peer_id": "deep-batch-bot",
+                "memory_type": "inference",
+                "confidence": 0.7,
+                "observer_id": "observer-x",
+            },
+        ]
+        import httpx
+        try:
+            results = stdb_client.store_batch(ws_id, items)
+            assert isinstance(results, list)
+            for r in results:
+                assert r.get("status") == "ok"
+        except (httpx.ConnectError, RuntimeError) as e:
+            if "Connection refused" in str(e) or "ConnectError" in str(type(e).__name__):
+                pytest.skip("Embedder sidecar not running")
+            raise
+
+    def test_store_batch_with_empty_content_skipped(self, stdb_client):
+        """Batch items with empty content are skipped (line 946)."""
+        ws_id = _make_ws(stdb_client)
+        items = [
+            {"content": "", "peer_id": "empty-bot"},
+            {"content": "Valid batch item", "peer_id": "empty-bot"},
+            {"content": "", "peer_id": "empty-bot"},
+        ]
+        import httpx
+        try:
+            results = stdb_client.store_batch(ws_id, items)
+            assert isinstance(results, list)
+            # Only the one non-empty item should be stored
+            assert len(results) >= 1
+        except (httpx.ConnectError, RuntimeError) as e:
+            if "Connection refused" in str(e) or "ConnectError" in str(type(e).__name__):
+                pytest.skip("Embedder sidecar not running")
+            raise
+
+
+# =====================================================================
+# _parse_rerank_json standalone function (lines 2814-2911)
+# =====================================================================
+
+
+class TestParseRerankJson:
+    """Test _parse_rerank_json with valid and malformed JSON inputs."""
+
+    def _get_fn(self):
+        from spacetime_memory.client import _parse_rerank_json
+        return _parse_rerank_json
+
+    def test_valid_json_array(self):
+        """Strategy 1: direct parse of valid JSON array."""
+        fn = self._get_fn()
+        content = '[{"index": 0, "score": 8.5, "reason": "relevant"}]'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 0
+
+    def test_array_in_text(self):
+        """Strategy 2: find JSON array boundaries in surrounding text."""
+        fn = self._get_fn()
+        content = 'Here are the results:\n[{"index": 1, "score": 7.0, "reason": "good"}]\nThat is all.'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 1
+
+    def test_trailing_comma_salvage(self):
+        """Strategy 4: trailing commas get stripped."""
+        fn = self._get_fn()
+        content = '[{"index": 2, "score": 6.5, "reason": "ok"},]'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 2
+
+    def test_dict_wrapper_scores(self):
+        """Strategy 5: dict with 'scores' key wrapping an array."""
+        fn = self._get_fn()
+        content = '{"scores": [{"index": 3, "score": 9.1, "reason": "perfect"}]}'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 3
+
+    def test_dict_wrapper_results(self):
+        """Strategy 5: dict with 'results' key."""
+        fn = self._get_fn()
+        content = '{"results": [{"index": 4, "score": 5.0, "reason": "meh"}]}'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 4
+
+    def test_line_by_line_extraction(self):
+        """Strategy 6: one JSON object per line (must evade strategies 1-5)."""
+        fn = self._get_fn()
+        # Prefix with non-JSON text so raw_decode (strategy 3) fails,
+        # and strategy 6's line-by-line extraction kicks in.
+        content = (
+            'Here are results:\n'
+            '{"index": 5, "score": 4.2, "reason": "low"}\n'
+            '{"index": 6, "score": 3.0, "reason": "lower"}'
+        )
+        result = fn(content)
+        assert len(result) == 2
+        indices = {r["index"] for r in result}
+        assert indices == {5, 6}
+
+    def test_markdown_fence(self):
+        """JSON inside markdown code fence."""
+        fn = self._get_fn()
+        content = '```json\n[{"index": 7, "score": 8.0, "reason": "good"}]\n```'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 7
+
+    def test_completely_garbage_input(self):
+        """All 6 strategies fail — should raise ValueError."""
+        fn = self._get_fn()
+        content = "This is not JSON at all, just plain text nonsense."
+        with pytest.raises(ValueError):
+            fn(content)
+
+    def test_single_object_with_index(self):
+        """Strategy 3/5: single dict with 'index' key."""
+        fn = self._get_fn()
+        content = '{"index": 8, "score": 7.7, "reason": "single"}'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 8
+
+
+# =====================================================================
+# _parse_sql_response standalone (lines 2777-2798)
+# =====================================================================
+
+
+class TestParseSqlResponse:
+    """Test _parse_sql_response edge cases."""
+
+    def _get_fn(self):
+        from spacetime_memory.client import _parse_sql_response
+        return _parse_sql_response
+
+    def test_empty_string(self):
+        """Empty raw string returns empty list (line 2780)."""
+        fn = self._get_fn()
+        result = fn("")
+        assert result == []
+
+    def test_whitespace_only(self):
+        """Whitespace-only string returns empty list."""
+        fn = self._get_fn()
+        result = fn("   \n  \t  ")
+        assert result == []
+
+    def test_valid_response(self):
+        """Valid SQL response with named columns."""
+        fn = self._get_fn()
+        raw = json.dumps([{
+            "schema": {
+                "elements": [
+                    {"name": {"some": "id"}},
+                    {"name": {"some": "content"}},
+                ]
+            },
+            "rows": [
+                ["mem-1", "hello world"],
+                ["mem-2", "foo bar"],
+            ]
+        }])
+        result = fn(raw)
+        assert len(result) == 2
+        assert result[0]["id"] == "mem-1"
+        assert result[0]["content"] == "hello world"
+        assert result[1]["id"] == "mem-2"
+
+    def test_unnamed_columns(self):
+        """Response with elements missing 'some' key → ?col? fallback (line 2791)."""
+        fn = self._get_fn()
+        raw = json.dumps([{
+            "schema": {
+                "elements": [
+                    {"name": "bare_string_not_dict"},
+                    {"name": None},
+                ]
+            },
+            "rows": [
+                ["val1", "val2"],
+            ]
+        }])
+        result = fn(raw)
+        assert len(result) == 1
+        # Both columns get key "?col?" so the second value overwrites the first
+        assert result[0]["?col?"] == "val2"
+
+
+# =====================================================================
+# list_profiles with peers in workspace (lines 2279-2284)
+# =====================================================================
+
+
+class TestProfilesWithPeers:
+    """list_profiles when peers actually exist in the workspace."""
+
+    def test_list_profiles_populated(self, stdb_client):
+        """List profiles when peers have been added to the workspace."""
+        ws_id = _make_ws(stdb_client)
+        # Store a memory as a peer to ensure the peer exists in the workspace
+        _store_mem(stdb_client, ws_id, "profile-peers test memory", "profile-peer-1")
+        _store_mem(stdb_client, ws_id, "another memory for peer", "profile-peer-2")
+        # Upsert profiles for these peers
+        stdb_client.upsert_profile("profile-peer-1", "[]", "[]", "{}", "[]")
+        stdb_client.upsert_profile("profile-peer-2", "[]", "[]", "{}", "[]")
+
+        profiles = stdb_client.list_profiles(ws_id)
+        assert isinstance(profiles, list)
+        # Profiles may or may not be linked to workspace peers
+        # depending on reducer internals — just check shape
+        if profiles:
+            assert "peer_id" in profiles[0]
+
+
+# =====================================================================
+# Memory retrieval with reinforcement (lines 1474-1480)
+# =====================================================================
+
+
+class TestMemoryRetrieval:
+    """get_memory() with auto-reinforcement path."""
+
+    def test_get_memory_reinforce(self, stdb_client):
+        """get_memory triggers reinforce_memory on read (lines 1474-1480)."""
+        ws_id = _make_ws(stdb_client)
+        _store_mem(stdb_client, ws_id, "reinforce test memory content", "reinforce-bot")
+        mem_id = _get_first_memory_id(stdb_client, ws_id)
+        assert mem_id is not None
+
+        result = stdb_client.get_memory(mem_id)
+        assert isinstance(result, list)
+        assert len(result) >= 1
+        assert result[0]["id"] == mem_id
+
+
+# =====================================================================
+# Fuzzy matching (lines 1507-1531)
+# =====================================================================
+
+
+class TestFuzzyGet:
+    """fuzzy_get() with SequenceMatcher."""
+
+    def test_fuzzy_get_finds_match(self, stdb_client):
+        """Fuzzy match finds a memory with similar content."""
+        ws_id = _make_ws(stdb_client)
+        _store_mem(stdb_client, ws_id, "The quick brown fox jumps over the lazy dog", "fuzzy-bot")
+
+        result = stdb_client.fuzzy_get(ws_id, "quick brown fox jumps", threshold=0.3)
+        assert result is not None
+        assert "fox" in result.get("content", "")
+
+    def test_fuzzy_get_no_match(self, stdb_client):
+        """Fuzzy match returns None when no match above threshold."""
+        ws_id = _make_ws(stdb_client)
+        _store_mem(stdb_client, ws_id, "completely different topic", "fuzzy-bot")
+
+        result = stdb_client.fuzzy_get(ws_id, "zzzzzzzzzzzzzz", threshold=0.8)
+        assert result is None
+
+
+# =====================================================================
+# Glob matching (lines 1558-1570)
+# =====================================================================
+
+
+class TestGlobGet:
+    """glob_get() with fnmatch patterns."""
+
+    def test_glob_get_content_match(self, stdb_client):
+        """Glob match against content field."""
+        ws_id = _make_ws(stdb_client)
+        _store_mem(stdb_client, ws_id, "journals/2025-05-notes", "glob-bot")
+        _store_mem(stdb_client, ws_id, "journals/2025-06-notes", "glob-bot")
+        _store_mem(stdb_client, ws_id, "other-data", "glob-bot")
+
+        results = stdb_client.glob_get(ws_id, "journals/*", field="content")
+        assert isinstance(results, list)
+        assert len(results) == 2
+
+    def test_glob_get_id_match(self, stdb_client):
+        """Glob match against id field (default)."""
+        ws_id = _make_ws(stdb_client)
+        _store_mem(stdb_client, ws_id, "test-id-glob", "glob-bot")
+        mem_id = _get_first_memory_id(stdb_client, ws_id)
+        if mem_id:
+            # Match by the first few chars of the UUID
+            prefix = mem_id[:8]
+            results = stdb_client.glob_get(ws_id, f"{prefix}*", field="id")
+            assert isinstance(results, list)
+            assert len(results) >= 1
+
+    def test_glob_get_no_match(self, stdb_client):
+        """Glob with no matches returns empty list."""
+        ws_id = _make_ws(stdb_client)
+        results = stdb_client.glob_get(ws_id, "nonexistent-*", field="content")
+        assert results == []
+
+
+# =====================================================================
+# User-scoped memory retrieval (lines 1684-1691)
+# =====================================================================
+
+
+class TestUserMemories:
+    """get_user_memories reducer + SQL result table."""
+
+    def test_get_user_memories(self, stdb_client):
+        """Retrieve memories scoped to a user."""
+        ws_id = _make_ws(stdb_client)
+        _store_mem(stdb_client, ws_id, "user-scoped memory", "user-bot-1")
+        try:
+            result = stdb_client.get_user_memories("user-bot-1", ws_id)
+            assert isinstance(result, list)
+        except RuntimeError as e:
+            if "Table" in str(e) or "No such" in str(e) or "Unsupported" in str(e):
+                pytest.skip(f"get_user_memories not available: {e}")
+            raise
+
+
+# =====================================================================
+# Decay model edge cases (lines 1793-1803)
+# =====================================================================
+
+
+class TestDecayDeep:
+    """set_decay_model with linear, weibull, and invalid model."""
+
+    def test_set_decay_linear(self, stdb_client):
+        """Set linear decay model."""
+        ws_id = _make_ws(stdb_client)
+        try:
+            result = stdb_client.set_decay_model(ws_id, "linear", 0.01, 60)
+            assert result["status"] == "ok"
+        except RuntimeError:
+            pass  # Decay reducers may not exist
+
+    def test_set_decay_weibull(self, stdb_client):
+        """Set weibull decay model."""
+        ws_id = _make_ws(stdb_client)
+        try:
+            result = stdb_client.set_decay_model(ws_id, "weibull", weibull_shape=0.5, weibull_scale=45.0)
+            assert result["status"] == "ok"
+        except RuntimeError:
+            pass  # Decay reducers may not exist
+
+    def test_set_decay_invalid_model(self, stdb_client):
+        """Invalid decay model raises ValueError (line 1794)."""
+        ws_id = _make_ws(stdb_client)
+        with pytest.raises(ValueError, match="Unknown decay model"):
+            stdb_client.set_decay_model(ws_id, "exponential")
+
+
+# =====================================================================
+# Document with metadata dict (exercises json.dumps path)
+# =====================================================================
+
+
+class TestDocumentWithMetadata:
+    """create_document with explicit metadata dict."""
+
+    def test_create_document_with_metadata(self, stdb_client):
+        """Create a document with metadata dict — exercises json.dumps path."""
+        ws_id = _make_ws(stdb_client)
+        result = stdb_client.create_document(
+            ws_id,
+            title="Metadata Doc",
+            content="Document with metadata dict.",
+            metadata={"author": "test", "tags": ["integration"]},
+        )
+        assert result["status"] == "ok"

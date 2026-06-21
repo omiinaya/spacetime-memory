@@ -74,6 +74,33 @@ def test_query_cache_clear():
     assert len(cache) == 0
 
 
+def test_query_cache_set_existing_key():
+    """set() on an existing key moves it to end (line 72) and setdefault reuses ws_keys."""
+    from spacetime_memory.query_cache import QueryCache
+    cache = QueryCache(maxsize=4, ttl=60)
+    key = cache.make_key("ws-1", "q", 10, "semantic")
+    cache.set(key, [{"id": "first"}], workspace_id="ws-1")
+    # Set again with same key and workspace — triggers line 72 (move_to_end) and setdefault path
+    cache.set(key, [{"id": "second"}], workspace_id="ws-1")
+    result = cache.get(key)
+    assert result[0]["id"] == "second"
+
+
+def test_query_cache_invalidate_all():
+    """invalidate with workspace_id=None clears everything (lines 84-85)."""
+    from spacetime_memory.query_cache import QueryCache
+    cache = QueryCache(maxsize=8, ttl=60)
+    k1 = cache.make_key("ws-A", "q", 10, "semantic")
+    k2 = cache.make_key("ws-B", "q", 10, "semantic")
+    cache.set(k1, [{"id": "A"}], workspace_id="ws-A")
+    cache.set(k2, [{"id": "B"}], workspace_id="ws-B")
+    assert len(cache) == 2
+    cache.invalidate()  # workspace_id=None → clear all
+    assert len(cache) == 0
+    assert cache.get(k1) is None
+    assert cache.get(k2) is None
+
+
 # ── EventBus ────────────────────────────────────────────────────────────
 
 def test_event_bus_subscribe_and_emit():
@@ -157,6 +184,39 @@ def test_event_bus_subscriber_count():
     bus.subscribe("search.performed", lambda e: None)
     bus.subscribe("*", lambda e: None)
     assert bus.subscriber_count == 3
+
+
+def test_event_bus_trim_log():
+    """Event log trims when exceeding max_log_size (line 107)."""
+    from spacetime_memory.streaming import EventBus, MemoryEvent
+    bus = EventBus()
+    bus._max_log_size = 5
+    for i in range(10):
+        bus.emit(MemoryEvent("memory.created", data={"i": i}))
+    assert bus.event_count == 5
+    log = bus.get_log(limit=10)
+    assert log[-1]["data"]["i"] == 5  # oldest retained
+
+
+def test_event_bus_clear_log():
+    """clear_log empties the event log (lines 125-126)."""
+    from spacetime_memory.streaming import EventBus, MemoryEvent
+    bus = EventBus()
+    bus.emit(MemoryEvent("memory.created", data={"id": "1"}))
+    assert bus.event_count == 1
+    bus.clear_log()
+    assert bus.event_count == 0
+    assert bus.get_log() == []
+
+
+def test_event_bus_event_count():
+    """event_count property returns log length (lines 157-158)."""
+    from spacetime_memory.streaming import EventBus, MemoryEvent
+    bus = EventBus()
+    assert bus.event_count == 0
+    bus.emit(MemoryEvent("memory.created"))
+    bus.emit(MemoryEvent("memory.deleted"))
+    assert bus.event_count == 2
 
 
 # ── PluginManager ───────────────────────────────────────────────────────

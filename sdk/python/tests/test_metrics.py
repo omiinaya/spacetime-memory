@@ -162,3 +162,31 @@ class TestMetricsCollector:
         s = mc.endpoint_stats("does-not-exist")
         assert s.count == 0
         assert s.errors == 0
+
+    @staticmethod
+    def test_format_duration_days() -> None:
+        """_format_duration includes days when >= 86400s (line 260)."""
+        result = MetricsCollector._format_duration(90000)  # 1d 1h 0m 0s
+        assert "1d" in result
+        assert "1h" in result
+
+    @staticmethod
+    def test_format_duration_hours() -> None:
+        """_format_duration includes hours when >= 3600s but < 86400s (line 262)."""
+        result = MetricsCollector._format_duration(7200)  # 2h 0m 0s
+        assert "2h" in result
+        assert "d" not in result
+        # minutes only appear when > 0, so 0m is omitted
+
+    @staticmethod
+    def test_format_duration_minutes() -> None:
+        """_format_duration includes minutes when >= 60s (line 264)."""
+        result = MetricsCollector._format_duration(120)  # 2m 0s
+        assert "2m" in result
+        assert "0s" in result
+
+    @staticmethod
+    def test_format_duration_seconds_only() -> None:
+        """_format_duration shows only seconds for < 60s."""
+        result = MetricsCollector._format_duration(30)
+        assert result == "30s"

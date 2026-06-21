@@ -331,6 +331,20 @@ class TestWebhookConnector:
                 headers={"x-hub-signature-256": "sha256=badbadbad"},
             )
 
+    def test_hmac_missing_signature_header(self):
+        """handle() raises ValueError when secret set but no signature header (line 133)."""
+        connector = WebhookConnector(
+            path="/webhook",
+            workspace_id="ws-1",
+            secret="my-secret",
+        )
+
+        with pytest.raises(ValueError, match="no signature header found"):
+            connector.handle(
+                {"content": "test"},
+                headers={},  # no signature headers at all
+            )
+
     def test_poll_returns_empty(self):
         """poll() is not applicable for WebhookConnector — returns []."""
         connector = WebhookConnector(
