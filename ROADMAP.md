@@ -21,8 +21,8 @@
 | 1 | Standalone mem0 adapter + 10 eval scripts | 2,151 | f77ea3d |
 | 2 | LocalEmbedder class + 7 orphan scripts | 1,547 | f77ea3d |
 | 3 | 4 superseded eval scripts + dataset merger | 1,067 | 7643bff |
-| 4 | ONNX embedder sidecar + deployment refs | 3,381 | 3c8227c |
-| **Total removed** | | **6,397** | |
+| 4 | ONNX embedder sidecar + deployment refs — **REVERTED** (proxy lacks embeddings) | 0 | 3c8227c→6aa0695 |
+| **Net removed** | | **3,016** | |
 
 ## Fresh Audit Signals (June 22, 2026)
 
@@ -31,7 +31,7 @@
 | `unwrap()` in Rust | **0** | Fixed `note.rs:447` — was resolved in prior commit ✓ |
 | `expect()` in Rust | **0** | Clean ✓ |
 | `#[allow(dead_code)]` | **0** | All dead code removed ✓ |
-| `except Exception:` in SDK | **6** | Down from 45 after cleanup. 6 remain: client.py(2), langchain.py(2), cross_encoder.py(1), context_agent.py(1) |
+| `except Exception:` in SDK | **0** | All narrowed to specific types (commit 6aa0695) ✓ |
 | `except Exception:` project-wide | **27** | Down from 185. Most in connectors/scripts. |
 | Rust compiler warnings | **0** | `cargo build` — clean ✓ |
 | `console.debug/log` in frontend | **2** | Only in `lib/spacetimedb.ts` (logging library) |
@@ -95,12 +95,13 @@ We test our adapters against **our SpacetimeDB backend**. We do NOT do real side
 
 **115/115 adapter integration tests pass against live STDB.** But these test OUR adapter against OUR backend, not equivalence to the upstream's behavior.
 
-### The Embedding Reality
+### The Embedding Reality (Updated June 22)
 
-- **Embedder sidecar removed** (was ONNX on :9090). Only path: `_embed_openai()` → proxy (localhost:4000)
-- Proxy `/v1/embeddings` requires auth (OPENAI_API_KEY). Integration tests don't set this, so **semantic search degrades to keyword-only** during testing.
-- `.env` has stale `EMBEDDER_TYPE=local` — code ignores it, always calls `_embed_openai()`
-- Retrieval quality benchmark (81.3% P@5, 0.960 MRR) was run with real embeddings via proxy — verified in commit cd275d7. But current tests don't exercise this path.
+- **Only working path**: ONNX sidecar on :9090 (bge-large-en-v1.5, 1024-dim). Removed and reverted same day.
+- **Proxy (localhost:4000)**: `/v1/embeddings` endpoint exists but **zero embedding models** — only chat completions. `baai/bge-m3` not in model list.
+- **Active config**: `EMBEDDER_TYPE=local` → ONNX sidecar. OpenAI path commented out.
+- **Current state**: Semantic search works with real embeddings via ONNX sidecar. Proxy path would need `baai/bge-m3` added to the LiteLLM model config.
+- **81.3% P@5, 0.960 MRR** — measured with real embeddings via the ONNX sidecar, not proxy. Verified in commit cd275d7.
 
 ## Feature Matrix — What Really Works
 
@@ -180,29 +181,29 @@ We test our adapters against **our SpacetimeDB backend**. We do NOT do real side
 
 ### What's Left to Do
 
-| # | Item | Severity | Effort | Real Impact |
-|---|------|----------|--------|-------------|
-| 1 | **Install and run upstream competitor libraries** for real behavioral parity tests | High | ~2h | Would validate/reassess 4 adapter scores |
-| 2 | **Fix embedding auth in test harness** so semantic search is actually tested | Medium | ~1h | Tests currently run keyword-only |
-| 3 | **Narrow 6 bare `except Exception`** to specific types | Low | ~30min | Production hardening |
-| 4 | **Clean `.env`** — remove stale EMBEDDER_TYPE, add correct embedding config | Low | ~5min | Prevents confusion |
-| 5 | **Concurrency + load testing** | Medium | ~4h | Real-world confidence |
-| 6 | **Mnemosyne push streaming** | Wishlist | ~1w | CDC polling exists |
+| # | Item | Severity | Effort | Status |
+|---|------|----------|--------|--------|
+| 1 | **Narrow 6 bare `except Exception`** to specific types | ~~Low~~ | ~~30min~~ | ✅ **DONE** (6aa0695) |
+| 2 | **Clean `.env`** — correct embedding config | ~~Low~~ | ~~5min~~ | ✅ **DONE** (6aa0695) |
+| 3 | **Add bge-m3 embedding model to proxy** | High | ~1h | Proxy has `/v1/embeddings` endpoint but no embedding models |
+| 4 | **Install and run upstream competitor libraries** for real behavioral parity tests | High | ~2h | Only LangGraph + Honcho installed |
+| 5 | **Fix embedding auth in test harness** so CI exercises real embedding path | Medium | ~1h | Currently keyword-only in CI |
+| 6 | **Concurrency + load testing** | Medium | ~4h | No tests exist |
 | 7 | **PyPI publish** | Deferred | ~1h | No token |
 
 ### Score Breakdown
 
 | Domain | Score | Why |
 |--------|:-----:|-----|
-| Core CRUD + Search | **95%** | Complete, tested, keyword search reliable |
 | STDB Best Practices | **100%** | Clean, verified |
 | Rust Quality | **98%** | 0 warnings, 0 unwrap, 0 anti-patterns |
-| Python Quality | **92%** | 295/295 tests, 6 bare excepts remain |
-| Adapter Parity | **85%** | Signature-matched, 4/6 not behaviorally verified |
-| Semantic Search | **75%** | Works with proxy auth, not tested in CI, degrades to keyword |
+| Core CRUD + Search | **95%** | Complete, tested, real embeddings working via ONNX |
+| Python Quality | **94%** | 295/295 tests, 0 bare except:Exception (↑ from 92%) |
 | Frontend | **90%** | All live data, 2 console.debug in library |
-| DevOps/Deploy | **80%** | compose.yaml clean after embedder removal, no CI/CD tests for semantics |
-| **Weighted Overall** | **~90%** | Down from 97% (inflated). Honest about untested assumptions |
+| Adapter Parity | **85%** | Signature-matched, 4/6 not behaviorally verified |
+| DevOps/Deploy | **80%** | Clean compose, ONNX sidecar active, no CI/CD semantic tests |
+| Semantic Search | **78%** | Works via ONNX, proxy path broken (no embedding models) |
+| **Weighted Overall** | **~91%** | Up from 90% (bare excepts fixed). Proxy embedding gap remains |
 
 ### The Path to 95%+
 
