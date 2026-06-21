@@ -4,8 +4,7 @@
 # Start with:
 #   docker compose up -d
 #
-# This starts SpacetimeDB standalone with the module pre-published and the
-# embedder sidecar listening for embedding requests.
+# This starts SpacetimeDB standalone with the module pre-published.
 #
 # Environment variables (set in .env or shell):
 #   SPACETIMEDB_VERSION  — SpacetimeDB version (default: 2.4.1)
@@ -21,7 +20,6 @@ services:
     container_name: spacetime-memory
     ports:
       - "${SPACETIMEDB_PORT:-3001}:3001"
-      - "9090:9090"
     env_file:
       - path: .env
         required: false
@@ -36,8 +34,6 @@ services:
       retries: 3
     volumes:
       - stmem-data:/app/data
-      - stmem-models:/app/model
 
 volumes:
   stmem-data:
-  stmem-models:

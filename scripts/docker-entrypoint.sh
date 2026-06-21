@@ -56,29 +56,7 @@ else
 fi
 
 # --------------------------------------------------------------------------
-# 3  Start the ONNX embedder sidecar in the background
-# --------------------------------------------------------------------------
-echo "==> Starting embedder (model: ${EMBEDDER_MODEL_PATH:-/app/model/all-MiniLM-L6-v2.onnx}) ..."
-export MODEL_PATH="${EMBEDDER_MODEL_PATH:-/app/model/all-MiniLM-L6-v2.onnx}"
-embedder &
-EMBEDDER_PID=$!
-
-# Wait for the embedder to become ready
-echo "==> Waiting for embedder ..."
-for i in $(seq 1 15); do
-    if curl -sf http://localhost:9090/health > /dev/null 2>&1; then
-        echo "==> Embedder is ready."
-        break
-    fi
-    if [ "$i" -eq 15 ]; then
-        echo "ERROR: Embedder failed to start within 15 seconds."
-        exit 1
-    fi
-    sleep 1
-done || true  # set -e guard
-
-# --------------------------------------------------------------------------
-# 4  Start the Tantivy BM25 sidecar in the background
+# 3  Start the Tantivy BM25 sidecar in the background
 # --------------------------------------------------------------------------
 echo "==> Starting Tantivy BM25 sidecar ..."
 tantivy-sidecar &
@@ -99,7 +77,7 @@ for i in $(seq 1 10); do
 done || true  # set -e guard
 
 # --------------------------------------------------------------------------
-# 5  Start a trivial static HTTP server for the frontend
+# 4  Start a trivial static HTTP server for the frontend
 # --------------------------------------------------------------------------
 if [ -f /app/frontend/index.html ]; then
     echo "==> Starting frontend on http://0.0.0.0:5173 ..."
@@ -119,7 +97,6 @@ echo "╔═══════════════════════�
 echo "║          Spacetime Memory is RUNNING                    ║"
 echo "╠══════════════════════════════════════════════════════════╣"
 echo "║  SpacetimeDB  ➜  http://localhost:3001                  ║"
-echo "║  Embedder     ➜  http://localhost:9090                  ║"
 echo "║  Tantivy BM25 ➜  http://localhost:9091                  ║"
 echo "║  Frontend     ➜  http://localhost:5173                  ║"
 echo "╚══════════════════════════════════════════════════════════╝"
@@ -133,7 +110,6 @@ cleanup() {
     echo "==> Shutting down all services ..."
     [ -n "$FRONTEND_PID" ] && kill "$FRONTEND_PID" 2>/dev/null && echo "    frontend stopped."
     [ -n "$TANTIVY_PID" ] && kill "$TANTIVY_PID" 2>/dev/null && echo "    Tantivy BM25 stopped."
-    kill "$EMBEDDER_PID" 2>/dev/null && echo "    embedder stopped."
     kill "$SPACETIME_PID" 2>/dev/null && echo "    SpacetimeDB stopped."
     wait
     echo "==> Goodbye."
