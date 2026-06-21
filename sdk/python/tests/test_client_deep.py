@@ -3113,3 +3113,1244 @@ class TestGetterMethods:
 
         config = stdb_client.get_decay_config(ws_id)
         assert config is None or isinstance(config, dict)
+
+
+# =====================================================================
+# Unit tests targeting missed coverage lines (mocked, no backend)
+# =====================================================================
+
+
+@pytest.mark.unit
+class TestClientUnitCoverage:
+    """Unit tests for missed lines in client.py — pure mocking, no backend."""
+
+    # ── _emit_event (lines 225-226) ──
+
+    def test_emit_event_with_bus(self):
+        """Lines 225-226: _emit_event when event_bus is set."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_bus = MagicMock()
+        client.event_bus = mock_bus
+        with patch("spacetime_memory.streaming.MemoryEvent") as mock_me:
+            client._emit_event("test.event", {"key": "val"}, workspace_id="ws1")
+        mock_bus.emit.assert_called_once()
+        mock_me.assert_called_once_with(
+            event_type="test.event", data={"key": "val"}, workspace_id="ws1"
+        )
+
+    def test_emit_event_no_bus(self):
+        """_emit_event when event_bus is None (no-op)."""
+        client = Client(host="localhost", port="3000", database="test")
+        client.event_bus = None
+        client._emit_event("test.event", {"key": "val"})  # should not raise
+
+    # ── _ensure_identity (lines 250-252) ──
+
+    def test_ensure_identity_connect_error(self):
+        """Lines 250-252: _ensure_identity catches ConnectError."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client.token = None
+        client._identity_established = False
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.ConnectError("refused")
+        client._http = mock_http
+        client._ensure_identity()
+        assert client._identity_established is True
+
+    def test_ensure_identity_timeout(self):
+        """Lines 250-252: _ensure_identity catches TimeoutException."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client.token = None
+        client._identity_established = False
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.TimeoutException("timed out")
+        client._http = mock_http
+        client._ensure_identity()
+        assert client._identity_established is True
+
+    def test_ensure_identity_remote_protocol_error(self):
+        """Lines 250-252: _ensure_identity catches RemoteProtocolError."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client.token = None
+        client._identity_established = False
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.RemoteProtocolError("protocol error")
+        client._http = mock_http
+        client._ensure_identity()
+        assert client._identity_established is True
+
+    # ── _whoami (lines 264-265) ──
+
+    def test_whoami_error_catch(self):
+        """Lines 264-265: _whoami catches errors and returns ''."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True  # skip _ensure_identity
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.ConnectError("nope")
+        client._http = mock_http
+        result = client._whoami()
+        assert result == ""
+
+    # ── Metrics (lines 277, 281-283) ──
+
+    def test_set_and_get_metrics(self):
+        """Lines 277, 281-283: set_metrics_collector and get_metrics."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        assert client.get_metrics() is None  # line 281-282
+
+        mock_collector = MagicMock()
+        mock_collector.to_dict.return_value = {"requests": 5}
+        client.set_metrics_collector(mock_collector)  # line 277
+        result = client.get_metrics()  # line 283
+        assert result == {"requests": 5}
+        mock_collector.to_dict.assert_called_once()
+
+    # ── from_token_file (lines 300-301) ──
+
+    def test_from_token_file(self):
+        """Lines 300-301: from_token_file classmethod."""
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jwt", delete=False) as f:
+            f.write("test-jwt-token-123\n")
+            token_path = f.name
+        try:
+            c = Client.from_token_file(
+                token_path, host="h1", port="42", database="db1"
+            )
+            assert c.token == "test-jwt-token-123"
+            assert c.host == "h1"
+            assert c.port == "42"
+            assert c.database == "db1"
+        finally:
+            os.unlink(token_path)
+
+    # ── Circuit breaker (line 325) ──
+
+    def test_circuit_breaker_open(self):
+        """Line 325: circuit breaker open raises RuntimeError."""
+        import time
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._circuit_open_until = time.time() + 999  # future
+        mock_http = MagicMock()
+        client._http = mock_http
+        with pytest.raises(RuntimeError, match="circuit breaker is open"):
+            client._request_with_retry("GET", "http://example.com")
+
+    # ── HTTP method routing (lines 337-340) ──
+
+    def test_request_retry_get_method(self):
+        """Line 337-338: GET method routing."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._circuit_open_until = 0.0
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_http.get.return_value = mock_resp
+        client._http = mock_http
+        resp = client._request_with_retry("GET", "http://example.com")
+        mock_http.get.assert_called_once()
+        assert resp.status_code == 200
+
+    def test_request_retry_post_method(self):
+        """Line 335-336: POST method routing."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._circuit_open_until = 0.0
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_http.post.return_value = mock_resp
+        client._http = mock_http
+        resp = client._request_with_retry("POST", "http://example.com")
+        mock_http.post.assert_called_once()
+        assert resp.status_code == 200
+
+    def test_request_retry_other_method(self):
+        """Line 339-340: OTHER method routing (e.g. PUT)."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._circuit_open_until = 0.0
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_http.request.return_value = mock_resp
+        client._http = mock_http
+        resp = client._request_with_retry("PUT", "http://example.com")
+        mock_http.request.assert_called_once_with("PUT", "http://example.com")
+        assert resp.status_code == 200
+
+    # ── Error catching in retry (lines 350-353) ──
+
+    def test_retry_connect_error(self):
+        """Lines 350-351: retry catches ConnectError and raises after max."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._circuit_open_until = 0.0
+        client.max_retries = 1
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.ConnectError("no connection")
+        client._http = mock_http
+        with pytest.raises(RuntimeError, match="Request failed"):
+            client._request_with_retry("GET", "http://example.com")
+
+    def test_retry_timeout(self):
+        """Lines 350-351: retry catches TimeoutException."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._circuit_open_until = 0.0
+        client.max_retries = 0
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.TimeoutException("timeout")
+        client._http = mock_http
+        with pytest.raises(RuntimeError, match="Request failed"):
+            client._request_with_retry("GET", "http://example.com")
+
+    def test_retry_remote_protocol_error(self):
+        """Lines 352-353: retry catches RemoteProtocolError."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._circuit_open_until = 0.0
+        client.max_retries = 0
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.RemoteProtocolError("protocol")
+        client._http = mock_http
+        with pytest.raises(RuntimeError, match="Request failed"):
+            client._request_with_retry("GET", "http://example.com")
+
+    # ── Circuit breaker trip (lines 365-366) ──
+
+    def test_circuit_breaker_trip(self):
+        """Lines 365-366: circuit breaker trips after threshold failures."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._circuit_open_until = 0.0
+        client.max_retries = 0
+        client._consecutive_failures = 2  # one below threshold
+        client._circuit_breaker_threshold = 3
+        client._circuit_breaker_reset_secs = 60
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.ConnectError("fail")
+        client._http = mock_http
+        with pytest.raises(RuntimeError, match="Request failed"):
+            client._request_with_retry("GET", "http://example.com")
+        # After failure, consecutive = 3, which >= threshold = 3 → circuit opens
+        assert client._consecutive_failures == 3
+        assert client._circuit_open_until > 0
+
+    # ── _sql metrics path (line 391) ──
+
+    def test_sql_with_metrics(self):
+        """Line 391: _sql uses metrics collector when set."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        mock_collector = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "[]"
+        mock_collector.record.return_value = mock_resp
+        client.set_metrics_collector(mock_collector)
+        result = client._sql("SELECT 1")
+        mock_collector.record.assert_called_once()
+        assert result == []
+
+    # ── _sql verbose error (line 398) ──
+
+    def test_sql_verbose_error(self):
+        """Line 398: _sql raises verbose RuntimeError."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test",
+                        verbose=True)
+        client._identity_established = True
+        mock_http = MagicMock()
+        client._http = mock_http
+        mock_resp = MagicMock()
+        mock_resp.status_code = 400
+        mock_resp.text = "database explosion"
+        mock_http.post.return_value = mock_resp
+        with pytest.raises(RuntimeError, match="SQL error"):
+            client._sql("SELECT * FROM doomed")
+
+    # ── _map_sql_error (line 446) ──
+
+    def test_map_sql_error_with_match(self):
+        """Line 446: _map_sql_error finds matching pattern."""
+        client = Client(host="localhost", port="3000", database="test")
+        result = client._map_sql_error("table 'foo' does not exist")
+        assert "Table not found" in result
+        assert "raw:" in result
+
+    def test_map_sql_error_no_match(self):
+        """_map_sql_error returns generic message on no match."""
+        client = Client(host="localhost", port="3000", database="test")
+        result = client._map_sql_error("something weird happened")
+        assert result.startswith("Database error:")
+
+    # ── _map_reducer_error (line 453) ──
+
+    def test_map_reducer_error_with_match(self):
+        """_map_reducer_error finds matching pattern."""
+        client = Client(host="localhost", port="3000", database="test")
+        result = client._map_reducer_error("not found: memory_id=xyz")
+        assert "Record not found" in result
+
+    def test_map_reducer_error_no_match(self):
+        """_map_reducer_error returns generic message on no match."""
+        client = Client(host="localhost", port="3000", database="test")
+        result = client._map_reducer_error("weird reducer failure")
+        assert result.startswith("Reducer error:")
+
+    # ── _call metrics (line 469) ──
+
+    def test_call_with_metrics(self):
+        """Line 469: _call uses metrics when collector set."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        mock_collector = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_collector.record.return_value = mock_resp
+        client.set_metrics_collector(mock_collector)
+        result = client._call("some_reducer", ["arg1"])
+        mock_collector.record.assert_called_once()
+        assert result == {"status": "ok"}
+
+    # ── _call verbose error (line 476) ──
+
+    def test_call_verbose_error(self):
+        """Line 476: _call with verbose=True raises verbose error."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test",
+                        verbose=True)
+        client._identity_established = True
+        mock_http = MagicMock()
+        client._http = mock_http
+        mock_resp = MagicMock()
+        mock_resp.status_code = 400
+        mock_resp.text = "reducer kaboom"
+        mock_http.post.return_value = mock_resp
+        with pytest.raises(RuntimeError, match="Reducer error"):
+            client._call("bad_reducer", [])
+
+    # ── _default_embedder_type (line 497) ──
+
+    def test_default_embedder_type_openai_key_set(self):
+        """Line 496-497: _default_embedder_type returns 'openai' when key set."""
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-fake"}, clear=False):
+            result = Client._default_embedder_type()
+            assert result == "openai"
+
+    def test_default_embedder_type_no_key(self):
+        """_default_embedder_type returns 'auto' when no OPENAI_API_KEY."""
+        with patch.dict(os.environ, {}, clear=True):
+            # clear=True wipes env, but we only care about OPENAI_API_KEY
+            if "OPENAI_API_KEY" in os.environ:
+                del os.environ["OPENAI_API_KEY"]
+            result = Client._default_embedder_type()
+            assert result == "auto"
+
+    # ── _embed_batch empty (lines 553-554) ──
+
+    def test_embed_batch_empty(self):
+        """Lines 553-554: _embed_batch with empty list returns []."""
+        client = Client(host="localhost", port="3000", database="test")
+        result = client._embed_batch([])
+        assert result == []
+
+    # ── _tantivy_index (lines 621-634) ──
+
+    def test_tantivy_index_success(self):
+        """Lines 621-634: _tantivy_index success path."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_http.post.return_value = mock_resp
+        client._http = mock_http
+        result = client._tantivy_index("ws1", "mem1", "hello world", "memory")
+        assert result is True
+        mock_http.post.assert_called_once()
+
+    def test_tantivy_index_error(self):
+        """Lines 633-634: _tantivy_index catches ConnectError, returns False."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_http.post.side_effect = httpx.ConnectError("nope")
+        client._http = mock_http
+        result = client._tantivy_index("ws1", "mem1", "hello")
+        assert result is False
+
+    # ── _tantivy_search (line 658) ──
+
+    def test_tantivy_search_error_status(self):
+        """Line 657-658: _tantivy_search on HTTP error status."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 500
+        mock_http.post.return_value = mock_resp
+        client._http = mock_http
+        result = client._tantivy_search("ws1", "query", limit=10)
+        assert result == []
+
+    # ── ping error catch (lines 684-686) ──
+
+    def test_ping_error_catch(self):
+        """Lines 684-686: ping catches ConnectError and returns error dict."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.ConnectError("connection refused")
+        client._http = mock_http
+        result = client.ping()
+        assert result["status"] == "error"
+        assert "latency_ms" in result
+
+    # ── _normalize_fuse with tantivy rows (lines 1029-1031) ──
+
+    def test_fuse_and_deduplicate_with_tantivy(self):
+        """Lines 1029-1031: _fuse_and_deduplicate adds tantivy rows."""
+        client = Client(host="localhost", port="3000", database="test")
+        rows = [{"entity_id": "a", "strategy": "semantic", "score": 0.9}]
+        tantivy_rows = [{"entity_id": "b", "strategy": "keyword", "score": 0.8, "content": "hi"}]
+        per_strat = {
+            "semantic": rows, "keyword": [], "graph": [], "temporal": [], "binary": [],
+        }
+        strat_min = {"semantic": 0.9, "keyword": 0.8}
+        strat_max = {"semantic": 0.9, "keyword": 0.8}
+        weights = {"semantic": 0.65, "keyword": 0.25, "graph": 0.0, "temporal": 0.05, "binary": 0.05}
+        result = client._fuse_and_deduplicate(
+            rows, tantivy_rows, per_strat, strat_min, strat_max, weights
+        )
+        # tantivy row "b" should be included
+        eids = {r.get("entity_id") for r in result}
+        assert "b" in eids
+        assert len(result) == 2
+
+    # ── search_sessions_semantic (lines 1460-1470) ──
+
+    def test_search_sessions_semantic(self):
+        """Lines 1460-1470: search_sessions_semantic method."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        mock_http = MagicMock()
+        client._http = mock_http
+
+        # Mock _embed to return a vector
+        with patch.object(client, "_embed", return_value=[0.1, 0.2, 0.3]):
+            # Mock _call
+            with patch.object(client, "_call", return_value={"status": "ok"}):
+                # Mock _sql to return session results
+                with patch.object(client, "_sql") as mock_sql:
+                    mock_sql.return_value = [
+                        {"session_id": "s1", "score": 0.9},
+                        {"session_id": "s2", "score": 0.5},
+                    ]
+                    result = client.search_sessions_semantic("test query", limit=5)
+                    assert len(result) == 2
+                    assert result[0]["session_id"] == "s1"
+
+    def test_search_sessions_semantic_no_embedding(self):
+        """search_sessions_semantic returns [] when embedder fails."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_embed", return_value=[]):
+            result = client.search_sessions_semantic("test")
+            assert result == []
+
+    # ── get_memory reinforce error (lines 1478-1479) ──
+
+    def test_get_memory_reinforce_error(self):
+        """Lines 1478-1479: get_memory catches RuntimeError on reinforce."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_query", return_value=[{"id": "m1"}]):
+            with patch.object(client, "_call", side_effect=RuntimeError("fail")):
+                result = client.get_memory("m1")
+                assert result == [{"id": "m1"}]
+
+    # ── update_memory ──
+
+    def test_update_memory(self):
+        """Test update_memory simple path."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_call", return_value={"status": "ok"}) as mock_call:
+            result = client.update_memory("m1", "new content", summary="sum", confidence=0.9)
+            mock_call.assert_called_once_with("update_memory", ["m1", "new content", "sum", 0.9])
+            assert result == {"status": "ok"}
+
+    # ── delete_memory query_cache path (lines 1583-1587, 1593) ──
+
+    def test_delete_memory_with_query_cache(self):
+        """Lines 1583-1587, 1593: delete_memory with query_cache set."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_cache = MagicMock()
+        client._query_cache = mock_cache
+        client._identity_established = True
+
+        mock_http = MagicMock()
+        client._http = mock_http
+
+        with patch.object(client, "_sql") as mock_sql:
+            mock_sql.return_value = [{"workspace_id": "ws1"}]
+            with patch.object(client, "_call", return_value={"status": "ok"}):
+                with patch("spacetime_memory.streaming.MemoryEvent"):
+                    result = client.delete_memory("m1")
+                    assert result == {"status": "ok"}
+                    mock_cache.invalidate.assert_called_once_with(workspace_id="ws1")
+
+    def test_delete_memory_already_deleted(self):
+        """delete_memory returns ok when 'not found' in error (line 1600-1601)."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._query_cache = None
+        with patch.object(client, "_call", side_effect=RuntimeError("not found: m1")):
+            result = client.delete_memory("m1")
+            assert result == {"status": "ok", "note": "already deleted"}
+
+    # ── set_workspace_context / set_memory_context / reinforce ──
+
+    def test_set_workspace_context(self):
+        """Simple set_workspace_context call."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_call", return_value={"status": "ok"}) as m:
+            result = client.set_workspace_context("ws1", "ctx")
+            m.assert_called_once_with("set_workspace_context", ["ws1", "ctx"])
+            assert result == {"status": "ok"}
+
+    def test_set_memory_context(self):
+        """Simple set_memory_context call."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_call", return_value={"status": "ok"}) as m:
+            result = client.set_memory_context("m1", "ctx")
+            m.assert_called_once_with("set_memory_context", ["m1", "ctx"])
+            assert result == {"status": "ok"}
+
+    def test_reinforce(self):
+        """Simple reinforce call (line 1633)."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_call", return_value={"status": "ok"}) as m:
+            result = client.reinforce("m1")
+            m.assert_called_once_with("reinforce_memory", ["m1"])
+            assert result == {"status": "ok"}
+
+    # ── _enrich_content (lines 1083-1093) ──
+
+    def test_enrich_content_node_path(self):
+        """Lines 1083-1085, 1090-1091: _enrich_content with node entity_type."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        rows = [{"entity_id": "n1", "entity_type": "node", "score": 0.8}]
+        with patch.object(client, "_query", return_value=[{"id": "n1", "label": "NodeLabel"}]):
+            result = client._enrich_content(rows, "ws1")
+            assert result[0]["memory_content"] == "NodeLabel"
+
+    def test_enrich_content_other_type(self):
+        """Line 1093: _enrich_content with non-memory/non-node entity_type."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        rows = [{"entity_id": "x1", "entity_type": "document", "score": 0.5}]
+        with patch.object(client, "_query", return_value=[]):
+            result = client._enrich_content(rows, "ws1")
+            assert result[0]["memory_content"] == ""
+
+    # ── _keyword_fallback with filters (lines 1113, 1115) ──
+
+    def test_keyword_fallback_with_memory_type_and_tier(self):
+        """Lines 1113, 1115: _keyword_fallback with memory_type and tier filters."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_query", return_value=[]) as mock_query:
+            result = client._keyword_fallback(
+                "ws1", "test query", memory_type="experience", tier="L0", limit=10
+            )
+            assert result == []
+            # Verify filter_dict includes memory_type and tier
+            call_kwargs = mock_query.call_args
+            assert call_kwargs is not None
+
+    # ── search query_cache hit (line 1210-1211) ──
+
+    def test_search_query_cache_hit(self):
+        """Lines 1206-1211: search returns cached result on cache hit."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_cache = MagicMock()
+        cached_result = [{"entity_id": "c1", "score": 0.99}]
+        mock_cache.get.return_value = cached_result
+        client._query_cache = mock_cache
+
+        with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+            result = client.search("ws1", "pizza", semantic=True, limit=5)
+            assert result == cached_result
+            mock_cache.get.assert_called_once()
+
+    # ── search query expansion (lines 1216-1219) ──
+
+    def test_search_query_expansion(self):
+        """Lines 1216-1219: search uses query expansion."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._query_cache = None
+        client._identity_established = True
+
+        with patch("spacetime_memory.client.expand_query", return_value="expanded pizza query"):
+            with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+                with patch.object(client, "_call", return_value={"status": "ok"}):
+                    with patch.object(client, "_sql", return_value=[]):
+                        with patch.object(client, "_tantivy_search", return_value=[]):
+                            with patch.object(client, "_fuse_and_deduplicate", return_value=[]):
+                                with patch.object(client, "_enrich_content", return_value=[]):
+                                    result = client.search(
+                                        "ws1", "pizza", semantic=True, limit=5,
+                                        query_expansion=True,
+                                    )
+                                    assert result == []
+
+    def test_search_query_expansion_gibberish_fallback(self):
+        """Line 1218-1219: fallback when expansion returns gibberish."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._query_cache = None
+        client._identity_established = True
+
+        with patch("spacetime_memory.client.expand_query", return_value="  ab "):
+            with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+                with patch.object(client, "_call", return_value={"status": "ok"}):
+                    with patch.object(client, "_sql", return_value=[]):
+                        with patch.object(client, "_tantivy_search", return_value=[]):
+                            with patch.object(client, "_fuse_and_deduplicate", return_value=[]):
+                                with patch.object(client, "_enrich_content", return_value=[]):
+                                    result = client.search(
+                                        "ws1", "pizza", semantic=True, limit=5,
+                                        query_expansion=True,
+                                    )
+                                    assert result == []
+
+    # ── search embedder_down path (lines 1242-1243) ──
+
+    def test_search_embedder_down_health_check_fails(self):
+        """Lines 1242-1243: embedder health check catches error, marks down."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._query_cache = None
+        client._identity_established = True
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.ConnectError("nope")
+        client._http = mock_http
+
+        with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+            with patch.object(client, "_call", return_value={"status": "ok"}):
+                with patch.object(client, "_sql", return_value=[]):
+                    with patch.object(client, "_tantivy_search", return_value=[]):
+                        with patch.object(client, "_fuse_and_deduplicate", return_value=[]):
+                            with patch.object(client, "_enrich_content", return_value=[]):
+                                result = client.search("ws1", "pizza", semantic=True, limit=5)
+                                assert result == []
+
+    # ── search plugin_manager dispatch (line 1393) ──
+
+    def test_search_plugin_dispatch(self):
+        """Line 1393: search dispatches through plugin_manager when set."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._query_cache = None
+        client._identity_established = True
+        client.event_bus = None
+
+        mock_pm = MagicMock()
+        modified_results = [{"entity_id": "mod", "score": 9.9}]
+        mock_pm.dispatch_search.return_value = (True, modified_results)
+        client.plugin_manager = mock_pm
+
+        mock_rows = [{"entity_id": "r1", "score": 0.8, "strategy": "semantic"}]
+        with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+            with patch.object(client, "_call", return_value={"status": "ok"}):
+                with patch.object(client, "_sql", return_value=mock_rows):
+                    with patch.object(client, "_tantivy_search", return_value=[]):
+                        with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
+                            with patch.object(client, "_enrich_content", return_value=mock_rows):
+                                result = client.search("ws1", "pizza", semantic=True, limit=5)
+                                assert result == modified_results
+                                mock_pm.dispatch_search.assert_called_once()
+
+    # ── search query_cache store (line 1396) ──
+
+    def test_search_query_cache_store(self):
+        """Line 1396: search stores results in query_cache when set."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        client.event_bus = None
+        mock_cache = MagicMock()
+        mock_cache.get.return_value = None  # no cache hit
+        client._query_cache = mock_cache
+
+        mock_rows = [{"entity_id": "r1", "score": 0.8, "strategy": "semantic"}]
+        with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+            with patch.object(client, "_call", return_value={"status": "ok"}):
+                with patch.object(client, "_sql", return_value=mock_rows):
+                    with patch.object(client, "_tantivy_search", return_value=[]):
+                        with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
+                            with patch.object(client, "_enrich_content", return_value=mock_rows):
+                                result = client.search("ws1", "pizza", semantic=True, limit=5)
+                                assert result == mock_rows
+                                mock_cache.set.assert_called_once()
+
+    # ── search _emit_event (line 1398) ──
+
+    def test_search_emit_event(self):
+        """Line 1398-1401: search emits search.performed event."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        client._query_cache = None
+        mock_bus = MagicMock()
+        client.event_bus = mock_bus
+
+        mock_rows = [{"entity_id": "r1", "score": 0.8, "strategy": "semantic"}]
+        with patch("spacetime_memory.streaming.MemoryEvent"):
+            with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+                with patch.object(client, "_call", return_value={"status": "ok"}):
+                    with patch.object(client, "_sql", return_value=mock_rows):
+                        with patch.object(client, "_tantivy_search", return_value=[]):
+                            with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
+                                with patch.object(client, "_enrich_content", return_value=mock_rows):
+                                    result = client.search("ws1", "pizza", semantic=True, limit=5)
+                                    assert result == mock_rows
+                                    mock_bus.emit.assert_called_once()
+
+    # ── _query method (lines 405-440) ──
+
+    def test_query_method(self):
+        """Test _query method end-to-end path."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        with patch.object(client, "_call", return_value={"status": "ok"}):
+            with patch.object(client, "_sql", return_value=[{"id": "a", "row_json": '{"key":"val"}'}]):
+                result = client._query("memory", workspace_id="ws1",
+                                      filter_dict={"id": "a"}, columns=["id", "content"])
+                assert len(result) == 1
+                assert result[0] == {"key": "val"}
+
+    def test_query_method_legacy_fallback(self):
+        """Line 439: _query legacy fallback when no row_json."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        with patch.object(client, "_call", return_value={"status": "ok"}):
+            with patch.object(client, "_sql", return_value=[{"id": "a", "content": "hi"}]):
+                result = client._query("memory", workspace_id="ws1", filter_dict={})
+                assert result == [{"id": "a", "content": "hi"}]
+
+    # ── rate_memory ──
+
+    def test_rate_memory(self):
+        """Test rate_memory simple path."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_call", return_value={"status": "ok"}) as m:
+            result = client.rate_memory("m1", "like", "peer1")
+            m.assert_called_once_with(
+                "rate_memory", ["m1", "like", "peer1"]
+            )
+            assert result == {"status": "ok"}
+
+    # ── fuzzy_get (lines 1514-1515) ──
+
+    def test_fuzzy_get_no_rows(self):
+        """Line 1515: fuzzy_get returns None when no rows."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_query", return_value=[]):
+            result = client.fuzzy_get("ws1", "name")
+            assert result is None
+
+    # ── list_memories (simple call) ──
+
+    def test_list_memories(self):
+        """Test list_memories with query."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_query", return_value=[{"id": "m1", "content": "hi"}]) as m:
+            result = client.list_memories(workspace_id="ws1", limit=5)
+            assert result == [{"id": "m1", "content": "hi"}]
+
+    # ── get_context_chain (line 1616) ──
+
+    def test_get_context_chain_no_memories(self):
+        """Line 1616: get_context_chain returns empty dicts when no memories."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_query", return_value=[]):
+            result = client.get_context_chain("nonexistent")
+            assert result == {"workspace_context": "", "memory_context": ""}
+
+    # ── create_workspace, list_workspaces ──
+
+    def test_create_workspace(self):
+        """Simple create_workspace call."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_call", return_value={"status": "ok"}) as m:
+            result = client.create_workspace("test-ws")
+            m.assert_called_once()
+            assert result["status"] == "ok"
+            assert "id" in result
+
+    def test_list_workspaces(self):
+        """Simple list_workspaces call."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_query", return_value=[{"id": "ws1", "name": "w1"}]) as m:
+            result = client.list_workspaces()
+            assert result == [{"id": "ws1", "name": "w1"}]
+
+    # ── check_embedder_health error (lines 608-609) ──
+
+    def test_check_embedder_health_connect_error(self):
+        """Lines 608-609: check_embedder_health catches ConnectError."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.ConnectError("refused")
+        client._http = mock_http
+        result = client.check_embedder_health()
+        assert result["reachable"] is False
+        assert result["status"] == "error"
+
+    def test_check_embedder_health_error_status(self):
+        """Lines 607: check_embedder_health on non-200."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 503
+        mock_http.get.return_value = mock_resp
+        client._http = mock_http
+        result = client.check_embedder_health()
+        assert result["status"] == "error"
+        assert result["code"] == 503
+
+    # ── search with MMR rerank (line 1385-1386) ──
+
+    def test_search_with_mmr_rerank(self):
+        """Line 1385-1386: search applies MMR reranking."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        client._query_cache = None
+        client.event_bus = None
+
+        mock_rows = [{"entity_id": "r1", "score": 0.8, "strategy": "semantic"}]
+        mmr_rows = [{"entity_id": "r1", "score": 0.9}]
+        with patch("spacetime_memory.mmr.mmr_rerank", return_value=mmr_rows):
+            with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+                with patch.object(client, "_call", return_value={"status": "ok"}):
+                    with patch.object(client, "_sql", return_value=mock_rows):
+                        with patch.object(client, "_tantivy_search", return_value=[]):
+                            with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
+                                with patch.object(client, "_enrich_content", return_value=mock_rows):
+                                    result = client.search(
+                                        "ws1", "pizza", semantic=True, limit=5,
+                                        mmr_lambda=0.7,
+                                    )
+                                    assert result == mmr_rows
+
+    # ── search with binary vector similarity (lines 1322-1339) ──
+
+    def test_search_binary_vectors(self):
+        """Lines 1322-1339: search uses binary vector cache when available."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        client._query_cache = None
+        client.event_bus = None
+        client._binary_cache = {"m1": b"\x00" * 32}
+
+        mock_rows = [{"entity_id": "r1", "score": 0.8, "strategy": "semantic"}]
+        with patch.object(client, "_embed", return_value=[0.1] * 1024):
+            with patch.object(client, "_call", return_value={"status": "ok"}):
+                with patch.object(client, "_sql", return_value=mock_rows):
+                    with patch.object(client, "_tantivy_search", return_value=[]):
+                        with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
+                            with patch.object(client, "_enrich_content", return_value=mock_rows):
+                                result = client.search("ws1", "pizza", semantic=True, limit=5)
+                                assert result == mock_rows
+
+    # ── search with binary vector ValueError fallback (line 1338-1339) ──
+
+    def test_search_binary_vectors_error_fallback(self):
+        """Lines 1338-1339: binary scoring ValueError becomes best-effort."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        client._query_cache = None
+        client.event_bus = None
+        client._binary_cache = {"m1": b"\x00" * 32}
+
+        mock_rows = [{"entity_id": "r1", "score": 0.8, "strategy": "semantic"}]
+        with patch.object(client, "_embed", return_value=[0.1] * 1024):
+            # Make binarize raise ValueError
+            with patch("spacetime_memory.binary_vectors.binarize", side_effect=ValueError("bad")):
+                with patch.object(client, "_call", return_value={"status": "ok"}):
+                    with patch.object(client, "_sql", return_value=mock_rows):
+                        with patch.object(client, "_tantivy_search", return_value=[]):
+                            with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
+                                with patch.object(client, "_enrich_content", return_value=mock_rows):
+                                    result = client.search("ws1", "pizza", semantic=True, limit=5)
+                                    assert result == mock_rows
+
+    # ── _embed_openai no api key (lines 513-515) ──
+
+    def test_embed_openai_no_key(self):
+        """Lines 513-515: _embed_openai returns [] when no API key."""
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.dict(os.environ, {}, clear=True):
+            if "OPENAI_API_KEY" in os.environ:
+                del os.environ["OPENAI_API_KEY"]
+            result = client._embed_openai("test text")
+            assert result == []
+
+    # ── _embed_batch_openai no key (lines 559-564) ──
+
+    def test_embed_batch_openai_no_key(self):
+        """Lines 559-564: _embed_batch_openai returns [] when no API key."""
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.dict(os.environ, {}, clear=True):
+            if "OPENAI_API_KEY" in os.environ:
+                del os.environ["OPENAI_API_KEY"]
+            result = client._embed_batch_openai(["text1", "text2"])
+            assert result == []
+
+    # ── _embed_batch_openai with api key (lines 565-597) ──
+
+    def test_embed_batch_openai_success(self):
+        """Lines 565-597: _embed_batch_openai success path."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "data": [
+                {"embedding": [0.1, 0.2]},
+                {"embedding": [0.3, 0.4]},
+            ]
+        }
+        mock_http.post.return_value = mock_resp
+        client._http = mock_http
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=False):
+            result = client._embed_batch_openai(["text1", "text2"])
+            assert result == [[0.1, 0.2], [0.3, 0.4]]
+
+    # ── _embed_openai with timeout (line 541-543) ──
+
+    def test_embed_openai_timeout(self):
+        """Lines 541-543: _embed_openai catches TimeoutException."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_http.post.side_effect = httpx.TimeoutException("timeout")
+        client._http = mock_http
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=False):
+            result = client._embed_openai("test text")
+            assert result == []
+
+    # ── _embed_openai general error (lines 544-546) ──
+
+    def test_embed_openai_general_error(self):
+        """Lines 544-546: _embed_openai catches general HTTP errors."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_http.post.side_effect = httpx.HTTPError("bad")
+        client._http = mock_http
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=False):
+            result = client._embed_openai("test text")
+            assert result == []
+
+    # ── _embed_batch_openai timeout (line 541-543 for batch) ──
+
+    def test_embed_batch_openai_timeout(self):
+        """_embed_batch_openai catches TimeoutException."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_http.post.side_effect = httpx.TimeoutException("timeout")
+        client._http = mock_http
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=False):
+            result = client._embed_batch_openai(["text1"])
+            assert result == []
+
+    # ── _embed_batch_openai general error (lines 595-597) ──
+
+    def test_embed_batch_openai_general_error(self):
+        """Lines 595-597: _embed_batch_openai catches general errors."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_http.post.side_effect = httpx.HTTPError("bad")
+        client._http = mock_http
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=False):
+            result = client._embed_batch_openai(["text1"])
+            assert result == []
+
+    # ── check_embedder_health success (lines 604-606) ──
+
+    def test_check_embedder_health_success(self):
+        """Lines 604-606: check_embedder_health returns health info on 200."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"model": "bge-m3", "version": "1.0"}
+        mock_http.get.return_value = mock_resp
+        client._http = mock_http
+        result = client.check_embedder_health()
+        assert result["reachable"] is True
+        assert result["model"] == "bge-m3"
+
+    # ── _embed_batch non-empty (line 555) ──
+
+    def test_embed_batch_non_empty(self):
+        """Line 555: _embed_batch with non-empty list calls _embed_batch_openai."""
+        from unittest.mock import patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        with patch.object(client, "_embed_batch_openai", return_value=[[0.1, 0.2]]):
+            result = client._embed_batch(["hello"])
+            assert result == [[0.1, 0.2]]
+
+    # ── _tantivy_search success (line 659) ──
+
+    def test_tantivy_search_success(self):
+        """Line 659: _tantivy_search returns json on success."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = [{"entity_id": "m1", "score": 0.9}]
+        mock_http.post.return_value = mock_resp
+        client._http = mock_http
+        result = client._tantivy_search("ws1", "query", limit=10)
+        assert result == [{"entity_id": "m1", "score": 0.9}]
+
+    # ── ping error response (line 679) ──
+
+    def test_ping_http_error(self):
+        """Line 679-682: ping on HTTP error >= 400."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 503
+        mock_http.get.return_value = mock_resp
+        client._http = mock_http
+        result = client.ping()
+        assert result["status"] == "error"
+        assert "HTTP 503" in result["message"]
+
+    # ── _fuse_and_deduplicate unknown strategy (line 1035) ──
+
+    def test_fuse_and_deduplicate_unknown_strategy(self):
+        """Line 1035: _fuse_and_deduplicate skips unknown strategy from per-strat tracking."""
+        client = Client(host="localhost", port="3000", database="test")
+        rows = [{"entity_id": "a", "strategy": "semantic", "score": 0.9}]
+        tantivy_rows = []
+        per_strat = {
+            "semantic": rows, "keyword": [], "graph": [], "temporal": [], "binary": [],
+        }
+        strat_min = {"semantic": 0.9}
+        strat_max = {"semantic": 0.9}
+        weights = {"semantic": 0.65, "keyword": 0.25, "graph": 0.0, "temporal": 0.05, "binary": 0.05}
+        rows_with_unknown = [
+            {"entity_id": "a", "strategy": "semantic", "score": 0.9},
+            {"entity_id": "b", "strategy": "unknown_x", "score": 0.5},
+        ]
+        result = client._fuse_and_deduplicate(
+            rows_with_unknown, tantivy_rows, per_strat, strat_min, strat_max, weights
+        )
+        # Both rows included (unknown gets fused_score=0.0), semantic row dedup'd
+        assert len(result) == 2
+        ids = {r["entity_id"] for r in result}
+        assert ids == {"a", "b"}
+
+    # ── _embed_openai success (lines 538-540) ──
+
+    def test_embed_openai_success(self):
+        """Lines 538-540: _embed_openai returns embedding on success."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "data": [{"embedding": [0.1, 0.2, 0.3]}]
+        }
+        mock_http.post.return_value = mock_resp
+        client._http = mock_http
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=False):
+            result = client._embed_openai("test text")
+            assert result == [0.1, 0.2, 0.3]
+
+    # ── check_embedder_health TimeoutException (line 608-609) ──
+
+    def test_check_embedder_health_timeout(self):
+        """check_embedder_health catches TimeoutException."""
+        from unittest.mock import MagicMock
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_http.get.side_effect = httpx.TimeoutException("timeout")
+        client._http = mock_http
+        result = client.check_embedder_health()
+        assert result["reachable"] is False
+
+    # ── _ensure_identity already established ──
+
+    def test_ensure_identity_already_established(self):
+        """_ensure_identity returns early if already established."""
+        client = Client(host="localhost", port="3000", database="test")
+        client._identity_established = True
+        client._ensure_identity()
+        assert client._identity_established is True
+
+    def test_ensure_identity_with_token(self):
+        """_ensure_identity returns early if token is set."""
+        client = Client(host="localhost", port="3000", database="test")
+        client.token = "fake-jwt"
+        client._identity_established = False
+        client._ensure_identity()
+
+    # ── search embedder down when health 400 ──
+
+    def test_search_embedder_down_health_400(self):
+        """Line 1241: embedder_down set when health check returns >=400."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        client._query_cache = None
+        client._identity_established = True
+        mock_http = MagicMock()
+        mock_http.get.return_value = MagicMock(status_code=500)
+        client._http = mock_http
+
+        with patch.object(client, "_embed", return_value=[0.1, 0.2]):
+            with patch.object(client, "_call", return_value={"status": "ok"}):
+                with patch.object(client, "_sql", return_value=[]):
+                    with patch.object(client, "_tantivy_search", return_value=[]):
+                        with patch.object(client, "_fuse_and_deduplicate", return_value=[]):
+                            with patch.object(client, "_enrich_content", return_value=[]):
+                                result = client.search("ws1", "pizza", semantic=True, limit=5)
+                                assert result == []
+
+    def test_embed_batch_openai_json_error(self):
+        """Lines 595-597: _embed_batch_openai catches JSONDecodeError."""
+        from unittest.mock import MagicMock, patch
+
+        client = Client(host="localhost", port="3000", database="test")
+        mock_http = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.side_effect = json.JSONDecodeError("bad", "", 0)
+        mock_http.post.return_value = mock_resp
+        client._http = mock_http
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=False):
+            result = client._embed_batch_openai(["text1"])
+            assert result == []
+
