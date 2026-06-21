@@ -508,108 +508,13 @@ class Client:
     _DEFAULT_EMBEDDER_URL = 'http://localhost:9090'
 
     def _embed(self, text: str) -> list[float]:
-        """Get an embedding vector.
+        """Get an embedding vector via the configured embedding API.
 
-        Behaviour depends on ``embedder_type``:
-        - ``"local"``: use the Rust ONNX sidecar (raises on failure)
-        - ``"python"``: use the in-process Python ONNX embedder
-        - ``"openai"``: call OpenAI embeddings API
-        - ``"auto"``: try sidecar first, fall back to OpenAI. If both fail,
-          raises ``EmbedderUnavailableError`` with a combined message.
+        Only the OpenAI-compatible proxy path is active (bge-m3 through
+        spacetime-llm proxy → NVIDIA NIM, 1024-dim). Local ONNX sidecar
+        and Python embedder paths were removed Jun 2026 as dead code.
         """
-        if self.embedder_type == "openai":
-            return self._embed_openai(text)
-        if self.embedder_type == "local":
-            return self._embed_local(text)
-        if self.embedder_type == "python":
-            return self._embed_python(text)
-
-        # "auto" — try local, fall back to OpenAI
-        # Skip local trial when EMBEDDER_URL is the default and a cloud
-        # API key is available — no point waiting for a connection timeout.
-        if self.embedder_url == self._DEFAULT_EMBEDDER_URL and os.environ.get('OPENAI_API_KEY'):
-            result = self._embed_openai(text)
-            if result:
-                return result
-        try:
-            return self._embed_local(text)
-        except EmbedderUnavailableError:
-            logger.info("Local embedder unavailable, falling back to OpenAI")
-            result = self._embed_openai(text)
-            if result:
-                return result
-            raise EmbedderUnavailableError(
-                "Embedder unavailable (local sidecar down, OpenAI fallback also failed). "
-                "Check EMBEDDER_URL and OPENAI_API_KEY."
-            )
-
-    # ── model detection ────────────────────────────────────────────────
-    _bge_model_cache: bool | None = None
-    _e5_model_cache: bool | None = None
-
-    def _is_bge_model(self) -> bool:
-        """Check if the embedder is running a BGE-family model (needs query instruction prefix)."""
-        if self._bge_model_cache is not None:
-            return self._bge_model_cache
-        try:
-            resp = self._http.get(f"{self.embedder_url}/health", timeout=2.0)
-            if resp.status_code < 400:
-                model = resp.json().get("model", "").lower()
-                self._bge_model_cache = "bge" in model and "reranker" not in model
-                return self._bge_model_cache
-        except (httpx.ConnectError, httpx.TimeoutException):
-            pass
-        return False
-
-    def _is_e5_model(self) -> bool:
-        """Check if the embedder is running an E5-family model (needs 'query: ' prefix)."""
-        if self._e5_model_cache is not None:
-            return self._e5_model_cache
-        try:
-            resp = self._http.get(f"{self.embedder_url}/health", timeout=2.0)
-            if resp.status_code < 400:
-                model = resp.json().get("model", "").lower()
-                self._e5_model_cache = "e5" in model
-                return self._e5_model_cache
-        except (httpx.ConnectError, httpx.TimeoutException):
-            pass
-        return False
-
-    def _embed_local(self, text: str) -> list[float]:
-        """Get an embedding vector via the Rust ONNX sidecar."""
-        # Truncate to ~512 tokens (BGE tokenizer uses ~3.5 chars/token for English)
-        # Longer texts timeout the CPU ONNX runtime and don't improve retrieval quality
-        max_chars = 1800
-        if len(text) > max_chars:
-            text = text[:max_chars]
-        try:
-            resp = self._http.post(
-                f"{self.embedder_url}/embed",
-                content=json.dumps({"text": text}),
-                headers={"Content-Type": "application/json"},
-                timeout=10.0,
-            )
-            if resp.status_code >= 400:
-                raise EmbedderUnavailableError(
-                    f"Embedder returned HTTP {resp.status_code} for text (len={len(text)})"
-                )
-            return resp.json().get("embedding", [])
-        except httpx.TimeoutException:
-            raise EmbedderUnavailableError(f"Embedder timed out for text (len={len(text)})")
-        except httpx.ConnectError:
-            raise EmbedderUnavailableError(
-                f"Embedder connection refused at {self.embedder_url}. Is the sidecar running?"
-            )
-        except Exception:  # Truly unexpected (JSON parse, etc.) — specific HTTP errors above
-            logger.exception("Unexpected error in _embed for text (len=%d)", len(text))
-            raise
-
-    def _embed_python(self, text: str) -> list[float]:
-        """Get an embedding vector via the in-process Python ONNX embedder.
-
-        Lazily initializes the :class:`LocalEmbedder` on first call.
-        """
-        return self._embed_batch_python([text])[0]
+        return self._embed_openai(text)
 
     def _embed_openai(self, text: str) -> list[float]:
         """Embed via OpenAI API."""
@@ -656,60 +561,7 @@ class Client:
         """
         if not texts:
             return []
-        if self.embedder_type == "openai":
-            return self._embed_batch_openai(texts)
-        if self.embedder_type == "local":
-            return self._embed_batch_local(texts)
-        if self.embedder_type == "python":
-            return self._embed_batch_python(texts)
-
-        # "auto" — try local, fall back to OpenAI
-        result = self._embed_batch_local(texts)
-        if result:
-            return result
-        logger.info("Local embedder unavailable for batch, falling back to OpenAI")
         return self._embed_batch_openai(texts)
-
-    def _embed_batch_local(self, texts: list[str]) -> list[list[float]]:
-        """Get embeddings for multiple texts via the Rust ONNX sidecar."""
-        if not texts:
-            return []
-        try:
-            resp = self._http.post(
-                f"{self.embedder_url}/embed",
-                content=json.dumps({"text": "", "texts": texts}),
-                headers={"Content-Type": "application/json"},
-                timeout=30.0,
-            )
-            if resp.status_code >= 400:
-                logger.warning(
-                    "Embedder returned HTTP %d for batch (count=%d): %s",
-                    resp.status_code, len(texts), resp.text[:200],
-                )
-                return []
-            return resp.json().get("embeddings", [])
-        except httpx.TimeoutException:
-            logger.warning("Embedder timed out for batch (count=%d)", len(texts))
-            return []
-        except httpx.ConnectError:
-            logger.warning("Embedder connection refused for batch (count=%d) — is the sidecar running?", len(texts))
-            return []
-        except Exception:  # Truly unexpected (JSON parse, etc.) — specific HTTP errors above
-            logger.exception("Unexpected error in _embed_batch (count=%d)", len(texts))
-            return []
-
-    def _embed_batch_python(self, texts: list[str]) -> list[list[float]]:
-        """Get embeddings for multiple texts via the in-process Python ONNX embedder.
-
-        Lazily initializes the :class:`LocalEmbedder` on first call.
-        """
-        if not texts:
-            return []
-        from .local_embedder import LocalEmbedder
-
-        if self._local_python_embedder is None:
-            self._local_python_embedder = LocalEmbedder()
-        return self._local_python_embedder.embed_batch(texts)
 
     def _embed_batch_openai(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings for multiple texts via OpenAI API."""
@@ -1229,12 +1081,7 @@ class Client:
                     search_query = query
 
             # BGE models need query instruction prefix for asymmetric search.
-            # E5 models need "query: " prefix.
-            query_text = search_query
-            if self._is_bge_model():
-                query_text = f"Represent this sentence for searching relevant passages: {search_query}"
-            elif self._is_e5_model():
-                query_text = f"query: {search_query}"
+            query_text = f"Represent this sentence for searching relevant passages: {search_query}"
             emb = self._embed(query_text)
             emb_json = json.dumps(emb) if emb else "[]"
 

@@ -125,34 +125,34 @@ class TestClientReducer:
 class TestClientEmbed:
     """_embed() method — Rust ONNX sidecar."""
 
-    def test_embed_success(self, mock_http_client):
-        """_embed() returns the embedding vector from the sidecar."""
+    def test_embed_success(self, mock_http_client, monkeypatch):
+        """_embed() returns a valid embedding vector."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         embed_response = Mock(status_code=200)
         embed_response.json.return_value = {
-            "embedding": [0.1, 0.2, 0.3],
-            "dimension": 3,
+            "data": [{"embedding": [0.1, 0.2, 0.3]}],
         }
         mock_http_client._http.post.return_value = embed_response
 
         result = mock_http_client._embed("hello world")
         assert result == [0.1, 0.2, 0.3]
 
-    def test_embed_error_returns_empty(self, mock_http_client):
-        """_embed() raises EmbedderUnavailableError on connection error."""
+    def test_embed_error_returns_empty(self, mock_http_client, monkeypatch):
+        """_embed() returns [] on connection error."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         import httpx
-        from spacetime_memory.client import EmbedderUnavailableError
         mock_http_client._http.post.side_effect = httpx.ConnectError("Connection refused")
 
-        with pytest.raises(EmbedderUnavailableError):
-            mock_http_client._embed("hello")
+        result = mock_http_client._embed("hello")
+        assert result == []
 
-    def test_embed_http_error_returns_empty(self, mock_http_client):
-        """_embed() raises EmbedderUnavailableError when embedder returns HTTP >= 400."""
-        from spacetime_memory.client import EmbedderUnavailableError
+    def test_embed_http_error_returns_empty(self, mock_http_client, monkeypatch):
+        """_embed() returns [] when the proxy returns HTTP >= 400."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         mock_http_client._http.post.return_value = Mock(status_code=503, text="")
 
-        with pytest.raises(EmbedderUnavailableError):
-            mock_http_client._embed("hello")
+        result = mock_http_client._embed("hello")
+        assert result == []
 
 
 class TestClientWorkspace:

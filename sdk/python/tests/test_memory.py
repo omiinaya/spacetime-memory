@@ -28,13 +28,14 @@ class TestMemoryStore:
         first_call_args = mock_http_client._http.post.call_args_list[0]
         assert "/v1/database/test-db/call/store_memory" in first_call_args.args[0]
 
-    def test_store_with_auto_index(self, mock_http_client):
+    def test_store_with_auto_index(self, mock_http_client, monkeypatch):
         """store() auto-indexes when embedder returns a vector."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         # Mock for the embedder call specifically
         def post_side_effect(*args, **kwargs):
-            if "/embed" in args[0]:
+            if "/embeddings" in args[0]:
                 emb_resp = Mock(status_code=200)
-                emb_resp.json.return_value = {"embedding": [0.1, 0.2, 0.3], "dimension": 3}
+                emb_resp.json.return_value = {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
                 return emb_resp
             # Reducer calls (store_memory, index_entity)
             red_resp = Mock(status_code=200)
@@ -66,12 +67,13 @@ class TestMemoryStore:
         # Should have called embed + store_memory + sql SELECT + index_entity
         assert mock_http_client._http.post.call_count >= 3
 
-    def test_store_with_tier(self, mock_http_client):
+    def test_store_with_tier(self, mock_http_client, monkeypatch):
         """store() updates tier when tier is L0/L1/L2."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         def post_side_effect(*args, **kwargs):
-            if "/embed" in args[0]:
+            if "/embeddings" in args[0]:
                 emb_resp = Mock(status_code=200)
-                emb_resp.json.return_value = {"embedding": [0.1, 0.2, 0.3]}
+                emb_resp.json.return_value = {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
                 return emb_resp
             red_resp = Mock(status_code=200)
             red_resp.text = "{}"
@@ -101,13 +103,14 @@ class TestMemoryStore:
 class TestMemorySearch:
     """search() method — hybrid and keyword search."""
 
-    def test_search_semantic(self, mock_http_client):
+    def test_search_semantic(self, mock_http_client, monkeypatch):
         """search() with semantic=True calls hybrid_search reducer."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         # Mock the embedder to return a proper vector
         def post_side_effect(*args, **kwargs):
-            if "/embed" in args[0]:
+            if "/embeddings" in args[0]:
                 emb_resp = Mock(status_code=200)
-                emb_resp.json.return_value = {"embedding": [0.1, 0.2, 0.3]}
+                emb_resp.json.return_value = {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
                 return emb_resp
             # SQL / reducer calls
             resp = Mock(status_code=200)
@@ -144,13 +147,14 @@ class TestMemorySearch:
         assert len(result) == 1
         assert "pizza" in result[0]["content"]
 
-    def test_search_with_filters(self, mock_http_client):
+    def test_search_with_filters(self, mock_http_client, monkeypatch):
         """search_with_filters applies metadata and location filters."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         # We need hybrid_search + SQL results for the search + filter path
         def post_side_effect(*args, **kwargs):
-            if "/embed" in args[0]:
+            if "/embeddings" in args[0]:
                 emb_resp = Mock(status_code=200)
-                emb_resp.json.return_value = {"embedding": [0.1, 0.2, 0.3]}
+                emb_resp.json.return_value = {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
                 return emb_resp
             resp = Mock(status_code=200)
             resp.text = make_sql_response([])

@@ -126,13 +126,13 @@ def mock_http_client():
         text=json.dumps([]),
         json=lambda: [],
     )
-    # Embedder health endpoint: return 200 so _is_bge_model() doesn't crash
+    # Embedder health endpoint mock: return 200 so health checks pass
     mock_http.get.return_value = Mock(
         status_code=200,
-        json=lambda: {"model": "mock"},
+        json=lambda: {"model": "bge-m3"},
     )
     client._http = mock_http
-    yield client
+    return client
 
 
 @pytest.fixture

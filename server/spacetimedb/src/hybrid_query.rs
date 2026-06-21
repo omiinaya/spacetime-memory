@@ -170,7 +170,7 @@ pub fn hybrid_search(
     tier: String,
     limit: u32,
     strategies_json: String,
-    polyphonic: bool,
+    _polyphonic: bool,
     mmr_lambda: f64,
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
@@ -571,46 +571,11 @@ pub fn hybrid_search(
         }
     }
 
-    // ── Result Fusion ────────────────────────────────────────────────
-    // ── Score Normalization ────────────────────────────────────────
-    // Normalize each strategy's raw scores to [0, 1] range independently.
-    // The Python SDK handles the actual weighted fusion with its own
-    // configurable weights — don't fuse here or the client's per-strategy
-    // grouping will operate on already-combined scores.
-    //
-    // Polyphonic mode uses RRF which inherently normalizes via rank
-    // position — skip per-strategy min-max for that path.
-    if !polyphonic {
-        let all_rows: Vec<_> = ctx
-            .db
-            .hybrid_result()
-            .iter()
-            .take(MAX_RESULTS)
-            .filter(|r| r.query_hash == qhash && r.workspace_id == workspace_id)
-            .collect();
-
-        if all_rows.len() >= 2 {
-            let mut strat_min: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
-            let mut strat_max: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
-            for row in &all_rows {
-                let e = strat_min.entry(row.strategy.clone()).or_insert(f64::MAX);
-                *e = e.min(row.score);
-                let e = strat_max.entry(row.strategy.clone()).or_insert(f64::MIN);
-                *e = e.max(row.score);
-            }
-            for mut row in all_rows {
-                let min_s = strat_min.get(&row.strategy).copied().unwrap_or(0.0);
-                let max_s = strat_max.get(&row.strategy).copied().unwrap_or(1.0);
-                let range = max_s - min_s;
-                if range > 1e-10 {
-                    row.score = ((row.score - min_s) / range).max(0.0).min(1.0);
-                } else {
-                    row.score = 1.0; // Single result per strategy
-                }
-                ctx.db.hybrid_result().id().update(row);
-            }
-        }
-    }
+    // ── Score Normalization REMOVED ────────────────────────────────
+    // Min-max normalization was done here but the Python SDK's fusion
+    // pipeline (client.py search()) does its own per-strategy min-max
+    // before weighted fusion. Double normalization flattened score
+    // distributions. The SDK handles it correctly. (Removed Jun 2026.)
 
     // ── MMR (Maximal Marginal Relevance) Reranking ─────────────────
     // When mmr_lambda > 0.0, re-rank results to balance relevance
