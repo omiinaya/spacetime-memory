@@ -1085,10 +1085,17 @@ class Client:
             # Check embedder health — if down, exclude semantic strategy and warn
             embedder_down = not emb
             if not embedder_down and emb:
-                # Double-check: try a health ping
+                # Double-check: try a health ping. Use the OpenAI base URL
+                # when embedding through the proxy, fall back to embedder_url.
+                health_url = self.embedder_url
+                import os as _os
+                base = _os.environ.get("OPENAI_BASE_URL", "").rstrip("/")
+                if base and _os.environ.get("OPENAI_API_KEY"):
+                    # Proxy health check: strip /v1 to get the root
+                    health_url = base.replace("/v1", "") if "/v1" in base else base
                 try:
                     health = self._http.get(
-                        f"{self.embedder_url}/health", timeout=2.0,
+                        f"{health_url}/health", timeout=2.0,
                     )
                     embedder_down = health.status_code >= 400
                 except (httpx.ConnectError, httpx.TimeoutException):
