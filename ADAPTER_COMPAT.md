@@ -247,7 +247,7 @@ Adapter: Architecture parity — not a library adapter. QMD is a Node.js CLI; Sp
 |--------|--------|-------|
 | Document indexing (markdown) | ✅ | `Document` + `DocChunk` tables with embeddings |
 | Keyword search (BM25) | ✅ | `hybrid_search` keyword strategy |
-| Vector/semantic search | ✅ | `hybrid_search` semantic strategy + ONNX embedder |
+| Vector/semantic search | ✅ | `hybrid_search` semantic strategy + proxy → NVIDIA NIM (bge-m3) |
 | Hybrid search + fusion | ✅ | `hybrid_search` multi-strategy with score fusion |
 | Collections (workspace-scoped) | ✅ | `workspace` table with ACL |
 | MCP server | ✅ | `server/mcp/` — 15 tools (query, get, multi-get, status equivalents) |

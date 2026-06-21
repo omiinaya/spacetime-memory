@@ -8,7 +8,7 @@ Similarity is computed via Hamming distance (bitwise XOR + popcount), which
 is deterministic, integer-only, and faster than cosine similarity for large
 vector sets.
 
-1024-dim bge-large:  4096 bytes (float32) → 128 bytes (binary) = 32× compression
+1024-dim bge-m3:  4096 bytes (float32) → 128 bytes (binary) = 32× compression
 
 Usage::
 

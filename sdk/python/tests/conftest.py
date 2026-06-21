@@ -9,8 +9,9 @@ Markers
   no marker is set on the test), runs ``pytest -m unit``.
 - ``integration`` — tests that require a running SpacetimeDB standalone and
   the module published, runs ``pytest -m integration``.
-- ``embedder`` — subset of integration tests that also require the Rust ONNX
-  embedder sidecar running on :9090.
+- ``embedder`` — subset of integration tests that also require the proxy
+  embedder. Set ``OPENAI_API_KEY`` + ``OPENAI_BASE_URL`` + ``EMBEDDING_MODEL``
+  before running these tests.
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ from spacetime_memory import Client
 def pytest_configure(config):
     config.addinivalue_line("markers", "unit: tests that mock HTTP (no SpacetimeDB needed)")
     config.addinivalue_line("markers", "integration: tests that need a running SpacetimeDB standalone")
-    config.addinivalue_line("markers", "embedder: tests that also need the ONNX embedder sidecar")
+    config.addinivalue_line("markers", "embedder: tests that also need the proxy embedder (set OPENAI_API_KEY)")
 
 
 def pytest_collection_modifyitems(config, items):

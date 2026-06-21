@@ -1141,7 +1141,7 @@ class ZepClient:
     ) -> list[Session]:
         """Search sessions by semantic relevance to the query.
 
-        Tries semantic search first (requires an embedder -- local ONNX sidecar
+        Tries semantic search first (requires an embedder — proxy → NVIDIA NIM
         or OpenAI API key).  Falls back to session-name substring matching when
         no embedding is available.
 

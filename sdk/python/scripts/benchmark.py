@@ -467,7 +467,7 @@ def format_markdown(results: list[dict[str, float]]) -> str:
     lines.append("")
     lines.append("- **Batch store** benchmarks run *n* individual `store_memory` calls sequentially to")
     lines.append("  simulate bulk-insert patterns. The latency shown is for the entire batch.")
-    lines.append("- **Semantic search** calls the embedder (local ONNX sidecar or OpenAI) and then")
+    lines.append("- **Semantic search** calls the embedder (proxy → NVIDIA NIM) and then")
     lines.append("  runs a hybrid search reducer on SpacetimeDB.")
     lines.append("- **Keyword search** (semantic=False) fetches all active memories from the workspace")
     lines.append("  and filters client-side, since SpacetimeDB SQL does not support `LIKE`.")

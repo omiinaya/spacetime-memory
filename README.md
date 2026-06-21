@@ -88,8 +88,8 @@ Additional features inspired by many projects (data model, schedules, CLI design
 │  └──────────────────────────────────────────────┘  └────────────┘  │
 │                                                                     │
 │  ┌──────────────────────────────────────────────┐                   │
-│  │  Rust ONNX Embedder Sidecar (:9090)          │                   │
-│  │  (all-MiniLM-L6-v2, 384d)                    │                   │
+│  │  spacetime-llm proxy (:4000) — Embeddings     │                   │
+│  │  (baai/bge-m3 → NVIDIA NIM, 1024d)             │                   │
 │  └──────────────────────────────────────────────┘                   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -231,11 +231,12 @@ spacetime publish spacetime-memory -p ./ --yes
 ### 4. Start Embedder Sidecar
 
 ```bash
-# The embedder is a compiled Rust binary (tract + all-MiniLM-L6-v2)
-# It's pre-built at server/embedder/target/release/embedder
-# Or build from source:
-cd server/embedder && cargo build --release
-./target/release/embedder   # Listens on :9090
+# Embeddings are routed through the spacetime-llm proxy (localhost:4000)
+# which forwards to NVIDIA NIM (baai/bge-m3, 1024-dim).
+# Set env vars:
+#   OPENAI_API_KEY=<your-key>
+#   OPENAI_BASE_URL=http://localhost:4000/v1
+#   EMBEDDING_MODEL=baai/bge-m3
 ```
 
 ### 5. Install Python SDK & CLI

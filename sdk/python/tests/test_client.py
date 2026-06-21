@@ -124,7 +124,7 @@ class TestClientReducer:
 
 
 class TestClientEmbed:
-    """_embed() method — Rust ONNX sidecar."""
+    """_embed() method — proxy → NVIDIA NIM bge-m3."""
 
     def test_embed_success(self, mock_http_client, monkeypatch):
         """_embed() returns a valid embedding vector."""

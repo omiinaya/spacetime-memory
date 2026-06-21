@@ -30,13 +30,14 @@ Without a token, SpacetimeDB assigns ephemeral HTTP identities per request
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `EMBEDDER_URL` | `http://localhost:9090` | URL of the ONNX embedder sidecar |
-| `EMBEDDER_TYPE` | `auto` | Embedder mode: `local` (sidecar only, fail if unreachable), `openai` (API only), `auto` (try sidecar, fall back to OpenAI) |
-| `OPENAI_API_KEY` | *(none)* | OpenAI API key for `openai` or `auto` embedder fallback |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible API endpoint |
+| `EMBEDDER_URL` | `http://localhost:4000` | URL of the spacetime-llm proxy (health check) |
+| `EMBEDDER_TYPE` | `openai` | Embedder mode: `openai` (proxy → NVIDIA NIM bge-m3) |
+| `OPENAI_API_KEY` | *(none)* | API key for proxy embedding and LLM calls |
+| `OPENAI_BASE_URL` | `http://localhost:4000/v1` | OpenAI-compatible API endpoint (local proxy) |
+| `EMBEDDING_MODEL` | `baai/bge-m3` | Embedding model name (routed through proxy → NVIDIA NIM) |
 
-The embedder sidecar runs `all-MiniLM-L6-v2` ONNX model on port 9090.
-In `auto` mode, the SDK tries the sidecar first, then OpenAI.
+The proxy at `localhost:4000` forwards embedding requests to NVIDIA NIM (bge-m3, 1024-dim).
+Set `OPENAI_API_KEY` to authenticate with the proxy.
 
 ## Retry & Resilience
 

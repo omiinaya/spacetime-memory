@@ -7,8 +7,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "sdk" / "python"
 import httpx
 from spacetime_memory import Client
 
-DB = open(os.path.join(os.path.dirname(__file__), "..", "data", "database_identity")).read().strip()
-EMB = os.environ.get("EMBEDDER_URL", "http://localhost:9092")
+DB = os.environ.get("SPACETIMEDB_DB", "")
+if not DB:
+    db_file = os.path.join(os.path.dirname(__file__), "..", "data", "database_identity")
+    if os.path.exists(db_file):
+        DB = open(db_file).read().strip()
+EMB = os.environ.get("EMBEDDER_URL", "http://localhost:4000")
 TANTIVY = "http://localhost:9091"
 
 # SAMPLE_CONTENT — 1000 pre-baked sentences

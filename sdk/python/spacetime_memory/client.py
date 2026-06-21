@@ -1,7 +1,7 @@
 """Python client for spacetime-memory.
 
 Provides a high-level Client class that wraps the SpacetimeDB HTTP SQL API,
-the reducer-call endpoint, and embedder support (Rust ONNX sidecar + OpenAI
+the reducer-call endpoint, and embedder support (OpenAI-compatible proxy → NVIDIA NIM).
 API fallback).
 """
 
@@ -137,11 +137,7 @@ class Client:
 
     Embedder type can be one of:
 
-    - ``"local"`` — use the Rust ONNX sidecar (HTTP, default behaviour)
-    - ``"python"`` — use the in-process Python ONNX embedder
-      (requires ``onnxruntime`` and ``tokenizers`` — install via
-      ``pip install 'spacetime-memory[local-embed]'``)
-    - ``"openai"`` — use OpenAI's embeddings API
+    - ``"openai"`` — use the OpenAI-compatible proxy (HTTP → NVIDIA NIM, default when API key is set)
     - ``"auto"`` — try the sidecar first, fall back to OpenAI if unavailable
 
     When using ``"openai"`` or ``"auto"`` fallback, set ``OPENAI_API_KEY``
@@ -507,9 +503,8 @@ class Client:
     def _embed(self, text: str) -> list[float]:
         """Get an embedding vector via the configured embedding API.
 
-        Only the OpenAI-compatible proxy path is active (bge-m3 through
-        spacetime-llm proxy → NVIDIA NIM, 1024-dim). Local ONNX sidecar
-        and Python embedder paths were removed Jun 2026 as dead code.
+        Uses the OpenAI-compatible proxy path (bge-m3 through
+        spacetime-llm proxy → NVIDIA NIM, 1024-dim).
         """
         return self._embed_openai(text)
 
@@ -1134,7 +1129,7 @@ class Client:
 
             # ── Weighted min-max fusion ──
             # Normalize each strategy to [0,1] via min-max, then weighted sum.
-            # Semantic (0.65): strongest signal — bge-large-en-v1.5 (1024d)
+            # Semantic (0.65): strongest signal — bge-m3 (1024d)
             # Keyword (0.25): Tantivy's real Okapi BM25 with stemming + IDF.
             # Binary (0.05): MIB binary vector Hamming similarity — fast, orthogonal signal.
             # Graph (0.00), temporal (0.05): removed — graph is substring-matching

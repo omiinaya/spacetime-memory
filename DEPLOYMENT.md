@@ -67,7 +67,7 @@ open http://localhost:5173
 
 This starts:
 - **SpacetimeDB** (port 3001) — the core persistence engine
-- **ONNX embedder** (port 9090) — vector embeddings for semantic search
+- **spacetime-llm proxy** (port 4000) — embeddings routed to NVIDIA NIM (bge-m3)
 - **Frontend** (port 5173) — React dashboard
 
 ### Upgrade
@@ -98,22 +98,14 @@ curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1
 spacetime version
 ```
 
-### 2. Download the embedding model
+### 2. Download embedding model
+
+Embeddings are routed through the spacetime-llm proxy (localhost:4000) which forwards to NVIDIA NIM. No local model download needed.
 
 ```bash
-pip install huggingface-hub
-bash scripts/download-model.sh
+# Ensure the spacetime-llm proxy is running with baai/bge-m3 registered
+curl http://localhost:4000/health
 ```
-
-### 3. Build the embedder sidecar
-
-```bash
-cd server/embedder
-cargo build --release
-cp target/release/embedder /usr/local/bin/
-```
-
-### 4. Publish the SpacetimeDB module
 
 ```bash
 spacetime start --listen-addr 0.0.0.0:3001 --data-dir data/ &
@@ -121,7 +113,7 @@ cd server/spacetimedb
 spacetime publish --project-path . spacetime-memory
 ```
 
-### 5. Install Python SDK + CLI
+### 4. Install Python SDK + CLI
 
 ```bash
 pip install -e sdk/python
@@ -131,11 +123,14 @@ pip install -e cli
 ### 6. Start the embedder
 
 ```bash
-export MODEL_PATH=server/embedder/model/all-MiniLM-L6-v2.onnx
-embedder &
+# Embeddings are routed through the spacetime-llm proxy (:4000).
+# Ensure the proxy is running and baai/bge-m3 is registered.
+# Set env vars:
+export OPENAI_BASE_URL=http://localhost:4000/v1
+export EMBEDDING_MODEL=baai/bge-m3
 ```
 
-### 7. Build and serve the frontend
+### 5. Build and serve the frontend
 
 ```bash
 cd client
@@ -166,16 +161,16 @@ All configuration uses environment variables. See [CONFIG.md](CONFIG.md) for the
 | `SPACETIMEDB_PORT` | `3001` | SpacetimeDB HTTP port |
 | `SPACETIMEDB_DB` | `spacetime-memory` | Database identity |
 
-### OpenAI embedding fallback (recommended)
+### Proxy embedding (required)
 
-The system uses a local ONNX embedder by default (`all-MiniLM-L6-v2`, 384d). For higher quality or as fallback:
+Embeddings are routed through the spacetime-llm proxy (localhost:4000) → NVIDIA NIM (bge-m3, 1024-dim).
 
 ```env
-EMBEDDER_TYPE=auto
+EMBEDDER_TYPE=openai
+EMBEDDING_MODEL=baai/bge-m3
+OPENAI_BASE_URL=http://localhost:4000/v1
 OPENAI_API_KEY=sk-...
 ```
-
-With `EMBEDDER_TYPE=auto`, the system tries the local embedder first, then falls back to OpenAI `text-embedding-3-small` if the local one is unavailable.
 
 ### Authentication
 
@@ -362,7 +357,7 @@ The embedder exposes `/health` (GET) — returns `{"status": "ok"}` when ready.
 │  memories · graph · sessions · profiles      │
 │  facts · notes · directories · auth          │
 ├──────────────────────────────────────────────┤
-│          ONNX Embedder (:9090)               │
-│          all-MiniLM-L6-v2 → 384d vectors     │
+│     spacetime-llm proxy (:4000)              │
+│     baai/bge-m3 → NVIDIA NIM (1024d)         │
 └──────────────────────────────────────────────┘
 ```
