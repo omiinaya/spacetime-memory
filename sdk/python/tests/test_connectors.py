@@ -251,6 +251,204 @@ class TestTwitterConnector:
                 workspace_id="ws-1",
             )
 
+    def test_poll_with_list_id(self):
+        """poll() works with list_id instead of user_id."""
+        mock_response = Mock(status_code=200)
+        mock_response.json.return_value = {
+            "data": [
+                {
+                    "id": "tweet-list-1",
+                    "text": "List tweet!",
+                    "author_id": "user-1",
+                    "created_at": "2024-01-01T00:00:00Z",
+                }
+            ]
+        }
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.return_value = mock_response
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                list_id="list-1",
+                workspace_id="ws-1",
+            )
+
+            events = connector.poll()
+
+        assert len(events) == 1
+        assert "List tweet!" in events[0].content
+
+    def test_poll_rate_limited(self):
+        """poll() returns empty on 429."""
+        mock_response = Mock(status_code=429)
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.return_value = mock_response
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                user_id="user-1",
+                workspace_id="ws-1",
+            )
+
+            events = connector.poll()
+
+        assert events == []
+
+    def test_poll_unauthorized(self):
+        """poll() returns empty on 401."""
+        mock_response = Mock(status_code=401)
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.return_value = mock_response
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                user_id="user-1",
+                workspace_id="ws-1",
+            )
+
+            events = connector.poll()
+
+        assert events == []
+
+    def test_poll_unexpected_status(self):
+        """poll() returns empty on unexpected status (e.g. 500)."""
+        mock_response = Mock(status_code=500)
+        mock_response.text = "Internal Server Error"
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.return_value = mock_response
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                user_id="user-1",
+                workspace_id="ws-1",
+            )
+
+            events = connector.poll()
+
+        assert events == []
+
+    def test_poll_request_error(self):
+        """poll() returns empty on httpx.RequestError."""
+        import httpx
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.side_effect = httpx.RequestError("timeout")
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                user_id="user-1",
+                workspace_id="ws-1",
+            )
+
+            events = connector.poll()
+
+        assert events == []
+
+    def test_poll_empty_data(self):
+        """poll() handles empty data array."""
+        mock_response = Mock(status_code=200)
+        mock_response.json.return_value = {"data": []}
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.return_value = mock_response
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                user_id="user-1",
+                workspace_id="ws-1",
+            )
+
+            events = connector.poll()
+
+        assert events == []
+
+    def test_poll_no_data_key(self):
+        """poll() handles response without data key."""
+        mock_response = Mock(status_code=200)
+        mock_response.json.return_value = {}
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.return_value = mock_response
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                user_id="user-1",
+                workspace_id="ws-1",
+            )
+
+            events = connector.poll()
+
+        assert events == []
+
+    def test_poll_deduplication(self):
+        """poll() skips already-seen tweet IDs."""
+        mock_response = Mock(status_code=200)
+        mock_response.json.return_value = {
+            "data": [
+                {
+                    "id": "tweet-dup",
+                    "text": "Seen before",
+                    "author_id": "user-1",
+                    "created_at": "2024-01-01T00:00:00Z",
+                }
+            ]
+        }
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.return_value = mock_response
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                user_id="user-1",
+                workspace_id="ws-1",
+            )
+
+            events1 = connector.poll()
+            events2 = connector.poll()
+
+        assert len(events1) == 1
+        assert len(events2) == 0
+
+    def test_tweet_no_created_at(self):
+        """Tweet without created_at still works."""
+        mock_response = Mock(status_code=200)
+        mock_response.json.return_value = {
+            "data": [
+                {
+                    "id": "tweet-no-date",
+                    "text": "No date tweet",
+                    "author_id": "user-1",
+                }
+            ]
+        }
+
+        with patch("httpx.Client") as MockClient:
+            mock_client_instance = MockClient.return_value.__enter__.return_value
+            mock_client_instance.get.return_value = mock_response
+
+            connector = TwitterConnector(
+                bearer_token="AAAAfake",
+                user_id="user-1",
+                workspace_id="ws-1",
+            )
+
+            events = connector.poll()
+
+        assert len(events) == 1
+        assert events[0].content == "No date tweet"
+
 
 class TestWebhookConnector:
     """WebhookConnector — processes incoming HTTP payloads."""

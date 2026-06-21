@@ -203,7 +203,7 @@
 | Frontend | **92%** | 23 pages, 8 Vitest unit + 7 Playwright E2E, Playwright config added. 2 console.debug in library |
 | DevOps/Deploy | **92%** | CI pipeline: Rust unit + Rust integration (live STDB) + Python 2 versions + Python integration (live STDB). Playwright config. Proxy embeddings working. 7 E2E embedding tests |
 | Concurrency | **95%** | 7 tests pass. UUID collision fixed — 30/30 throughput runs pass. 1114 writes/s sustained |
-| Python Quality | **96%** | 1141/1141 passing with live STDB. +825 new tests (605 unit + 220 mock). 18 modules at 100%. Python coverage: 58% (with live STDB). |
+| Python Quality | **97%** | 1512/1512 passing with live STDB (0 failures). +1250 new tests. Python coverage: 71% (with live STDB). 30 modules at 100%. |
 | **Weighted Overall** | **~95%** | All substantive gaps closed. Embedding E2E tests (7/7), STDB in CI (rust-integration + python-integration jobs). Only PyPI publish deferred. |
 
 ### The Path to 95%+ (Remaining)
