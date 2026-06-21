@@ -406,3 +406,328 @@ pub fn extract_entities(
     );
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── is_company_suffix ──────────────────────────────────────────────
+
+    #[test]
+    fn test_company_suffix_known() {
+        assert!(is_company_suffix("Inc"));
+        assert!(is_company_suffix("LLC"));
+        assert!(is_company_suffix("Corp"));
+        assert!(is_company_suffix("Ltd"));
+        assert!(is_company_suffix("GmbH"));
+        assert!(is_company_suffix("Technologies"));
+        assert!(is_company_suffix("Ventures"));
+        assert!(is_company_suffix("Labs"));
+        assert!(is_company_suffix("AI"));
+        assert!(is_company_suffix("Software"));
+    }
+
+    #[test]
+    fn test_company_suffix_case_insensitive() {
+        assert!(is_company_suffix("inc"));
+        assert!(is_company_suffix("llc"));
+        assert!(is_company_suffix("gmbh"));
+        assert!(is_company_suffix("ltd"));
+    }
+
+    #[test]
+    fn test_company_suffix_not_a_suffix() {
+        assert!(!is_company_suffix("Banana"));
+        assert!(!is_company_suffix(""));
+        assert!(!is_company_suffix("Apple"));
+        assert!(!is_company_suffix("Corporation")); // "Corp" yes, "Corporation" no
+    }
+
+    // ── is_proper_word ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_proper_word_valid() {
+        assert!(is_proper_word("Alice"));
+        assert!(is_proper_word("Bob"));
+        assert!(is_proper_word("Zurich"));
+        assert!(is_proper_word("Python"));
+    }
+
+    #[test]
+    fn test_proper_word_invalid() {
+        assert!(!is_proper_word("alice"));       // lowercase
+        assert!(!is_proper_word("ALICE"));       // all caps
+        assert!(!is_proper_word("a"));           // too short, lowercase
+        assert!(!is_proper_word(""));            // empty
+        assert!(!is_proper_word("AlIcE"));       // mixed case
+    }
+
+    #[test]
+    fn test_proper_word_single_char() {
+        // Single uppercase char: chars().next() = Some('A') is uppercase,
+        // chars().all() on remaining (none) is vacuously true → returns true.
+        // This is the correct behavior — a single-char proper word is valid.
+        assert!(is_proper_word("A"));
+        assert!(is_proper_word("Z"));
+    }
+
+    // ── entity_score ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_entity_score_noise_words() {
+        for word in &["the", "and", "for", "with", "this", "that", "from",
+                       "have", "been", "was", "are", "has", "had", "not",
+                       "but", "its", "his", "her", "they", "will", "would",
+                       "could", "should", "there", "their", "about", "which",
+                       "when", "where", "what", "into", "over"] {
+            assert_eq!(entity_score(word), 0, "noise word '{}' should score 0", word);
+        }
+    }
+
+    #[test]
+    fn test_entity_score_too_short() {
+        assert_eq!(entity_score("ab"), 0);
+        assert_eq!(entity_score("a"), 0);
+        assert_eq!(entity_score(""), 0);
+    }
+
+    #[test]
+    fn test_entity_score_valid() {
+        assert_eq!(entity_score("Alice"), 1);
+        assert_eq!(entity_score("OpenAI"), 1);
+        assert_eq!(entity_score("Rust"), 1);
+        assert_eq!(entity_score("Garry"), 1);
+    }
+
+    #[test]
+    fn test_entity_score_case_insensitive_noise() {
+        // entity_score lowercases first, so "The" → "the" → noise = 0
+        assert_eq!(entity_score("The"), 0);
+        assert_eq!(entity_score("AND"), 0);
+    }
+
+    // ── extract_single_words ───────────────────────────────────────────
+
+    #[test]
+    fn test_extract_single_words_tech_names() {
+        let mentions = extract_single_words("We use Python and Docker");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"Python"));
+        assert!(names.contains(&"Docker"));
+    }
+
+    #[test]
+    fn test_extract_single_words_skips_sentence_starters() {
+        let mentions = extract_single_words("Python is great. Docker runs containers.");
+        // "Python" is first word — should be skipped as sentence starter
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(!names.contains(&"Python"), "first word 'Python' is sentence starter, should be skipped");
+        // "Docker" follows a period — also a sentence starter
+        assert!(!names.contains(&"Docker"), "'Docker' after period is sentence starter, should be skipped");
+    }
+
+    #[test]
+    fn test_extract_single_words_skips_common_words() {
+        let mentions = extract_single_words("The First Based Given after Some");
+        assert!(mentions.is_empty(), "all common capitalized words should be skipped");
+    }
+
+    #[test]
+    fn test_extract_single_words_skips_short() {
+        let mentions = extract_single_words("Go is fast but C is faster");
+        // "Go" and "C" are <3 chars → skipped
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_single_words_skips_followed_by_capitalized() {
+        // "Garry Tan" — "Garry" followed by capitalized "Tan" → extract_people territory
+        let mentions = extract_single_words("Garry Tan works here");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(!names.contains(&"Garry"), "'Garry' followed by capitalized 'Tan', should be skipped");
+    }
+
+    #[test]
+    fn test_extract_single_words_empty() {
+        let mentions = extract_single_words("");
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_single_words_concept_type() {
+        let mentions = extract_single_words("After lunch, Python was discussed");
+        // "Python" is a tech name → entity_type should be "technology"
+        let python = mentions.iter().find(|m| m.name == "Python").unwrap();
+        assert_eq!(python.entity_type, "technology");
+    }
+
+    #[test]
+    fn test_extract_single_words_non_tech_concept() {
+        // "Canada" — not a tech name, 6 chars, capitalized → concept
+        let mentions = extract_single_words("After lunch, Canada exports maple");
+        let canada = mentions.iter().find(|m| m.name == "Canada");
+        assert!(canada.is_some());
+        assert_eq!(canada.unwrap().entity_type, "concept");
+    }
+
+    // ── extract_acronyms ───────────────────────────────────────────────
+
+    #[test]
+    fn test_extract_acronyms_valid() {
+        let mentions = extract_acronyms("The API and DB are running on AWS");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"API"));
+        assert!(names.contains(&"DB"));
+        assert!(names.contains(&"AWS"));
+    }
+
+    #[test]
+    fn test_extract_acronyms_with_digits() {
+        let mentions = extract_acronyms("GPT4 and BERT2 are models");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"GPT4"));
+        assert!(names.contains(&"BERT2"));
+    }
+
+    #[test]
+    fn test_extract_acronyms_skips_noise() {
+        let mentions = extract_acronyms("THE AND FOR NOT BUT ITS ARE");
+        assert!(mentions.is_empty(), "all noise acronyms should be skipped");
+    }
+
+    #[test]
+    fn test_extract_acronyms_length_bounds() {
+        let mentions = extract_acronyms("A BC ABCDEF KLMNOPQ");
+        // "A" < 2 → skip, "BC" valid, "ABCDEF" = 6 valid, "KLMNOPQ" = 7 → skip
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"BC"));
+        assert!(names.contains(&"ABCDEF"));
+        assert!(!names.contains(&"A"));
+        assert!(!names.contains(&"KLMNOPQ"));
+    }
+
+    #[test]
+    fn test_extract_acronyms_lowercase_skipped() {
+        let mentions = extract_acronyms("api is lowercase");
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_acronyms_empty() {
+        let mentions = extract_acronyms("");
+        assert!(mentions.is_empty());
+    }
+
+    // ── extract_people ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_extract_people_two_word_names() {
+        let mentions = extract_people("Garry Tan and Sam Altman spoke");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"Garry Tan"));
+        assert!(names.contains(&"Sam Altman"));
+    }
+
+    #[test]
+    fn test_extract_people_wrong_case() {
+        let mentions = extract_people("garry tan is lowercase");
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_people_single_name_not_extracted() {
+        let mentions = extract_people("Alice wrote the code");
+        // Single word — no pair → not extracted
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_people_short_names_filtered() {
+        // "A Bc" — first word "A" has len 1 → entity_score returns 0 (len < 3)
+        let mentions = extract_people("A Bc and Xy Zz are here");
+        // "A" is too short, "Xy" len=2 → entity_score=0
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_people_false_positives_filtered() {
+        // "I The" — "I" is short (len 1), should be filtered
+        let mentions = extract_people("I The person said hi");
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_people_middle_of_sentence() {
+        let mentions = extract_people("The speaker John Doe presented today");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"John Doe"));
+    }
+
+    #[test]
+    fn test_extract_people_empty() {
+        let mentions = extract_people("");
+        assert!(mentions.is_empty());
+    }
+
+    // ── extract_companies ──────────────────────────────────────────────
+
+    #[test]
+    fn test_extract_companies_with_suffix() {
+        let mentions = extract_companies("OpenAI Inc and Google LLC are big");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"OpenAI Inc"));
+        assert!(names.contains(&"Google LLC"));
+    }
+
+    #[test]
+    fn test_extract_companies_multi_word() {
+        let mentions = extract_companies("Atlas Venture Partners raised a fund");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"Atlas Venture Partners"));
+    }
+
+    #[test]
+    fn test_extract_companies_suffix_at_start() {
+        // "Inc" at position 0 — no preceding capitalized words
+        let mentions = extract_companies("Inc is not a company name here");
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_companies_min_two_words() {
+        let mentions = extract_companies("Acme Corp");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"Acme Corp"));
+    }
+
+    #[test]
+    fn test_extract_companies_no_suffix() {
+        let mentions = extract_companies("Apple and Google are companies");
+        assert!(mentions.is_empty(), "no known suffix → not extracted as company");
+    }
+
+    #[test]
+    fn test_extract_companies_case_insensitive_suffix() {
+        let mentions = extract_companies("Acme inc is a company");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"Acme inc"));
+    }
+
+    #[test]
+    fn test_extract_companies_empty() {
+        let mentions = extract_companies("");
+        assert!(mentions.is_empty());
+    }
+
+    #[test]
+    fn test_extract_companies_with_punctuation() {
+        let mentions = extract_companies("Acme Corp, and Beta LLC. are here");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"Acme Corp"));
+        assert!(names.contains(&"Beta LLC"));
+    }
+}
