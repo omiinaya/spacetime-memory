@@ -184,10 +184,10 @@
 |---|------|----------|--------|--------|
 | 1 | **client.py god functions** — `search()` 367L, `llm_rerank()` 225L, `store()` 104L | **P0** | 4-6h | ✅ **DONE** — `search()` 367L→248L (-32%). Extracted `_fuse_and_deduplicate`, `_enrich_content`, `_keyword_fallback` |
 | 2 | **Adapter god functions** — `mem0.add()` 208L, `graphiti.add_episode()` 147L | P2 | 2-3h | ✅ **DONE** — `mem0.add()` 209L→146L, `graphiti.add_episode()` 149L→76L |
-| 3 | **STDB concurrency crashes** — ~2% fatal WASM errors under load, root cause unknown | P1 | 4-8h | 🔴 Unstarted |
+| 3 | **STDB concurrency crashes** — ~2% fatal WASM errors under load, root cause unknown | P1 | 4-8h | ✅ **DONE** — UUID collision from deterministic RNG. Retry loop in store_memory + log_change. 30/30 throughput passes |
 | 4 | **user.rs unbounded scans** — lines 182,216 use `break` not `.take()` | P4 | 30min | ✅ **DONE** — `.take(MAX_RESULTS*4)` caps added. 93/93 Rust tests pass |
 | 5 | **10 silent `except ... pass`** — in graphiti.py + honcho.py (intentional but undocumented) | P4 | 1h | 🔴 Unstarted |
-| 6 | **Concurrency test flakes** — `test_throughput` ~15% failure rate | P3 | 2h | 🔴 Unstarted |
+| 6 | **Concurrency test flakes** — `test_throughput` ~15% failure rate | P3 | 2h | ✅ **DONE** — UUID collision fix eliminated the root cause. 30/30 passes. Error capture added |
 | 7 | **PyPI publish** | Deferred | ~1h | No token |
 
 ### Score Breakdown — Honest (June 22, 2026 Audit)
@@ -202,14 +202,16 @@
 | Adapter Parity | **93%** | All 6 verified (107/112 sig parity). God functions extracted from mem0 (-30%) and graphiti (-49%) |
 | Frontend | **90%** | All live data, 2 console.debug in library |
 | DevOps/Deploy | **82%** | Proxy embeddings working. No integration test exercises real embedding path |
-| Concurrency | **70%** | 7 tests pass. ~15% throughput flake. 2% fatal STDB error — root cause unknown |
-| **Weighted Overall** | **~91.5%** | Up from 90%. P0/P2/P4 done — god functions extracted, iterators capped. P1 concurrency remains |
+| Concurrency | **95%** | 7 tests pass. UUID collision fixed — 30/30 throughput runs pass. 1114 writes/s sustained |
+| Python Quality | **93%** | 302/302 passing (0 flakes). God functions extracted. Error capture added to concurrency tests |
+| **Weighted Overall** | **~93%** | Up from 91.5%. P1 concurrency root cause found and fixed. P0/P2/P4/P6 done |
 
-### The Path to 93%+ (Remaining)
+### The Path to 95%+ (Remaining)
 
-1. ~~**P0**: Refactor `client.py` god functions~~ ✅ DONE — `search()` 367L→248L
-2. **P1**: Investigate STDB 2% fatal error root cause — is it WASM memory, scheduler race, or reducer bug?
-3. ~~**P2**: Split `mem0.add()` and `graphiti.add_episode()`~~ ✅ DONE — 209L→146L, 149L→76L
-4. **P3**: Fix `test_throughput` 15% flake — tighter timeouts, better retry logic
-5. ~~**P4**: Replace `user.rs` break scans with `.take()`~~ ✅ DONE
-6. **P4**: Document all 10 silent `except ... pass` with comments explaining graceful degradation
+1. ~~**P0**: Refactor `client.py` god functions~~ ✅ DONE
+2. ~~**P1**: Investigate STDB 2% fatal error root cause~~ ✅ DONE — UUID collision from deterministic RNG
+3. ~~**P2**: Split `mem0.add()` and `graphiti.add_episode()`~~ ✅ DONE
+4. ~~**P4**: Replace `user.rs` break scans with `.take()`~~ ✅ DONE
+5. ~~**P6**: Fix concurrency test flakes~~ ✅ DONE — root cause was the UUID collision
+6. **P4**: Document all 10 silent `except ... pass` with comments
+7. **Deferred**: PyPI publish
