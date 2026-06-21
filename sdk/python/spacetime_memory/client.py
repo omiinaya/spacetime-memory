@@ -1009,6 +1009,153 @@ class Client:
 
         return [{"status": "ok"} for _ in clean_items]
 
+    def _fuse_and_deduplicate(
+        self,
+        rows: list[dict[str, Any]],
+        tantivy_rows: list[dict[str, Any]],
+        per_strat: dict[str, list[dict]],
+        strat_min: dict[str, float],
+        strat_max: dict[str, float],
+        strategy_weights: dict[str, float],
+    ) -> list[dict[str, Any]]:
+        """Min-max normalize per strategy, weighted-sum fuse, dedup by entity_id."""
+        best_per_strat: dict[str, dict[str, float]] = {
+            "semantic": {}, "keyword": {}, "graph": {}, "temporal": {},
+            "binary": {},
+        }
+        best_row: dict[str, dict] = {}
+        all_rows = list(rows)
+        for tr in tantivy_rows:
+            eid = tr.get("entity_id", "")
+            if eid not in best_row:
+                all_rows.append(tr)
+        for r in all_rows:
+            s = r.get("strategy", "")
+            if s not in best_per_strat:
+                continue
+            sc = float(r.get("score", 0.0))
+            eid = r.get("entity_id", "")
+            rng = strat_max.get(s, 1.0) - strat_min.get(s, 0.0)
+            normalized = ((sc - strat_min.get(s, 0.0)) / rng) if rng > 1e-10 else 1.0
+            if eid not in best_per_strat[s] or normalized > best_per_strat[s][eid]:
+                best_per_strat[s][eid] = normalized
+            if eid not in best_row or sc > float(best_row[eid].get("score", 0)):
+                best_row[eid] = dict(r)
+
+        fused: dict[str, float] = {}
+        for eid in set().union(*(d.keys() for d in best_per_strat.values())):
+            total = 0.0
+            for s, w in strategy_weights.items():
+                total += best_per_strat[s].get(eid, 0.0) * w
+            fused[eid] = total
+
+        seen: dict[str, dict] = {}
+        for r in all_rows:
+            eid = r.get("entity_id", "")
+            fs = fused.get(eid, 0.0)
+            r["fused_score"] = fs
+            if eid not in seen or fs > seen[eid].get("fused_score", float("-inf")):
+                seen[eid] = r
+
+        result = list(seen.values())
+        result.sort(key=lambda r: r.get("fused_score", 0.0), reverse=True)
+        return result
+
+    def _enrich_content(
+        self,
+        rows: list[dict[str, Any]],
+        workspace_id: str,
+    ) -> list[dict[str, Any]]:
+        """Look up memory/node content from STDB and apply veracity weighting."""
+        mem_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "memory"]
+        node_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "node"]
+        mem_map = {}
+        mem_confidences: dict[str, float] = {}
+        node_map = {}
+        for mid in mem_ids:
+            mems = self._query("memory", filter_dict={"id": mid},
+                               workspace_id=workspace_id,
+                               columns=["id", "content", "confidence"])
+            if mems:
+                mem_map[mid] = mems[0].get("content", "")
+                mem_confidences[mid] = mems[0].get("confidence", 0.8)
+        for nid in node_ids:
+            nodes = self._query("kg_node", filter_dict={"id": nid}, columns=["id", "label"])
+            if nodes:
+                node_map[nid] = nodes[0].get("label", "")
+        for r in rows:
+            eid = r.get("entity_id", "")
+            if r.get("entity_type") == "memory":
+                r["memory_content"] = mem_map.get(eid, "")
+            elif r.get("entity_type") == "node":
+                r["memory_content"] = node_map.get(eid, "")
+            else:
+                r["memory_content"] = ""
+            r["score"] = r.get("fused_score", r.get("score", 0.0))
+            if eid in mem_confidences:
+                from .veracity import confidence_multiplier
+                mult = confidence_multiplier(mem_confidences[eid])
+                r["score"] = r["score"] * mult
+                r["veracity_multiplier"] = mult
+        return rows
+
+    def _keyword_fallback(
+        self,
+        workspace_id: str,
+        query: str,
+        memory_type: str,
+        tier: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        """Non-semantic keyword-only search fallback using client-side filtering."""
+        clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
+        if memory_type:
+            clauses.append(f"memory_type = '{_esc(memory_type)}'")
+        if tier:
+            clauses.append(f"tier = '{_esc(tier)}'")
+        filt = {}
+        for clause in clauses:
+            parts = clause.split(" = ", 1)
+            if len(parts) == 2:
+                key = parts[0].strip()
+                val = parts[1].strip().strip("'")
+                filt[key] = val
+        rows = self._query("memory", workspace_id=workspace_id, filter_dict=filt)
+
+        if query:
+            _STOPWORDS = {
+                "a", "an", "the", "is", "are", "was", "were", "be", "been",
+                "who", "what", "where", "when", "why", "how", "which", "do",
+                "does", "did", "has", "have", "had", "can", "will", "would",
+                "tell", "me", "about", "of", "in", "on", "at", "to", "for",
+                "with", "and", "or", "not", "we", "our", "us", "i", "you",
+                "they", "it", "its", "s", "that", "this", "there", "from",
+            }
+            keywords = [
+                w.lower().rstrip("?,.:;!\"'")
+                for w in query.split()
+                if len(w.rstrip("?,.:;!\"'")) > 1
+                and w.lower().rstrip("?,.:;!\"'") not in _STOPWORDS
+            ]
+            if keywords:
+                rows = [
+                    r for r in rows
+                    if any(
+                        kw in r.get("content", "").lower()
+                        or kw in r.get("summary", "").lower()
+                        for kw in keywords
+                    )
+                ]
+
+        rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        results = rows[:limit]
+        self._emit_event("search.performed", {
+            "query": query,
+            "result_count": len(results),
+        }, workspace_id=workspace_id)
+        return results
+
+
     def search(
         self,
         workspace_id: str,
@@ -1206,87 +1353,14 @@ class Client:
                     strat_min[s] = min(strat_min.get(s, float("inf")), sc)
                     strat_max[s] = max(strat_max.get(s, float("-inf")), sc)
 
-            # Fuse: take the BEST normalized score per strategy per entity,
-            # then weighted sum.  (Don't sum all rows — an entity can appear
-            # in many keyword rows for different term matches.)
-            best_per_strat: dict[str, dict[str, float]] = {
-                "semantic": {}, "keyword": {}, "graph": {}, "temporal": {},
-                "binary": {},
-            }
-            best_row: dict[str, dict] = {}
-            # Include both STDB rows and Tantivy keyword rows in normalization
-            all_rows = list(rows)
-            for tr in tantivy_rows:
-                # Only add Tantivy row if entity not already covered by STDB
-                eid = tr.get("entity_id", "")
-                if eid not in best_row:
-                    all_rows.append(tr)
-            for r in all_rows:
-                s = r.get("strategy", "")
-                if s not in best_per_strat:
-                    continue
-                sc = float(r.get("score", 0.0))
-                eid = r.get("entity_id", "")
-                rng = strat_max.get(s, 1.0) - strat_min.get(s, 0.0)
-                normalized = ((sc - strat_min.get(s, 0.0)) / rng) if rng > 1e-10 else 1.0
-                if eid not in best_per_strat[s] or normalized > best_per_strat[s][eid]:
-                    best_per_strat[s][eid] = normalized
-                if eid not in best_row or sc > float(best_row[eid].get("score", 0)):
-                    best_row[eid] = dict(r)
+            # ── Weighted min-max fusion + dedup ──
+            rows = self._fuse_and_deduplicate(
+                rows, tantivy_rows, per_strat,
+                strat_min, strat_max, STRATEGY_WEIGHTS,
+            )
 
-            # Weighted sum of best per-strategy normalized scores
-            fused: dict[str, float] = {}
-            for eid in set().union(*(d.keys() for d in best_per_strat.values())):
-                total = 0.0
-                for s, w in STRATEGY_WEIGHTS.items():
-                    total += best_per_strat[s].get(eid, 0.0) * w
-                fused[eid] = total
-
-            # Deduplicate: keep best row per entity, tag with fused score
-            seen: dict[str, dict] = {}
-            for r in all_rows:
-                eid = r.get("entity_id", "")
-                fs = fused.get(eid, 0.0)
-                r["fused_score"] = fs
-                if eid not in seen or fs > seen[eid].get("fused_score", float("-inf")):
-                    seen[eid] = r
-
-            rows = list(seen.values())
-            rows.sort(key=lambda r: r.get("fused_score", 0.0), reverse=True)
-
-            # Look up content from source tables in Python
-            mem_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "memory"]
-            node_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "node"]
-            mem_map = {}
-            mem_confidences: dict[str, float] = {}
-            node_map = {}
-            for mid in mem_ids:
-                mems = self._query("memory", filter_dict={"id": mid},
-                                   workspace_id=workspace_id,
-                                   columns=["id", "content", "confidence"])
-                if mems:
-                    mem_map[mid] = mems[0].get("content", "")
-                    mem_confidences[mid] = mems[0].get("confidence", 0.8)
-            for nid in node_ids:
-                nodes = self._query("kg_node", filter_dict={"id": nid}, columns=["id", "label"])
-                if nodes:
-                    node_map[nid] = nodes[0].get("label", "")
-            for r in rows:
-                eid = r.get("entity_id", "")
-                if r.get("entity_type") == "memory":
-                    r["memory_content"] = mem_map.get(eid, "")
-                elif r.get("entity_type") == "node":
-                    r["memory_content"] = node_map.get(eid, "")
-                else:
-                    r["memory_content"] = ""
-                # Surface fused_score as the canonical score for consumers
-                r["score"] = r.get("fused_score", r.get("score", 0.0))
-                # Apply veracity confidence weighting
-                if eid in mem_confidences:
-                    from .veracity import confidence_multiplier
-                    mult = confidence_multiplier(mem_confidences[eid])
-                    r["score"] = r["score"] * mult
-                    r["veracity_multiplier"] = mult
+            # ── Look up content and apply veracity weighting ──
+            rows = self._enrich_content(rows, workspace_id)
 
             if cross_encoder:
                 try:
@@ -1328,55 +1402,7 @@ class Client:
             return results
 
         # Non-semantic (keyword) fallback
-        # SpacetimeDB SQL doesn't support LIKE, so we fetch all and filter client-side
-        clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
-        if memory_type:
-            clauses.append(f"memory_type = '{_esc(memory_type)}'")
-        if tier:
-            clauses.append(f"tier = '{_esc(tier)}'")
-        filt = {}
-        for clause in clauses:
-            parts = clause.split(" = ", 1)
-            if len(parts) == 2:
-                key = parts[0].strip()
-                val = parts[1].strip().strip("'")
-                filt[key] = val
-        rows = self._query("memory", workspace_id=workspace_id, filter_dict=filt)
-
-        # Client-side keyword filter — split query into words, remove stopwords, OR-match
-        if query:
-            _STOPWORDS = {
-                "a", "an", "the", "is", "are", "was", "were", "be", "been",
-                "who", "what", "where", "when", "why", "how", "which", "do",
-                "does", "did", "has", "have", "had", "can", "will", "would",
-                "tell", "me", "about", "of", "in", "on", "at", "to", "for",
-                "with", "and", "or", "not", "we", "our", "us", "i", "you",
-                "they", "it", "its", "s", "that", "this", "there", "from",
-            }
-            keywords = [
-                w.lower().rstrip("?,.:;!\"'")
-                for w in query.split()
-                if len(w.rstrip("?,.:;!\"'")) > 1
-                and w.lower().rstrip("?,.:;!\"'") not in _STOPWORDS
-            ]
-            if keywords:
-                rows = [
-                    r for r in rows
-                    if any(
-                        kw in r.get("content", "").lower()
-                        or kw in r.get("summary", "").lower()
-                        for kw in keywords
-                    )
-                ]
-
-        rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
-        results = rows[:limit]
-        # ── Emit search.performed event ──
-        self._emit_event("search.performed", {
-            "query": query,
-            "result_count": len(results),
-        }, workspace_id=workspace_id)
-        return results
+        return self._keyword_fallback(workspace_id, query, memory_type, tier, limit)
 
     def detect_patterns(
         self,
