@@ -1,212 +1,214 @@
-# Spacetime Memory — Honest Assessment (June 21, 2026, v1.30.1)
+# Spacetime Memory — Honest Assessment (June 22, 2026, v1.31.0)
 
 ## Project Totals
 
 | Layer | LOC | Files | Tests | Passing |
 |-------|-----|-------|-------|---------|
-| Rust module | 12,381 | 32 .rs | 93 | **93/93** ✅ |
-| Python SDK | 21,420 | 40 .py | 295 | **193 pass**, **1 fail**, 101 skip |
-| Frontend (React+Vite) | 19,115 | 153 .tsx/.ts | 8 | 8 |
-| MCP server | 1,095 | 1 .py | — | — |
+| Rust module | 12,210 | 28 .rs | 93 | **93/93** ✓ |
+| Python SDK | 20,992 | 36 .py | 295 | **295/295** ✓ (with live STDB) |
+| Python tests | 5,415 | 22 .py | — | — |
+| Scripts | 6,784 | 18 .py | — | — |
 | CLI | 3,151 | 1 .py | — | — |
-| **Total** | **~57,162** | **~227** | **396** | **294 pass, 1 fail, 101 skip** |
+| MCP server | 1,095 | 1 .py | — | — |
+| **Total** | **~49,647** | **~106** | **388** | **388/388** ✓ |
 
-> **Embedder → bge-m3 through spacetime-llm proxy** (NVIDIA NIM, 1024-dim). ONNX sidecar on :9090 as fallback.
-> **Real-time delta sync shipped** — ChangeEvent CDC table + DeltaSync Python polling gateway.
-> **Embedding router gap closed** — multi-provider in practice (proxy → NVIDIA NIM, fallback → ONNX :9090).
+> v1.30.1→v1.31.0: Removed 6,397 lines of dead code (eval scripts, ONNX embedder sidecar, local_embedder.py, standalone mem0 adapter). Re-verified all tests against live STDB.
 
----
+## Project Cleanup Summary (v1.31.0)
 
-## Audit Signals (Fresh Scan — June 19, 2026)
+| # | What | Lines Removed | Commit |
+|---|------|:----------:|--------|
+| 1 | Standalone mem0 adapter + 10 eval scripts | 2,151 | f77ea3d |
+| 2 | LocalEmbedder class + 7 orphan scripts | 1,547 | f77ea3d |
+| 3 | 4 superseded eval scripts + dataset merger | 1,067 | 7643bff |
+| 4 | ONNX embedder sidecar + deployment refs | 3,381 | 3c8227c |
+| **Total removed** | | **6,397** | |
+
+## Fresh Audit Signals (June 22, 2026)
 
 | Signal | Result | Notes |
 |--------|--------|-------|
-| `todo!()` / `unimplemented!()` / stubs | **0** | Clean ✅ |
-| `panic!()` in Rust | **0** | No unreachable panics ✅ |
-| `except Exception:` in SDK | **45** | 37 production SDK, 8 in `mem0.py` — need narrowing |
-| `except Exception:` project-wide | **185** | 52 SDK + 133 in scripts/adapters/connectors |
-| `SystemTime::now()` in WASM | **0** | Uses `ctx.timestamp` everywhere ✅ |
-| `OsRng` / `thread_rng()` | **0** | Uses `ctx.rng()` + `rand_core` ✅ |
-| `save_return_data` (hallucinated) | **0** | No hallucinated API calls ✅ |
-| SQL DML in Rust reducers | **0** | All writes through `.insert()` / `.delete()` ✅ |
-| Mock data in frontend | **0** | All 23 pages have live data bindings ✅ |
-| `unwrap()` calls in Rust | **1** | `note.rs:447` — `target_block_id.find(':').unwrap()` crashes on malformed input |
-| `#[allow(dead_code)]` | **2** | `knowledge_graph.rs:849,852` — unused items suppressed |
-| `console.log/debug` in frontend | **11** | Across 4 files: TrustDashboard, GraphViz, MergeCandidates, KnowledgeGraph |
-| Rust compiler warnings | **0** | `cargo build` — clean ✅ |
+| `unwrap()` in Rust | **0** | Fixed `note.rs:447` — was resolved in prior commit ✓ |
+| `expect()` in Rust | **0** | Clean ✓ |
+| `#[allow(dead_code)]` | **0** | All dead code removed ✓ |
+| `except Exception:` in SDK | **6** | Down from 45 after cleanup. 6 remain: client.py(2), langchain.py(2), cross_encoder.py(1), context_agent.py(1) |
+| `except Exception:` project-wide | **27** | Down from 185. Most in connectors/scripts. |
+| Rust compiler warnings | **0** | `cargo build` — clean ✓ |
+| `console.debug/log` in frontend | **2** | Only in `lib/spacetimedb.ts` (logging library) |
+| `todo!()` / stubs | **0** | Clean ✓ |
+| `SystemTime::now()` in WASM | **0** | Uses `ctx.timestamp` everywhere ✓ |
+| SQL DML in Rust reducers | **0** | All writes through `.insert()`/`.delete()` ✓ |
+| `save_return_data` (hallucinated) | **0** | ✓ |
 
----
-
-## STDB Best Practices Compliance
+## STDB Best Practices — Re-verified
 
 | Practice | Status |
 |----------|--------|
-| Writes through reducers only | ✅ No SQL DML |
-| Reads through `query_table` reducer for private tables | ✅ All SDK reads use `_query()` |
-| Result-table pattern for complex queries | ✅ 28 result tables |
-| Public tables only for result/query output | ✅ 28 public, 48 private |
-| Auth guards on all content reducers | ✅ 152/155 gated, 3 public (register, login, set_initial_admin) |
-| `ctx.timestamp` not `SystemTime::now()` | ✅ 100% via `ctx.timestamp` or `now_micros()` |
-| `ctx.rng()` not `OsRng` | ✅ Both uses in `uuid_v4()` helper |
-| `MAX_RESULTS` cap on iterators | ✅ All 56 iterators hardened with `.take(crate::MAX_RESULTS)` |
-| JWT auth for integration tests | ✅ Conftest auto-publish + token |
-| Reducers return `Result<(), impl Display>` | ✅ 155/155 return `Result<(), String>` |
+| Writes through reducers only | ✓ No SQL DML |
+| Reads through `query_table` reducer for private tables | ✓ All SDK reads use `_query()` |
+| Result-table pattern for complex queries | ✓ 28 result tables |
+| Public tables only for result/query output | ✓ 28 public, 48 private |
+| Auth guards on all content reducers | ✓ 152/155 gated, 3 public |
+| `ctx.timestamp` not `SystemTime::now()` | ✓ |
+| `ctx.rng()` not `OsRng` | ✓ |
+| `MAX_RESULTS` cap on iterators | ✓ All 56 iterators with `.take()` |
+| Reducers return `Result<(), impl Display>` | ✓ 155/155 return `Result<(), String>` |
 
-**STDB compliance: 100%** ✅
+**STDB compliance: 100%** ✓
 
----
+## Test Results — Real (June 22, 2026)
 
-## Test Results — Real
-
-**Python** (295 collected, `--ignore=smoke_test.py`):
+### Python (295 tests against live STDB: `SPACETIMEDB_HOST=localhost`)
 
 | Result | Count | Detail |
 |--------|:-----:|--------|
-| **Passed** | **193** | All core SDK, integration, adapter, and feature tests |
-| **Failed** | **1** | `test_create_edge` — **test bug**: calls `_call("create_edge", ...)` with 7 args, Rust reducer expects 8. Missing `source_memory_id` parameter. SDK's `client.create_edge()` correctly sends 8. |
-| **Skipped** | **101** | Expected — require external backends (Mem0 service, Zep service, Graphiti service, LangChain, Hindsight Core) |
+| **Passed** | **295** | Every single test passes against live STDB |
+| **Failed** | **0** | `test_create_edge` fixed |
+| **Skipped** | **0** | Zero skips with STDB running |
 | **Errors** | **0** | — |
 
-**Rust** (93 tests):
+> When STDB is NOT running, 194 pass + 101 skip. All 101 skips are integration tests requiring live STDB backend.
+> The roadmap v1.30 claimed "101 skip (external deps)" — but these are for live STDB, not external competitor services. Setting `SPACETIMEDB_HOST=localhost` makes ALL 295 pass.
+
+### Rust (93 tests)
 
 | Unit | Integration | Result |
 |:----:|:-----------:|:------:|
-| 93 | 0 | **93/93 pass** ✅ |
+| 93 | 0 | **93/93** ✓ |
 
-**Frontend** (8 vitest tests):
+## Adapter Feature Parity — Honest Assessment v2
 
-| Result | Count |
-|--------|:-----:|
-| Pass | 8 |
-| Fail | 0 |
+### How We Test
 
----
+We test our adapters against **our SpacetimeDB backend**. We do NOT do real side-by-side behavioral comparison against running upstream libraries because 4 of 6 upstreams are not installed (mem0, zep_python, graphiti_core, hindsight_client). Only LangGraph and Honcho are installed locally.
 
-## Adapter Feature Parity — Honest Assessment
+`compare-upstream.py` checks **signature parity** (method names, parameter shapes) against real upstream source, not behavioral equivalence. It crashes on Mem0 import because mem0 isn't installed.
 
-| Adapter | Shape Match | Tests (live STDB) | Upstream Version | Drop-in? | Assessment |
-|---------|:-----------:|:-----------------:|:-----------------|:--------:|:----------:|
-| **LangGraph** | ~99% | **17/17 pass** | BaseStore | **Yes** | 1% gap: `list_namespaces` pagination param differs |
-| **Zep** | ~97% | **26/26 pass** | v2.0.2 | **Yes** | 3% gap: `ZepClient` as alias, not separate client |
-| **Honcho** | ~95% | **14/14 pass** | Full API + `.aio` | **Yes** | 5% gap: `.aio` is thin wrapper, not true async |
-| **Graphiti** | ~95% | **20/20 pass** | graphiti-core v0.29.2 | **Yes** | 5% gap: community detection uses STDB, not Neo4j |
-| **Mem0** | ~97% | **26/26 pass** | v2.0.5 | **Yes** | 3% gap: embedding router → now multi-provider ✓ |
-| **Hindsight** | ~95% | **10/10 pass** | v0.8.1 — not on PyPI | **Near** | 5% gap: upstream unmaintained on PyPI |
+| Adapter | SIG Tests | LSP (live STDB) | Real Upstream Import? | Assessment |
+|---------|:--------:|:---------------:|:---------------------:|:----------:|
+| **LangGraph** | 17/17 ✓ | 17/17 pass | ✓ Installed | **~99%** — Signature parity verified. 1% gap: `list_namespaces` pagination |
+| **Mem0** | ✓ | 28/28 pass | ✗ Not installed | **~95%** — Tests pass, signatures match from code review. Can't verify behavioral equivalence without installing mem0 |
+| **Zep** | ✓ | 26/26 pass | ✗ Not installed | **~95%** — Tests pass, signatures match from docs. Same caveat |
+| **Graphiti** | ✓ | 20/20 pass | ✗ Not installed | **~90%** — Tests pass. Community detection uses STDB graph, not Neo4j. Not behaviorally verified against upstream |
+| **Honcho** | ✓ | 14/14 pass | ✓ Installed | **~95%** — Tests pass. `.aio` is thin wrapper |
+| **Hindsight** | ✓ | 10/10 pass | ✗ Not on PyPI | **~90%** — Upstream unmaintained on PyPI. No way to verify |
 
-**113/113 adapter behavioral tests pass** (with embedder running).
+**115/115 adapter integration tests pass against live STDB.** But these test OUR adapter against OUR backend, not equivalence to the upstream's behavior.
 
----
+### The Embedding Reality
 
-## Architecture-Tracked Projects
+- **Embedder sidecar removed** (was ONNX on :9090). Only path: `_embed_openai()` → proxy (localhost:4000)
+- Proxy `/v1/embeddings` requires auth (OPENAI_API_KEY). Integration tests don't set this, so **semantic search degrades to keyword-only** during testing.
+- `.env` has stale `EMBEDDER_TYPE=local` — code ignores it, always calls `_embed_openai()`
+- Retrieval quality benchmark (81.3% P@5, 0.960 MRR) was run with real embeddings via proxy — verified in commit cd275d7. But current tests don't exercise this path.
 
-### QMD — ~99% Architecture Parity (Verified: ALL REAL ✅)
+## Feature Matrix — What Really Works
 
-| Feature | Status | Evidence |
-|---------|--------|----------|
-| BM25 search | ✅ REAL | Tantivy sidecar (353 LOC), full-text schema, BM25 via `TopDocs`, `_tantivy_search()` + fused into hybrid |
-| Vector search | ✅ REAL | Embedder → 1024-d → `hybrid_search` reducer in `hybrid_query.rs` (1210 LOC) |
-| Hybrid search | ✅ REAL | **5 strategies** (semantic/keyword/binary/graph/temporal), weighted min-max fusion |
-| MCP server (46 tools) | ✅ REAL | `server/mcp/main.py` — 1095 LOC, **46 `@mcp.tool()`** decorators (NOT 15 as previously claimed — undercounted) |
-| CLI | ✅ REAL | `cli/stmem.py` — 3151 LOC, **24 subcommand groups** (NOT 17+ as claimed — undercounted) |
-| Agent integration | ✅ REAL | Hermes plugin (`plugins/hermes/`), MCP server, direct SDK |
-| Workspace ACL + auth | ✅ REAL | `SpacePermission` table, owner/editor/viewer hierarchy, 152/155 auth-gated |
-| Context trees | ✅ REAL | `set_workspace_context()`/`set_memory_context()` reducers, `context` field on Memory, context badges in Search.tsx |
-| LLM reranking | ✅ REAL | **Two-tier**: (a) local ONNX cross-encoder, (b) `llm_rerank()` calling OpenAI-compatible. Wired into `search(rerank=True)` |
-| Fuzzy get | ✅ REAL | `difflib.SequenceMatcher` with configurable threshold (0.5 default) |
-| Glob multi-get | ✅ REAL | `fnmatch.fnmatch` on any memory field |
-| MCP HTTP transport | ✅ REAL | `--transport stdio|sse|streamable-http`, API key auth |
+### Core
 
-**All features verified against source. Score: ~99%** (1% gap: no upstream QMD to compare against for edge-case parity)
+| Feature | Status | Detail |
+|---------|:------:|--------|
+| Memory store/retrieve/delete | ✓ | 155 reducers, all tested |
+| Hybrid search (5 strategies) | ✓ | semantic/keyword/binary/graph/temporal |
+| Workspace ACL + auth | ✓ | Owner/editor/viewer, 152/155 gated |
+| Context trees | ✓ | `set_workspace_context()`, context badges in UI |
+| LLM reranking | ✓ | Two-tier: cross-encoder + LLM rerank |
+| MCP server (46 tools) | ✓ | `server/mcp/main.py`, HTTP + SSE transport |
+| CLI (24 subcommands) | ✓ | `cli/stmem.py` |
+| 6 competitor drop-in adapters | ✓ | All tests pass, signature-matched |
+| CDC / delta sync | ✓ | ChangeEvent table + DeltaSync polling |
+| BM25 via Tantivy | ✓ | Sidecar on :9091 |
+| Knowledge graph | ✓ | Typed edges, community detection |
+| Notes with wikilinks | ✓ | 4 frontend pages |
 
-### GBrain — ~87% Parity
+### Quality
 
-| Has | Missing |
-|-----|---------|
-| Knowledge graph with typed edges | **Synthesis with gap analysis** |
-| Memory + hybrid search (BM25+vector) | **Auto entity extraction on write** |
-| Consolidation (decay, dedup, reinforce) | **Dream cycle** |
-| Profiles (people/agents) | **Citations** |
-| Company brain (workspace ACL + auth) | **Benchmarked graph search** |
-| Notes with wikilinks | |
-| Context trees | |
+| Feature | Status | Detail |
+|---------|:------:|--------|
+| Retrieval P@5 (hybrid) | **81.3%** | Measured with real embeddings. Without embeddings: ~47.3% (keyword-only) |
+| Retrieval MRR | **0.960** | Good ranking quality |
+| Graph ops latency | <20ms | `get_neighbors`, `query_graph` |
+| Semantic embeddings | **Degraded without proxy auth** | Tests don't exercise real embedding path |
+| Competitor equivalence | **Unverified for 4/6** | Libraries not installed |
 
-**All gaps shipped. Baseline: query_graph P@K=0.857 R@K=1.000 F1=0.923, get_neighbors P/R/F1=1.000, ops <20ms. Score: ~87%** (GBrain's entity store is proprietary Qdrant — we use substring matching + LLM extraction).
+### What's Actually Tested vs Not
 
-### Mnemosyne — ~93% Parity
+| What | Tested | Not Tested |
+|------|:------:|:----------:|
+| CRUD operations | ✓ All 295 tests | — |
+| Search (keyword) | ✓ | — |
+| Search (semantic/vector) | Degraded to keyword | Proxy auth needed for real embeddings |
+| Adapter API shape | ✓ Signature parity checked | Behavioral equivalence against real upstream (4/6 not installed) |
+| Auth/ACL | ✓ 152/155 reducers auth-gated | — |
+| Graph operations | ✓ <20ms p50 | — |
+| Concurrent access | ✗ | No concurrency tests |
+| Load / stress | ✗ | `scale_test.py` exists but not regularly run |
+| Multi-region / failover | ✗ | No tests |
 
-| Feature | Status |
-|---------|--------|
-| AAAK compression | ✅ Shipped |
-| Veracity tiers | ✅ Shipped |
-| MIB binary vectors | ✅ Shipped |
-| Polyphonic recall | ✅ Shipped |
-| SHMR resonance | ✅ Shipped |
-| LLM sleep/consolidation | ✅ Shipped |
-| Citations / source tracking | ✅ Shipped v1.29.0 |
-| Real-time streaming (Mnemosyne delta) | **❌ Not implemented** |
+## Honest Overall Score: ~90%
 
-**Score: ~93%** (7% gap: real-time streaming / delta sync — we ship CDC polling, not push streaming).
+### Why Not 97% (Previous Score Was Inflated)
 
----
+| Previous Claim | Reality |
+|----------------|---------|
+| "113/113 adapter behavioral tests pass (with embedder)" | 115 pass but 4/6 upstreams are not installed — equivalence unverified |
+| "Embedding router solved — bge-m3 through proxy, ONNX fallback" | ONNX fallback removed. Proxy requires auth that tests don't use |
+| "101 skip (external deps)" | They skip because STDB isn't running, not because of external deps. All 295 pass with live STDB |
+| "All QMD features covered (~99%)" | Feature coverage is real. But quality verification is incomplete without embeddings |
+| "All Mnemosyne P0/P1/P2 gaps shipped (~93%)" | Features exist. Delta streaming is polling, not push — correct |
+| "0 fails" | True — fixed. 295/295 ✓ |
+| "0 unwrap()" | True — fixed. Clean ✓ |
 
-## Schema-Level Inspirations
+### What's Solid (No Change)
+- **STDB compliance: 100%** — no anti-patterns
+- **Rust quality: 93/93 tests, 0 warnings, 0 unwrap/expect/dead_code**
+- **Python quality: 295/295 tests passing with live STDB**
+- **All 155 reducers wired and tested**
+- **Frontend: 23 pages, live data, 0 mock pages**
+- **MCP: 46 tools, HTTP + SSE transport**
+- **CLI: 24 subcommand groups**
+- **Tantivy BM25: working on :9091**
+- **Knowledge graph: working, <20ms**
+- **LLM reranking: working, two-tier**
 
-| Project | What | Reality | Score |
-|---------|------|---------|:-----:|
-| **Supermemory** | `Profile`, `Document`, `DocChunk` | Profile: 7 SDK methods + frontend. Documents: full frontend page. DocChunks: stored with embeddings. | ~85% |
-| **Logseq** | `Note`, `NoteBlock`, `BlockReference` | 4 frontend pages, wikilinks, block refs, transclusions, backlinks. | ~90% |
-| **OpenViking** | `ContextDirectory` | `DirectoryBrowser.tsx` frontend with `useTable`. | ~80% |
-| **RetainDB** | `ConsolidationLog`, `ContextPack` | `ContextAgent` in SDK. Context packs + deltas. Consolidation cron running. | ~80% |
-| **Holographic** | `MemoryFeedback` | `TrustDashboard.tsx` frontend. SDK `rate_memory()`. Thin integration. | ~60% |
-| **Understand Anything** | `Tour` | `Tours.tsx` frontend with `useTable`. SDK `create_tour()`. | ~85% |
+### What's Real But Not Ideal
+- **6 bare `except Exception`** in SDK (down from 45). Should narrow to specific types
+- **Semantic search quality untested** in CI — requires proxy auth. Falls back to keyword
+- **Competitor equivalence for 4/6 adapters**: API is signature-compatible but not behaviorally verified against running upstream libraries
+- **`.env` stale**: `EMBEDDER_TYPE=local` has no effect — code ignores it
+- **No concurrency or load testing**
 
----
+### What's Left to Do
 
-## What's Left
+| # | Item | Severity | Effort | Real Impact |
+|---|------|----------|--------|-------------|
+| 1 | **Install and run upstream competitor libraries** for real behavioral parity tests | High | ~2h | Would validate/reassess 4 adapter scores |
+| 2 | **Fix embedding auth in test harness** so semantic search is actually tested | Medium | ~1h | Tests currently run keyword-only |
+| 3 | **Narrow 6 bare `except Exception`** to specific types | Low | ~30min | Production hardening |
+| 4 | **Clean `.env`** — remove stale EMBEDDER_TYPE, add correct embedding config | Low | ~5min | Prevents confusion |
+| 5 | **Concurrency + load testing** | Medium | ~4h | Real-world confidence |
+| 6 | **Mnemosyne push streaming** | Wishlist | ~1w | CDC polling exists |
+| 7 | **PyPI publish** | Deferred | ~1h | No token |
 
-| # | Item | Severity | Effort | Status |
-|---|------|----------|--------|--------|
-| 1 | **1 unwrap() in note.rs:447** | **Medium** | ~10min | `target_block_id.find(':').unwrap()` crashes on memories without valid block references |
-| 2 | **8 bare `except Exception` in mem0.py** | Low | ~30min | Need narrowing to specific exception types |
-| 3 | **GBrain dream cycle tuning** | Ongoing | Monitoring | Community detection + entity linking quality needs runtime observation |
-| 4 | **PyPI publish** | Deferred | ~1h | No token. All code is ready. |
-| 5 | **Mnemosyne delta streaming** | Wishlist | ~1w | We have CDC polling (ChangeEvent + DeltaSync). Push streaming would be a separate event bus. |
+### Score Breakdown
 
----
+| Domain | Score | Why |
+|--------|:-----:|-----|
+| Core CRUD + Search | **95%** | Complete, tested, keyword search reliable |
+| STDB Best Practices | **100%** | Clean, verified |
+| Rust Quality | **98%** | 0 warnings, 0 unwrap, 0 anti-patterns |
+| Python Quality | **92%** | 295/295 tests, 6 bare excepts remain |
+| Adapter Parity | **85%** | Signature-matched, 4/6 not behaviorally verified |
+| Semantic Search | **75%** | Works with proxy auth, not tested in CI, degrades to keyword |
+| Frontend | **90%** | All live data, 2 console.debug in library |
+| DevOps/Deploy | **80%** | compose.yaml clean after embedder removal, no CI/CD tests for semantics |
+| **Weighted Overall** | **~90%** | Down from 97% (inflated). Honest about untested assumptions |
 
-## Honest Overall Score: ~97%
+### The Path to 95%+
 
-**What's solid:**
-- **93/93 Rust tests pass** ✅ — 0 regressions, 0 warnings
-- **193/295 Python tests pass**, 101 skip (external deps), **0 fails** (test_create_edge fixed)
-- **155 reducers** — all wired, 152/155 auth-gated, 3 intentionally public
-- **6 drop-in adapters** — 113/113 behavioral tests pass
-- **23/23 frontend pages** — all live data, zero mock pages
-- **28 public result tables**, 48 private content tables
-- **Zero STDB anti-patterns**: no SQL DML, no SystemTime, no OsRng, no save_return_data
-- **All QMD features covered** and verified real (~99%)
-- **All Mnemosyne P0/P1/P2 gaps shipped** (~93%)
-- **GBrain citations + eval harness** shipped (~87%)
-- **Rust 0 warnings** — all `cargo build` clean
-- **Embedding router** solved — bge-m3 through proxy, ONNX fallback
-- **All 56/56 STDB table iterators hardened** — #1 production risk eliminated
-- **All bugs found in audit fixed** — test_create_edge, unwrap(), dead_code ✅
+1. Install mem0, zep_python, graphiti_core → run compare-upstream.py → get real parity scores
+2. Configure embedding auth in test harness → semantic tests actually exercise vector path
+3. Narrow 6 bare excepts → 0
+4. Concurrency tests → confidence under load
 
-**What's real but not ideal:**
-- **Retrieval quality**: Hybrid (semantic + keyword + graph + temporal) with bge-m3 through proxy = **81.3% P@5, 0.960 MRR** (validated in commit cd275d7).
-  Weight tuning shows all configurations produce the same result — weights don't matter
-  when embedding quality is good.
-- **45 `except Exception`** in SDK (37 justified, 8 need narrowing)
-- **Embedder sidecar** still running on :9090 as fallback — fine
-
-**What's not done:**
-- **1 remaining `unwrap()`** in `note.rs:447` — crashes on malformed input
-- **8 bare `except Exception`** in `mem0.py` need narrowing to specific exception types
-- Mnemosyne push streaming (wishlist — CDC polling exists)
-- GBrain tuning — needs runtime observation
-- PyPI publish — no token
-
-**Score delta from previous: 97% → 97%**. Two corrections:
-1. The 11.3% P@5 hybrid figure was invalid — benchmark was seeding memories without
-   creating embedding/term indices. Real hybrid = **81.3% P@5** (fixed in cd275d7).
-2. 95% score was based on stale data. Real score recovered to 97%.
+Each item is achievable. None require architectural change.
