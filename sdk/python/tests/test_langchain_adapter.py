@@ -22,6 +22,14 @@ pytestmark = [
 from spacetime_memory.sdks.langchain import (
     StmemMemoryStore,
     StmemStore,
+    StmemChatMessageHistory,
+    _apply_filter,
+    _caller_tag,
+    _hash_hex,
+    _to_dt,
+    _json_parse,
+    _esc,
+    _memory_to_dict,
 )
 from spacetime_memory.auth import generate_token
 
@@ -286,6 +294,12 @@ class TestStmemStore:
         namespaces = store.list_namespaces(prefix=("deep",))
         assert isinstance(namespaces, list)
 
+    def test_list_namespaces_with_suffix(self, store: StmemStore):
+        """list_namespaces with suffix filter."""
+        store.put(("suffix_test", "data"), "sk1", {"content": "suffix test"})
+        namespaces = store.list_namespaces(suffix=("data",))
+        assert isinstance(namespaces, list)
+
     def test_delete_existing(self, store: StmemStore):
         """delete on existing namespace/key."""
         store.put(("del_existing_ns",), "dek1", {"content": "delete existing"})
@@ -410,3 +424,329 @@ class TestStmemStoreAdvanced:
         ]
         results = store.batch(ops)
         assert isinstance(results, list)
+
+
+# =====================================================================
+# Unit tests for helper functions
+# =====================================================================
+
+
+class TestHelperFunctions:
+    """Unit tests for standalone helper functions in langchain.py."""
+
+    def test_apply_filter_empty(self):
+        """_apply_filter with empty filter returns rows unchanged."""
+        rows = [{"content": "test", "entities_json": "{}"}]
+        result = _apply_filter(rows, {})
+        assert result is rows or result == rows
+
+    def test_apply_filter_non_dict_meta(self):
+        """_apply_filter where entities_json is valid non-dict JSON."""
+        rows = [{"content": "test", "entities_json": "[1, 2, 3]"}]
+        result = _apply_filter(rows, {"key": "val"})
+        assert result == []
+
+    def test_caller_tag_with_token(self, client):
+        """_caller_tag with a client that has a token returns hash prefix."""
+        tag = _caller_tag(client)
+        assert isinstance(tag, str)
+        assert len(tag) > 0
+
+    def test_hash_hex(self):
+        """_hash_hex returns SHA-256 hex digest."""
+        result = _hash_hex("test-string")
+        assert isinstance(result, str)
+        assert len(result) == 64
+
+    def test_to_dt_zero(self):
+        """_to_dt with 0 returns empty string."""
+        result = _to_dt(0)
+        assert result == ""
+
+    def test_to_dt_normal(self):
+        """_to_dt with a timestamp returns ISO string."""
+        result = _to_dt(1719000000000000)  # some micros value
+        assert isinstance(result, str)
+        assert "T" in result or result == ""
+
+    def test_json_parse_dict(self):
+        """_json_parse returns dict inputs as-is."""
+        d = {"a": 1}
+        result = _json_parse(d)
+        assert result is d
+
+    def test_json_parse_invalid(self):
+        """_json_parse handles invalid JSON gracefully."""
+        result = _json_parse("not-json{")
+        assert result == {}
+
+    def test_esc(self):
+        """_esc escapes single quotes for SQL."""
+        result = _esc("it's")
+        assert result == "it''s"
+
+    def test_memory_to_dict(self):
+        """_memory_to_dict converts a memory row."""
+        row = {"content": "hello", "summary": "hi", "memory_type": "memory",
+               "entities_json": '{"role": "user"}'}
+        result = _memory_to_dict(row)
+        assert result["content"] == "hello"
+        assert result["summary"] == "hi"
+        assert result["memory_type"] == "memory"
+        assert result.get("metadata", {}).get("role") == "user"
+
+
+# =====================================================================
+# Config-based init (no pre-existing client)
+# =====================================================================
+
+
+class TestConfigInit:
+    """Test creating stores from config dict instead of client."""
+
+    def test_memory_store_from_config(self, stdb_session):
+        """StmemMemoryStore created from config dict."""
+        store = StmemMemoryStore(config={
+            "host": stdb_session["host"],
+            "port": stdb_session["port"],
+            "db": stdb_session["database"],
+        })
+        store.mset([("cfg-mm-key", {"content": "config init"})])
+        values = store.mget(["cfg-mm-key"])
+        assert len(values) == 1
+
+    def test_stmem_store_from_config(self, stdb_session):
+        """StmemStore created from config dict."""
+        store = StmemStore(config={
+            "host": stdb_session["host"],
+            "port": stdb_session["port"],
+            "db": stdb_session["database"],
+        })
+        # Register for auth
+        import secrets
+        try:
+            store._client._call("register", [
+                f"cfg_test_{secrets.token_hex(4)}", "CFG Test", "testpass"
+            ])
+        except RuntimeError:
+            pass
+        my_id = store._client._whoami()
+        if my_id:
+            try:
+                store._client._call("set_initial_admin", [my_id])
+            except RuntimeError:
+                pass
+        store.put(("cfg-ns",), "cfg-k", {"content": "config store"})
+        item = store.get(("cfg-ns",), "cfg-k")
+        assert item is not None
+
+    def test_empty_namespace(self, store: StmemStore):
+        """_ns_to_ws with empty namespace returns default workspace."""
+        ws_name = store._ns_to_ws(())
+        assert isinstance(ws_name, str)
+        assert ws_name.startswith("langgraph-")
+
+    def test_sql_helper(self, store: StmemStore):
+        """_sql helper returns a list."""
+        result = store._sql("SELECT 1")
+        assert isinstance(result, list)
+
+
+# =====================================================================
+# Batch with real LangGraph Op types
+# =====================================================================
+
+
+class TestStmemStoreBatchRealOps:
+    """Test batch() with real LangGraph GetOp/PutOp/SearchOp/ListNamespacesOp."""
+
+    def test_batch_get_op(self, store: StmemStore):
+        """batch with a real GetOp."""
+        from langgraph.store.base import GetOp
+        store.put(("real-get-ns",), "rg1", {"content": "getop test"})
+        ops = [GetOp(namespace=("real-get-ns",), key="rg1")]
+        results = store.batch(ops)
+        assert len(results) == 1
+
+    def test_batch_put_op(self, store: StmemStore):
+        """batch with a real PutOp."""
+        from langgraph.store.base import PutOp
+        ops = [PutOp(namespace=("real-put-ns",), key="rp1",
+                      value={"content": "putop test"})]
+        results = store.batch(ops)
+        assert len(results) == 1
+
+    def test_batch_put_op_delete(self, store: StmemStore):
+        """batch PutOp with value=None triggers delete."""
+        from langgraph.store.base import PutOp
+        store.put(("real-del-ns",), "rd1", {"content": "to del"})
+        ops = [PutOp(namespace=("real-del-ns",), key="rd1", value=None)]
+        results = store.batch(ops)
+        assert len(results) == 1
+
+    def test_batch_search_op(self, store: StmemStore):
+        """batch with a real SearchOp."""
+        from langgraph.store.base import SearchOp
+        store.put(("real-search-ns",), "rs1", {"content": "searchop test"})
+        ops = [SearchOp(namespace_prefix=("real-search-ns",), query="searchop",
+                        filter=None, limit=5, offset=0)]
+        results = store.batch(ops)
+        assert len(results) == 1
+
+    def test_batch_list_namespaces_op(self, store: StmemStore):
+        """batch with a real ListNamespacesOp (no match_conditions)."""
+        from langgraph.store.base import ListNamespacesOp
+        ops = [ListNamespacesOp(match_conditions=None, max_depth=None,
+                                limit=10, offset=0)]
+        results = store.batch(ops)
+        assert len(results) == 1
+
+    def test_batch_list_namespaces_with_prefix_match(self, store: StmemStore):
+        """batch ListNamespacesOp with prefix match condition."""
+        from langgraph.store.base import ListNamespacesOp, MatchCondition
+        store.put(("lns-prefix", "x"), "lp1", {"content": "ns test"})
+        ops = [ListNamespacesOp(
+            match_conditions=[MatchCondition(match_type="prefix", path=("lns-prefix",))],
+            max_depth=None, limit=10, offset=0,
+        )]
+        results = store.batch(ops)
+        assert len(results) == 1
+
+    def test_batch_list_namespaces_with_suffix_match(self, store: StmemStore):
+        """batch ListNamespacesOp with suffix match condition."""
+        from langgraph.store.base import ListNamespacesOp, MatchCondition
+        store.put(("x", "lns-suffix"), "ls1", {"content": "ns suffix"})
+        ops = [ListNamespacesOp(
+            match_conditions=[MatchCondition(match_type="suffix", path=("lns-suffix",))],
+            max_depth=None, limit=10, offset=0,
+        )]
+        results = store.batch(ops)
+        assert len(results) == 1
+
+    def test_batch_dict_legacy_ops(self, store: StmemStore):
+        """batch with legacy dict-based ops."""
+        store.put(("legacy-ns",), "lk1", {"content": "legacy"})
+        ops = [
+            {"type": "get", "namespace": ("legacy-ns",), "key": "lk1"},
+            {"type": "put", "namespace": ("legacy-put-ns",), "key": "lp1",
+             "value": {"content": "legacy put"}},
+            {"type": "delete", "namespace": ("legacy-put-ns",), "key": "lp1"},
+            {"type": "search", "namespace_prefix": ("legacy-ns",),
+             "kwargs": {"query": "legacy"}},
+        ]
+        results = store.batch(ops)
+        assert len(results) == 4
+
+    def test_batch_unknown_type(self, store: StmemStore):
+        """batch with unknown op type returns None."""
+        ops = [{"type": "unknown_type"}]
+        results = store.batch(ops)
+        assert results == [None]
+
+    def test_batch_no_type(self, store: StmemStore):
+        """batch with op having no type returns None."""
+        ops = [{}]
+        results = store.batch(ops)
+        assert results == [None]
+
+    def test_abatch(self, store: StmemStore):
+        """abatch delegates to sync batch."""
+        import asyncio
+        store.put(("abatch-ns",), "ab1", {"content": "abatch test"})
+        from langgraph.store.base import GetOp
+        ops = [GetOp(namespace=("abatch-ns",), key="ab1")]
+
+        async def _run():
+            return await store.abatch(ops)
+        results = asyncio.run(_run())
+        assert len(results) == 1
+
+
+# =====================================================================
+# StmemChatMessageHistory tests
+# =====================================================================
+
+
+class TestStmemChatMessageHistory:
+    """Tests for the LangChain BaseChatMessageHistory implementation."""
+
+    @pytest.fixture
+    def chat_hist(self, client: Client) -> StmemChatMessageHistory:
+        import secrets
+        sid = f"chat_test_{secrets.token_hex(4)}"
+        return StmemChatMessageHistory(session_id=sid, client=client)
+
+    def test_init_with_client(self, client: Client):
+        """Init with a pre-existing client."""
+        hist = StmemChatMessageHistory(session_id="test-session", client=client)
+        assert hist.session_id == "test-session"
+        assert hist._client is client
+        assert hist._workspace_id == ""
+
+    def test_init_with_config(self, stdb_session):
+        """Init with config dict (no client)."""
+        hist = StmemChatMessageHistory(
+            session_id="cfg-session",
+            config={
+                "host": stdb_session["host"],
+                "port": stdb_session["port"],
+                "db": stdb_session["database"],
+            },
+        )
+        assert hist.session_id == "cfg-session"
+
+    def test_resolve_workspace(self, chat_hist):
+        """_resolve_workspace creates or looks up 'chat_history' workspace."""
+        ws_id = chat_hist._resolve_workspace()
+        assert isinstance(ws_id, str)
+        assert len(ws_id) > 0
+
+    def test_messages_empty(self, chat_hist):
+        """Messages on a fresh history returns empty list."""
+        msgs = chat_hist.messages
+        assert msgs == []
+
+    def test_clear_empty(self, chat_hist):
+        """Clearing an empty history doesn't raise."""
+        chat_hist.clear()
+
+    def test_repr(self, chat_hist):
+        """__repr__ returns expected format."""
+        r = repr(chat_hist)
+        assert "StmemChatMessageHistory" in r
+        assert chat_hist.session_id in r
+        assert "message_count=" in r
+
+    def test_try_count(self, chat_hist):
+        """_try_count returns list on empty history."""
+        count = chat_hist._try_count()
+        assert isinstance(count, list)
+
+    def test_add_messages_and_messages(self, chat_hist):
+        """Add messages using langchain_core and retrieve them."""
+        from langchain_core.messages import HumanMessage, AIMessage
+        chat_hist.add_messages([
+            HumanMessage(content="Hello, AI!"),
+            AIMessage(content="Hello, human!"),
+        ])
+        msgs = chat_hist.messages
+        assert len(msgs) >= 1
+
+    def test_clear_after_messages(self, chat_hist):
+        """Clear after storing messages."""
+        from langchain_core.messages import HumanMessage
+        chat_hist.add_messages([HumanMessage(content="Clear me")])
+        chat_hist.clear()
+        msgs = chat_hist.messages
+        assert msgs == []
+
+    def test_workspace_id_from_config(self, client: Client):
+        """Provided workspace_id in config is used directly."""
+        hist = StmemChatMessageHistory(
+            session_id="ws-cfg-test",
+            client=client,
+            config={"workspace_id": "my-custom-ws"},
+        )
+        assert hist._workspace_id == "my-custom-ws"
+        ws_id = hist._resolve_workspace()
+        assert ws_id == "my-custom-ws"

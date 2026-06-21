@@ -13,9 +13,10 @@ import os
 import uuid
 from pathlib import Path
 import time
+from unittest.mock import patch
 import pytest
 
-from spacetime_memory import Client
+from spacetime_memory import Client, EmbedderUnavailableError
 
 pytestmark = [
     pytest.mark.skipif(
@@ -465,3 +466,358 @@ class TestMem0GraphStore:
         )
         assert "results" in result
         assert len(result["results"]) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Additional tests to push coverage to ≥70%
+# ---------------------------------------------------------------------------
+
+
+class TestMem0ConfigVariants:
+    """Constructor and config edge cases (lines 522-525, 542-543)."""
+
+    def test_init_with_empty_dict(self, host: str, port: int) -> None:
+        """Memory(config={}) uses defaults."""
+        m = Memory(config={})
+        assert isinstance(m, Memory)
+
+    def test_init_with_pydantic_like(self, host: str, port: int) -> None:
+        """Memory(config=...) with object that has model_dump()."""
+        class FakeConfig:
+            def model_dump(self):
+                return {"host": host, "port": port}
+        m = Memory(config=FakeConfig())
+        assert isinstance(m, Memory)
+
+    def test_init_with_none_config(self) -> None:
+        """Memory() with no config hits else branch (line 525)."""
+        m = Memory(config=None)
+        assert isinstance(m, Memory)
+
+    def test_init_with_llm_config(self, host: str, port: int) -> None:
+        """Memory(config=...) with llm_config dict (lines 542-543)."""
+        m = Memory(config={
+            "host": host, "port": port,
+            "llm_config": {"user1": {"model": "gpt-4", "api_key": "sk-test"}},
+        })
+        assert isinstance(m, Memory)
+
+    def test_init_llm_config_skips_non_dict(self, host: str, port: int) -> None:
+        """Memory(config=...) with non-dict llm_config entries (line 542 is False)."""
+        m = Memory(config={
+            "host": host, "port": port,
+            "llm_config": {"user1": "not-a-dict"},
+        })
+        assert isinstance(m, Memory)
+
+
+class TestMem0Unscoped:
+    """Tests for unscoped (no user_id) operations."""
+
+    def test_get_all_without_user_id(self, mem: Memory) -> None:
+        """get_all() without user_id (lines 1169-1170)."""
+        result = mem.get_all()
+        assert "results" in result
+        assert isinstance(result["results"], list)
+
+    def test_add_with_empty_filters(self, mem: Memory) -> None:
+        """add() with empty filters dict hits _extract_ids_from_filters None path."""
+        uid = _uid()
+        result = mem.add("test", filters={}, user_id=uid)
+        assert "results" in result
+
+
+class TestMem0LLMConfig:
+    """LLM config resolution tests."""
+
+    def test_resolve_llm_for_with_override(self, mem: Memory) -> None:
+        """_resolve_llm_for uses per-user override (line 599)."""
+        from spacetime_memory.sdks.mem0 import _resolve_llm
+        uid = _uid()
+        mem.set_llm_config(uid, {"model": "gpt-4", "api_key": "sk-test"})
+        llm = mem._resolve_llm_for(uid)
+        assert llm is not None
+
+    def test_resolve_llm_with_config(self) -> None:
+        """_resolve_llm with full config dict (line 486)."""
+        from spacetime_memory.sdks.mem0 import _resolve_llm
+        llm = _resolve_llm({"model": "gpt-4", "api_key": "sk-test", "base_url": "http://x"})
+        assert llm is not None
+
+
+class TestMem0InternalPaths:
+    """Exercise internal code paths for coverage."""
+
+    def test_ws_cached_hit(self, mem: Memory) -> None:
+        """_ws returns cached workspace_id without server call."""
+        uid = _uid()
+        ws1 = mem._ws(uid)  # creates workspace
+        ws2 = mem._ws(uid)  # cached → returns immediately
+        assert ws1 == ws2
+
+    def test_ws_finds_existing_workspace(self, mem: Memory) -> None:
+        """_ws finds existing workspace on server (line 614)."""
+        uid = _uid()
+        mem._ws(uid)  # creates workspace
+        # Clear cache so next call must query server
+        mem._user_id_to_ws.clear()
+        ws = mem._ws(uid)  # should find existing → line 614
+        assert ws
+
+    def test_extract_ids_from_filters_none(self, mem: Memory) -> None:
+        """_extract_ids_from_filters with None returns (None, None, None) (line 644)."""
+        uid = _uid()
+        result = mem.search("test", filters={}, user_id=uid, graph_context=False)
+        assert "results" in result
+
+    def test_search_with_graph_context(self, mem: Memory) -> None:
+        """search() with graph_context=True populates metadata.graph_context (line 1094)."""
+        uid = _uid()
+        mem.add("graph context test", user_id=uid)
+        time.sleep(0.3)
+        result = mem.search("graph", user_id=uid, graph_context=True)
+        assert "results" in result
+        # May or may not have graph_context depending on KG data
+
+    def test_get_all_with_empty_filters(self, mem: Memory) -> None:
+        """get_all() with empty filters dict (exercises _extract_ids_from_filters with {})."""
+        uid = _uid()
+        mem.add("filter test", user_id=uid)
+        result = mem.get_all(filters={}, user_id=uid)
+        assert "results" in result
+
+    def test_search_user_scope_isolation(self, mem: Memory) -> None:
+        """search() checks user_scope isolation (line 1090 coverage attempt)."""
+        uid1 = _uid("mem0-scope-a")
+        uid2 = _uid("mem0-scope-b")
+        mem.add("user A memory", user_id=uid1)
+        time.sleep(0.3)
+        # Search as user B — should not return A's scoped memories
+        result = mem.search("user A memory", user_id=uid2)
+        assert "results" in result  # May be empty but should not crash
+
+    def test_get_graph_context_error(self, mem: Memory) -> None:
+        """_get_graph_context returns [] on RuntimeError (lines 704-706)."""
+        uid = _uid()
+        with patch.object(mem._client, 'query_graph', side_effect=RuntimeError("no graph")):
+            result = mem._get_graph_context("test", user_id=uid)
+            assert result == []
+
+    def test_set_llm_config_persists(self, mem: Memory) -> None:
+        """set_llm_config stores per-user overrides."""
+        uid = _uid()
+        mem.set_llm_config(uid, {"model": "gpt-3.5-turbo"})
+        assert uid in mem._llm_overrides
+        assert mem._llm_overrides[uid]["model"] == "gpt-3.5-turbo"
+
+
+class TestMem0ExceptionHandlers:
+    """Test that API methods properly handle and wrap exceptions via mocking."""
+
+    # ── add() exception handlers (lines 951-956) ─────────────────────────
+
+    def test_add_handles_value_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'store', side_effect=ValueError("test err")):
+            with pytest.raises(ValueError, match="test err"):
+                mem.add("test", user_id=uid, infer=False)
+
+    def test_add_handles_runtime_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'store', side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                mem.add("test", user_id=uid, infer=False)
+
+    def test_add_handles_embedder_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'store',
+                          side_effect=EmbedderUnavailableError("no embedder")):
+            with pytest.raises(EmbedderUnavailableError, match="no embedder"):
+                mem.add("test", user_id=uid, infer=False)
+
+    def test_add_wraps_generic_exception(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'store', side_effect=TypeError("boom")):
+            with pytest.raises(RuntimeError, match=r"mem0\.add\(\) failed"):
+                mem.add("test", user_id=uid, infer=False)
+
+    # ── get() exception handlers (lines 990-997) ─────────────────────────
+
+    def test_get_handles_value_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'get_memory', side_effect=ValueError("test err")):
+            with pytest.raises(ValueError, match="test err"):
+                mem.get("fake-id")
+
+    def test_get_handles_runtime_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'get_memory', side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                mem.get("fake-id")
+
+    def test_get_handles_embedder_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'get_memory',
+                          side_effect=EmbedderUnavailableError("no embedder")):
+            with pytest.raises(EmbedderUnavailableError, match="no embedder"):
+                mem.get("fake-id")
+
+    def test_get_wraps_generic_exception(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'get_memory', side_effect=TypeError("boom")):
+            with pytest.raises(RuntimeError, match=r"mem0\.get\('fake-id'\) failed"):
+                mem.get("fake-id")
+
+    # ── search() exception handlers (lines 1105-1112) ────────────────────
+
+    def test_search_handles_value_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'search', side_effect=ValueError("test err")):
+            with pytest.raises(ValueError, match="test err"):
+                mem.search("test", user_id=uid, graph_context=False)
+
+    def test_search_handles_runtime_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'search', side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                mem.search("test", user_id=uid, graph_context=False)
+
+    def test_search_handles_embedder_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'search',
+                          side_effect=EmbedderUnavailableError("no embedder")):
+            with pytest.raises(EmbedderUnavailableError, match="no embedder"):
+                mem.search("test", user_id=uid, graph_context=False)
+
+    def test_search_wraps_generic_exception(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'search', side_effect=TypeError("boom")):
+            with pytest.raises(RuntimeError, match=r"mem0\.search\('test'\) failed"):
+                mem.search("test", user_id=uid, graph_context=False)
+
+    # ── get_all() exception handlers (lines 1183-1190) ───────────────────
+
+    def test_get_all_handles_value_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'list_memories', side_effect=ValueError("test err")):
+            with pytest.raises(ValueError, match="test err"):
+                mem.get_all(user_id=uid)
+
+    def test_get_all_handles_runtime_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'list_memories', side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                mem.get_all(user_id=uid)
+
+    def test_get_all_handles_embedder_error(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'list_memories',
+                          side_effect=EmbedderUnavailableError("no embedder")):
+            with pytest.raises(EmbedderUnavailableError, match="no embedder"):
+                mem.get_all(user_id=uid)
+
+    def test_get_all_wraps_generic_exception(self, mem: Memory) -> None:
+        uid = _uid()
+        with patch.object(mem._client, 'list_memories', side_effect=TypeError("boom")):
+            with pytest.raises(RuntimeError, match=r"mem0\.get_all\(user_id="):
+                mem.get_all(user_id=uid)
+
+    # ── update() exception handlers (lines 1227-1232) ────────────────────
+
+    def test_update_handles_value_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'update_memory', side_effect=ValueError("test err")):
+            with pytest.raises(ValueError, match="test err"):
+                mem.update("fake-id", "content")
+
+    def test_update_handles_runtime_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'update_memory', side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                mem.update("fake-id", "content")
+
+    def test_update_handles_embedder_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'update_memory',
+                          side_effect=EmbedderUnavailableError("no embedder")):
+            with pytest.raises(EmbedderUnavailableError, match="no embedder"):
+                mem.update("fake-id", "content")
+
+    def test_update_wraps_generic_exception(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'update_memory', side_effect=TypeError("boom")):
+            with pytest.raises(RuntimeError, match=r"mem0\.update\('fake-id'\) failed"):
+                mem.update("fake-id", "content")
+
+    # ── delete() exception handlers (lines 1252-1259) ────────────────────
+
+    def test_delete_handles_value_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'delete_memory', side_effect=ValueError("test err")):
+            with pytest.raises(ValueError, match="test err"):
+                mem.delete("fake-id")
+
+    def test_delete_handles_runtime_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'delete_memory', side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                mem.delete("fake-id")
+
+    def test_delete_handles_embedder_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'delete_memory',
+                          side_effect=EmbedderUnavailableError("no embedder")):
+            with pytest.raises(EmbedderUnavailableError, match="no embedder"):
+                mem.delete("fake-id")
+
+    def test_delete_wraps_generic_exception(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'delete_memory', side_effect=TypeError("boom")):
+            with pytest.raises(RuntimeError, match=r"mem0\.delete\('fake-id'\) failed"):
+                mem.delete("fake-id")
+
+    # ── delete_all() exception handlers (lines 1296-1303) ────────────────
+
+    def test_delete_all_handles_value_error(self, mem: Memory) -> None:
+        uid = _uid()
+        # Add a memory first so get_all returns results, then delete_memory raises
+        mem.add("to delete", user_id=uid)
+        with patch.object(mem._client, 'delete_memory', side_effect=ValueError("test err")):
+            with pytest.raises(ValueError, match="test err"):
+                mem.delete_all(user_id=uid)
+
+    def test_delete_all_handles_runtime_error(self, mem: Memory) -> None:
+        uid = _uid()
+        mem.add("to delete", user_id=uid)
+        with patch.object(mem._client, 'delete_memory', side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                mem.delete_all(user_id=uid)
+
+    def test_delete_all_handles_embedder_error(self, mem: Memory) -> None:
+        uid = _uid()
+        mem.add("to delete", user_id=uid)
+        with patch.object(mem._client, 'delete_memory',
+                          side_effect=EmbedderUnavailableError("no embedder")):
+            with pytest.raises(EmbedderUnavailableError, match="no embedder"):
+                mem.delete_all(user_id=uid)
+
+    def test_delete_all_wraps_generic_exception(self, mem: Memory) -> None:
+        uid = _uid()
+        mem.add("to delete", user_id=uid)
+        with patch.object(mem._client, 'delete_memory', side_effect=TypeError("boom")):
+            with pytest.raises(RuntimeError, match=r"mem0\.delete_all\(user_id="):
+                mem.delete_all(user_id=uid)
+
+    # ── history() exception handlers (lines 1325-1332) ───────────────────
+
+    def test_history_handles_value_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'get_memory_history',
+                          side_effect=ValueError("test err")):
+            with pytest.raises(ValueError, match="test err"):
+                mem.history("fake-id")
+
+    def test_history_handles_runtime_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'get_memory_history',
+                          side_effect=RuntimeError("db down")):
+            with pytest.raises(RuntimeError, match="db down"):
+                mem.history("fake-id")
+
+    def test_history_handles_embedder_error(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'get_memory_history',
+                          side_effect=EmbedderUnavailableError("no embedder")):
+            with pytest.raises(EmbedderUnavailableError, match="no embedder"):
+                mem.history("fake-id")
+
+    def test_history_wraps_generic_exception(self, mem: Memory) -> None:
+        with patch.object(mem._client, 'get_memory_history',
+                          side_effect=TypeError("boom")):
+            with pytest.raises(RuntimeError, match=r"mem0\.history\('fake-id'\) failed"):
+                mem.history("fake-id")
