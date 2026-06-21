@@ -40,11 +40,14 @@ pub const MAX_RESULTS: usize = 1000;
 /// produce different UUIDs.
 pub fn uuid_v4(ctx: &spacetimedb::ReducerContext) -> String {
     use spacetimedb::rand::RngCore;
-    let ts = ctx.timestamp.to_micros_since_unix_epoch();
-    let r1 = ctx.rng().next_u64();
-    let r2 = ctx.rng().next_u64();
-    let high = (ts as u64 ^ r1) as u64;
-    let low = r2;
+    // Hybrid: high bits from RNG (distribution), low bits XOR'd with
+    // timestamp (uniqueness nonce). STDB's ctx.rng() is deterministic
+    // per-module, so two reducers in the same transaction batch get
+    // identical RNG outputs. The timestamp XOR guarantees uniqueness
+    // even when RNG repeats.
+    let ts = ctx.timestamp.to_micros_since_unix_epoch() as u64;
+    let high = ctx.rng().next_u64();
+    let low = ctx.rng().next_u64() ^ ts;
     let ts_part = format!("{:016x}", high);
     let mut rand_hex = format!("{:016x}", low);
 

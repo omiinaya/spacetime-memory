@@ -280,6 +280,7 @@ def _throughput_store(client: Client, ws_id: str, batch_start: int, batch_size: 
     t0 = time.time()
     ok = 0
     fail = 0
+    errors = []  # capture actual exception types
     for i in range(batch_start, batch_start + batch_size):
         try:
             client.store(
@@ -288,10 +289,11 @@ def _throughput_store(client: Client, ws_id: str, batch_start: int, batch_size: 
                 memory_type="experience",
             )
             ok += 1
-        except Exception:
+        except Exception as exc:
             fail += 1
+            errors.append(f"{type(exc).__name__}: {str(exc)[:120]}")
     elapsed = time.time() - t0
-    results.append({"ok": ok, "fail": fail, "elapsed": elapsed, "rate": ok / elapsed if elapsed > 0 else 0})
+    results.append({"ok": ok, "fail": fail, "elapsed": elapsed, "rate": ok / elapsed if elapsed > 0 else 0, "_errors": errors})
 
 
 def test_throughput(stdb_client: Client):
@@ -317,7 +319,10 @@ def test_throughput(stdb_client: Client):
 
     print(f"\n  Throughput: {total_ok}/{n_workers * batch_size} stored in {total_elapsed:.1f}s ({overall_rate:.1f} writes/s)")
 
-    assert total_fail == 0, f"{total_fail} write failures"
+    assert total_fail == 0, (
+        f"{total_fail} write failures: "
+        f"{[e for r in results if '_errors' in r for e in r['_errors']]}"
+    )
     # Don't query for verification — the query_table reducer has issues with dict args
     # Under heavy concurrent write load. The stores themselves are verified by the
     # absence of failures and the individual write success counts.

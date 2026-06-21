@@ -68,8 +68,16 @@ pub fn log_change(
     data_json: &str,
 ) {
     let now = now_micros(ctx);
+    // Retry UUID to avoid collisions under concurrent load (same issue as memory.rs)
+    let mut event_id = uuid_v4(ctx);
+    for _ in 0..3 {
+        if ctx.db.change_event().id().find(&event_id).is_none() {
+            break;
+        }
+        event_id = uuid_v4(ctx);
+    }
     let event = ChangeEvent {
-        id: uuid_v4(ctx),
+        id: event_id,
         workspace_id: workspace_id.to_string(),
         table_name: table_name.to_string(),
         operation: operation.to_string(),
