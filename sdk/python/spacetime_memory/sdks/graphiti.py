@@ -822,74 +822,19 @@ class Graphiti:
             logger.warning("add_episode: LLM returned invalid JSON; skipping extraction")
             return None
 
-    def add_episode(
+    def _build_entities_and_edges(
         self,
-        name: str,
-        episode_body: str,
-        source_description: str,
-        reference_time: datetime | None = None,
-        source: str = "message",
-        group_id: str | None = None,
-        uuid: str | None = None,
-        **kwargs: Any,
-    ) -> AddEpisodeResults:
-        """Store an episode (text content) and extract entities/edges via LLM.
+        extracted: dict[str, Any],
+        ws_id: str,
+        gid: str,
+        episode_uuid: str,
+    ) -> tuple[list[EntityNode], list[EntityEdge]]:
+        """Create entities and edges from LLM-extracted data.
 
-        Stores the episode as a memory record and attempts to extract
-        entities and relationships from the episode body using the
-        configured LLM.  Extraction degrades gracefully when no LLM is
-        configured.
-
-        Args:
-            name: Episode name.
-            episode_body: The text content.
-            source_description: Description of the source.
-            reference_time: Timestamp for the episode.
-            source: Episode type (message, text, json, fact_triple).
-            group_id: Workspace name (maps to Graphiti's group_id).
-            uuid: Optional episode UUID.
-            **kwargs: Additional Graphiti parameters (accepted for
-                compatibility, ignored).
-
-        Returns:
-            :class:`AddEpisodeResults` with the stored episode and any
-            extracted nodes and edges.
+        Returns (nodes, edges) with DB-assigned UUIDs populated.
         """
-        ws_id = self._resolve_workspace(group_id or "default")
-        gid = group_id or "default"
-        ts = reference_time or datetime.now(timezone.utc)
-        episode_uuid = uuid or _uuid.uuid4().hex[:32]
-
-        try:
-            self._client.store(
-                workspace_id=ws_id,
-                content=episode_body,
-                memory_type="episode",
-                peer_id=source_description or name,
-                source_session_id=episode_uuid,
-            )
-        except RuntimeError as exc:
-            raise RuntimeError(
-                f"graphiti.add_episode('{name}') failed: {exc}"
-            ) from exc
-
-        episode = EpisodicNode(
-            uuid=episode_uuid,
-            name=name,
-            content=episode_body,
-            source=source,
-            source_description=source_description,
-            group_id=gid,
-            valid_at=ts,
-        )
-
-        # Attempt LLM-powered entity / relationship extraction
         nodes: list[EntityNode] = []
         edges: list[EntityEdge] = []
-
-        extracted = self._extract_entities_from_text(episode_body)
-        if extracted is None:
-            return AddEpisodeResults(episode=episode, nodes=nodes, edges=edges)
 
         # Map entity names to (node_uuid, EntityNode) pairs
         entity_map: dict[str, tuple[str, EntityNode]] = {}
@@ -964,6 +909,78 @@ class Graphiti:
                 target_node_uuid=tgt_uuid,
                 group_id=gid,
             ))
+
+        return nodes, edges
+
+    def add_episode(
+        self,
+        name: str,
+        episode_body: str,
+        source_description: str,
+        reference_time: datetime | None = None,
+        source: str = "message",
+        group_id: str | None = None,
+        uuid: str | None = None,
+        **kwargs: Any,
+    ) -> AddEpisodeResults:
+        """Store an episode (text content) and extract entities/edges via LLM.
+
+        Stores the episode as a memory record and attempts to extract
+        entities and relationships from the episode body using the
+        configured LLM.  Extraction degrades gracefully when no LLM is
+        configured.
+
+        Args:
+            name: Episode name.
+            episode_body: The text content.
+            source_description: Description of the source.
+            reference_time: Timestamp for the episode.
+            source: Episode type (message, text, json, fact_triple).
+            group_id: Workspace name (maps to Graphiti's group_id).
+            uuid: Optional episode UUID.
+            **kwargs: Additional Graphiti parameters (accepted for
+                compatibility, ignored).
+
+        Returns:
+            :class:`AddEpisodeResults` with the stored episode and any
+            extracted nodes and edges.
+        """
+        ws_id = self._resolve_workspace(group_id or "default")
+        gid = group_id or "default"
+        ts = reference_time or datetime.now(timezone.utc)
+        episode_uuid = uuid or _uuid.uuid4().hex[:32]
+
+        try:
+            self._client.store(
+                workspace_id=ws_id,
+                content=episode_body,
+                memory_type="episode",
+                peer_id=source_description or name,
+                source_session_id=episode_uuid,
+            )
+        except RuntimeError as exc:
+            raise RuntimeError(
+                f"graphiti.add_episode('{name}') failed: {exc}"
+            ) from exc
+
+        episode = EpisodicNode(
+            uuid=episode_uuid,
+            name=name,
+            content=episode_body,
+            source=source,
+            source_description=source_description,
+            group_id=gid,
+            valid_at=ts,
+        )
+
+        # Attempt LLM-powered entity / relationship extraction
+        extracted = self._extract_entities_from_text(episode_body)
+        if extracted is None:
+            return AddEpisodeResults(episode=episode, nodes=[], edges=[])
+
+        nodes, edges = self._build_entities_and_edges(
+            extracted, ws_id, gid, episode_uuid,
+        )
 
         return AddEpisodeResults(
             episode=episode,

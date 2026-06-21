@@ -49,6 +49,9 @@ from ..llm import LLMClient
 
 logger = logging.getLogger(__name__)
 
+# Internal signal: message-list LLM fact extraction completed via recursion.
+_InferMergeDone = type("_InferMergeDone", (BaseException,), {})
+
 
 class _GraphStore:
     """Mem0-compatible graph / entity store.
@@ -706,6 +709,106 @@ class Memory:
     # Mem0 API
     # -------------------------------------------------------------------
 
+    def _handle_message_list(
+        self,
+        messages: list[dict[str, str]],
+        user_id: str | None,
+        agent_id: str | None,
+        run_id: str | None,
+        infer: bool,
+    ) -> tuple[str, str]:
+        """Convert message list to content string; extract facts via LLM.
+
+        Returns (content, summary).  If infer=True and LLM extraction
+        succeeds, stores each fact individually via recursive add().
+        Raises StopIteration to signal that the caller should return
+        immediately (facts were stored recursively).
+        """
+        # Format conversation for LLM extraction
+        conversation = "\n".join(
+            f"{m.get('role', 'user')}: {m.get('content', '')}"
+            for m in messages if m.get('content')
+        )
+
+        # Try LLM memory extraction from conversation (real Mem0 behavior)
+        extracted_memories = None
+        if infer:
+            try:
+                llm = self._resolve_llm_for(user_id)
+                if llm and llm.available:
+                    extracted_memories = llm.extract_facts(conversation)
+            except RuntimeError as exc:
+                logger.warning("LLM memory extraction from conversation failed: %s", exc)
+
+        if extracted_memories and len(extracted_memories) > 0:
+            # Store each extracted memory individually (Mem0 behavior)
+            all_results = []
+            for fact in extracted_memories:
+                r = self.add(
+                    fact, user_id=user_id, agent_id=agent_id,
+                    run_id=run_id, infer=False,
+                )
+                all_results.extend(r.get("results", []))
+            raise _InferMergeDone({"results": all_results, "relation_events": []})
+
+        # Fallback: concatenate
+        if infer:
+            content = " ".join(
+                m.get("content", "") for m in messages if m.get("content")
+            )
+            summary = ""
+        else:
+            content = conversation
+            summary = content[:200]
+        return content, summary
+
+    def _try_infer_merge(
+        self,
+        content: str,
+        user_id: str | None,
+        agent_id: str | None,
+    ) -> dict[str, Any] | None:
+        """Try infer+merge: search for similar memories and append if found.
+
+        Returns the merge result dict if a close match was found, None otherwise.
+        """
+        search_result = self.search(query=content, user_id=user_id, limit=5)
+        close_matches = [
+            r for r in search_result.get("results", [])
+            if r.get("score", 0) > 0.85
+        ]
+        if not close_matches:
+            return None
+
+        best_match = close_matches[0]
+        mem_id = best_match["id"]
+        existing_content = best_match.get("memory", "")
+        merged = f"{existing_content}\n{content}"
+        self.update(memory_id=mem_id, data=merged)
+        # LLM fact extraction on merged content
+        try:
+            llm = self._resolve_llm_for(user_id)
+            if llm and llm.available:
+                facts = llm.extract_facts(merged)
+                if facts:
+                    self._store_facts_as_kg_nodes(facts, user_id, agent_id)
+                    self._call(
+                        "update_memory", mem_id,
+                        json.dumps({"extracted_facts": facts}),
+                    )
+        except RuntimeError as exc:
+            logger.warning("Failed to update memory with KG facts: %s", exc)
+        return {
+            "results": [{
+                "id": mem_id,
+                "memory": merged,
+                "event": "UPDATE",
+                "user_id": user_id or "",
+                "agent_id": agent_id or "",
+            }],
+            "relation_events": [],
+        }
+
     def add(
         self,
         messages: str | list[dict[str, str]],
@@ -767,42 +870,9 @@ class Memory:
 
         try:
             if isinstance(messages, list):
-                # Format conversation for LLM extraction
-                conversation = "\n".join(
-                    f"{m.get('role', 'user')}: {m.get('content', '')}"
-                    for m in messages if m.get('content')
+                content, summary = self._handle_message_list(
+                    messages, user_id, agent_id, run_id, infer,
                 )
-
-                # Try LLM memory extraction from conversation (real Mem0 behavior)
-                extracted_memories = None
-                if infer:
-                    try:
-                        llm = self._resolve_llm_for(user_id)
-                        if llm and llm.available:
-                            extracted_memories = llm.extract_facts(conversation)
-                    except RuntimeError as exc:
-                        logger.warning("LLM memory extraction from conversation failed: %s", exc)
-
-                if extracted_memories and len(extracted_memories) > 0:
-                    # Store each extracted memory individually (Mem0 behavior)
-                    all_results = []
-                    for fact in extracted_memories:
-                        r = self.add(
-                            fact, user_id=user_id, agent_id=agent_id,
-                            run_id=run_id, infer=False,  # No recursion
-                        )
-                        all_results.extend(r.get("results", []))
-                    return {"results": all_results, "relation_events": []}
-
-                # Fallback: concatenate (original behavior)
-                if infer:
-                    content = " ".join(
-                        m.get("content", "") for m in messages if m.get("content")
-                    )
-                    summary = ""
-                else:
-                    content = conversation
-                    summary = content[:200]
             else:
                 content = str(messages)
                 summary = ""
@@ -812,42 +882,9 @@ class Memory:
             # When infer=True and content is a string, try to merge with
             # similar existing memories instead of creating a new one.
             if infer and isinstance(messages, str) and user_id:
-                search_result = self.search(query=content, user_id=user_id, limit=5)
-                close_matches = [
-                    r for r in search_result.get("results", [])
-                    if r.get("score", 0) > 0.85
-                ]
-                if close_matches:
-                    best_match = close_matches[0]
-                    mem_id = best_match["id"]
-                    existing_content = best_match.get("memory", "")
-                    merged = f"{existing_content}\n{content}"
-                    self.update(memory_id=mem_id, data=merged)
-                    # LLM fact extraction on merged content
-                    try:
-                        llm = self._resolve_llm_for(user_id)
-                        if llm and llm.available:
-                            facts = llm.extract_facts(merged)
-                            if facts:
-                                self._store_facts_as_kg_nodes(
-                                    facts, user_id, agent_id,
-                                )
-                                self._call(
-                                    "update_memory", mem_id,
-                                    json.dumps({"extracted_facts": facts}),
-                                )
-                    except RuntimeError as exc:
-                        logger.warning("Failed to update memory with KG facts: %s", exc)
-                    return {
-                        "results": [{
-                            "id": mem_id,
-                            "memory": merged,
-                            "event": "UPDATE",
-                            "user_id": user_id or "",
-                            "agent_id": agent_id or "",
-                        }],
-                        "relation_events": [],
-                    }
+                merged_result = self._try_infer_merge(content, user_id, agent_id)
+                if merged_result is not None:
+                    return merged_result
 
             # LLM fact extraction when infer=True
             extracted_facts = None
@@ -907,6 +944,8 @@ class Memory:
                 ],
                 "relation_events": [],
             }
+        except _InferMergeDone as done:
+            return done.args[0]
         except RuntimeError:
             raise
         except ValueError:
