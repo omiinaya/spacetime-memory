@@ -9,6 +9,8 @@ Markers
   no marker is set on the test), runs ``pytest -m unit``.
 - ``integration`` — tests that require a running SpacetimeDB standalone and
   the module published, runs ``pytest -m integration``.
+- ``embedder`` — subset of integration tests that also require the Rust ONNX
+  embedder sidecar running on :9090.
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ from spacetime_memory import Client
 def pytest_configure(config):
     config.addinivalue_line("markers", "unit: tests that mock HTTP (no SpacetimeDB needed)")
     config.addinivalue_line("markers", "integration: tests that need a running SpacetimeDB standalone")
+    config.addinivalue_line("markers", "embedder: tests that also need the ONNX embedder sidecar")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -100,7 +103,7 @@ def mock_http_client():
     The fixture creates a real Client with test-safe connection parameters,
     then replaces its internal ``_http`` (httpx.Client) with a MagicMock
     so that no real network calls are made.  Tests can control what the
-    SQL / reducer endpoints return by setting::
+    SQL / reducer / embedder endpoints return by setting::
 
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
@@ -113,6 +116,7 @@ def mock_http_client():
         host="localhost",
         port="3001",
         database="test-db",
+        embedder_url="http://localhost:9090",
     )
     # Replace the real httpx client with a mock — no actual network I/O.
     mock_http = MagicMock(spec=httpx.Client)
