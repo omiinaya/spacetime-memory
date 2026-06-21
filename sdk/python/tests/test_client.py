@@ -2,6 +2,7 @@
 
 import json
 import pytest
+import httpx
 from unittest.mock import Mock
 from spacetime_memory import Client
 from tests.conftest import make_sql_response
@@ -149,7 +150,11 @@ class TestClientEmbed:
     def test_embed_http_error_returns_empty(self, mock_http_client, monkeypatch):
         """_embed() returns [] when the proxy returns HTTP >= 400."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-        mock_http_client._http.post.return_value = Mock(status_code=503, text="")
+        mock_resp = Mock(status_code=503)
+        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Service Unavailable", request=Mock(), response=mock_resp
+        )
+        mock_http_client._http.post.return_value = mock_resp
 
         result = mock_http_client._embed("hello")
         assert result == []

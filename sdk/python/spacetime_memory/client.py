@@ -547,7 +547,7 @@ class Client:
         except httpx.TimeoutException:
             logger.warning("OpenAI embedder timed out for text (len=%d)", len(text))
             return []
-        except Exception:  # Truly unexpected (JSON parse, etc.) — specific HTTP errors above
+        except (json.JSONDecodeError, httpx.HTTPError, KeyError, IndexError, ValueError):
             logger.exception("OpenAI embedder failed for text (len=%d)", len(text))
             return []
 
@@ -598,7 +598,7 @@ class Client:
         except httpx.TimeoutException:
             logger.warning("OpenAI embedder timed out for batch (count=%d)", len(texts))
             return []
-        except Exception:  # Truly unexpected (JSON parse, etc.) — specific HTTP errors above
+        except (json.JSONDecodeError, httpx.HTTPError, KeyError, IndexError, ValueError):
             logger.exception("OpenAI embedder failed for batch (count=%d)", len(texts))
             return []
 

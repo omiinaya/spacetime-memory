@@ -332,7 +332,7 @@ class ContextAgent:
         )
         try:
             return llm.generate(prompt, max_tokens=512, temperature=0.3)
-        except Exception:  # Graceful degradation: any LLM failure returns None
+        except (RuntimeError, ValueError, OSError):  # llama.cpp inference or model loading failure
             return None
 
     def format_context(self, entries: list[dict[str, Any]]) -> str:
