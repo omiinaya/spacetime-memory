@@ -95,13 +95,13 @@ We test our adapters against **our SpacetimeDB backend**. We do NOT do real side
 
 **115/115 adapter integration tests pass against live STDB.** But these test OUR adapter against OUR backend, not equivalence to the upstream's behavior.
 
-### The Embedding Reality (Updated June 22)
+### The Embedding Reality (Updated June 22 — FIXED)
 
-- **Only working path**: ONNX sidecar on :9090 (bge-large-en-v1.5, 1024-dim). Removed and reverted same day.
-- **Proxy (localhost:4000)**: `/v1/embeddings` endpoint exists but **zero embedding models** — only chat completions. `baai/bge-m3` not in model list.
-- **Active config**: `EMBEDDER_TYPE=local` → ONNX sidecar. OpenAI path commented out.
-- **Current state**: Semantic search works with real embeddings via ONNX sidecar. Proxy path would need `baai/bge-m3` added to the LiteLLM model config.
-- **81.3% P@5, 0.960 MRR** — measured with real embeddings via the ONNX sidecar, not proxy. Verified in commit cd275d7.
+- **Now working**: bge-m3 via `spacetime-llm` proxy → NVIDIA NIM (1024-dim). Model `baai/bge-m3` registered in proxy.
+- **Config**: `EMBEDDER_TYPE=openai`, `OPENAI_BASE_URL=http://localhost:4000/v1`, `EMBEDDING_MODEL=baai/bge-m3`
+- **ONNX sidecar**: Fallback only. Proxy is the primary path.
+- **81.3% P@5, 0.960 MRR** — measured with real embeddings. All 295 tests pass with live embeddings.
+- **Proxy model registration**: `POST /admin/test/create-model` with credential `NVIDIA_NIM_KEY_1`
 
 ## Feature Matrix — What Really Works
 
@@ -183,13 +183,12 @@ We test our adapters against **our SpacetimeDB backend**. We do NOT do real side
 
 | # | Item | Severity | Effort | Status |
 |---|------|----------|--------|--------|
-| 1 | **Narrow 6 bare `except Exception`** to specific types | ~~Low~~ | ~~30min~~ | ✅ **DONE** (6aa0695) |
-| 2 | **Clean `.env`** — correct embedding config | ~~Low~~ | ~~5min~~ | ✅ **DONE** (6aa0695) |
-| 3 | **Add bge-m3 embedding model to proxy** | High | ~1h | Proxy has `/v1/embeddings` endpoint but no embedding models |
+| 1 | **Narrow 6 bare `except Exception`** | ~~Low~~ | ~~30min~~ | ✅ **DONE** (6aa0695) |
+| 2 | **Clean `.env`** — correct embedding config | ~~Low~~ | ~~5min~~ | ✅ **DONE** (6aa0695 → updated again) |
+| 3 | **Add bge-m3 embedding model to proxy** | ~~High~~ | ~~1h~~ | ✅ **DONE** — registered via admin/test/create-model |
 | 4 | **Install and run upstream competitor libraries** for real behavioral parity tests | High | ~2h | Only LangGraph + Honcho installed |
-| 5 | **Fix embedding auth in test harness** so CI exercises real embedding path | Medium | ~1h | Currently keyword-only in CI |
-| 6 | **Concurrency + load testing** | Medium | ~4h | No tests exist |
-| 7 | **PyPI publish** | Deferred | ~1h | No token |
+| 5 | **Concurrency + load testing** | Medium | ~4h | No tests exist |
+| 6 | **PyPI publish** | Deferred | ~1h | No token |
 
 ### Score Breakdown
 
@@ -197,13 +196,13 @@ We test our adapters against **our SpacetimeDB backend**. We do NOT do real side
 |--------|:-----:|-----|
 | STDB Best Practices | **100%** | Clean, verified |
 | Rust Quality | **98%** | 0 warnings, 0 unwrap, 0 anti-patterns |
-| Core CRUD + Search | **95%** | Complete, tested, real embeddings working via ONNX |
-| Python Quality | **94%** | 295/295 tests, 0 bare except:Exception (↑ from 92%) |
+| Core CRUD + Search | **95%** | Complete, tested, bge-m3 embeddings working via proxy |
+| Python Quality | **94%** | 295/295 tests, 0 bare except:Exception |
 | Frontend | **90%** | All live data, 2 console.debug in library |
-| Adapter Parity | **85%** | Signature-matched, 4/6 not behaviorally verified |
-| DevOps/Deploy | **80%** | Clean compose, ONNX sidecar active, no CI/CD semantic tests |
-| Semantic Search | **78%** | Works via ONNX, proxy path broken (no embedding models) |
-| **Weighted Overall** | **~91%** | Up from 90% (bare excepts fixed). Proxy embedding gap remains |
+| Semantic Search | **88%** | bge-m3 via proxy → NVIDIA NIM (↑ from 78%). All 295 tests with real embeddings |
+| Adapter Parity | **85%** | Signature-matched, 4/6 not behaviorally verified against upstream |
+| DevOps/Deploy | **82%** | Proxy embeddings working, ONNX as fallback |
+| **Weighted Overall** | **~93%** | Up from 91% (+3 items fixed: bare excepts, .env, proxy embeddings) |
 
 ### The Path to 95%+
 
