@@ -1508,3 +1508,365 @@ class TestAsyncZepV2:
 
             fetched = await client.user.get(uid)
             assert fetched["user_id"] == uid
+
+
+# ==========================================================================
+# Unit tests for error paths and edge cases (mocking, no DB needed)
+# ==========================================================================
+
+class TestImportFallbacks:
+    """Test that the fallback stubs load correctly when zep_python is absent."""
+
+    def test_import_fallback_stubs_defined(self) -> None:
+        """When zep_python is missing, all stub exceptions are RuntimeError subclasses.
+
+        Uses patch on sys.modules to block zep_python imports, then reloads
+        the zep module so the fallback definitions in the ``except ImportError``
+        block are exercised.
+        """
+        import sys
+        import importlib
+        from unittest.mock import patch
+
+        # Block ALL zep_python modules
+        blocked = {k: None for k in list(sys.modules)
+                   if k == "zep_python" or k.startswith("zep_python.")}
+        # Also block any sub-imports that haven't been loaded yet
+        import_error = ImportError("No module named 'zep_python'")
+
+        class BlockedLoader:
+            @staticmethod
+            def find_spec(fullname, path, target=None):
+                if fullname == "zep_python" or fullname.startswith("zep_python."):
+                    raise import_error
+                return None
+
+        import spacetime_memory.sdks.zep as zep_mod
+        with patch.dict(sys.modules, blocked, clear=False):
+            with patch.object(sys, "meta_path", [BlockedLoader] + sys.meta_path):
+                importlib.reload(zep_mod)
+
+        # After reload with zep_python blocked, stubs should be RuntimeError subclasses
+        assert issubclass(zep_mod.NotFoundError, RuntimeError)
+        assert issubclass(zep_mod.BadRequestError, RuntimeError)
+        assert issubclass(zep_mod.ApiError, RuntimeError)
+        assert issubclass(zep_mod.ConflictError, RuntimeError)
+
+        # Restore by re-reloading normally
+        importlib.reload(zep_mod)
+
+
+class TestNowIso:
+    """Test _now_iso() utility method."""
+
+    def test_now_iso_format(self, zep: ZepClient) -> None:
+        """_now_iso returns valid ISO-8601 timestamp."""
+        from datetime import datetime, timezone
+        ts = zep._now_iso()
+        # Should parse as valid datetime
+        parsed = datetime.fromisoformat(ts)
+        assert parsed.tzinfo is not None  # Should be timezone-aware
+        assert ts.endswith("+00:00") or ts.endswith("Z")
+
+
+class TestAddMemoryEdgeCases:
+    """Test add_memory with non-standard message types."""
+
+    def test_add_memory_with_raw_string(self, zep: ZepClient) -> None:
+        """Messages that are raw strings (not dict or MemoryMessage) are cast to str."""
+        sid = _sid("zep-test-raw-str")
+        result = zep.add_memory(session_id=sid, messages=["raw string message"])
+        assert result["status"] == "ok"
+        assert len(result["message_ids"]) > 0
+
+        mem = zep.get_memory(session_id=sid)
+        assert mem is not None
+        contents = [m["content"] for m in mem["messages"]]
+        assert "raw string message" in contents
+
+
+class TestUpdateMemoryBranches:
+    """Test update_memory with MemoryMessage and raw string types."""
+
+    def test_update_memory_with_memorymessage(self, zep: ZepClient) -> None:
+        """update_memory with MemoryMessage objects hits the MemoryMessage branch."""
+        sid = _sid("zep-test-upd-memmsg")
+        add_result = zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Original"}],
+        )
+        memory_id = add_result["message_ids"][0]
+        # Explicitly test the MemoryMessage isinstance branch (line 825-826)
+        result = zep.update_memory(
+            session_id=sid,
+            memory_id=memory_id,
+            messages=[MemoryMessage(role="user", content="Updated via MemoryMessage")],
+        )
+        assert result["status"] == "ok"
+        # MemoryMessage branch extracts .content — verified via status=="ok"
+
+    def test_update_memory_with_raw_string(self, zep: ZepClient) -> None:
+        """update_memory with raw string (not dict or MemoryMessage) uses str()."""
+        sid = _sid("zep-test-upd-str")
+        add_result = zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Original"}],
+        )
+        memory_id = add_result["message_ids"][0]
+        result = zep.update_memory(
+            session_id=sid,
+            memory_id=memory_id,
+            messages=["raw update string"],
+        )
+        assert result["status"] == "ok"
+
+
+class TestDeleteFactBackwardCompat:
+    """Test delete_fact with legacy fact_id kwarg signature."""
+
+    def test_delete_fact_with_fact_id_kwarg(self, zep: ZepClient) -> None:
+        """delete_fact(fact_uuid="", fact_id=...) hits the backward compat branch."""
+        sid = _sid("zep-test-delfact-bw")
+        add_result = zep.add_fact(session_id=sid, fact="Backward compat fact")
+        fact_id = add_result["fact_id"]
+        assert fact_id
+
+        # Use legacy signature: fact_id kwarg overrides fact_uuid
+        result = zep.delete_fact("", fact_id=fact_id)
+        assert result["status"] == "ok"
+
+    def test_delete_fact_with_session_id_and_fact_id(self, zep: ZepClient) -> None:
+        """delete_fact(session_id=..., fact_id=...) backward compat signature."""
+        sid = _sid("zep-test-delfact-bw2")
+        add_result = zep.add_fact(session_id=sid, fact="Another bw fact")
+        fact_id = add_result["fact_id"]
+        assert fact_id
+
+        result = zep.delete_fact("", session_id=sid, fact_id=fact_id)
+        assert result["status"] == "ok"
+
+
+class TestGetSessionMessageErrors:
+    """Test get_session_message error paths."""
+
+    def test_session_not_found(self, zep: ZepClient) -> None:
+        """get_session_message raises NotFoundError when session doesn't exist."""
+        with pytest.raises(NotFoundError):
+            zep.get_session_message(
+                session_id=_sid("zep-test-noexist-session"),
+                message_uuid="any-uuid",
+            )
+
+
+class TestUpdateMessageMetadataErrors:
+    """Test update_message_metadata error paths."""
+
+    def test_session_not_found(self, zep: ZepClient) -> None:
+        """update_message_metadata raises NotFoundError when session doesn't exist."""
+        with pytest.raises(NotFoundError):
+            zep.update_message_metadata(
+                session_id=_sid("zep-test-noexist-meta"),
+                message_uuid="any-uuid",
+                metadata={},
+            )
+
+    def test_message_not_found(self, zep: ZepClient) -> None:
+        """update_message_metadata raises NotFoundError when message not in session."""
+        sid = _sid("zep-test-meta-msg-ne")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Setup"}],
+        )
+        with pytest.raises(NotFoundError):
+            zep.update_message_metadata(
+                session_id=sid,
+                message_uuid="nonexistent-uuid-999",
+                metadata={},
+            )
+
+    def test_runtime_error_swallowed(self, zep: ZepClient) -> None:
+        """update_message_metadata swallows RuntimeError from _client.update_memory."""
+        from unittest.mock import patch
+        sid = _sid("zep-test-meta-runtime")
+        add_result = zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Will mock update"}],
+        )
+        msg_id = add_result["message_ids"][0]
+
+        with patch.object(zep._client, "update_memory", side_effect=RuntimeError("mock")):
+            result = zep.update_message_metadata(
+                session_id=sid,
+                message_uuid=msg_id,
+                metadata={"key": "val"},
+            )
+            # Should still return the message info (metadata merged in-memory before update)
+            assert "uuid" in result
+            assert result["uuid"] == msg_id
+
+
+class TestDeleteMemoryErrorHandlers:
+    """Test delete_memory exception handlers in the deletion loop."""
+
+    def test_value_error_re_raised(self, zep: ZepClient) -> None:
+        """ValueError from _client.delete_memory is re-raised."""
+        from unittest.mock import patch
+        sid = _sid("zep-test-delmem-valueerror")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Will trigger ValueError"}],
+        )
+
+        with patch.object(zep._client, "delete_memory", side_effect=ValueError("bad id")):
+            with pytest.raises(ValueError, match="bad id"):
+                zep.delete_memory(session_id=sid)
+
+    def test_runtime_error_swallowed(self, zep: ZepClient) -> None:
+        """RuntimeError from _client.delete_memory is swallowed, deletions continue."""
+        from unittest.mock import patch
+        sid = _sid("zep-test-delmem-runtime")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Msg 1"}, {"role": "user", "content": "Msg 2"}],
+        )
+
+        # First call raises, second succeeds
+        call_count = [0]
+
+        def mock_delete(mem_id):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise RuntimeError("mock error")
+            return {"status": "ok"}
+
+        with patch.object(zep._client, "delete_memory", side_effect=mock_delete):
+            result = zep.delete_memory(session_id=sid)
+            # Should have deleted the second message
+            assert result["status"] == "ok"
+            assert result["deleted"] == 1  # Only second one succeeded
+
+
+class TestResolveSessionCache:
+    """Test _resolve_session cache population path."""
+
+    def test_cache_population_from_list_workspaces(self, zep: ZepClient) -> None:
+        """_resolve_session populates _session_to_ws cache from list_workspaces."""
+        sid = _sid("zep-test-resolve-cache")
+        # Create a session
+        zep.add_session(session_id=sid)
+
+        # Clear the cache to force list_workspaces path
+        zep._session_to_ws.clear()
+
+        # Now resolve — should hit list_workspaces() and populate cache
+        ws_id = zep._resolve_session(sid)
+        assert ws_id is not None
+        # Workspace ID can be int or string depending on backend
+        assert isinstance(ws_id, (int, str))
+        # Cache should now be populated
+        assert sid in zep._session_to_ws
+        assert zep._session_to_ws[sid] == ws_id
+
+    def test_resolve_session_cache_hit(self, zep: ZepClient) -> None:
+        """_resolve_session returns cached workspace ID when available."""
+        sid = _sid("zep-test-resolve-cached")
+        zep.add_session(session_id=sid)
+
+        # First resolution populates cache
+        ws_id1 = zep._resolve_session(sid)
+        # Second resolution should hit cache
+        ws_id2 = zep._resolve_session(sid)
+        assert ws_id1 == ws_id2
+
+
+class TestSummarizeMemoryErrors:
+    """Test summarize_memory error paths and edge cases using mocking."""
+
+    def test_value_error_re_raised(self, zep: ZepClient) -> None:
+        """ValueError from get_memory is re-raised in summarize_memory."""
+        from unittest.mock import patch
+
+        with patch.object(zep, "get_memory", side_effect=ValueError("bad arg")):
+            with pytest.raises(ValueError, match="bad arg"):
+                zep.summarize_memory(session_id=_sid("zep-test-sum-valerr"))
+
+    def test_runtime_error_returns_none(self, zep: ZepClient) -> None:
+        """RuntimeError from get_memory returns None gracefully."""
+        from unittest.mock import patch
+
+        with patch.object(zep, "get_memory", side_effect=RuntimeError("backend error")):
+            result = zep.summarize_memory(session_id=_sid("zep-test-sum-runerr"))
+            assert result is None
+
+    def test_no_messages_returns_none(self, zep: ZepClient) -> None:
+        """summarize_memory returns None when memory has empty messages list."""
+        from unittest.mock import patch
+
+        with patch.object(zep, "get_memory", return_value={"messages": []}):
+            result = zep.summarize_memory(session_id=_sid("zep-test-sum-empty-msgs"))
+            assert result is None
+
+    def test_no_text_parts_returns_none(self, zep: ZepClient) -> None:
+        """summarize_memory returns None when messages have no content text."""
+        from unittest.mock import patch
+
+        # Messages that are dicts but with no content
+        with patch.object(zep, "get_memory", return_value={
+            "messages": [{"role": "user", "content": ""}, {"role": "assistant", "content": ""}]
+        }):
+            result = zep.summarize_memory(session_id=_sid("zep-test-sum-no-text"))
+            assert result is None
+
+    def test_object_messages_with_role_and_content(self, zep: ZepClient) -> None:
+        """summarize_memory handles messages that are objects with role/content attrs."""
+        from unittest.mock import patch, MagicMock
+
+        msg_obj = MagicMock()
+        msg_obj.role = "user"
+        msg_obj.content = "Object-based message"
+
+        with patch.object(zep, "get_memory", return_value={"messages": [msg_obj]}):
+            # Mock LLMClient to avoid needing actual LLM
+            # LLMClient is imported lazily via 'from ..llm import LLMClient'
+            with patch("spacetime_memory.llm.LLMClient") as mock_llm_class:
+                mock_llm = MagicMock()
+                mock_llm.available = True
+                mock_llm.summarize.return_value = "Summary of object message"
+                mock_llm_class.return_value = mock_llm
+
+                result = zep.summarize_memory(session_id=_sid("zep-test-sum-obj"))
+                assert result is not None
+                assert result == "Summary of object message"
+
+    def test_llm_not_available_returns_none(self, zep: ZepClient) -> None:
+        """summarize_memory returns None when LLMClient is not available."""
+        from unittest.mock import patch, MagicMock
+
+        with patch.object(zep, "get_memory", return_value={
+            "messages": [{"role": "user", "content": "Some content"}]
+        }):
+            with patch("spacetime_memory.llm.LLMClient") as mock_llm_class:
+                mock_llm = MagicMock()
+                mock_llm.available = False
+                mock_llm_class.return_value = mock_llm
+
+                result = zep.summarize_memory(session_id=_sid("zep-test-sum-no-llm"))
+                assert result is None
+
+    def test_messages_with_message_type_field(self, zep: ZepClient) -> None:
+        """summarize_memory handles dict messages using message_type fallback."""
+        from unittest.mock import patch, MagicMock
+
+        with patch.object(zep, "get_memory", return_value={
+            "messages": [
+                {"message_type": "user", "message": "Content from message_type"}
+            ]
+        }):
+            with patch("spacetime_memory.llm.LLMClient") as mock_llm_class:
+                mock_llm = MagicMock()
+                mock_llm.available = True
+                mock_llm.summarize.return_value = "Summarized"
+                mock_llm_class.return_value = mock_llm
+
+                result = zep.summarize_memory(session_id=_sid("zep-test-sum-msgtype"))
+                assert result is not None

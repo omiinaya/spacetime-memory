@@ -2033,3 +2033,1147 @@ class TestAdditionalCoverage:
         """edges.next_episode.get_by_uuids with nonexistent UUIDs returns empty."""
         edges = graphiti.edges.next_episode.get_by_uuids(["no-such-ne-1", "no-such-ne-2"])
         assert edges == []
+
+
+class TestGraphitiMockedExtended:
+    """Additional mock-based tests to push coverage ≥92%."""
+
+    # ------------------------------------------------------------------
+    # _get_or_create_node error paths
+    # ------------------------------------------------------------------
+
+    def test_get_or_create_node_create_runtime_error(self):
+        """_get_or_create_node: create_node RuntimeError is caught silently."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = []  # no existing nodes
+        mock_client.create_node.side_effect = RuntimeError("create failed")
+
+        g = Graphiti(client=mock_client)
+        g._ws_cache["ws-1"] = "ws-1"
+        result = g._get_or_create_node(
+            EntityNode(name="NewNode", group_id="default"), "ws-1", create=True
+        )
+        # Should fall through to returning the node.uuid with 0.0 dedup score
+        assert result is not None
+        assert result[1] == 0.0
+
+    # ------------------------------------------------------------------
+    # add_triplet error paths
+    # ------------------------------------------------------------------
+
+    def test_add_triplet_create_edge_runtime_error(self):
+        """add_triplet: create_edge RuntimeError is re-raised."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        # _get_or_create_node needs _query to return matching node
+        mock_client._query.return_value = [
+            {"id": "node-1", "label": "Alice"},
+        ]
+        # create_edge fails
+        mock_client.create_edge.side_effect = RuntimeError("edge creation failed")
+
+        g = Graphiti(client=mock_client)
+        with pytest.raises(RuntimeError, match="create_edge failed"):
+            g.add_triplet(
+                source_node=EntityNode(name="Alice", group_id="default"),
+                edge=EntityEdge(name="likes", group_id="default"),
+                target_node=EntityNode(name="Bob", group_id="default"),
+            )
+
+    # ------------------------------------------------------------------
+    # add_episode error paths
+    # ------------------------------------------------------------------
+
+    def test_add_episode_store_runtime_error(self):
+        """add_episode: store RuntimeError is re-raised."""
+        from unittest.mock import MagicMock, patch
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.store.side_effect = RuntimeError("store failed")
+
+        g = Graphiti(client=mock_client)
+
+        with patch.object(g, "_extract_entities_from_text", return_value=None):
+            with pytest.raises(RuntimeError, match="add_episode.*failed"):
+                g.add_episode(
+                    name="test-ep",
+                    episode_body="some content",
+                    source_description="test",
+                )
+
+    # ------------------------------------------------------------------
+    # _build_entities_and_edges edge cases
+    # ------------------------------------------------------------------
+
+    def test_build_entities_and_edges_empty_entity_name(self):
+        """_build_entities_and_edges: entity with empty name is skipped."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        g = Graphiti(client=mock_client)
+
+        extracted = {
+            "entities": [{"name": "", "entity_type": "person"}],
+            "edges": [],
+        }
+        nodes, edges = g._build_entities_and_edges(extracted, "ws-1", "gid", "ep-1")
+        assert nodes == []
+        assert edges == []
+
+    def test_build_entities_and_edges_get_node_returns_none(self):
+        """_build_entities_and_edges: _get_or_create_node returns None is skipped."""
+        from unittest.mock import MagicMock, patch
+
+        mock_client = MagicMock()
+        g = Graphiti(client=mock_client)
+        g._ws_cache["ws-1"] = "ws-1"
+
+        # mock _get_or_create_node to return None
+        with patch.object(g, "_get_or_create_node", return_value=None):
+            extracted = {
+                "entities": [{"name": "Alice", "entity_type": "person"}],
+                "edges": [],
+            }
+            nodes, edges = g._build_entities_and_edges(extracted, "ws-1", "gid", "ep-1")
+            assert nodes == []
+            assert edges == []
+
+    def test_build_entities_and_edges_missing_src_tgt_names(self):
+        """_build_entities_and_edges: edge with missing source/target is skipped."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [{"id": "node-1", "label": "Alice"}]
+        mock_client.create_node.return_value = None
+
+        g = Graphiti(client=mock_client)
+        g._ws_cache["ws-1"] = "ws-1"
+
+        extracted = {
+            "entities": [{"name": "Alice", "entity_type": "person"}],
+            "edges": [{"source": "", "target": "Alice", "relation": "knows"}],
+        }
+        nodes, edges = g._build_entities_and_edges(extracted, "ws-1", "gid", "ep-1")
+        assert len(nodes) == 1  # Alice entity created
+        assert edges == []  # edge skipped due to empty source
+
+    def test_build_entities_and_edges_src_not_in_map(self):
+        """_build_entities_and_edges: edge source not in entity_map is skipped."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [{"id": "node-1", "label": "Alice"}]
+        mock_client.create_node.return_value = None
+
+        g = Graphiti(client=mock_client)
+        g._ws_cache["ws-1"] = "ws-1"
+
+        extracted = {
+            "entities": [{"name": "Alice", "entity_type": "person"}],
+            "edges": [{"source": "Bob", "target": "Alice", "relation": "knows"}],
+        }
+        nodes, edges = g._build_entities_and_edges(extracted, "ws-1", "gid", "ep-1")
+        assert len(nodes) == 1
+        assert edges == []  # Bob not in entity_map
+
+    def test_build_entities_and_edges_create_edge_runtime_error(self):
+        """_build_entities_and_edges: create_edge RuntimeError is caught."""
+        from unittest.mock import MagicMock, patch
+
+        mock_client = MagicMock()
+        mock_client._query.side_effect = [
+            # First call: _get_or_create_node → _query for Alice
+            [{"id": "node-1", "label": "Alice"}],
+            # Second call: _get_or_create_node → _query for Bob
+            [{"id": "node-2", "label": "Bob"}],
+            # Third+ call: edge lookup after create_edge
+            [{"id": "edge-1", "relation": "knows"}],
+        ]
+        mock_client.create_node.return_value = None
+        mock_client.create_edge.side_effect = RuntimeError("edge failed")
+
+        g = Graphiti(client=mock_client)
+        g._ws_cache["ws-1"] = "ws-1"
+
+        # Patch _get_or_create_node to return fake IDs since we control _query
+        with patch.object(g, "_get_or_create_node") as mock_gn:
+            mock_gn.side_effect = [
+                ("node-1", 1.0),  # Alice
+                ("node-2", 1.0),  # Bob
+            ]
+            extracted = {
+                "entities": [
+                    {"name": "Alice", "entity_type": "person"},
+                    {"name": "Bob", "entity_type": "person"},
+                ],
+                "edges": [{"source": "Alice", "target": "Bob", "relation": "knows"}],
+            }
+            nodes, edges = g._build_entities_and_edges(extracted, "ws-1", "gid", "ep-1")
+            assert len(nodes) == 2
+            # Edge creation failed, but the edge query after won't find it
+            # The RuntimeError is caught, so edges list should be empty
+            assert edges == []
+
+    # ------------------------------------------------------------------
+    # search() edge cases
+    # ------------------------------------------------------------------
+
+    def test_search_edge_type_in_results(self):
+        """search: hybrid results include edge-type entries."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        # search returns hybrid results with an edge entry
+        mock_client.search.return_value = [
+            {"entity_id": "node-1", "entity_type": "node"},
+            {"entity_id": "edge-1", "entity_type": "edge"},
+        ]
+        # get_neighbors returns edge data for node-1
+        mock_client.get_neighbors.return_value = [
+            {
+                "id": "neighbor-edge-1",
+                "source_node_id": "node-1",
+                "target_node_id": "node-2",
+                "relation": "likes",
+                "workspace_id": "ws-uuid",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+            },
+        ]
+        # _query for edge by ID
+        mock_client._query.return_value = [
+            {
+                "id": "edge-1",
+                "source_node_id": "node-3",
+                "target_node_id": "node-4",
+                "relation": "knows",
+                "workspace_id": "ws-uuid",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+            },
+        ]
+
+        g = Graphiti(client=mock_client)
+        edges = g.search("test query", group_ids=["default"])
+        assert len(edges) >= 1
+
+    def test_search_get_neighbors_runtime_error(self):
+        """search: get_neighbors RuntimeError is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.search.return_value = [
+            {"entity_id": "node-1", "entity_type": "node"},
+        ]
+        # get_neighbors fails
+        mock_client.get_neighbors.side_effect = RuntimeError("neighbor error")
+
+        g = Graphiti(client=mock_client)
+        edges = g.search("test query", group_ids=["default"])
+        # No edges found, falls through to fallback query_graph which also fails
+        assert isinstance(edges, list)
+
+    def test_search_fallback_get_neighbors_runtime_error(self):
+        """search: fallback query_graph then get_neighbors RuntimeError."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        # search returns no results → forces fallback path
+        mock_client.search.return_value = []
+        # query_graph returns some nodes
+        mock_client.query_graph.return_value = [
+            {"id": "node-fb", "label": "Fallback"},
+        ]
+        # get_neighbors fails for fallback nodes
+        mock_client.get_neighbors.side_effect = RuntimeError("fallback neighbor error")
+
+        g = Graphiti(client=mock_client)
+        edges = g.search("test query", group_ids=["default"])
+        assert edges == []
+
+    def test_search_fallback_query_graph_runtime_error(self):
+        """search: query_graph RuntimeError in fallback path."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.search.return_value = []
+        mock_client.query_graph.side_effect = RuntimeError("query_graph error")
+
+        g = Graphiti(client=mock_client)
+        edges = g.search("test query", group_ids=["default"])
+        assert edges == []
+
+    # ------------------------------------------------------------------
+    # search_() edge cases
+    # ------------------------------------------------------------------
+
+    def test_search_underscore_edge_type_in_results(self):
+        """search_: hybrid results include edge-type entries."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.search.return_value = [
+            {"entity_id": "node-1", "entity_type": "node"},
+            {"entity_id": "edge-99", "entity_type": "edge"},
+        ]
+        mock_client.get_neighbors.return_value = [
+            {
+                "id": "ne-edge",
+                "source_node_id": "node-1",
+                "target_node_id": "node-2",
+                "relation": "test_rel",
+                "workspace_id": "ws-uuid",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+            },
+        ]
+        mock_client._query.return_value = [
+            {
+                "id": "edge-99",
+                "source_node_id": "n-a",
+                "target_node_id": "n-b",
+                "relation": "edge_rel",
+                "workspace_id": "ws-uuid",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+            },
+        ]
+
+        g = Graphiti(client=mock_client)
+        results = g.search_("test query", group_ids=["default"])
+        assert isinstance(results, SearchResults)
+        assert len(results.edges) >= 1
+
+    def test_search_underscore_fallback_query_graph_runtime_error(self):
+        """search_: fallback query_graph RuntimeError is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.search.return_value = []
+        mock_client.query_graph.side_effect = RuntimeError("query_graph error")
+
+        g = Graphiti(client=mock_client)
+        results = g.search_("test query", group_ids=["default"])
+        assert isinstance(results, SearchResults)
+        assert results.edges == []
+
+    # ------------------------------------------------------------------
+    # get_entity_edge_summary error path
+    # ------------------------------------------------------------------
+
+    def test_get_entity_edge_summary_runtime_error(self):
+        """get_entity_edge_summary: get_neighbors RuntimeError returns empty."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.get_neighbors.side_effect = RuntimeError("neighbor error")
+
+        g = Graphiti(client=mock_client)
+        result = g.get_entity_edge_summary("entity-1", group_ids=["default"])
+        assert result == {"edges": [], "nodes": [], "summary": ""}
+
+    # ------------------------------------------------------------------
+    # build_communities
+    # ------------------------------------------------------------------
+
+    def test_build_communities_detect_error(self):
+        """build_communities: detect_communities RuntimeError is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.detect_communities.side_effect = RuntimeError("detect failed")
+        # seed_communities also called; mock it too
+        mock_client.seed_communities.return_value = None
+        # _query for community nodes returns empty
+        mock_client._query.return_value = []
+
+        g = Graphiti(client=mock_client)
+        communities = g.build_communities(group_ids=["default"])
+        assert communities == []
+
+    def test_build_communities_with_summary_no_llm(self):
+        """build_communities: community with existing summary skips LLM."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.detect_communities.return_value = None
+        mock_client.seed_communities.return_value = None
+
+        # First _query call: community nodes
+        community_row = {
+            "id": "comm-1",
+            "label": "Tech Community",
+            "workspace_id": "ws-uuid",
+            "summary": "A tech-focused community",
+            "node_type": "community",
+            "created_at": 1700000000000000,
+            "labels": '["tech"]',
+        }
+        # Second+ _query calls: community edges
+        edge_row = {
+            "id": "ce-1",
+            "source_node_id": "comm-1",
+            "target_node_id": "node-1",
+            "relation": "MEMBER_OF",
+            "workspace_id": "ws-uuid",
+            "created_at": 1700000000000000,
+            "valid_at": 1700000000000000,
+            "invalid_at": 0,
+            "metadata_json": "{}",
+        }
+        mock_client._query.side_effect = [
+            [community_row],  # community nodes query
+            [edge_row],  # community edges query
+        ]
+
+        g = Graphiti(client=mock_client)
+        communities = g.build_communities(group_ids=["default"])
+        assert len(communities) == 1
+        assert communities[0].name == "Tech Community"
+        assert communities[0].summary == "A tech-focused community"
+
+    def test_build_communities_empty_summary_no_llm(self):
+        """build_communities: community with empty summary triggers LLM path."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.detect_communities.return_value = None
+        mock_client.seed_communities.return_value = None
+
+        community_row = {
+            "id": "comm-2",
+            "label": "community_abc123",
+            "workspace_id": "ws-uuid",
+            "summary": "",
+            "node_type": "community",
+            "created_at": 1700000000000000,
+            "labels": '[]',
+        }
+        mock_client._query.side_effect = [
+            [community_row],  # community nodes
+            [],  # community edges (empty)
+        ]
+
+        g = Graphiti(client=mock_client)
+        # LLM not available → skips summarization
+        communities = g.build_communities(group_ids=["default"])
+        assert len(communities) == 1
+        assert communities[0].name == "community_abc123"  # unchanged
+
+    def test_build_communities_edge_query_runtime_error(self):
+        """build_communities: edge query RuntimeError for community is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.detect_communities.return_value = None
+        mock_client.seed_communities.return_value = None
+
+        community_row = {
+            "id": "comm-3",
+            "label": "My Community",
+            "workspace_id": "ws-uuid",
+            "summary": "Has summary",
+            "node_type": "community",
+            "created_at": 1700000000000000,
+            "labels": '["misc"]',
+        }
+        mock_client._query.side_effect = [
+            [community_row],  # community nodes
+            RuntimeError("edge query failed"),  # community edges
+        ]
+
+        g = Graphiti(client=mock_client)
+        communities = g.build_communities(group_ids=["default"])
+        assert len(communities) == 1  # still returns the community
+        assert communities[0].name == "My Community"
+
+    # ------------------------------------------------------------------
+    # summarize_saga edge cases
+    # ------------------------------------------------------------------
+
+    def test_summarize_saga_episode_no_content(self):
+        """summarize_saga: episode with empty content gets placeholder."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "default", "name": "default"},
+        ]
+        mock_client._query.return_value = [
+            {
+                "id": "ep-1",
+                "content": "",
+                "created_at": 1700000000000000,
+                "peer_id": "saga-1",
+                "workspace_id": "default",
+            },
+        ]
+        mock_client.create_node.return_value = None
+
+        g = Graphiti(client=mock_client)
+        saga = g.summarize_saga("saga-1")
+        assert isinstance(saga, SagaNode)
+        assert saga.summary == ""
+
+    def test_summarize_saga_create_node_error_then_update(self):
+        """summarize_saga: create_node fails, falls back to update_node."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "default", "name": "default"},
+        ]
+        mock_client._query.return_value = [
+            {
+                "id": "ep-1",
+                "content": "Episode content",
+                "created_at": 1700000000000000,
+                "peer_id": "saga-1",
+                "workspace_id": "default",
+            },
+        ]
+        mock_client.create_node.side_effect = RuntimeError("node exists")
+        mock_client._call.return_value = None
+
+        g = Graphiti(client=mock_client)
+        saga = g.summarize_saga("saga-1")
+        assert isinstance(saga, SagaNode)
+        # Should have attempted update_node via _call
+        assert mock_client._call.called
+
+    def test_summarize_saga_create_and_update_both_error(self):
+        """summarize_saga: both create_node and update_node error is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "default", "name": "default"},
+        ]
+        mock_client._query.return_value = [
+            {
+                "id": "ep-1",
+                "content": "Some saga episode",
+                "created_at": 1700000000000000,
+                "peer_id": "saga-x",
+                "workspace_id": "default",
+            },
+        ]
+        mock_client.create_node.side_effect = RuntimeError("create failed")
+        mock_client._call.side_effect = RuntimeError("update failed")
+
+        g = Graphiti(client=mock_client)
+        saga = g.summarize_saga("saga-x")
+        assert isinstance(saga, SagaNode)
+        # Both failed but saga is still returned
+
+    # ------------------------------------------------------------------
+    # remove_episode error path
+    # ------------------------------------------------------------------
+
+    def test_remove_episode_delete_memory_runtime_error(self):
+        """remove_episode: delete_memory RuntimeError is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [{"id": "mem-1"}]
+        mock_client.delete_memory.side_effect = RuntimeError("delete failed")
+
+        g = Graphiti(client=mock_client)
+        result = g.remove_episode("ep-uuid")
+        assert result == {"status": "ok", "episode_uuid": "ep-uuid"}
+
+    # ------------------------------------------------------------------
+    # retrieve_episodes timestamp encoding
+    # ------------------------------------------------------------------
+
+    def test_retrieve_episodes_microsecond_timestamp(self):
+        """retrieve_episodes: timestamp > 1e12 treated as microseconds."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        # timestamp > 1e12 → microseconds
+        mock_client._query.return_value = [
+            {
+                "id": "mem-1",
+                "content": "test content",
+                "created_at": 1700000000000000,  # microseconds
+                "source_session_id": "ep-1",
+                "workspace_id": "ws-uuid",
+                "peer_id": "test-peer",
+            },
+        ]
+
+        g = Graphiti(client=mock_client)
+        episodes = g.retrieve_episodes(group_ids=["default"])
+        assert len(episodes) == 1
+        assert episodes[0].uuid == "ep-1"
+
+    def test_retrieve_episodes_second_timestamp(self):
+        """retrieve_episodes: timestamp ≤ 1e12 treated as seconds."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        # timestamp ≤ 1e12 → seconds
+        mock_client._query.return_value = [
+            {
+                "id": "mem-2",
+                "content": "test content 2",
+                "created_at": 1700000000,  # seconds
+                "source_session_id": "ep-2",
+                "workspace_id": "ws-uuid",
+                "peer_id": "test-peer-2",
+            },
+        ]
+
+        g = Graphiti(client=mock_client)
+        episodes = g.retrieve_episodes(group_ids=["default"])
+        assert len(episodes) == 1
+        assert episodes[0].uuid == "ep-2"
+
+    def test_retrieve_episodes_zero_timestamp(self):
+        """retrieve_episodes: created_at=0 falls back to now."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client._query.return_value = [
+            {
+                "id": "mem-3",
+                "content": "content",
+                "created_at": 0,
+                "source_session_id": "",
+                "workspace_id": "ws-uuid",
+                "peer_id": "peer-3",
+            },
+        ]
+
+        g = Graphiti(client=mock_client)
+        episodes = g.retrieve_episodes(group_ids=["default"])
+        assert len(episodes) == 1
+
+    # ------------------------------------------------------------------
+    # Namespace save/delete/get_by_uuid methods
+    # ------------------------------------------------------------------
+
+    def test_nodes_entity_delete_runtime_error(self):
+        """nodes.entity.delete: RuntimeError is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._call.side_effect = RuntimeError("delete failed")
+
+        g = Graphiti(client=mock_client)
+        node = EntityNode(uuid="node-x", group_id="default")
+        # Should not raise
+        g.nodes.entity.delete(node)
+
+    def test_nodes_episode_save(self):
+        """nodes.episode.save calls store_memory reducer."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client._call.return_value = None
+
+        g = Graphiti(client=mock_client)
+        ep = EpisodicNode(
+            uuid="ep-1",
+            name="test-ep",
+            group_id="default",
+            content="episode body",
+        )
+        result = g.nodes.episode.save(ep)
+        assert result is ep
+        assert mock_client._call.called
+
+    def test_nodes_community_save_existing(self):
+        """nodes.community.save: existing community returns immediately."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client._query.return_value = [{"id": "comm-exists"}]
+
+        g = Graphiti(client=mock_client)
+        comm = CommunityNode(uuid="comm-exists", group_id="default")
+        result = g.nodes.community.save(comm)
+        assert result is comm
+        # Should NOT have called create_node
+        mock_client.create_node.assert_not_called()
+
+    def test_nodes_community_save_new(self):
+        """nodes.community.save: creates new community node."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client._query.return_value = []  # not existing
+        mock_client.create_node.return_value = None
+
+        g = Graphiti(client=mock_client)
+        comm = CommunityNode(uuid="comm-new", group_id="default")
+        result = g.nodes.community.save(comm)
+        assert result is comm
+        mock_client.create_node.assert_called_once()
+
+    def test_nodes_community_get_by_uuid_not_found(self):
+        """nodes.community.get_by_uuid raises KeyError when not found."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = []  # no results
+
+        g = Graphiti(client=mock_client)
+        with pytest.raises(KeyError, match="CommunityNode"):
+            g.nodes.community.get_by_uuid("nonexistent-comm")
+
+    def test_nodes_community_delete_runtime_error(self):
+        """nodes.community.delete: RuntimeError is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._call.side_effect = RuntimeError("delete failed")
+
+        g = Graphiti(client=mock_client)
+        comm = CommunityNode(uuid="comm-x")
+        # Should not raise
+        g.nodes.community.delete(comm)
+
+    def test_nodes_saga_save_existing(self):
+        """nodes.saga.save: existing saga returns immediately."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client._query.return_value = [{"id": "saga-exists"}]
+
+        g = Graphiti(client=mock_client)
+        saga = SagaNode(uuid="saga-exists", group_id="default")
+        result = g.nodes.saga.save(saga)
+        assert result is saga
+        mock_client.create_node.assert_not_called()
+
+    def test_nodes_saga_save_new(self):
+        """nodes.saga.save: creates new saga node."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client._query.return_value = []
+        mock_client.create_node.return_value = None
+
+        g = Graphiti(client=mock_client)
+        saga = SagaNode(uuid="saga-new", group_id="default")
+        result = g.nodes.saga.save(saga)
+        assert result is saga
+        mock_client.create_node.assert_called_once()
+
+    def test_nodes_saga_get_by_uuid_not_found(self):
+        """nodes.saga.get_by_uuid raises KeyError when not found."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = []
+
+        g = Graphiti(client=mock_client)
+        with pytest.raises(KeyError, match="SagaNode"):
+            g.nodes.saga.get_by_uuid("nonexistent-saga")
+
+    def test_nodes_saga_get_by_uuids(self):
+        """nodes.saga.get_by_uuids returns matching sagas."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.side_effect = [
+            [{"id": "saga-1", "label": "Saga 1", "workspace_id": "ws-uuid",
+              "summary": "", "labels": "[]", "created_at": 1700000000000000}],
+            [],  # second uuid not found
+        ]
+
+        g = Graphiti(client=mock_client)
+        sagas = g.nodes.saga.get_by_uuids(["saga-1", "saga-2"])
+        assert len(sagas) == 1
+        assert sagas[0].uuid == "saga-1"
+
+    def test_nodes_saga_get_by_group_ids(self):
+        """nodes.saga.get_by_group_ids returns sagas by workspace."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client._query.return_value = [
+            {"id": "saga-ws", "label": "Workspace Saga", "workspace_id": "ws-uuid",
+             "summary": "", "labels": "[]", "created_at": 1700000000000000},
+        ]
+
+        g = Graphiti(client=mock_client)
+        sagas = g.nodes.saga.get_by_group_ids(["default"])
+        assert len(sagas) == 1
+        assert sagas[0].name == "Workspace Saga"
+
+    def test_edges_entity_delete_runtime_error(self):
+        """edges.entity.delete: RuntimeError is caught."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._call.side_effect = RuntimeError("delete failed")
+
+        g = Graphiti(client=mock_client)
+        edge = EntityEdge(uuid="edge-x", group_id="default")
+        # Should not raise
+        g.edges.entity.delete(edge)
+
+    def test_edges_episodic_get_by_uuids(self):
+        """edges.episodic.get_by_uuids returns matching edges."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.side_effect = [
+            [{"id": "ep-edge-1", "source_node_id": "n1", "target_node_id": "n2",
+              "workspace_id": "default", "created_at": 1700000000000000,
+              "valid_at": 1700000000000000, "invalid_at": 0,
+              "metadata_json": "{}", "relation": "HAS_EPISODE"}],
+            [],  # second not found
+        ]
+
+        g = Graphiti(client=mock_client)
+        edges = g.edges.episodic.get_by_uuids(["ep-edge-1", "ep-edge-2"])
+        assert len(edges) == 1
+        assert edges[0].uuid == "ep-edge-1"
+
+    def test_edges_community_get_by_uuids(self):
+        """edges.community.get_by_uuids returns matching edges."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.side_effect = [
+            [{"id": "comm-edge-1", "source_node_id": "c1", "target_node_id": "n1",
+              "workspace_id": "default", "created_at": 1700000000000000,
+              "valid_at": 1700000000000000, "invalid_at": 0,
+              "metadata_json": "{}", "relation": "MEMBER_OF"}],
+        ]
+
+        g = Graphiti(client=mock_client)
+        edges = g.edges.community.get_by_uuids(["comm-edge-1"])
+        assert len(edges) == 1
+        assert edges[0].uuid == "comm-edge-1"
+
+    def test_edges_has_episode_get_by_uuids(self):
+        """edges.has_episode.get_by_uuids returns matching edges."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.side_effect = [
+            [{"id": "he-edge-1", "source_node_id": "e1", "target_node_id": "e2",
+              "workspace_id": "default", "created_at": 1700000000000000,
+              "valid_at": 1700000000000000, "invalid_at": 0,
+              "metadata_json": "{}", "relation": "HAS_EPISODE"}],
+        ]
+
+        g = Graphiti(client=mock_client)
+        edges = g.edges.has_episode.get_by_uuids(["he-edge-1"])
+        assert len(edges) == 1
+        assert edges[0].uuid == "he-edge-1"
+
+    def test_edges_next_episode_get_by_uuids(self):
+        """edges.next_episode.get_by_uuids returns matching edges."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.side_effect = [
+            [{"id": "ne-edge-1", "source_node_id": "ep1", "target_node_id": "ep2",
+              "workspace_id": "default", "created_at": 1700000000000000,
+              "valid_at": 1700000000000000, "invalid_at": 0,
+              "metadata_json": "{}", "relation": "NEXT_EPISODE"}],
+        ]
+
+        g = Graphiti(client=mock_client)
+        edges = g.edges.next_episode.get_by_uuids(["ne-edge-1"])
+        assert len(edges) == 1
+        assert edges[0].uuid == "ne-edge-1"
+
+    # ------------------------------------------------------------------
+    # get_by_uuid success paths (currently only "not found" paths tested)
+    # ------------------------------------------------------------------
+
+    def test_nodes_community_get_by_uuid_success(self):
+        """nodes.community.get_by_uuid returns community when found."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [
+            {"id": "comm-found", "label": "FoundComm", "workspace_id": "ws",
+             "summary": "desc", "labels": '["tag"]', "created_at": 1700000000000000},
+        ]
+
+        g = Graphiti(client=mock_client)
+        community = g.nodes.community.get_by_uuid("comm-found")
+        assert community.uuid == "comm-found"
+        assert community.name == "FoundComm"
+
+    def test_nodes_saga_get_by_uuid_success(self):
+        """nodes.saga.get_by_uuid returns saga when found."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [
+            {"id": "saga-found", "label": "FoundSaga", "workspace_id": "ws",
+             "summary": "saga desc", "labels": "[]", "created_at": 1700000000000000},
+        ]
+
+        g = Graphiti(client=mock_client)
+        saga = g.nodes.saga.get_by_uuid("saga-found")
+        assert saga.uuid == "saga-found"
+        assert saga.name == "FoundSaga"
+
+    def test_edges_episodic_get_by_uuid_success(self):
+        """edges.episodic.get_by_uuid returns edge when found."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [
+            {"id": "ep-edge-found", "source_node_id": "n1", "target_node_id": "n2",
+             "workspace_id": "default", "created_at": 1700000000000000,
+             "valid_at": 1700000000000000, "invalid_at": 0,
+             "metadata_json": "{}", "relation": "HAS_EPISODE"},
+        ]
+
+        g = Graphiti(client=mock_client)
+        edge = g.edges.episodic.get_by_uuid("ep-edge-found")
+        assert edge.uuid == "ep-edge-found"
+
+    def test_edges_community_get_by_uuid_success(self):
+        """edges.community.get_by_uuid returns edge when found."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [
+            {"id": "comm-edge-found", "source_node_id": "c1", "target_node_id": "n1",
+             "workspace_id": "default", "created_at": 1700000000000000,
+             "valid_at": 1700000000000000, "invalid_at": 0,
+             "metadata_json": "{}", "relation": "MEMBER_OF"},
+        ]
+
+        g = Graphiti(client=mock_client)
+        edge = g.edges.community.get_by_uuid("comm-edge-found")
+        assert edge.uuid == "comm-edge-found"
+
+    def test_edges_has_episode_get_by_uuid_success(self):
+        """edges.has_episode.get_by_uuid returns edge when found."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [
+            {"id": "he-edge-found", "source_node_id": "e1", "target_node_id": "e2",
+             "workspace_id": "default", "created_at": 1700000000000000,
+             "valid_at": 1700000000000000, "invalid_at": 0,
+             "metadata_json": "{}", "relation": "HAS_EPISODE"},
+        ]
+
+        g = Graphiti(client=mock_client)
+        edge = g.edges.has_episode.get_by_uuid("he-edge-found")
+        assert edge.uuid == "he-edge-found"
+
+    def test_edges_next_episode_get_by_uuid_success(self):
+        """edges.next_episode.get_by_uuid returns edge when found."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.return_value = [
+            {"id": "ne-edge-found", "source_node_id": "ep1", "target_node_id": "ep2",
+             "workspace_id": "default", "created_at": 1700000000000000,
+             "valid_at": 1700000000000000, "invalid_at": 0,
+             "metadata_json": "{}", "relation": "NEXT_EPISODE"},
+        ]
+
+        g = Graphiti(client=mock_client)
+        edge = g.edges.next_episode.get_by_uuid("ne-edge-found")
+        assert edge.uuid == "ne-edge-found"
+
+    # ------------------------------------------------------------------
+    # search sort key TypeError/ValueError
+    # ------------------------------------------------------------------
+
+    def test_search_sort_key_type_error(self):
+        """search: sort key handles _score with non-numeric value."""
+        from unittest.mock import MagicMock, patch
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client.search.return_value = [
+            {"entity_id": "n1", "entity_type": "node"},
+        ]
+        mock_client.get_neighbors.return_value = [
+            {
+                "id": "edge-1",
+                "source_node_id": "n1",
+                "target_node_id": "n2",
+                "relation": "test",
+                "workspace_id": "ws-uuid",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+            },
+        ]
+
+        g = Graphiti(client=mock_client)
+
+        # Patch EntityEdge.from_stmem to add a non-numeric _score
+        original_from_stmem = EntityEdge.from_stmem
+        def from_stmem_with_bad_score(row):
+            edge = original_from_stmem(row)
+            object.__setattr__(edge, "_score", "not-a-number")
+            return edge
+
+        with patch.object(EntityEdge, "from_stmem", side_effect=from_stmem_with_bad_score):
+            edges = g.search("test", group_ids=["default"])
+            # The sort function caught the TypeError, edges still returned
+            assert isinstance(edges, list)
+
+    # ------------------------------------------------------------------
+    # get_nodes_and_edges_by_episode edge rows
+    # ------------------------------------------------------------------
+
+    def test_get_nodes_and_edges_by_episode_with_edges(self):
+        """get_nodes_and_edges_by_episode with edges in results (empty case)."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        # Episode UUID → memory → empty results
+        mock_client._query.return_value = []
+
+        g = Graphiti(client=mock_client)
+        results = g.get_nodes_and_edges_by_episode(["ep-uuid"])
+        assert isinstance(results, SearchResults)
+        assert results.edges == []
+        assert results.nodes == []
+
+    # ------------------------------------------------------------------
+    # _extract_entities_from_text with LLM unavailable
+    # ------------------------------------------------------------------
+
+    def test_extract_entities_from_text_no_api_key(self):
+        """_extract_entities_from_text: returns None when no API key configured."""
+        from unittest.mock import MagicMock, patch
+
+        mock_client = MagicMock()
+        g = Graphiti(client=mock_client)
+
+        # Ensure LLMClient.available returns False
+        with patch("spacetime_memory.sdks.graphiti.LLMClient") as MockLLM:
+            mock_llm = MagicMock()
+            mock_llm.available = False
+            MockLLM.return_value = mock_llm
+            result = g._extract_entities_from_text("some text")
+            assert result is None
+
+    # ------------------------------------------------------------------
+    # Nodes namespace methods
+    # ------------------------------------------------------------------
+
+    def test_nodes_community_get_by_uuids_with_matches(self):
+        """nodes.community.get_by_uuids returns matching communities."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client._query.side_effect = [
+            [{"id": "comm-a", "label": "CommA", "workspace_id": "ws",
+              "summary": "", "labels": "[]", "created_at": 1700000000000000}],
+            [],  # second not found
+        ]
+
+        g = Graphiti(client=mock_client)
+        communities = g.nodes.community.get_by_uuids(["comm-a", "comm-b"])
+        assert len(communities) == 1
+        assert communities[0].uuid == "comm-a"
+
+    def test_nodes_community_get_by_group_ids_with_rows(self):
+        """nodes.community.get_by_group_ids returns matching communities."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [
+            {"id": "ws-uuid", "name": "default"},
+        ]
+        mock_client._query.return_value = [
+            {"id": "comm-gid", "label": "GroupComm", "workspace_id": "ws-uuid",
+             "summary": "", "labels": "[]", "created_at": 1700000000000000},
+        ]
+
+        g = Graphiti(client=mock_client)
+        communities = g.nodes.community.get_by_group_ids(["default"])
+        assert len(communities) == 1
+        assert communities[0].uuid == "comm-gid"
