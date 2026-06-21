@@ -4354,3 +4354,65 @@ class TestClientUnitCoverage:
             result = client._embed_batch_openai(["text1"])
             assert result == []
 
+
+
+# ── Coverage gap fillers: JSONFormatter, configure_logging, MemoryRecord ────
+
+def test_json_formatter_with_exception():
+    """JSONFormatter.format() includes exception info when record has exc_info (line 86)."""
+    import logging
+    import sys
+    from spacetime_memory.client import JSONFormatter
+
+    formatter = JSONFormatter()
+    try:
+        raise ValueError("test boom")
+    except ValueError:
+        record = logging.LogRecord(
+            "test", logging.ERROR, "", 0, "test error", (), sys.exc_info()
+        )
+    output = formatter.format(record)
+    parsed = json.loads(output)
+    assert "exception" in parsed
+    assert "ValueError" in parsed["exception"]
+
+
+def test_configure_logging_with_log_file():
+    """configure_logging() with log_file creates FileHandler (line 112)."""
+    import logging
+    from spacetime_memory.client import configure_logging
+    from tempfile import NamedTemporaryFile
+
+    f = NamedTemporaryFile(suffix=".log", delete=False)
+    log_path = f.name
+    f.close()
+    try:
+        configure_logging(level="DEBUG", json_format=False, log_file=log_path)
+        logger_obj = logging.getLogger("spacetime_memory")
+        handlers = logger_obj.handlers
+        assert len(handlers) > 0
+        assert isinstance(handlers[0], logging.FileHandler)
+        assert handlers[0].baseFilename == log_path
+    finally:
+        for h in logger_obj.handlers[:]:
+            h.close()
+            logger_obj.removeHandler(h)
+        os.unlink(log_path)
+
+
+def test_memory_record_from_dict():
+    """MemoryRecord.from_dict() filters to known fields only (line 756)."""
+    from spacetime_memory.client import Client
+
+    rec = Client.MemoryRecord.from_dict({
+        "id": "mem-1", "workspace_id": "ws-1", "peer_id": "peer-1",
+        "observer_id": "", "memory_type": "experience", "content": "hello",
+        "summary": "hi", "entities_json": "[]", "confidence": 0.9,
+        "is_active": True, "created_at": 1000, "expires_at": 2000,
+        "updated_at": 1500, "tier": "L1", "access_count": 5,
+        "strength": 0.8, "version": 1, "trust_score": 0.5,
+        "feedback_count": 0, "consolidated_to": "",
+    })
+    assert rec.id == "mem-1"
+    assert rec.content == "hello"
+    assert rec.confidence == 0.9
