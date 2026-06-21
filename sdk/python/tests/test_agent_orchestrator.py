@@ -242,3 +242,204 @@ class TestAgentOrchestrator:
         )
 
         assert result == "tool-call-789"
+
+    # ── Coverage gap: context=string with JSONDecodeError (lines 101-105) ────
+
+    def test_start_session_context_string_invalid_json(self, mock_client):
+        """start_session with invalid JSON string context uses it raw."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        session_id = orch.start_session(
+            agent_name="test",
+            user_id="user1",
+            context="this is not json at all",
+        )
+        assert session_id
+        # The metadata should have {"context": "this is not json at all"}
+        create_calls = [
+            c for c in mock_client._call.call_args_list
+            if c[0][0] == "create_session"
+        ]
+        assert len(create_calls) >= 1
+        _reducer, args = create_calls[0][0]
+        assert '"context"' in args[2]
+        assert "this is not json at all" in args[2]
+
+    def test_start_session_context_valid_json_string(self, mock_client):
+        """start_session with valid JSON string context parses it."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        session_id = orch.start_session(
+            agent_name="test",
+            user_id="user1",
+            context='{"key": "value", "nested": {"a": 1}}',
+        )
+        assert session_id
+        create_calls = [
+            c for c in mock_client._call.call_args_list
+            if c[0][0] == "create_session"
+        ]
+        assert len(create_calls) >= 1
+        _reducer, args = create_calls[0][0]
+        assert '"key": "value"' in args[2]
+
+    # ── Coverage gap: _query returns empty rows → fallback UUID (line 131) ───
+
+    def test_start_session_no_query_rows_fallback(self, mock_client):
+        """When _query returns no rows, session_id falls back to UUID."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        # _query returns empty list — fallback session_id = uuid4()
+        mock_client._query.return_value = []
+        session_id = orch.start_session(agent_name="test", user_id="user1")
+        assert session_id
+        # Should be a UUID-like string (36 chars with dashes)
+        assert len(session_id) == 36
+        assert session_id.count("-") == 4
+
+    # ── Coverage gap: end_session without session_id but with sessions (line 162) ──
+
+    def test_end_session_implicit_uses_last(self, mock_client):
+        """end_session() with no session_id picks the last session."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        sid1 = orch.start_session(agent_name="first", user_id="user1")
+        sid2 = orch.start_session(agent_name="second", user_id="user2")
+
+        # Both sessions exist
+        assert sid1 in orch._sessions
+        assert sid2 in orch._sessions
+
+        # mock _query for store memory lookup
+        mock_client._query.return_value = [{"id": "mem-999"}]
+        mock_client.store.return_value = {"status": "ok"}
+
+        result = orch.end_session(summary="done")  # no session_id
+
+        # The last session (sid2) should have been ended
+        assert result["session_id"] == sid2
+        assert sid2 not in orch._sessions
+        assert sid1 in orch._sessions  # first session still active
+
+    # ── Coverage gap: end_session with unknown session_id (line 167) ─────────
+
+    def test_end_session_unknown_session_id(self, mock_client):
+        """end_session with a session_id not in _sessions still works."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+
+        mock_client._query.return_value = [{"id": "mem-999"}]
+        mock_client.store.return_value = {"status": "ok"}
+
+        result = orch.end_session(
+            session_id="unknown-session-999",
+            summary="cleanup",
+        )
+
+        assert result["session_id"] == "unknown-session-999"
+        assert result["step_count"] == 0
+
+    # ── Coverage gap: get_context with _sql session steps (lines 401-419) ───
+
+    def test_get_context_with_session_steps_via_sql(self, mock_client):
+        """get_context with session_id uses _sql for session steps."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        session_id = orch.start_session(agent_name="test", user_id="user1")
+
+        # Mock _sql to return steps (not _query)
+        mock_client._sql.return_value = [
+            {
+                "step_type": "thought",
+                "id": "step-abc",
+                "content": "thinking about the problem",
+                "summary": "thinking",
+            },
+        ]
+
+        context = orch.get_context("test", top_k=5, session_id=session_id)
+
+        # Should have session steps entries
+        steps = [e for e in context if e.get("source") == "session_steps"]
+        assert len(steps) >= 1
+        assert steps[0]["type"] == "step"
+        assert steps[0]["step_type"] == "thought"
+        assert steps[0]["content"] == "thinking about the problem"
+        assert steps[0]["score"] == 1.0
+
+    def test_get_context_session_steps_error(self, mock_client):
+        """get_context catches RuntimeError from session steps path."""
+        import logging
+
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        session_id = orch.start_session(agent_name="test", user_id="user1")
+
+        # Make _call raise RuntimeError for the get_session_steps call
+        def _call_side_effect(reducer, args):
+            if reducer == "get_session_steps":
+                raise RuntimeError("failed to get steps")
+            return {"status": "ok"}
+
+        mock_client._call.side_effect = _call_side_effect
+
+        # Should not raise — error is logged
+        context = orch.get_context("query", session_id=session_id)
+        assert isinstance(context, list)
+
+    # ── Coverage gap: get_collaborative_context with non-empty context (line 505) ──
+
+    def test_get_collaborative_context_with_entries(self, mock_client):
+        """get_collaborative_context sets visible_to on each entry."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        session_id = orch.start_session(agent_name="test", user_id="user1")
+
+        # Mock search to return memories so context is non-empty
+        mock_client.search.return_value = [
+            {
+                "id": "mem-1",
+                "memory_content": "relevant memory",
+                "score": 0.9,
+            },
+        ]
+        # Mock _sql for session steps
+        mock_client._sql.return_value = [
+            {
+                "step_type": "thought",
+                "id": "step-1",
+                "content": "thinking",
+                "summary": "think",
+            },
+        ]
+
+        context = orch.get_collaborative_context(
+            session_id=session_id,
+            peer_id="peer1",
+            query="test",
+        )
+
+        assert len(context) > 0
+        for entry in context:
+            assert "visible_to" in entry
+            assert entry["visible_to"] == ["peer1"]
+
+    # ── Coverage gap: context=dict (line 107) ──────────────────────────────
+
+    def test_start_session_context_dict(self, mock_client):
+        """start_session with a dict context uses it directly."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        session_id = orch.start_session(
+            agent_name="test",
+            user_id="user1",
+            context={"key": "value", "nested": {"a": 1}},
+        )
+        assert session_id
+        create_calls = [
+            c for c in mock_client._call.call_args_list
+            if c[0][0] == "create_session"
+        ]
+        assert len(create_calls) >= 1
+        _reducer, args = create_calls[0][0]
+        assert '"key": "value"' in args[2]
+
+    # ── Coverage gap: _query returns rows → session_id from DB (line 131) ──
+
+    def test_start_session_query_returns_rows(self, mock_client):
+        """When _query returns rows, session_id comes from the DB."""
+        orch = AgentOrchestrator(mock_client, workspace_id="ws1")
+        mock_client._query.return_value = [{"id": "db-session-001", "created_at": 999999}]
+        session_id = orch.start_session(agent_name="test", user_id="user1")
+        assert session_id == "db-session-001"

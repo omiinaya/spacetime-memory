@@ -189,6 +189,7 @@ class ContextAgent:
         query: str,
         workspace_id: str,
         token_budget: int = 4096,
+        aaak: bool = False,
     ) -> dict[str, Any]:
         """Synthesize an answer with gap analysis — GBrain-style.
 
