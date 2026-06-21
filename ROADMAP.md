@@ -10,9 +10,10 @@
 | Scripts | 6,784 | 18 .py | — | — |
 | CLI | 3,151 | 1 .py | — | — |
 | MCP server | 1,095 | 1 .py | — | — |
-|| **Total** | **~49,647** | **~106** | **441** | **441/441** ✓ |
+|| **Total** | **~49,647** | **~106** | **1053** | **1053/1053** ✓ |
 
 > v1.30.1→v1.31.0: Removed 6,397 lines of dead code (eval scripts, ONNX embedder sidecar, local_embedder.py, standalone mem0 adapter). Re-verified all tests against live STDB.
+> v1.32.0→v1.33.0: +612 tests (605 unit + 7 embed E2E). Coverage: 34%→54% (with live STDB). 921 pass with STDB, 763 pass unit-only.
 
 ## Project Cleanup Summary (v1.31.0)
 
@@ -62,7 +63,7 @@
 
 | Result | Count | Detail |
 |--------|:-----:|--------|
-| **Passed** | **302** | Every single test passes against live STDB (295 + 7 new concurrency) |
+| **Passed** | **921** | Every single test passes against live STDB (763 + 101 integration + 50 concurrency + 7 embedder) |
 | **Failed** | **0** | — |
 | **Skipped** | **0** | Zero skips with STDB running |
 | **Errors** | **0** | — |
@@ -202,7 +203,7 @@
 | Frontend | **92%** | 23 pages, 8 Vitest unit + 7 Playwright E2E, Playwright config added. 2 console.debug in library |
 | DevOps/Deploy | **92%** | CI pipeline: Rust unit + Rust integration (live STDB) + Python 2 versions + Python integration (live STDB). Playwright config. Proxy embeddings working. 7 E2E embedding tests |
 | Concurrency | **95%** | 7 tests pass. UUID collision fixed — 30/30 throughput runs pass. 1114 writes/s sustained |
-| Python Quality | **95%** | 763/763 passing (0 flakes). 605 new tests — 10 modules at 100%. Python coverage: 41% (unit tests), 95%+ with STDB integration |
+| Python Quality | **95%** | 921/921 passing with live STDB (0 skipped, 0 failed). +605 new unit tests. Python coverage: 54% (with live STDB), 41% (unit-only). 10 pure-function modules at 100%. |
 | **Weighted Overall** | **~95%** | All substantive gaps closed. Embedding E2E tests (7/7), STDB in CI (rust-integration + python-integration jobs). Only PyPI publish deferred. |
 
 ### The Path to 95%+ (Remaining)
