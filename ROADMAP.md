@@ -5,7 +5,7 @@
 | Layer | LOC | Files | Tests | Passing |
 |-------|-----|-------|-------|---------|
 | Rust module | 12,210 | 28 .rs | 93 | **93/93** ✓ |
-| Python SDK | 20,992 | 36 .py | 302 | **302/302** ✓ (with live STDB) |
+| Python SDK | 20,992 | 36 .py | 321 | **321/321** ✓ (with live STDB) |
 | Python tests | 5,415 | 22 .py | — | — |
 | Scripts | 6,784 | 18 .py | — | — |
 | CLI | 3,151 | 1 .py | — | — |
@@ -196,22 +196,25 @@
 |--------|:-----:|-----|
 | STDB Best Practices | **100%** | Clean, verified |
 | Rust Quality | **99%** | 0 warnings, 0 unwrap, 0 anti-patterns. All iterators now capped |
-| Core CRUD + Search | **97%** | Complete, tested. search() refactored from 367L to 248L with extracted private methods |
-| Python Quality | **91%** | 301/302 passing. God functions in client.py and adapters extracted. 10 silent except:pass remaining |
+| Core CRUD + Search | **97%** | Complete, tested. search() refactored from 367L to 248L, llm_rerank 226L→120L |
 | Semantic Search | **92%** | bge-m3 via proxy. Health check routes correctly. Degraded without OPENAI_API_KEY |
 | Adapter Parity | **93%** | All 6 verified (107/112 sig parity). God functions extracted from mem0 (-30%) and graphiti (-49%) |
-| Frontend | **90%** | All live data, 2 console.debug in library |
-| DevOps/Deploy | **82%** | Proxy embeddings working. No integration test exercises real embedding path |
+| Frontend | **92%** | 23 pages, 8 Vitest unit + 7 Playwright E2E, Playwright config added. 2 console.debug in library |
+| DevOps/Deploy | **87%** | CI pipeline (GitHub Actions: Rust + Python 2 versions). Playwright config. Proxy embeddings working |
 | Concurrency | **95%** | 7 tests pass. UUID collision fixed — 30/30 throughput runs pass. 1114 writes/s sustained |
-| Python Quality | **93%** | 302/302 passing (0 flakes). God functions extracted. Error capture added to concurrency tests |
-| **Weighted Overall** | **~93%** | Up from 91.5%. P1 concurrency root cause found and fixed. P0/P2/P4/P6 done |
+| Python Quality | **93%** | 321/321 passing (0 flakes). God functions extracted, 19 fuzz tests added, error capture added to concurrency tests |
+| **Weighted Overall** | **~94%** | Up from 93%. CI, fuzz tests, Rust integration tests, Playwright config added |
 
 ### The Path to 95%+ (Remaining)
 
 1. ~~**P0**: Refactor `client.py` god functions~~ ✅ DONE
-2. ~~**P1**: Investigate STDB 2% fatal error root cause~~ ✅ DONE — UUID collision from deterministic RNG
+2. ~~**P1**: Investigate STDB 2% fatal error root cause~~ ✅ DONE
 3. ~~**P2**: Split `mem0.add()` and `graphiti.add_episode()`~~ ✅ DONE
 4. ~~**P4**: Replace `user.rs` break scans with `.take()`~~ ✅ DONE
-5. ~~**P6**: Fix concurrency test flakes~~ ✅ DONE — root cause was the UUID collision
-6. ~~**P4**: Document all 22 silent `except ... pass`~~ ✅ DONE — context-aware comments added
-7. **Deferred**: PyPI publish
+5. ~~**P4**: Document all 22 silent `except ... pass`~~ ✅ DONE
+6. ~~**P6**: Fix concurrency test flakes~~ ✅ DONE
+7. ~~**Fuzz tests**: 19 tests covering boundaries, malicious payloads, stress~~ ✅ DONE
+8. ~~**CI**: GitHub Actions (Rust + Python, 2 Python versions)~~ ✅ DONE
+9. **Embedding E2E**: Integration test that exercises real embedding path with API keys
+10. **Rust integration**: Run 3 integration tests with live STDB in CI
+11. **Deferred**: PyPI publish
