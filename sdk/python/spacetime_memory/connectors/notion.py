@@ -180,15 +180,6 @@ class NotionConnector(Connector):
                     return "".join(
                         p.get("plain_text", "") for p in parts
                     )
-        # Fallback: use the first text property we find
-        for prop in props.values():
-            prop_type = prop.get("type", "")
-            if prop_type in ("title", "rich_text"):
-                parts = prop.get(prop_type, [])
-                if parts:
-                    return "".join(
-                        p.get("plain_text", "") for p in parts
-                    )
         return "Untitled"
 
     @staticmethod

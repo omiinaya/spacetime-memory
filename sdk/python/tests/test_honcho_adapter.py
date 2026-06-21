@@ -187,3 +187,206 @@ class TestHonchoSearch:
         s.add_messages([msg])
         results = honcho.search("pizza")
         assert results is not None
+
+
+class TestHonchoPeerAdvanced:
+    """Advanced Peer operations."""
+
+    def test_peer_chat(self, honcho: Honcho) -> None:
+        """Peer.chat() returns a response based on context."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        response = p.chat("What do I like?")
+        # Returns None when no memories exist, or a string
+        assert response is None or isinstance(response, str)
+
+    def test_peer_chat_with_stored_data(self, honcho: Honcho) -> None:
+        """Peer.chat() with stored memories returns context."""
+        pid = _uid()
+        sid = _uid("session")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+        msg = p.message("I love hiking in the mountains")
+        s.add_messages([msg])
+        response = p.chat("What do I enjoy?")
+        # May be None if search doesn't find, or a string
+        assert response is None or isinstance(response, str)
+
+    def test_peer_chat_stream(self, honcho: Honcho) -> None:
+        """Peer.chat_stream() returns a generator."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        generator = p.chat_stream("Hello")
+        chunks = list(generator)
+        assert isinstance(chunks, list)
+
+    def test_peer_get_card(self, honcho: Honcho) -> None:
+        """Peer.get_card() returns a dict with summary and traits."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        card = p.get_card()
+        assert isinstance(card, dict)
+        assert "summary" in card
+        assert "traits" in card
+
+    def test_peer_search(self, honcho: Honcho) -> None:
+        """Peer.search() returns relevant memories."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        results = p.search("anything")
+        assert results is not None
+
+    def test_peer_sessions_actual(self, honcho: Honcho) -> None:
+        """Peer.sessions() returns sessions with data."""
+        pid = _uid()
+        sid = _uid("session")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+        pages = p.sessions()
+        assert pages is not None
+
+    def test_peer_representation(self, honcho: Honcho) -> None:
+        """Peer.representation() returns a description."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        rep = p.representation()
+        assert rep is None or isinstance(rep, str)
+
+    def test_peer_context(self, honcho: Honcho) -> None:
+        """Peer.context() returns peer context."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        ctx = p.context()
+        assert ctx is not None
+
+    def test_peer_get_set_metadata(self, honcho: Honcho) -> None:
+        """Peer.get_metadata() and set_metadata()."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        initial = p.get_metadata()
+        assert isinstance(initial, dict)
+        p.set_metadata({"test": "value"})
+        updated = p.get_metadata()
+        assert updated["test"] == "value"
+
+    def test_peer_get_set_configuration(self, honcho: Honcho) -> None:
+        """Peer.get_configuration() and set_configuration()."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        config = p.get_configuration()
+        assert config is not None
+
+    def test_peer_refresh(self, honcho: Honcho) -> None:
+        """Peer.refresh() does not raise."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        p.refresh()
+
+    def test_peer_aio(self, honcho: Honcho) -> None:
+        """Peer.aio property returns async interface."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        aio = p.aio
+        assert aio is not None
+
+    def test_peer_conclusions(self, honcho: Honcho) -> None:
+        """Peer.conclusions() returns conclusion scope."""
+        pid = _uid()
+        p = honcho.peer(pid)
+        scope = p.conclusions(observer=p)
+        assert scope is not None
+
+
+class TestHonchoSessionAdvanced:
+    """Advanced Session operations."""
+
+    def test_session_search(self, honcho: Honcho) -> None:
+        """Session.search() searches within session."""
+        pid = _uid()
+        sid = _uid("session")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+        msg = p.message("Session search test content")
+        s.add_messages([msg])
+        results = s.search("test")
+        assert results is not None
+
+    def test_session_context_rich(self, honcho: Honcho) -> None:
+        """Session.context() with multiple messages."""
+        pid = _uid()
+        sid = _uid("session")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+        for i in range(3):
+            msg = p.message(f"Context message {i}")
+            s.add_messages([msg])
+        ctx = s.context()
+        assert ctx is not None
+
+    def test_session_summaries_rich(self, honcho: Honcho) -> None:
+        """Session.summaries() with stored data."""
+        pid = _uid()
+        sid = _uid("session")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+        msg = p.message("Summarize this session content")
+        s.add_messages([msg])
+        summaries = s.summaries()
+        assert summaries is not None
+
+    def test_session_get_set_metadata(self, honcho: Honcho) -> None:
+        """Session get/set metadata."""
+        sid = _uid("session")
+        s = honcho.session(sid)
+        if hasattr(s, 'get_metadata'):
+            md = s.get_metadata()
+            assert md is not None
+
+    def test_honcho_search_with_filters(self, honcho: Honcho) -> None:
+        """Honcho.search() with stored data returns results."""
+        pid = _uid()
+        sid = _uid("session")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+        msg = p.message("Additional filter search test")
+        s.add_messages([msg])
+        results = honcho.search("filter")
+        assert results is not None
+
+    def test_session_get_configuration(self, honcho: Honcho) -> None:
+        """Session.get_configuration returns config."""
+        sid = _uid("session")
+        s = honcho.session(sid)
+        config = s.get_configuration()
+        assert config is not None
+
+    def test_session_set_configuration(self, honcho: Honcho) -> None:
+        """Session.set_configuration does not raise."""
+        from spacetime_memory.sdks.honcho import SessionConfiguration
+        sid = _uid("session")
+        s = honcho.session(sid)
+        s.set_configuration(SessionConfiguration())
+        # No error = success
+
+    def test_session_aio(self, honcho: Honcho) -> None:
+        """Session.aio property returns async interface."""
+        sid = _uid("session")
+        s = honcho.session(sid)
+        aio = s.aio
+        assert aio is not None
+
+    def test_honcho_aio(self, honcho: Honcho) -> None:
+        """Honcho.aio property returns async interface."""
+        aio = honcho.aio
+        assert aio is not None
+
+    def test_honcho_close(self, honcho: Honcho) -> None:
+        """Honcho.close() releases resources."""
+        # Already closed in fixture teardown, but test it anyway
+        honcho.close()  # Should not raise

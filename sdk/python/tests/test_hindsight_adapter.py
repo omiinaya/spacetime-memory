@@ -34,6 +34,8 @@ from spacetime_memory.sdks.hindsight import (
     FileRetainResponse,
     ListMemoryUnitsResponse,
     CreateBankResponse,
+    CreateMentalModelResponse,
+    CreateDirectiveResponse,
 )
 
 
@@ -247,3 +249,207 @@ class TestHindsightCore:
         assert result.offset == 0
         # At least the two we stored should be there
         assert result.total >= 2
+
+    def test_list_memories_pagination(self, hindsight: Hindsight) -> None:
+        """list_memories with offset pagination."""
+        bid = _bid()
+        for i in range(5):
+            hindsight.retain(bank_id=bid, content=f"Page test memory {i}")
+
+        result = hindsight.list_memories(bank_id=bid, limit=2, offset=1)
+        assert isinstance(result, ListMemoryUnitsResponse)
+        assert result.limit == 2
+        assert result.offset == 1
+
+    def test_delete_bank(self, hindsight: Hindsight) -> None:
+        """delete_bank removes a bank."""
+        bid = _bid("hs-test-delete-bank")
+        hindsight.create_bank(name=bid)
+        hindsight.delete_bank(bank_id=bid)
+        # Deleting again shouldn't raise
+        try:
+            hindsight.delete_bank(bank_id=bid)
+        except RuntimeError:
+            pass  # idempotent behavior
+
+    def test_create_mental_model(self, hindsight: Hindsight) -> None:
+        """create_mental_model returns valid response."""
+        bid = _bid()
+        hindsight.retain(bank_id=bid, content="Alice is a software engineer")
+        hindsight.retain(bank_id=bid, content="Alice enjoys hiking")
+
+        result = hindsight.create_mental_model(
+            bank_id=bid,
+            name="Alice Profile",
+            query="What are Alice's traits?",
+        )
+        assert isinstance(result, CreateMentalModelResponse)
+        assert result.name == "Alice Profile"
+
+    def test_create_directive(self, hindsight: Hindsight) -> None:
+        """create_directive returns valid response."""
+        bid = _bid()
+        result = hindsight.create_directive(
+            bank_id=bid,
+            name="Test Directive",
+            prompt="Always be helpful",
+        )
+        assert isinstance(result, CreateDirectiveResponse)
+        assert result.name == "Test Directive"
+
+    def test_retain_with_all_params(self, hindsight: Hindsight) -> None:
+        """retain with metadata, tags, entities."""
+        bid = _bid()
+        result = hindsight.retain(
+            bank_id=bid,
+            content="Rich retain test",
+            metadata={"source": "test", "version": "1.0"},
+            tags=["integration-test", "sdk"],
+            entities=[{"name": "Hindsight", "type": "software"}],
+            context="Testing all retain parameters",
+            document_id="doc-001",
+        )
+        assert isinstance(result, RetainResponse)
+        assert result.success is True
+
+    def test_retain_batch_with_mixed_items(self, hindsight: Hindsight) -> None:
+        """retain_batch with items that have various fields."""
+        bid = _bid()
+        items = [
+            {"content": "Item 1", "context": "Context for item 1"},
+            {"content": "Item 2"},
+            {},  # Empty item should be skipped
+        ]
+        result = hindsight.retain_batch(bank_id=bid, items=items)
+        assert isinstance(result, RetainResponse)
+        assert result.success is True
+
+    def test_recall_with_types(self, hindsight: Hindsight) -> None:
+        """recall with types filter."""
+        bid = _bid()
+        hindsight.retain(bank_id=bid, content="Type test memory")
+
+        result = hindsight.recall(
+            bank_id=bid,
+            query="test",
+            types=["experience"],
+            budget="low",
+        )
+        assert isinstance(result, RecallResponse)
+
+    def test_recall_with_tags(self, hindsight: Hindsight) -> None:
+        """recall with tags filter."""
+        bid = _bid()
+        hindsight.retain(bank_id=bid, content="Tagged memory", tags=["important"])
+
+        result = hindsight.recall(
+            bank_id=bid,
+            query="memory",
+            tags=["important"],
+        )
+        assert isinstance(result, RecallResponse)
+
+    def test_reflect_with_response_schema(self, hindsight: Hindsight) -> None:
+        """reflect with response_schema for structured output."""
+        bid = _bid()
+        hindsight.retain(bank_id=bid, content="Bob's favorite color is blue")
+
+        result = hindsight.reflect(
+            bank_id=bid,
+            query="What color does Bob like?",
+            response_schema={"type": "object", "properties": {"answer": {"type": "string"}}},
+            include_facts=True,
+        )
+        assert isinstance(result, ReflectResponse)
+
+    def test_reflect_with_budget_high(self, hindsight: Hindsight) -> None:
+        """reflect with high budget."""
+        bid = _bid()
+        hindsight.retain(bank_id=bid, content="Budget test memory")
+
+        result = hindsight.reflect(
+            bank_id=bid,
+            query="Tell me about the budget test",
+            budget="high",
+        )
+        assert isinstance(result, ReflectResponse)
+
+    def test_create_bank_duplicate(self, hindsight: Hindsight) -> None:
+        """Creating a bank that already exists returns pre-existing."""
+        bid = _bid("hs-test-dup-bank")
+        r1 = hindsight.create_bank(name=bid, description="First creation")
+        r2 = hindsight.create_bank(name=bid, description="Second creation")
+        assert r2.success is True
+        assert r2.config.get("pre_existing") is True
+
+    def test_low_level_shells(self, hindsight: Hindsight) -> None:
+        """Low-level REST shells return graceful empty responses."""
+        # documents shell
+        docs_result = hindsight.documents.list()
+        assert isinstance(docs_result, dict)
+        assert docs_result.get("status") == "ok"
+
+        # entities shell
+        entities_result = hindsight.entities.list()
+        assert isinstance(entities_result, dict)
+
+        # operations shell
+        ops_result = hindsight.operations.list()
+        assert isinstance(ops_result, dict)
+
+        # monitoring shell
+        mon_result = hindsight.monitoring.status()
+        assert isinstance(mon_result, dict)
+
+    def test_mental_models_shell(self, hindsight: Hindsight) -> None:
+        """mental_models.create() delegates to create_mental_model."""
+        bid = _bid()
+        hindsight.retain(bank_id=bid, content="Shell test memory")
+        result = hindsight.mental_models.create(
+            bank_id=bid,
+            name="Shell Model",
+            query="test",
+        )
+        assert isinstance(result, CreateMentalModelResponse)
+
+    def test_directives_shell(self, hindsight: Hindsight) -> None:
+        """directives.create() delegates to create_directive."""
+        bid = _bid()
+        result = hindsight.directives.create(
+            bank_id=bid,
+            name="Shell Directive",
+            prompt="Be concise",
+        )
+        assert isinstance(result, CreateDirectiveResponse)
+
+    def test_files_shell(self, hindsight: Hindsight) -> None:
+        """files.upload() delegates to retain_files."""
+        import tempfile
+        bid = _bid()
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as f:
+            f.write("Files shell upload test content.")
+            f.flush()
+            tmp_path = f.name
+
+        try:
+            result = hindsight.files.upload(
+                bank_id=bid,
+                files=[tmp_path],
+                context="Upload from files shell",
+            )
+            assert isinstance(result, FileRetainResponse)
+            assert isinstance(result.operation_ids, list)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_aretain_async(self, hindsight: Hindsight) -> None:
+        """aretain async method works (via _run_async)."""
+        import asyncio
+        bid = _bid()
+        async def _test():
+            return await hindsight.aretain(bank_id=bid, content="Async retain test")
+        result = asyncio.run(_test())
+        assert isinstance(result, RetainResponse)
+        assert result.success is True

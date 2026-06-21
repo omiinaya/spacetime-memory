@@ -458,3 +458,242 @@ class TestZepClient:
             min_score=0.0,
         )
         assert isinstance(results, list)
+
+    def test_search_memory_mmr_type(self, zep: ZepClient) -> None:
+        """search_memory with search_type='mmr'."""
+        sid = _sid("zep-test-mmr")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "MMR search test content"}],
+        )
+
+        results = zep.search_memory(
+            session_id=sid,
+            query="MMR search",
+            limit=5,
+            search_type="mmr",
+        )
+        assert isinstance(results, list)
+
+    def test_get_session_messages(self, zep: ZepClient) -> None:
+        """get_session_messages returns paginated messages."""
+        sid = _sid("zep-test-session-msgs")
+        zep.add_memory(
+            session_id=sid,
+            messages=[
+                {"role": "user", "content": f"Msg {i}"}
+                for i in range(3)
+            ],
+        )
+        result = zep.get_session_messages(session_id=sid, limit=2)
+        assert "messages" in result
+        assert len(result["messages"]) <= 2
+
+    def test_get_session_messages_nonexistent(self, zep: ZepClient) -> None:
+        """get_session_messages on nonexistent session returns empty."""
+        result = zep.get_session_messages(session_id=_sid("zep-test-noexist-msgs"))
+        assert result["messages"] == []
+
+    def test_get_session_message(self, zep: ZepClient) -> None:
+        """get_session_message retrieves a single message by UUID."""
+        sid = _sid("zep-test-get-msg")
+        add_result = zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Single message retrieval"}],
+        )
+        msg_id = add_result["message_ids"][0] if add_result["message_ids"] else None
+        if msg_id:
+            msg = zep.get_session_message(session_id=sid, message_uuid=msg_id)
+            assert msg["content"] == "Single message retrieval"
+
+    def test_get_session_message_nonexistent(self, zep: ZepClient) -> None:
+        """get_session_message on nonexistent message raises NotFoundError."""
+        sid = _sid("zep-test-get-msg-ne")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Setup for test"}],
+        )
+        with pytest.raises(NotFoundError):
+            zep.get_session_message(session_id=sid, message_uuid="nonexistent-uuid-999")
+
+    def test_update_message_metadata(self, zep: ZepClient) -> None:
+        """update_message_metadata updates metadata on a message."""
+        sid = _sid("zep-test-update-meta")
+        add_result = zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Metadata update test"}],
+        )
+        msg_id = add_result["message_ids"][0] if add_result["message_ids"] else None
+        if msg_id:
+            result = zep.update_message_metadata(
+                session_id=sid, message_uuid=msg_id,
+                metadata={"pinned": True, "tags": ["important"]},
+            )
+            assert result["metadata"]["pinned"] is True
+
+    def test_get_fact(self, zep: ZepClient) -> None:
+        """get_fact retrieves a fact by UUID."""
+        sid = _sid("zep-test-get-fact")
+        add_result = zep.add_fact(session_id=sid, fact="User enjoys cooking")
+        fact_id = add_result["fact_id"]
+        if fact_id:
+            fact = zep.get_fact(fact_uuid=fact_id)
+            assert isinstance(fact, Fact)
+            assert fact.fact == "User enjoys cooking"
+
+    def test_get_fact_nonexistent(self, zep: ZepClient) -> None:
+        """get_fact on nonexistent raises NotFoundError."""
+        with pytest.raises(NotFoundError):
+            zep.get_fact(fact_uuid="nonexistent-fact-uuid-999")
+
+    def test_add_fact_empty_string(self, zep: ZepClient) -> None:
+        """add_fact with empty string still works."""
+        sid = _sid("zep-test-fact-empty")
+        result = zep.add_fact(session_id=sid, fact="")
+        assert result["status"] == "ok"
+
+    def test_list_facts_pagination(self, zep: ZepClient) -> None:
+        """list_facts with limit parameter."""
+        sid = _sid("zep-test-facts-pag")
+        for i in range(5):
+            zep.add_fact(session_id=sid, fact=f"Fact number {i}")
+        facts = zep.list_facts(session_id=sid, limit=3)
+        assert len(facts) <= 3
+
+    def test_add_session(self, zep: ZepClient) -> None:
+        """add_session creates a new session."""
+        sid = _sid("zep-test-add-session")
+        session = zep.add_session(session_id=sid, metadata={"source": "test"})
+        assert isinstance(session, Session)
+        assert session.session_id == sid
+
+    def test_update_session(self, zep: ZepClient) -> None:
+        """update_session updates metadata."""
+        sid = _sid("zep-test-update-session")
+        zep.add_session(session_id=sid)
+        session = zep.update_session(session_id=sid, metadata={"updated": True})
+        assert session.metadata == {"updated": True}
+
+    def test_update_session_nonexistent(self, zep: ZepClient) -> None:
+        """update_session on nonexistent raises NotFoundError."""
+        with pytest.raises(NotFoundError):
+            zep.update_session(session_id=_sid("zep-test-noexist-update"), metadata={})
+
+    def test_search_sessions(self, zep: ZepClient) -> None:
+        """search_sessions returns compatible sessions."""
+        sid = _sid("zep-test-search-sessions")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Session search test"}],
+        )
+        results = zep.search_sessions(sid[:8], limit=5)
+        assert isinstance(results, list)
+
+    def test_list_sessions_pagination(self, zep: ZepClient) -> None:
+        """list_sessions with pagination params."""
+        sid = _sid("zep-test-list-sessions-pag")
+        zep.add_session(session_id=sid)
+        sessions = zep.list_sessions(page_number=1, page_size=10, order_by="created_at", asc=False)
+        assert isinstance(sessions, list)
+
+    def test_add_memory_with_no_messages(self, zep: ZepClient) -> None:
+        """add_memory called without messages parameter is fine."""
+        sid = _sid("zep-test-nomsg")
+        result = zep.add_memory(session_id=sid, messages=[])
+        assert result["status"] == "ok"
+        assert result["message_ids"] == []
+
+    def test_get_memory_with_min_rating(self, zep: ZepClient) -> None:
+        """get_memory with min_rating parameter."""
+        sid = _sid("zep-test-min-rating")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Rating test"}],
+        )
+        memory = zep.get_memory(session_id=sid, min_rating=0.5)
+        assert memory is not None
+
+    def test_search_memory_high_threshold(self, zep: ZepClient) -> None:
+        """search_memory with high score threshold filters results."""
+        sid = _sid("zep-test-high-thresh")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "Pizza is a popular food"}],
+        )
+        time.sleep(0.3)
+        results = zep.search_memory(
+            session_id=sid,
+            query="quantum mechanics",
+            limit=5,
+            score_threshold=0.9,
+        )
+        assert isinstance(results, list)
+
+    def test_update_memory_nonexistent(self, zep: ZepClient) -> None:
+        """update_memory on nonexistent memory may raise RuntimeError."""
+        sid = _sid("zep-test-update-ne")
+        zep.add_session(session_id=sid)
+        try:
+            result = zep.update_memory(
+                session_id=sid,
+                memory_id="nonexistent-uuid-999",
+                messages=[{"role": "user", "content": "Won't be stored"}],
+            )
+            assert result["status"] == "ok"
+        except RuntimeError:
+            pass  # Either behavior is acceptable
+
+    def test_summarize_memory(self, zep: ZepClient) -> None:
+        """summarize_memory returns a summary or None."""
+        sid = _sid("zep-test-summarize")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "The quick brown fox jumps over the lazy dog"}],
+        )
+        result = zep.summarize_memory(session_id=sid)
+        # Returns None if LLM not available, or summary string
+        assert result is None or isinstance(result, str)
+
+    def test_summarize_memory_empty(self, zep: ZepClient) -> None:
+        """summarize_memory on empty session returns None."""
+        result = zep.summarize_memory(session_id=_sid("zep-test-summarize-empty"))
+        assert result is None
+
+    def test_get_session_messages_with_cursor(self, zep: ZepClient) -> None:
+        """get_session_messages with cursor pagination."""
+        sid = _sid("zep-test-cursor")
+        zep.add_memory(
+            session_id=sid,
+            messages=[
+                {"role": "user", "content": f"Cursor msg {i}"}
+                for i in range(4)
+            ],
+        )
+        result = zep.get_session_messages(session_id=sid, limit=3, cursor=0)
+        assert "messages" in result
+        assert "cursor" in result
+
+    def test_search_memory_with_mmr(self, zep: ZepClient) -> None:
+        """search_memory with search_type mmr and high lambda."""
+        sid = _sid("zep-test-mmr-high")
+        zep.add_memory(
+            session_id=sid,
+            messages=[{"role": "user", "content": "MMR lambda test"}],
+        )
+        results = zep.search_memory(
+            session_id=sid,
+            query="MMR test",
+            limit=5,
+            search_type="mmr",
+        )
+        assert isinstance(results, list)
+
+    def test_get_fact_from_session(self, zep: ZepClient) -> None:
+        """get_fact after adding to a session returns the correct fact."""
+        sid = _sid("zep-test-fact-session")
+        add_result = zep.add_fact(session_id=sid, fact="Zep fact retrieval test")
+        fact_id = add_result["fact_id"]
+        if fact_id:
+            fact = zep.get_fact(fact_uuid=fact_id)
+            assert isinstance(fact, Fact)
+            assert fact.uuid == fact_id

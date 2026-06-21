@@ -449,3 +449,208 @@ class TestTemporalEdgeTracking:
         v1 = next((e for e in history if e.version == 1), None)
         if v1:
             assert v1.invalid_at is not None
+
+    def test_update_edge_nonexistent(self, graphiti: Graphiti):
+        """update_edge on nonexistent edge raises RuntimeError."""
+        with pytest.raises(RuntimeError):
+            graphiti.update_edge(
+                edge_id="nonexistent-edge-uuid-999",
+                relation="new_relation",
+                weight=1.0,
+            )
+
+
+class TestGraphitiNamespaces:
+    """Tests for graphiti.nodes and graphiti.edges namespace properties."""
+
+    def test_nodes_namespace(self, graphiti: Graphiti):
+        """graphiti.nodes property exists."""
+        assert graphiti.nodes is not None
+
+    def test_edges_namespace(self, graphiti: Graphiti):
+        """graphiti.edges property exists."""
+        assert graphiti.edges is not None
+
+    def test_token_tracker(self, graphiti: Graphiti):
+        """graphiti.token_tracker property returns None."""
+        assert graphiti.token_tracker is None
+
+
+class TestGraphitiDataModels:
+    """Tests for EntityNode and EntityEdge data models."""
+
+    def test_entity_node_from_stmem(self, workspace_id: str):
+        """EntityNode.from_stmem() parses a kg_node row."""
+        row = {
+            "id": "test-node-123",
+            "label": "TestNode",
+            "summary": "A test node",
+            "workspace_id": workspace_id,
+            "metadata_json": '{"key": "value"}',
+            "labels": '["label1", "label2"]',
+            "created_at": 1700000000000000,
+        }
+        node = EntityNode.from_stmem(row)
+        assert node.uuid == "test-node-123"
+        assert node.name == "TestNode"
+        assert node.summary == "A test node"
+        assert node.group_id == workspace_id
+        assert node.attributes == {"key": "value"}
+        assert node.labels == ["label1", "label2"]
+
+    def test_entity_edge_from_stmem(self, workspace_id: str):
+        """EntityEdge.from_stmem() parses a kg_edge row."""
+        row = {
+            "id": "test-edge-456",
+            "relation": "likes",
+            "fact": "Alice likes pizza",
+            "source_node_id": "src-1",
+            "target_node_id": "tgt-2",
+            "workspace_id": workspace_id,
+            "metadata_json": '{"weight": 2.0}',
+            "created_at": 1700000000000000,
+            "valid_at": 1700000000000000,
+            "invalid_at": 0,
+            "version": 1,
+            "edge_group_id": "group-789",
+        }
+        edge = EntityEdge.from_stmem(row)
+        assert edge.uuid == "test-edge-456"
+        assert edge.name == "likes"
+        assert edge.fact == "Alice likes pizza"
+        assert edge.source_node_uuid == "src-1"
+        assert edge.target_node_uuid == "tgt-2"
+        assert edge.attributes == {"weight": 2.0}
+        assert edge.version == 1
+
+    def test_entity_node_model_dump(self):
+        """EntityNode.model_dump() returns dict."""
+        node = EntityNode(name="DumpNode", group_id="default")
+        d = node.model_dump()
+        assert d["name"] == "DumpNode"
+
+    def test_entity_edge_model_dump(self):
+        """EntityEdge.model_dump() returns dict."""
+        edge = EntityEdge(name="connects", fact="test fact", group_id="default")
+        d = edge.model_dump()
+        assert d["name"] == "connects"
+
+
+class TestGraphitiSearchEdgeCases:
+    """Edge cases for search."""
+
+    def test_search_with_explicit_num_results(self, graphiti: Graphiti, workspace_id: str):
+        """search with num_results parameter."""
+        edges = graphiti.search("anything", group_ids=[workspace_id], num_results=5)
+        assert isinstance(edges, list)
+
+    def test_search_nonexistent_query(self, graphiti: Graphiti, workspace_id: str):
+        """search on a topic with no results returns empty list."""
+        edges = graphiti.search("xyznonexistentquery12345", group_ids=[workspace_id])
+        assert edges == []
+
+    def test_search_multiple_group_ids(self, graphiti: Graphiti, workspace_id: str):
+        """search with multiple group_ids."""
+        edges = graphiti.search("test", group_ids=[workspace_id, "nonexistent-ws"])
+        assert isinstance(edges, list)
+
+    def test_build_communities_empty(self, graphiti: Graphiti):
+        """build_communities on empty workspace returns list."""
+        import uuid
+        fresh_name = f"community-empty-{uuid.uuid4().hex[:8]}"
+        try:
+            graphiti._client.create_workspace(fresh_name)
+        except RuntimeError:
+            pass
+        fresh_id = ""
+        for ws in graphiti._client.list_workspaces():
+            if ws.get("name") == fresh_name:
+                fresh_id = ws["id"]
+                break
+        if fresh_id:
+            result = graphiti.build_communities(group_ids=[fresh_id])
+            assert isinstance(result, list)
+
+
+class TestGraphitiNamespaceOps:
+    """Tests for graphiti.nodes.* and graphiti.edges.* namespace operations."""
+
+    def test_nodes_entity_get_by_group_ids(self, graphiti: Graphiti, workspace_id: str):
+        """nodes.entity.get_by_group_ids returns entity nodes."""
+        nodes = graphiti.nodes.entity.get_by_group_ids([workspace_id])
+        assert isinstance(nodes, list)
+
+    def test_nodes_entity_get_by_uuid(self, graphiti: Graphiti, workspace_id: str):
+        """nodes.entity.get_by_uuid returns an entity node."""
+        src = EntityNode(name="UUIDTestNode", group_id=workspace_id)
+        result = graphiti.add_triplet(
+            source_node=src,
+            edge=EntityEdge(name="test_edge", fact="Testing UUID retrieval", group_id=workspace_id),
+            target_node=EntityNode(name="UUIDTargetNode", group_id=workspace_id),
+        )
+        node_uuid = result.nodes[0].uuid
+        if node_uuid:
+            node = graphiti.nodes.entity.get_by_uuid(node_uuid)
+            assert isinstance(node, EntityNode)
+            assert node.name == "UUIDTestNode"
+
+    def test_retrieve_episodes(self, graphiti: Graphiti, workspace_id: str):
+        """retrieve_episodes returns episodes from the workspace."""
+        graphiti.add_episode(
+            name="RetrieveTest",
+            episode_body="Content for retrieval",
+            source_description="test",
+            group_id=workspace_id,
+        )
+        episodes = graphiti.retrieve_episodes(group_ids=[workspace_id])
+        assert isinstance(episodes, list)
+
+    def test_retrieve_episodes_with_limit(self, graphiti: Graphiti, workspace_id: str):
+        """retrieve_episodes respects last_n."""
+        for i in range(3):
+            graphiti.add_episode(
+                name=f"RetrieveLimitTest-{i}",
+                episode_body=f"Episode {i} content",
+                source_description="test",
+                group_id=workspace_id,
+            )
+        episodes = graphiti.retrieve_episodes(group_ids=[workspace_id], last_n=2)
+        assert isinstance(episodes, list)
+        assert len(episodes) <= 2
+
+    def test_get_nodes_and_edges_by_episode(self, graphiti: Graphiti, workspace_id: str):
+        """get_nodes_and_edges_by_episode returns SearchResults."""
+        result = graphiti.add_episode(
+            name="LinkedEpisode",
+            episode_body="Alice likes pizza and coffee.",
+            source_description="test",
+            group_id=workspace_id,
+        )
+        if result.episode and result.episode.uuid:
+            sr = graphiti.get_nodes_and_edges_by_episode([result.episode.uuid])
+            assert isinstance(sr, SearchResults)
+
+    def test_search_advanced_params(self, graphiti: Graphiti, workspace_id: str):
+        """search_ with various parameters."""
+        results = graphiti.search_(
+            "test",
+            group_ids=[workspace_id],
+            num_results=10,
+            center_node_uuid=None,
+        )
+        assert isinstance(results, SearchResults)
+
+    def test_nodes_saga_get_by_group_ids(self, graphiti: Graphiti, workspace_id: str):
+        """nodes.saga.get_by_group_ids returns saga nodes."""
+        sagas = graphiti.nodes.saga.get_by_group_ids([workspace_id])
+        assert isinstance(sagas, list)
+
+    def test_nodes_community_get_by_group_ids(self, graphiti: Graphiti, workspace_id: str):
+        """nodes.community.get_by_group_ids returns community nodes."""
+        communities = graphiti.nodes.community.get_by_group_ids([workspace_id])
+        assert isinstance(communities, list)
+
+    def test_edges_entity_get_by_group_ids(self, graphiti: Graphiti, workspace_id: str):
+        """edges.entity.get_by_group_ids returns entity edges."""
+        edges = graphiti.edges.entity.get_by_group_ids([workspace_id])
+        assert isinstance(edges, list)

@@ -179,9 +179,6 @@ class OrgModeParser(Connector):
             else:
                 break
 
-        if level == 0:
-            return None
-
         # Remainder after the asterisks
         rest = line[level:].strip()
         if not rest:

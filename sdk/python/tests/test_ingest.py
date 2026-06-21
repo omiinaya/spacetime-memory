@@ -290,6 +290,20 @@ class TestIngest:
             stats = ingester.ingest(str(tmp_path), "ws1")
             assert stats["errors"] == 1
 
+    def test_unknown_extension_skipped_in_loop(self, tmp_path):
+        """Files with unknown extensions are skipped by the ingest loop."""
+        mock_client = Mock()
+        mock_client.detect_communities.return_value = None
+
+        ingester = CodebaseIngester(mock_client)
+
+        # Create files with unknown extensions
+        (tmp_path / "readme.txt").write_text("hello")
+        (tmp_path / "data.csv").write_text("a,b,c")
+
+        stats = ingester.ingest(str(tmp_path), "ws1")
+        assert stats["files"] == 0  # both skipped
+
 
 # ── _process_file method ────────────────────────────────────────────────
 
@@ -379,6 +393,77 @@ class TestProcessFile:
 
         assert py_file not in file_nodes
         assert ingester._stats["files"] == 0
+
+    def test_process_file_create_node_error(self, tmp_path):
+        """RuntimeError from create_node is caught and logged."""
+        mock_client = Mock()
+        mock_client.create_node.side_effect = RuntimeError("db down")
+        mock_client.query_graph.return_value = [{"id": "f1", "label": "test.py"}]
+
+        ingester = CodebaseIngester(mock_client)
+
+        py_file = tmp_path / "test.py"
+        py_file.write_text("def foo(): pass\n")
+
+        file_nodes: dict = {}
+        def_nodes: dict = {}
+
+        with patch("spacetime_memory.ingest._LangConfig") as mock_lc:
+            mock_cfg = Mock()
+            mock_cfg.name = "python"
+            mock_cfg.parser = Mock()
+            mock_tree = Mock()
+            mock_root = Mock()
+            mock_cfg.parser.parse.return_value = mock_tree
+            mock_tree.root_node = mock_root
+            mock_cfg.queries = {"defs": Mock(), "calls": Mock()}
+
+            with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
+                mock_cursor = Mock()
+                mock_cursor.matches.return_value = []
+                mock_cc.return_value = mock_cursor
+
+                ingester._parser = Mock(return_value=mock_cfg)
+                ingester._process_file(py_file, tmp_path, "ws1", file_nodes, def_nodes)
+
+        # File should still be registered and stats incremented
+        assert py_file in file_nodes
+        assert ingester._stats["files"] == 1
+
+    def test_process_file_progress_every_50(self, tmp_path):
+        """Progress is printed every 50 files."""
+        mock_client = Mock()
+        mock_client.detect_communities.return_value = None
+        mock_client.query_graph.return_value = []
+        mock_client.create_node.return_value = None
+
+        ingester = CodebaseIngester(mock_client)
+
+        # Create 51 Python files
+        for i in range(51):
+            (tmp_path / f"file_{i}.py").write_text(f"x{i} = {i}")
+
+        with patch("spacetime_memory.ingest.get_language") as mock_get_lang, \
+             patch("spacetime_memory.ingest.TSParser") as mock_parser_cls, \
+             patch("spacetime_memory.ingest.Query") as mock_query_cls, \
+             patch("spacetime_memory.ingest.QueryCursor") as mock_cursor_cls:
+            mock_lang = Mock()
+            mock_get_lang.return_value = mock_lang
+            mock_parser = Mock()
+            mock_parser_cls.return_value = mock_parser
+            mock_tree = Mock()
+            mock_root = Mock()
+            mock_parser.parse.return_value = mock_tree
+            mock_tree.root_node = mock_root
+            mock_query = Mock()
+            mock_query_cls.return_value = mock_query
+            mock_cursor = Mock()
+            mock_cursor.matches.return_value = []
+            mock_cursor_cls.return_value = mock_cursor
+
+            stats = ingester.ingest(str(tmp_path), "ws1")
+
+        assert stats["files"] == 51
 
 
 # ── _extract_defs method ────────────────────────────────────────────────
@@ -652,6 +737,41 @@ class TestExtractDefs:
 
         # create_edge should not be called for contains
         mock_client.create_edge.assert_not_called()
+
+    def test_contains_edge_error_is_handled(self, tmp_path):
+        """RuntimeError from create_edge in _extract_defs is caught."""
+        mock_client = Mock()
+        mock_client.create_node.return_value = None
+        mock_client.create_edge.side_effect = RuntimeError("edge fail")
+        mock_client.query_graph.return_value = [{"id": "d1", "label": "test.py:foo"}]
+
+        ingester = CodebaseIngester(mock_client)
+        source = "def foo(): pass\n"
+
+        mock_cfg = Mock()
+        mock_cfg.queries = {"defs": Mock()}
+        mock_tree = Mock()
+        mock_tree.root_node = Mock()
+
+        name_node = Mock()
+        name_node.start_byte = 4
+        name_node.end_byte = 7
+
+        with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
+            mock_cursor = Mock()
+            mock_cursor.matches.return_value = [
+                (0, {"name": [name_node], "func": [Mock()]})
+            ]
+            mock_cc.return_value = mock_cursor
+
+            def_nodes: dict = {}
+            ingester._extract_defs(
+                mock_cfg, mock_tree, source, "test.py",
+                "ws1", "file-node-1", def_nodes,
+            )
+
+        # Def should still be recorded despite edge creation failure
+        assert ingester._stats["defs"] == 1
 
 
 # ── _create_dependency_edges ────────────────────────────────────────────

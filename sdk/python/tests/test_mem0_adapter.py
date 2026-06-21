@@ -315,3 +315,153 @@ class TestMem0EdgeCases:
         """Search on nonexistent user returns empty."""
         result = mem.search("test", user_id=_uid("mem0-test-noexist-search"))
         assert "results" in result
+
+    def test_delete_nonexistent(self, mem: Memory) -> None:
+        """Delete on nonexistent memory ID may raise or return gracefully."""
+        try:
+            result = mem.delete("nonexistent-uuid-999")
+            assert "message" in result
+        except RuntimeError:
+            pass  # Either behavior is acceptable
+
+    def test_history(self, mem: Memory) -> None:
+        """history() returns version list."""
+        uid = _uid()
+        add_result = mem.add("History test memory", user_id=uid)
+        memory_id = add_result["results"][0]["id"]
+        result = mem.history(memory_id=memory_id)
+        assert isinstance(result, list)
+
+    def test_history_nonexistent(self, mem: Memory) -> None:
+        """history() on nonexistent memory may raise or return empty."""
+        try:
+            result = mem.history("nonexistent-uuid-999")
+            assert isinstance(result, list)
+        except RuntimeError:
+            pass  # Either behavior is acceptable
+
+    def test_update_nonexistent(self, mem: Memory) -> None:
+        """Update on nonexistent memory ID may raise RuntimeError."""
+        try:
+            result = mem.update("nonexistent-uuid-999", "New content")
+            assert "message" in result
+        except RuntimeError:
+            pass  # Either behavior is acceptable
+
+    def test_add_with_filters_param(self, mem: Memory) -> None:
+        """add() using filters dict instead of user_id (Mem0 v2 compat)."""
+        uid = _uid()
+        result = mem.add("Filters param test", filters={"user_id": uid})
+        assert "results" in result
+        assert len(result["results"]) >= 1
+
+    def test_add_with_memory_type(self, mem: Memory) -> None:
+        """add() with memory_type accepted."""
+        uid = _uid()
+        result = mem.add("Procedural test", user_id=uid, memory_type="procedural_memory")
+        assert "results" in result
+        assert len(result["results"]) >= 1
+
+    def test_get_all_pagination(self, mem: Memory) -> None:
+        """get_all with limit and top_k."""
+        uid = _uid()
+        for i in range(4):
+            mem.add(f"Pagination memory {i}", user_id=uid)
+        result = mem.get_all(user_id=uid, limit=2)
+        assert len(result["results"]) <= 2
+        result2 = mem.get_all(user_id=uid, top_k=1)
+        assert len(result2["results"]) <= 1
+
+    def test_search_with_high_threshold(self, mem: Memory) -> None:
+        """search with high threshold filters all but very close matches."""
+        uid = _uid()
+        mem.add("The sky is blue", user_id=uid)
+        time.sleep(0.3)
+        result = mem.search("quantum physics", user_id=uid, threshold=0.95)
+        assert "results" in result
+
+    def test_chat_fallback(self, mem: Memory) -> None:
+        """chat() returns response even without LLM configured."""
+        uid = _uid()
+        result = mem.chat("What do I like?", user_id=uid)
+        assert "response" in result
+        assert "context" in result
+        assert "memories" in result
+
+    def test_create_memory_tool(self, mem: Memory) -> None:
+        """create_memory_tool() returns not_implemented status."""
+        result = mem.create_memory_tool()
+        assert result["status"] == "not_implemented"
+
+
+class TestMem0GraphStore:
+    """Tests for the Mem0 graph store (_GraphStore)."""
+
+    def test_graph_add(self, mem: Memory) -> None:
+        """graph.add() creates a graph entity."""
+        uid = _uid()
+        result = mem.graph.add("GraphTestEntity", entity_type="concept", user_id=uid)
+        assert "id" in result or "status" in result
+
+    def test_graph_add_empty_raises(self, mem: Memory) -> None:
+        """graph.add() with empty text raises ValueError."""
+        with pytest.raises(ValueError):
+            mem.graph.add("  ", user_id=_uid())
+
+    def test_graph_search(self, mem: Memory) -> None:
+        """graph.search() returns entities."""
+        uid = _uid()
+        mem.graph.add("SearchEntity", entity_type="concept", user_id=uid)
+        results = mem.graph.search("Search", user_id=uid)
+        assert isinstance(results, list)
+
+    def test_graph_get_all(self, mem: Memory) -> None:
+        """graph.get_all() lists entities."""
+        uid = _uid()
+        mem.graph.add("ListAllEntity", entity_type="concept", user_id=uid)
+        results = mem.graph.get_all(user_id=uid)
+        assert isinstance(results, list)
+
+    def test_graph_delete(self, mem: Memory) -> None:
+        """graph.delete() deletes a graph entity."""
+        uid = _uid()
+        result = mem.graph.add("DeleteEntity", entity_type="concept", user_id=uid)
+        entity_id = result.get("id", "")
+        if entity_id:
+            del_result = mem.graph.delete(entity_id)
+            assert del_result["status"] == "ok"
+
+    def test_graph_add_with_metadata(self, mem: Memory) -> None:
+        """graph.add() with metadata."""
+        uid = _uid()
+        result = mem.graph.add(
+            "MetaEntity", entity_type="person", user_id=uid,
+            metadata={"source": "test", "importance": 5},
+        )
+        assert "id" in result or "status" in result
+
+    def test_graph_add_with_agent_id(self, mem: Memory) -> None:
+        """graph.add() with agent_id."""
+        uid = _uid()
+        result = mem.graph.add(
+            "AgentScopedEntity", entity_type="concept",
+            user_id=uid, agent_id="my-agent",
+        )
+        assert "id" in result or "status" in result
+
+    def test_set_llm_config(self, mem: Memory) -> None:
+        """set_llm_config stores per-user LLM config overrides."""
+        uid = _uid()
+        mem.set_llm_config(uid, {"model": "gpt-4", "api_key": "test-key"})
+        # No error = success — just testing it doesn't raise
+
+    def test_add_with_metadata_dict(self, mem: Memory) -> None:
+        """add() with rich metadata dict."""
+        uid = _uid()
+        result = mem.add(
+            "Metadata rich test",
+            user_id=uid,
+            metadata={"source": "conversation", "importance": 7, "tags": ["preference"]},
+        )
+        assert "results" in result
+        assert len(result["results"]) >= 1

@@ -169,6 +169,13 @@ class TestGetPropValue:
     def test_unique_id_none(self):
         assert NotionConnector._get_prop_value("unique_id", {"type": "unique_id", "unique_id": None}) is None
 
+    def test_unique_id_prefix_no_number(self):
+        """When unique_id has prefix but number is None, returns None."""
+        assert NotionConnector._get_prop_value("unique_id", {
+            "type": "unique_id",
+            "unique_id": {"prefix": "TASK", "number": None},
+        }) is None
+
     def test_formula_string(self):
         val = NotionConnector._get_prop_value("formula", {
             "type": "formula",
@@ -238,6 +245,13 @@ class TestGetPropValue:
         })
         assert val == "(incomplete rollup)"
 
+    def test_rollup_unknown_type(self):
+        """Rollup with an unrecognised type returns None."""
+        assert NotionConnector._get_prop_value("rollup", {
+            "type": "rollup",
+            "rollup": {"type": "bogus_rollup"},
+        }) is None
+
     def test_people(self):
         val = NotionConnector._get_prop_value("people", {
             "type": "people",
@@ -271,6 +285,30 @@ class TestGetPropValue:
 
     def test_files_empty(self):
         assert NotionConnector._get_prop_value("files", {"type": "files", "files": []}) is None
+
+    def test_files_name_only_no_url(self):
+        """Files with a name but no URL are still included."""
+        val = NotionConnector._get_prop_value("files", {
+            "type": "files",
+            "files": [
+                {"name": "readme.md", "file": {}},
+                {"name": "LICENSE"},
+            ],
+        })
+        assert "readme.md" in val
+        assert "LICENSE" in val
+
+    def test_files_url_only_no_name(self):
+        """Files with a URL but no name are still included."""
+        val = NotionConnector._get_prop_value("files", {
+            "type": "files",
+            "files": [
+                {"file": {"url": "https://s3/bucket/key"}},
+                {"external": {"url": "https://cdn/asset"}},
+            ],
+        })
+        assert "https://s3/bucket/key" in val
+        assert "https://cdn/asset" in val
 
     def test_created_by(self):
         val = NotionConnector._get_prop_value("created_by", {
