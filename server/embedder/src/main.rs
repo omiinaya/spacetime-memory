@@ -1,5 +1,6 @@
-use axum::{routing::post, Json, Router};
+use axum::{routing::{get, post}, Json, Router};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
 use tract_onnx::prelude::*;
 use tract_onnx::tract_core::plan::SimplePlan;
@@ -20,6 +21,41 @@ struct EmbedResponse {
     embedding: Vec<f32>,
     embeddings: Option<Vec<Vec<f32>>>,
     dimension: usize,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum OpenAIEmbedInput {
+    Single(String),
+    Batch(Vec<String>),
+}
+
+#[derive(Deserialize)]
+struct OpenAIEmbedRequest {
+    input: OpenAIEmbedInput,
+    model: Option<String>,
+    dimensions: Option<usize>,
+}
+
+#[derive(Serialize)]
+struct OpenAIEmbedResponse {
+    object: String,
+    data: Vec<OpenAIEmbedData>,
+    model: String,
+    usage: OpenAIUsage,
+}
+
+#[derive(Serialize)]
+struct OpenAIEmbedData {
+    object: String,
+    index: usize,
+    embedding: Vec<f32>,
+}
+
+#[derive(Serialize)]
+struct OpenAIUsage {
+    prompt_tokens: usize,
+    total_tokens: usize,
 }
 
 #[derive(Serialize)]
@@ -126,6 +162,21 @@ fn compute_embedding(
     mean_pool_and_normalize(last_hidden_state, &attn_t.into())
 }
 
+/// Wrapper that runs CPU-bound embedding on a blocking thread.
+async fn compute_embedding_async(
+    state: &SharedState,
+    text: &str,
+) -> Vec<f32> {
+    let state = state.clone();
+    let text = text.to_string();
+    let dim = state.dimension;
+    tokio::task::spawn_blocking(move || {
+        compute_embedding(&state.model, &state.tokenizer, &text, state.num_inputs)
+    })
+    .await
+    .unwrap_or_else(|_| vec![0.0f32; dim])
+}
+
 // ---------------------------------------------------------------------------
 // HTTP handlers
 // ---------------------------------------------------------------------------
@@ -145,11 +196,21 @@ async fn embed(
     state: axum::extract::State<SharedState>,
     Json(req): Json<EmbedRequest>,
 ) -> Json<EmbedResponse> {
-    let texts = req.texts.unwrap_or_else(|| vec![req.text]);
+    let texts = if let Some(ts) = req.texts {
+        ts
+    } else if let Some(t) = req.text {
+        vec![t]
+    } else {
+        return Json(EmbedResponse {
+            embedding: vec![],
+            embeddings: None,
+            dimension: 0,
+        });
+    };
     let mut all_embeddings: Vec<Vec<f32>> = Vec::with_capacity(texts.len());
 
     for t in &texts {
-        all_embeddings.push(compute_embedding(&state.model, &state.tokenizer, t, state.num_inputs));
+        all_embeddings.push(compute_embedding_async(&state, t).await);
     }
 
     state.embedding_count.fetch_add(
@@ -181,8 +242,78 @@ async fn embed(
     }
 }
 
+/// Extract text strings from an OpenAI-format request body.
+fn openai_texts(input: &OpenAIEmbedInput) -> Vec<String> {
+    match input {
+        OpenAIEmbedInput::Single(s) => vec![s.clone()],
+        OpenAIEmbedInput::Batch(ts) => ts.clone(),
+    }
+}
+
+/// OpenAI-compatible /v1/embeddings handler
+async fn openai_embed(
+    state: axum::extract::State<SharedState>,
+    Json(req): Json<OpenAIEmbedRequest>,
+) -> Json<Value> {
+    let texts = openai_texts(&req.input);
+    let text_count = texts.len();
+    let total_chars: usize = texts.iter().map(|t| t.len()).sum();
+    eprintln!("[embedder] /v1/embeddings: {} texts, {} chars total", text_count, total_chars);
+
+    if texts.is_empty() || texts.iter().any(|t| t.is_empty()) {
+        eprintln!("[embedder] /v1/embeddings: invalid input (empty text)");
+        return Json(json!({
+            "error": {
+                "message": "input must be a non-empty string or array of non-empty strings",
+                "type": "invalid_request_error"
+            }
+        }));
+    }
+
+    let model_name = req.model.unwrap_or_else(|| state.model_name.clone());
+    let mut all_embeddings: Vec<Vec<f32>> = Vec::with_capacity(texts.len());
+    for t in &texts {
+        // Truncate very long inputs (~512 tokens max for CPU stability)
+        let input = if t.len() > 1800 { &t[..1800] } else { t.as_str() };
+        all_embeddings.push(compute_embedding_async(&state, input).await);
+    }
+
+    state.embedding_count.fetch_add(
+        all_embeddings.len() as u64,
+        std::sync::atomic::Ordering::Relaxed,
+    );
+
+    let requested_dim = req.dimensions.unwrap_or(state.dimension);
+    let clamped_dim = requested_dim.min(state.dimension);
+    for vec in &mut all_embeddings {
+        vec.truncate(clamped_dim);
+    }
+
+    let data: Vec<OpenAIEmbedData> = all_embeddings
+        .into_iter()
+        .enumerate()
+        .map(|(i, vec)| OpenAIEmbedData {
+            object: "embedding".into(),
+            index: i,
+            embedding: vec,
+        })
+        .collect();
+
+    eprintln!("[embedder] /v1/embeddings: returning {} embeddings at {} dims", data.len(), clamped_dim);
+    Json(json!(OpenAIEmbedResponse {
+        object: "list".into(),
+        data,
+        model: model_name,
+        usage: OpenAIUsage {
+            prompt_tokens: texts.iter().map(|t| t.len() / 4).sum(),
+            total_tokens: texts.iter().map(|t| t.len() / 4).sum(),
+        },
+    }))
+
+}
+
 // ---------------------------------------------------------------------------
-// Main
+// HTTP handlers
 // ---------------------------------------------------------------------------
 
 #[tokio::main]
@@ -246,6 +377,7 @@ async fn main() {
     let app = Router::new()
         .route("/health", axum::routing::get(health))
         .route("/embed", post(embed))
+        .route("/v1/embeddings", post(openai_embed))
         .with_state(state);
 
     let port: u16 = std::env::var("PORT")

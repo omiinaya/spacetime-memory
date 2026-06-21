@@ -11,15 +11,12 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 import httpx
 
 import logging
 import re
-
-if TYPE_CHECKING:
-    from .local_embedder import LocalEmbedder
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +211,7 @@ class Client:
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
         self.reducer_url = f"{base}/v1/database/{self.database}/call"
         self._http = httpx.Client(timeout=timeout)
-        self._local_python_embedder: LocalEmbedder | None = None
+        self._local_python_embedder = None
 
     def _headers(self) -> dict[str, str]:
         """Return common HTTP headers, including auth if a token is set."""
