@@ -207,7 +207,6 @@ class Client:
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
         self.reducer_url = f"{base}/v1/database/{self.database}/call"
         self._http = httpx.Client(timeout=timeout)
-        self._local_python_embedder = None
 
     def _headers(self) -> dict[str, str]:
         """Return common HTTP headers, including auth if a token is set."""

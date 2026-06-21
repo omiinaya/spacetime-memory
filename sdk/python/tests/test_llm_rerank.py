@@ -37,8 +37,6 @@ def mock_client():
     c._query = MagicMock(return_value=[])
     c._embed = MagicMock(return_value=[0.1] * 384)
     c._query_cache = None
-    c._bge_model_cache = False
-    c._e5_model_cache = False
     c._binary_cache = {}
     c.plugin_manager = None
     c.event_bus = None
