@@ -20,3 +20,5 @@ venv/
 .upstream-venv/
 build/
 .env
+coverage
+*.profraw
