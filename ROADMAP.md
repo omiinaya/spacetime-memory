@@ -178,36 +178,38 @@
 - **`.env` stale**: `EMBEDDER_TYPE=local` has no effect — code ignores it (cosmetic)
 - **STDB ~2% fatal error rate under 50-thread concurrent load** — documented concurrency limit
 
-### What's Left to Do
+### Structural Debt — Real Issues (June 22, 2026 Audit)
 
 | # | Item | Severity | Effort | Status |
 |---|------|----------|--------|--------|
-| 1 | **Narrow 6 bare `except Exception`** | ~~Low~~ | ~~30min~~ | ✅ **DONE** (6aa0695) |
-| 2 | **Clean `.env`** — correct embedding config | ~~Low~~ | ~~5min~~ | ✅ **DONE** (6aa0695 → updated again) |
-| 3 | **Add bge-m3 embedding model to proxy** | ~~High~~ | ~~1h~~ | ✅ **DONE** — registered via admin/test/create-model |
-| 4 | **Install + run upstream competitor libraries** for real behavioral parity tests | ~~High~~ | ~~2h~~ | ✅ **DONE** (Jun 22) — 107/112 pass, all 6 installed |
-| 5 | **Concurrency + load testing** | ~~Medium~~ | ~~4h~~ | ✅ **DONE** (Jun 22) — 7 tests, 302/302 pass. Found: ~2% STDB fatal errors under 50-thread load, 1114 writes/s |
-| 6 | **PyPI publish** | Deferred | ~1h | No token |
+| 1 | **client.py god functions** — `search()` 367L, `llm_rerank()` 225L, `store()` 104L | **P0** | 4-6h | 🔴 Unstarted |
+| 2 | **Adapter god functions** — `mem0.add()` 208L, `graphiti.add_episode()` 147L | P2 | 2-3h | 🔴 Unstarted |
+| 3 | **STDB concurrency crashes** — ~2% fatal WASM errors under load, root cause unknown | P1 | 4-8h | 🔴 Unstarted |
+| 4 | **user.rs unbounded scans** — lines 182,216 use `break` not `.take()` | P4 | 30min | 🔴 Unstarted |
+| 5 | **10 silent `except ... pass`** — in graphiti.py + honcho.py (intentional but undocumented) | P4 | 1h | 🔴 Unstarted |
+| 6 | **Concurrency test flakes** — `test_throughput` ~15% failure rate | P3 | 2h | 🔴 Unstarted |
+| 7 | **PyPI publish** | Deferred | ~1h | No token |
 
-### Score Breakdown
+### Score Breakdown — Honest (June 22, 2026 Audit)
 
 | Domain | Score | Why |
 |--------|:-----:|-----|
 | STDB Best Practices | **100%** | Clean, verified |
-| Rust Quality | **98%** | 0 warnings, 0 unwrap, 0 anti-patterns |
-| Core CRUD + Search | **95%** | Complete, tested, bge-m3 embeddings working via proxy |
-| Python Quality | **94%** | 302/302 tests, 0 bare except:Exception |
-| Semantic Search | **92%** | bge-m3 via proxy → NVIDIA NIM. Health check routes correctly when API key set |
-| Adapter Parity | **92%** | All 6 verified against real upstream (107/112 sig parity, avg 92.2%) |
+| Rust Quality | **98%** | 0 warnings, 0 unwrap, 0 anti-patterns. user.rs unbounded scans (-2%) |
+| Core CRUD + Search | **95%** | Complete, tested, bge-m3 embeddings working. search() is a 367L monolith (-2%) |
+| Python Quality | **88%** | 301/302 passing (15% throughput flake). 10 silent except:pass. God functions in adapters |
+| Semantic Search | **92%** | bge-m3 via proxy. Health check routes correctly. Degraded without OPENAI_API_KEY |
+| Adapter Parity | **92%** | All 6 verified against real upstream (107/112 sig parity). mem0 add() is 208L |
 | Frontend | **90%** | All live data, 2 console.debug in library |
-| DevOps/Deploy | **82%** | Proxy embeddings working, ONNX as fallback |
-| Concurrency | **78%** | 7 tests pass, ~2% STDB fatal rate documented |
-| **Weighted Overall** | **~94%** | Up from 93% (competitor parity + concurrency tests added) |
+| DevOps/Deploy | **82%** | Proxy embeddings working. No integration test exercises real embedding path |
+| Concurrency | **70%** | 7 tests pass. ~15% throughput flake. 2% fatal STDB error — root cause unknown, NOT "documented" |
+| **Weighted Overall** | **~90%** | Down from inflated 94%. Structural debt is real — god functions, concurrency bugs, flaky tests |
 
-### The Path to 95%+
+### The Path to 92%+ (Real)
 
-1. ~~Install mem0, zep_python, graphiti_core → run compare-upstream.py~~ ✅ **DONE** — 107/112 pass
-2. ~~Configure embedding auth in test harness~~ ✅ **DONE** (Jun 22) — health check routes to proxy when API key set
-3. ~~Concurrency tests → confidence under load~~ ✅ **DONE** — 7 tests, 302/302 pass
-
-**All actionable items complete.** Remaining cosmetic: clean `.env`, PyPI publish (deferred).
+1. **P0**: Refactor `client.py` god functions — split `search()` into `_run_strategies()`, `_fuse_scores()`, `_deduplicate()`, `_dispatch_reranker()`
+2. **P1**: Investigate STDB 2% fatal error root cause — is it WASM memory, scheduler race, or reducer bug?
+3. **P2**: Split `mem0.add()` (208L) and `graphiti.add_episode()` (147L) into sub-methods
+4. **P3**: Fix `test_throughput` 15% flake — tighter timeouts, better retry logic
+5. **P4**: Replace `user.rs:182,216` `break` with `.take(MAX_RESULTS)` + `find()`
+6. **P4**: Document all 10 silent `except ... pass` with comments explaining graceful degradation
