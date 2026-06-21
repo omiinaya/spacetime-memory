@@ -2802,6 +2802,115 @@ def _parse_sql_response(raw: str) -> list[dict[str, Any]]:
 # LLM Reranking (QMD parity)
 # ---------------------------------------------------------------------------
 
+def _parse_rerank_json(content: str) -> list[dict]:
+    """Parse LLM reranker JSON output with 6 fallback strategies.
+
+    LLMs frequently return malformed JSON — trailing commas, markdown fences,
+    wrapped objects, line-by-line output.  This tries progressively more
+    aggressive salvage strategies.
+
+    Raises ValueError if all 6 strategies fail.
+    """
+    scores: list[dict] = []
+    parse_ok = False
+    errors: list[str] = []
+
+    # Strategy 1: Direct parse
+    try:
+        scores = json.loads(content)
+        if isinstance(scores, list):
+            parse_ok = True
+    except json.JSONDecodeError as e:
+        errors.append(f"direct: {e}")
+
+    # Strategy 2: Find JSON array boundaries
+    if not parse_ok:
+        m = re.search(r'\[.*\]', content, re.DOTALL)
+        if m:
+            try:
+                scores = json.loads(m.group())
+                if isinstance(scores, list):
+                    parse_ok = True
+            except json.JSONDecodeError as e:
+                errors.append(f"array: {e}")
+
+    # Strategy 3: Strict=False, try to salvage partial
+    if not parse_ok:
+        try:
+            decoder = json.JSONDecoder()
+            scores, _ = decoder.raw_decode(content)
+            if isinstance(scores, dict):
+                scores = [scores]
+            if isinstance(scores, list):
+                parse_ok = True
+        except json.JSONDecodeError as e:
+            errors.append(f"strict_false: {e}")
+
+    # Strategy 4: Aggressive salvage — strip trailing commas, fix unquoted keys
+    if not parse_ok:
+        cleaned = content
+        cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)
+        m = re.search(r'\[.*\]', cleaned, re.DOTALL)
+        if m:
+            try:
+                scores = json.loads(m.group())
+                if isinstance(scores, dict):
+                    scores = [scores]
+                if isinstance(scores, list):
+                    parse_ok = True
+            except json.JSONDecodeError as e:
+                errors.append(f"salvage_array: {e}")
+
+        if not parse_ok:
+            m = re.search(r'\{.*?\}.*?\"score\"', cleaned, re.DOTALL)
+            if m:
+                try:
+                    obj = json.loads(m.group().rstrip('\"score\"').rstrip(','))
+                    if isinstance(obj, dict):
+                        scores = [obj]
+                        parse_ok = True
+                except json.JSONDecodeError:
+                    pass
+
+    # Strategy 5: Dict wrapper — LLM returned {"scores": [...]} or similar
+    if not parse_ok:
+        m = re.search(r'\{.*\}', content, re.DOTALL)
+        if m:
+            try:
+                obj = json.loads(m.group())
+                if isinstance(obj, dict):
+                    for key in ("scores", "results", "rankings", "items", "data"):
+                        if key in obj and isinstance(obj[key], list):
+                            scores = obj[key]
+                            parse_ok = True
+                            break
+                    if not parse_ok and "index" in obj:
+                        scores = [obj]
+                        parse_ok = True
+            except json.JSONDecodeError as e:
+                errors.append(f"dict_wrapper: {e}")
+
+    # Strategy 6: Line-by-line extraction — one JSON object per line
+    if not parse_ok and content.strip():
+        lines = [l.strip() for l in content.split("\n") if l.strip().startswith("{")]
+        if lines:
+            extracted = []
+            for line in lines:
+                try:
+                    obj = json.loads(line.rstrip(","))
+                    if isinstance(obj, dict) and "index" in obj:
+                        extracted.append(obj)
+                except json.JSONDecodeError:
+                    continue
+            if extracted:
+                scores = extracted
+                parse_ok = True
+
+    if not parse_ok:
+        raise ValueError(f"JSON parse failed after 6 strategies: {'; '.join(errors[-2:])}")
+    return scores
+
+
 _RERANK_PROMPT = """Score each search result for relevance to the query (1-10).
 
 10 — perfectly answers the query, exact match
@@ -2914,112 +3023,7 @@ def llm_rerank(
             content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
         # Robust JSON parsing — LLMs sometimes return malformed JSON
-        scores: list[dict] = []
-        parse_ok = False
-        errors = []
-
-        # Strategy 1: Direct parse
-        try:
-            scores = json.loads(content)
-            if isinstance(scores, list):
-                parse_ok = True
-        except json.JSONDecodeError as e:
-            errors.append(f"direct: {e}")
-
-        # Strategy 2: Find JSON array boundaries
-        if not parse_ok:
-            import re
-            m = re.search(r'\[.*\]', content, re.DOTALL)
-            if m:
-                try:
-                    scores = json.loads(m.group())
-                    if isinstance(scores, list):
-                        parse_ok = True
-                except json.JSONDecodeError as e:
-                    errors.append(f"array: {e}")
-
-        # Strategy 3: Strict=False, try to salvage partial
-        if not parse_ok:
-            try:
-                decoder = json.JSONDecoder()
-                scores, _ = decoder.raw_decode(content)
-                # Might be a single dict, wrap in list
-                if isinstance(scores, dict):
-                    scores = [scores]
-                if isinstance(scores, list):
-                    parse_ok = True
-            except json.JSONDecodeError as e:
-                errors.append(f"strict_false: {e}")
-
-        # Strategy 4: Aggressive salvage — strip trailing commas, fix unquoted keys
-        if not parse_ok:
-            import re as _re
-            cleaned = content
-            # Remove trailing commas before closing brackets/braces
-            cleaned = _re.sub(r',\s*([}\]])', r'\1', cleaned)
-            # Try to extract any JSON array
-            m = _re.search(r'\[.*\]', cleaned, _re.DOTALL)
-            if m:
-                try:
-                    scores = json.loads(m.group())
-                    if isinstance(scores, dict):
-                        scores = [scores]
-                    if isinstance(scores, list):
-                        parse_ok = True
-                except json.JSONDecodeError as e:
-                    errors.append(f"salvage_array: {e}")
-            
-            if not parse_ok:
-                # Last resort: try to find any JSON object and wrap it
-                m = _re.search(r'\{.*?\}.*?\"score\"', cleaned, _re.DOTALL)
-                if m:
-                    try:
-                        # Try parsing as a dict directly
-                        obj = json.loads(m.group().rstrip('\"score\"').rstrip(','))
-                        if isinstance(obj, dict):
-                            scores = [obj]
-                            parse_ok = True
-                    except json.JSONDecodeError:
-                        pass
-
-        # Strategy 5: Dict wrapper — LLM returned {"scores": [...]} or similar
-        if not parse_ok:
-            import re as _re2
-            m = _re2.search(r'\{.*\}', content, _re2.DOTALL)
-            if m:
-                try:
-                    obj = json.loads(m.group())
-                    if isinstance(obj, dict):
-                        for key in ("scores", "results", "rankings", "items", "data"):
-                            if key in obj and isinstance(obj[key], list):
-                                scores = obj[key]
-                                parse_ok = True
-                                break
-                        # Single-item dict with index/score/reason keys
-                        if not parse_ok and "index" in obj:
-                            scores = [obj]
-                            parse_ok = True
-                except json.JSONDecodeError as e:
-                    errors.append(f"dict_wrapper: {e}")
-
-        # Strategy 6: Line-by-line extraction — LLM returned one JSON object per line
-        if not parse_ok and content.strip():
-            lines = [l.strip() for l in content.split("\n") if l.strip().startswith("{")]
-            if lines:
-                extracted = []
-                for line in lines:
-                    try:
-                        obj = json.loads(line.rstrip(","))
-                        if isinstance(obj, dict) and "index" in obj:
-                            extracted.append(obj)
-                    except json.JSONDecodeError:
-                        continue
-                if extracted:
-                    scores = extracted
-                    parse_ok = True
-
-        if not parse_ok:
-            raise ValueError(f"JSON parse failed after 6 strategies: {'; '.join(errors[-2:])}")
+        scores = _parse_rerank_json(content)
 
         # Merge LLM scores back into original results
         score_map: dict[int, tuple[float, str]] = {}
