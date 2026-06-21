@@ -1807,7 +1807,7 @@ class Honcho:
             )
             completed = len(mems)
         except RuntimeError:
-            pass
+            pass  # STDB backend unavailable — completed defaults to 0, non-fatal
 
         return QueueStatusResponse(
             total_work_units=completed,

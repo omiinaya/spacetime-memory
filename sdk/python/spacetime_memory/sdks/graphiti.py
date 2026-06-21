@@ -98,7 +98,7 @@ class EntityNode:
             try:
                 attrs = json.loads(raw) if isinstance(raw, str) else raw
             except (json.JSONDecodeError, TypeError):
-                pass
+                pass  # corrupt attribute data — skip this entry gracefully
         labels_raw = row.get("labels", "")
         labels = json.loads(labels_raw) if isinstance(labels_raw, str) and labels_raw else []
         created = row.get("created_at", 0)
@@ -164,7 +164,7 @@ class EntityEdge:
             try:
                 attrs = json.loads(raw) if isinstance(raw, str) else raw
             except (json.JSONDecodeError, TypeError):
-                pass
+                pass  # corrupt attribute data — skip this entry gracefully
         created = row.get("created_at", 0)
         valid = row.get("valid_at", 0)
         invalid = row.get("invalid_at", 0)
@@ -523,7 +523,7 @@ class Graphiti:
         try:
             self._client.create_workspace(group_id)
         except RuntimeError:
-            pass
+            pass  # resource may already exist — non-fatal
 
         # Re-list to find the newly created workspace
         try:
@@ -652,7 +652,7 @@ class Graphiti:
                 metadata_json=json.dumps(node.attributes),
             )
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
         # Re-query to get the new node's UUID
         all_nodes = self._client._query(
             "kg_node", workspace_id=workspace_uuid, columns=["id", "label"]
@@ -1139,7 +1139,7 @@ class Graphiti:
                                 seen_edge_ids.add(eid)
                                 edges.append(EntityEdge.from_stmem(row))
             except RuntimeError:
-                pass
+                pass  # non-fatal — operation may fail under concurrent load or missing data
 
         # Apply time-range filter on valid_at (if provided)
         valid_at_after = kwargs.get("valid_at_after")
@@ -1228,7 +1228,7 @@ class Graphiti:
                         seen_node_ids.add(nid)
                         nodes.append(EntityNode.from_stmem(n))
             except RuntimeError:
-                pass
+                pass  # non-fatal — operation may fail under concurrent load or missing data
 
         # Apply time-range filter on edges (if provided)
         valid_at_after = kwargs.get("valid_at_after")
@@ -1311,11 +1311,11 @@ class Graphiti:
         try:
             self._client.detect_communities(ws_id)
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
         try:
             self._client.seed_communities(ws_id)
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
         community_nodes = self._client._query("kg_node", workspace_id=ws_id,
                                      filter_dict={"node_type": "community"})
@@ -1344,7 +1344,7 @@ class Graphiti:
                         group_id=gid,
                     ))
             except RuntimeError:
-                pass
+                pass  # non-fatal — operation may fail under concurrent load or missing data
             # Generate LLM name and summary if not already set
             if not community.summary or not community.name or community.name.startswith("community_"):
                 try:
@@ -1400,7 +1400,7 @@ class Graphiti:
                                 if llm_summary:
                                     community.summary = llm_summary
                             except (json.JSONDecodeError, TypeError):
-                                pass
+                                pass  # corrupt attribute data — skip this entry gracefully
 
                         # Fall back to summarize_community if summary still empty
                         if not community.summary:
@@ -1421,7 +1421,7 @@ class Graphiti:
                                      community.summary, "{}"],
                                 )
                             except RuntimeError:
-                                pass
+                                pass  # non-fatal — operation may fail under concurrent load or missing data
                 except RuntimeError as exc:
                     logger.warning("build_communities() failed to process community: %s", exc)
                     pass
@@ -1569,7 +1569,7 @@ class Graphiti:
                      })],
                 )
             except RuntimeError:
-                pass
+                pass  # non-fatal — operation may fail under concurrent load or missing data
 
         return saga
 
@@ -1594,7 +1594,7 @@ class Graphiti:
             try:
                 self._client.delete_memory(mem["id"])
             except RuntimeError:
-                pass
+                pass  # non-fatal — operation may fail under concurrent load or missing data
 
         return {"status": "ok", "episode_uuid": episode_uuid}
 
@@ -1829,7 +1829,7 @@ class EntityNodeNamespace:
         try:
             self._g._client._call("delete_node", [node.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> EntityNode:
         rows = self._g._client._query("kg_node", filter_dict={"id": uuid})
@@ -1883,7 +1883,7 @@ class EpisodeNodeNamespace:
         try:
             self._g._client._call("deactivate_memory", [node.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> EpisodicNode:
         rows = self._g._client._query("memory", filter_dict={"source_session_id": uuid})
@@ -1976,7 +1976,7 @@ class CommunityNodeNamespace:
         try:
             self._g._client._call("delete_node", [node.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> CommunityNode:
         rows = self._g._client._query("kg_node", filter_dict={"id": uuid})
@@ -2052,7 +2052,7 @@ class SagaNodeNamespace:
         try:
             self._g._client._call("delete_node", [node.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> SagaNode:
         rows = self._g._client._query("kg_node", filter_dict={"id": uuid})
@@ -2142,7 +2142,7 @@ class EntityEdgeNamespace:
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> EntityEdge:
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
@@ -2227,7 +2227,7 @@ class EpisodicEdgeNamespace:
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> EpisodicEdge:
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
@@ -2299,7 +2299,7 @@ class CommunityEdgeNamespace:
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> CommunityEdge:
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
@@ -2371,7 +2371,7 @@ class HasEpisodeEdgeNamespace:
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> HasEpisodeEdge:
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
@@ -2443,7 +2443,7 @@ class NextEpisodeEdgeNamespace:
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
-            pass
+            pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> NextEpisodeEdge:
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
