@@ -2850,6 +2850,70 @@ class TestParseRerankJsonDeep:
 
 
 # =====================================================================
+# _parse_rerank_json final uncovered branches (strategy 4 error, 5 wrapper, 6 skip)
+# =====================================================================
+
+
+@pytest.mark.unit
+class TestParseRerankJsonFinal:
+    """Cover the last remaining _parse_rerank_json branches:
+    strategy 4 salvage error (2861-2862),
+    strategy 5 dict wrapper with rankings/items/data keys (2884-2886),
+    strategy 6 malformed line skip (2903-2904)."""
+
+    def _get_fn(self):
+        from spacetime_memory.client import _parse_rerank_json
+        return _parse_rerank_json
+
+    def test_strategy4_error_and_strategy5_rankings_wrapper(self):
+        """Strategy 4: invalid array → error append (line 2861-2862).
+        Strategy 5: dict with 'rankings' key containing a list (lines 2884-2886).
+
+        Content uses an invalid array [bad ...] that defeats strategies 1-4,
+        then a valid dict wrapper with 'rankings' that strategy 5 finds.
+        """
+        fn = self._get_fn()
+        content = '[bad and {"rankings": [{"index": 0, "score": 5}]}]'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 0
+
+    def test_strategy5_items_wrapper(self):
+        """Strategy 5: dict with 'items' key containing a list (line 2884)."""
+        fn = self._get_fn()
+        content = '[bad and {"items": [{"index": 1, "score": 4}]}]'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 1
+
+    def test_strategy5_data_wrapper(self):
+        """Strategy 5: dict with 'data' key containing a list (line 2884)."""
+        fn = self._get_fn()
+        content = '[bad and {"data": [{"index": 2, "score": 3}]}]'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 2
+
+    def test_strategy6_skip_malformed_line(self):
+        """Strategy 6: line-by-line extraction skips malformed lines (lines 2895-2904).
+
+        Strategies 1-5 must fail. Strategy 6 parses lines starting with {,
+        skipping those that are invalid JSON (line 2903).
+        No 'score' keyword anywhere after dicts to defeat strategy 4 dict fallback.
+        """
+        fn = self._get_fn()
+        content = (
+            'unparseable start\n'
+            '{"index": 10, "value": 5.0}\n'
+            '{not valid json at all}\n'
+            '{"index": 11, "rank": 4.0}'
+        )
+        result = fn(content)
+        indices = {r["index"] for r in result}
+        assert indices == {10, 11}
+
+
+# =====================================================================
 # llm_rerank remaining branches (rate-limit exhaustion, markdown fence,
 # unranked penalty)
 # =====================================================================
@@ -5331,3 +5395,73 @@ class TestQueryCacheInvalidation:
         result = c.get_user_memories("user1", "ws")
         assert len(result) == 1
         assert result[0]["content"] == "test"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Tantivy result conversion + health check OPENAI path (lines 1236, 1295-1303)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestTantivyAndHealthCheck:
+    """Cover Tantivy keyword result conversion, embedder health check OPENAI path,
+    and binary vector cache similarity."""
+
+    def test_tantivy_and_binary_cache(self, monkeypatch):
+        """Tantivy search + binary cache similarity (lines 1236, 1295-1303, 1328-1337)."""
+        from unittest.mock import Mock
+        from spacetime_memory.binary_vectors import binarize
+        monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost:4000/v1")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
+        c = Client(host="localhost", port=3001)
+        emb = [0.1] * 1024
+        c._embed = Mock(return_value=emb)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[
+            {"entity_id": "e1", "entity_type": "memory", "content": "semantic hit",
+             "score": 0.9, "strategy": "semantic", "workspace_id": "ws",
+             "summary": "s", "confidence": 1.0, "created_at": 100},
+        ])
+        c._tantivy_search = Mock(return_value=[
+            {"entity_id": "e2", "entity_type": "memory", "content": "keyword hit",
+             "score": 1.5}
+        ])
+        # Populate binary cache with same embedding → similarity = 1.0
+        c._binary_cache = {"e3": binarize(emb)}
+        mock_http = Mock()
+        mock_http.get.return_value = Mock(status_code=200)
+        mock_http.post.return_value = Mock(status_code=200)
+        c._http = mock_http
+        c._emit_event = Mock()
+        result = c.search("ws", "test", semantic=True)
+        c._tantivy_search.assert_called_once()
+        assert isinstance(result, list)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Restore manifest edge cases (lines 2710, 2719, 2733-2734)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestRestoreManifest:
+    """Cover restore() edge cases: empty first row, NULL values, RuntimeError skip."""
+
+    def test_restore_empty_and_null_handling(self, tmp_path):
+        """Cover lines 2710 (falsy rows[0]) and 2719 (NULL value append)."""
+        from unittest.mock import Mock
+        import json
+        manifest = {
+            "tables": {
+                "empty_table": [],              # hits line 2708
+                "none_first": [None, {"col": "x"}],  # hits line 2710
+                "valid_table": [{"col1": "val1", "col2": None}],  # hits line 2719
+            }
+        }
+        backup_path = tmp_path / "backup.json"
+        backup_path.write_text(json.dumps(manifest))
+
+        c = Client(host="localhost", port=3001)
+        c._http = Mock()
+        c._http.post.return_value = Mock(status_code=200, text="[]")
+        result = c.restore(str(backup_path))
+        assert result["status"] == "ok"
+        assert "valid_table" in result["tables"]
