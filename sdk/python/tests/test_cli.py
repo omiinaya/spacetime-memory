@@ -1004,13 +1004,37 @@ class TestCliMoreGroups:
     """Help checks for remaining command groups (exercises Click wiring)."""
 
     MORE_GROUPS = [
-        "mental", "replication",
+        "mental", "replication", "org", "metrics",
     ]
 
     def test_more_group_helps(self, runner):
         for group in self.MORE_GROUPS:
             result = runner.invoke(cli, [group, "--help"])
             assert result.exit_code == 0, f"Failed: {group} --help"
+
+
+class TestCliOrg:
+    """Org sync commands."""
+
+    def test_org_sync_no_script(self, mocked_cli_runner, monkeypatch):
+        runner, mock_client = mocked_cli_runner
+        monkeypatch.setattr("os.path.exists", lambda p: False)
+        result = runner.invoke(cli, ["org", "sync", "ws1"])
+        assert "not found" in result.output.replace("\n", " ") or result.exit_code == 1
+
+
+class TestCliMetrics:
+    """Metrics commands."""
+
+    def test_metrics_show(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, ["metrics", "show"])
+        assert result.exit_code == 0
+
+    def test_metrics_show_json(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, ["metrics", "show", "--json"])
+        assert result.exit_code == 0
 
 
 class TestCliDiagnostics:
