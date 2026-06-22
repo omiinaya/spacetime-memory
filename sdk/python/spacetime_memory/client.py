@@ -1956,7 +1956,7 @@ class Client:
                 meta_str = r.get("metadata_json", "{}")
                 try:
                     meta = json.loads(meta_str) if isinstance(meta_str, str) else meta_str
-                except RuntimeError:
+                except Exception:
                     meta = {}
                 matches = all(meta.get(k) == v for k, v in mf.items())
                 if matches:
@@ -2730,7 +2730,7 @@ class Client:
                         pass  # may be a duplicate or schema mismatch
                 restored.append(table)
                 total_restored += len(rows)
-            except RuntimeError:
+            except Exception:
                 continue
 
         return {
@@ -2854,18 +2854,17 @@ def _parse_rerank_json(content: str) -> list[dict]:
         if m:
             try:
                 scores = json.loads(m.group())
-                if isinstance(scores, dict):
-                    scores = [scores]
                 if isinstance(scores, list):
                     parse_ok = True
             except json.JSONDecodeError as e:
                 errors.append(f"salvage_array: {e}")
 
         if not parse_ok:
-            m = re.search(r'\{.*?\}.*?\"score\"', cleaned, re.DOTALL)
+            # Look for a JSON object containing a "score" key
+            m = re.search(r'\{[^}]*"score"[^}]*\}', cleaned, re.DOTALL)
             if m:
                 try:
-                    obj = json.loads(m.group().rstrip('\"score\"').rstrip(','))
+                    obj = json.loads(m.group())
                     if isinstance(obj, dict):
                         scores = [obj]
                         parse_ok = True

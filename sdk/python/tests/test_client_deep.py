@@ -1606,10 +1606,13 @@ class TestParseRerankJson:
         fn = self._get_fn()
         # Prefix with non-JSON text so raw_decode (strategy 3) fails,
         # and strategy 6's line-by-line extraction kicks in.
+        # NOTE: lines with "score" are now caught by strategy 4's improved
+        # dict-with-score regex. This content has no "score" key to
+        # ensure strategy 6 is reached.
         content = (
             'Here are results:\n'
-            '{"index": 5, "score": 4.2, "reason": "low"}\n'
-            '{"index": 6, "score": 3.0, "reason": "lower"}'
+            '{"index": 5, "value": 4.2, "reason": "low"}\n'
+            '{"index": 6, "value": 3.0, "reason": "lower"}'
         )
         result = fn(content)
         assert len(result) == 2
@@ -2796,9 +2799,10 @@ class TestParseRerankJsonDeep:
 
     def test_strategy5_dict_index_key(self):
         """Strategy 5: dict with 'index' key but no scores/results wrapper
-        (lines 2887-2889)."""
+        (lines 2887-2889). Needs a non-JSON prefix to defeat strategy 3 (raw_decode),
+        and no 'score' key to defeat strategy 4's dict-with-score regex."""
         fn = self._get_fn()
-        content = '{"index": 12, "score": 7.5, "reason": "standalone"}'
+        content = 'prefix {"index": 12, "value": 7.5} trailing'
         result = fn(content)
         assert len(result) == 1
         assert result[0]["index"] == 12
@@ -2911,6 +2915,18 @@ class TestParseRerankJsonFinal:
         result = fn(content)
         indices = {r["index"] for r in result}
         assert indices == {10, 11}
+
+    def test_strategy4_dict_with_score_fallback(self):
+        """Strategy 4 dict fallback: regex matches a JSON object containing 'score'
+        (lines 2864-2871). Requires strategies 1-3 to fail and strategy 4 array
+        salvage to also fail, so the dict-with-score path triggers.
+        """
+        fn = self._get_fn()
+        # [invalid] fails array parse; {"index": 99, "score": 5.0} is matched by the dict-with-score regex
+        content = '[invalid] and {"index": 99, "score": 5.0} trailing'
+        result = fn(content)
+        assert len(result) == 1
+        assert result[0]["index"] == 99
 
 
 # =====================================================================
@@ -4816,17 +4832,18 @@ class TestSearchWithFiltersUnit:
         assert result[0]["content"] == "hello world"
 
     def test_metadata_filter_invalid_json(self):
-        """Metadata filter: invalid metadata_json raises json.JSONDecodeError (not RuntimeError — line 1959 is dead code)."""
-        # The code only catches RuntimeError, but json.loads raises JSONDecodeError.
-        # This test documents that this is currently dead code.
+        """Metadata filter: invalid metadata_json gracefully falls back to {} (line 1959-1960)."""
         from unittest.mock import Mock
+        import json as _json
         c = Client(host="localhost", port=3001)
         c.search = Mock(return_value=[
             {"content": "hello world", "metadata_json": "not json"},
+            {"content": "other", "metadata_json": '{"key": "val"}'},
         ])
-        # json.JSONDecodeError is NOT caught → propagates
-        with pytest.raises(json.JSONDecodeError if hasattr(json, 'JSONDecodeError') else ValueError):
-            c.search_with_filters("ws", query="test", metadata_filter='{"key": "val"}')
+        result = c.search_with_filters("ws", query="test", metadata_filter='{"key": "val"}')
+        # "not json" row has empty metadata → won't match {"key":"val"}
+        assert len(result) == 1
+        assert result[0]["content"] == "other"
 
     def test_metadata_filter_dict_input(self):
         """Metadata filter: dict input (not string) works directly (line 1953)."""
@@ -5446,7 +5463,8 @@ class TestRestoreManifest:
     """Cover restore() edge cases: empty first row, NULL values, RuntimeError skip."""
 
     def test_restore_empty_and_null_handling(self, tmp_path):
-        """Cover lines 2710 (falsy rows[0]) and 2719 (NULL value append)."""
+        """Cover lines 2710 (falsy rows[0]), 2719 (NULL value append),
+        and 2733-2734 (outer except Exception skip)."""
         from unittest.mock import Mock
         import json
         manifest = {
@@ -5454,6 +5472,7 @@ class TestRestoreManifest:
                 "empty_table": [],              # hits line 2708
                 "none_first": [None, {"col": "x"}],  # hits line 2710
                 "valid_table": [{"col1": "val1", "col2": None}],  # hits line 2719
+                "bad_table": [{"col": "v"}, "not a dict"],  # 2nd row has no .keys() → AttributeError → hits 2733
             }
         }
         backup_path = tmp_path / "backup.json"
