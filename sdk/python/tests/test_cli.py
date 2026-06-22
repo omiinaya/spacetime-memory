@@ -939,6 +939,55 @@ class TestCliReplication:
         result = runner.invoke(cli, ["replication", "peers"])
         assert result.exit_code == 0
 
+    def test_replication_add_peer(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "replication", "add-peer", "http://remote:3001",
+            "--workspace-id", "ws1", "--name", "remote1",
+        ])
+        assert result.exit_code == 0
+        assert "registered" in result.output.lower()
+
+    def test_replication_remove(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, ["replication", "remove", "peer-1"])
+        assert result.exit_code == 0
+        assert "removed" in result.output.lower()
+
+    def test_replication_status(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client._http.post.return_value = Mock(
+            status_code=200,
+            text=make_sql_response([{"json_data": '{"synced": true}'}]),
+        )
+        result = runner.invoke(cli, ["replication", "status", "--workspace-id", "ws1"])
+        assert result.exit_code == 0
+
+
+class TestCliMental:
+    """Mental model commands."""
+
+    def test_mental_list(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client._http.post.return_value = Mock(
+            status_code=200, text=json.dumps([]),
+        )
+        result = runner.invoke(cli, ["mental", "list"])
+        assert result.exit_code == 0
+
+
+class TestCliMoreGroups:
+    """Help checks for remaining command groups (exercises Click wiring)."""
+
+    MORE_GROUPS = [
+        "mental", "replication",
+    ]
+
+    def test_more_group_helps(self, runner):
+        for group in self.MORE_GROUPS:
+            result = runner.invoke(cli, [group, "--help"])
+            assert result.exit_code == 0, f"Failed: {group} --help"
+
 
 class TestCliDiagnostics:
     """Diagnostics command."""
