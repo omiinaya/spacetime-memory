@@ -1050,3 +1050,46 @@ class TestCliDiagnostics:
         runner, mock_client = mocked_cli_runner
         result = runner.invoke(cli, ["diagnostics", "--json"])
         assert result.exit_code == 0
+
+
+# ── CLI ─────────────────────────────────────────────────────────────
+# veracity / aaak — pure computation, no SDK needed
+# ──────────────────────────────────────────────────────────────────────
+
+
+class TestCliVeracity:
+    """Veracity tier commands — pure computation."""
+
+    def test_veracity_compound(self, runner):
+        result = runner.invoke(cli, ["veracity", "compound", "--tier", "stated", "--sources", "3"])
+        assert result.exit_code == 0
+
+    def test_veracity_calc(self, runner):
+        result = runner.invoke(cli, ["veracity", "calc", "--tier", "inferred", "--sources", "5"])
+        assert result.exit_code == 0
+
+    def test_veracity_list(self, runner):
+        result = runner.invoke(cli, ["veracity", "list"])
+        assert result.exit_code == 0
+
+
+class TestCliAaak:
+    """AAAK compression commands — pure computation."""
+
+    def test_aaak_compress(self, runner):
+        result = runner.invoke(cli, [
+            "aaak", "compress", "PREFERENCE: User asked for dark mode",
+        ])
+        assert result.exit_code == 0
+
+    def test_aaak_decompress(self, runner):
+        result = runner.invoke(cli, [
+            "aaak", "decompress", "PREF: User asked for dark mode",
+        ])
+        assert result.exit_code == 0
+
+    def test_aaak_ratio(self, runner):
+        result = runner.invoke(cli, [
+            "aaak", "ratio", "PREFERENCE: User asked for dark mode",
+        ])
+        assert result.exit_code == 0
