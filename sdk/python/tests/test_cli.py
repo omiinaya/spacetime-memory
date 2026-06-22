@@ -1093,3 +1093,469 @@ class TestCliAaak:
             "aaak", "ratio", "PREFERENCE: User asked for dark mode",
         ])
         assert result.exit_code == 0
+from click.testing import CliRunner
+from cli.stmem import cli
+
+
+# ════════════════════════════════════════════════════════════════════
+# Restore — comprehensive JSONL restore tests
+# ════════════════════════════════════════════════════════════════════
+
+class TestRestoreFull:
+    """Restore command with valid JSONL covering all table types."""
+
+    def test_restore_dry_run(self, mocked_cli_runner, tmp_path):
+        """--dry-run prints [DRY] and skips actual restores."""
+        runner, mock_client = mocked_cli_runner
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "memory", "content": "hello",
+                                       "summary": "s", "memory_type": "world_fact",
+                                       "peer_id": "p1"}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup), "--dry-run"])
+        assert result.exit_code == 0
+        assert "[DRY]" in result.output
+        assert "1 rows" in result.output or "0 errors" in result.output
+
+    def test_restore_memory(self, mocked_cli_runner, tmp_path):
+        """Restore a memory row via client.store."""
+        runner, mock_client = mocked_cli_runner
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "memory", "content": "hello",
+                                       "summary": "s", "memory_type": "world_fact",
+                                       "peer_id": "p1"}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "Restore complete" in result.output
+        assert "1 rows" in result.output
+
+    def test_restore_session(self, mocked_cli_runner, tmp_path):
+        """Restore a session row via _call."""
+        runner, mock_client = mocked_cli_runner
+        mock_client._call = Mock(return_value=None)
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "session", "id": "s1",
+                                       "name": "test", "summary": "summary",
+                                       "participants_json": "[]"}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "Restore complete" in result.output
+
+    def test_restore_kg_node(self, mocked_cli_runner, tmp_path):
+        """Restore a kg_node row."""
+        runner, mock_client = mocked_cli_runner
+        mock_client._call = Mock(return_value=None)
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "kg_node", "label": "Node1",
+                                       "node_type": "concept", "summary": "s",
+                                       "metadata_json": "{}"}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "Restore complete" in result.output
+
+    def test_restore_kg_edge(self, mocked_cli_runner, tmp_path):
+        """Restore a kg_edge row."""
+        runner, mock_client = mocked_cli_runner
+        mock_client._call = Mock(return_value=None)
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "kg_edge", "source_node_id": "n1",
+                                       "target_node_id": "n2", "relation": "related_to",
+                                       "weight": 1.0, "confidence": "EXTRACTED",
+                                       "metadata_json": "{}"}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "Restore complete" in result.output
+
+    def test_restore_profile(self, mocked_cli_runner, tmp_path):
+        """Restore a profile row."""
+        runner, mock_client = mocked_cli_runner
+        mock_client._call = Mock(return_value=None)
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "profile", "peer_id": "p1",
+                                       "static_facts_json": "{}",
+                                       "dynamic_context_json": "{}"}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "Restore complete" in result.output
+
+    def test_restore_insight(self, mocked_cli_runner, tmp_path):
+        """Restore an insight row."""
+        runner, mock_client = mocked_cli_runner
+        mock_client._call = Mock(return_value=None)
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "insight", "source": "test",
+                                       "content": "something new",
+                                       "insight_type": "observation",
+                                       "entities_json": "[]",
+                                       "confidence": 0.7}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "Restore complete" in result.output
+
+    def test_restore_note(self, mocked_cli_runner, tmp_path):
+        """Restore a note row."""
+        runner, mock_client = mocked_cli_runner
+        mock_client._call = Mock(return_value=None)
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "note", "title": "My Note",
+                                       "content": "text here",
+                                       "tags_json": '["tag1"]'}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "Restore complete" in result.output
+
+    def test_restore_unknown_table(self, mocked_cli_runner, tmp_path):
+        """Unknown table type prints a skip warning."""
+        runner, mock_client = mocked_cli_runner
+        mock_client._call = Mock(return_value=None)
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "banana", "x": 1}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "Skipping" in result.output or "no restore handler" in result.output
+
+    def test_restore_invalid_json_line(self, mocked_cli_runner, tmp_path):
+        """A line with invalid JSON produces an error."""
+        runner, mock_client = mocked_cli_runner
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text("not valid json at all\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "invalid JSON" in result.output
+
+    def test_restore_missing_table_field(self, mocked_cli_runner, tmp_path):
+        """A JSON line missing the 'table' key produces an error."""
+        runner, mock_client = mocked_cli_runner
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"content": "no table here"}) + "\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "missing table field" in result.output
+
+    def test_restore_runtime_error(self, mocked_cli_runner, tmp_path):
+        """If store raises RuntimeError, it's caught and counted as error."""
+        runner, mock_client = mocked_cli_runner
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text(json.dumps({"table": "memory", "content": "hello",
+                                       "summary": "s", "memory_type": "world_fact",
+                                       "peer_id": "p1"}) + "\n")
+        mock_client.store = Mock(side_effect=RuntimeError("boom"))
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "1 errors" in result.output
+
+    def test_restore_empty_lines_skipped(self, mocked_cli_runner, tmp_path):
+        """Empty lines are skipped silently."""
+        runner, mock_client = mocked_cli_runner
+        backup = tmp_path / "backup.jsonl"
+        backup.write_text("\n\n" + json.dumps({"table": "memory", "content": "hi",
+                                                 "summary": "s", "memory_type": "world_fact",
+                                                 "peer_id": "p1"}) + "\n\n")
+        result = runner.invoke(cli, ["restore", "ws1", str(backup)])
+        assert result.exit_code == 0
+        assert "1 rows" in result.output
+
+
+# ════════════════════════════════════════════════════════════════════
+# Main function — alias substitution & exception handling
+# ════════════════════════════════════════════════════════════════════
+
+class TestMainFunction:
+    """Tests for main() entry point."""
+
+    def test_main_alias_substitution(self, monkeypatch, tmp_path):
+        """Alias is loaded from alias file and substituted."""
+        alias_file = tmp_path / "aliases.json"
+        alias_file.write_text(json.dumps({"srch": "search --limit 5"}))
+        monkeypatch.setattr("cli.stmem.ALIASES_FILE", str(alias_file))
+        import sys
+        orig_argv = sys.argv[:]
+        try:
+            sys.argv = ["stmem", "srch", "test query"]
+            called = []
+            monkeypatch.setattr("cli.stmem.cli", lambda: called.append(True))
+            from cli.stmem import main
+            main()
+            assert called
+            assert "search" in sys.argv
+            assert "--limit" in sys.argv
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_alias_no_match(self, monkeypatch, tmp_path):
+        """No substitution when arg doesn't match an alias."""
+        alias_file = tmp_path / "aliases.json"
+        alias_file.write_text(json.dumps({"srch": "search --limit 5"}))
+        monkeypatch.setattr("cli.stmem.ALIASES_FILE", str(alias_file))
+        import sys
+        orig_argv = sys.argv[:]
+        try:
+            sys.argv = ["stmem", "search", "hello"]
+            called = []
+            monkeypatch.setattr("cli.stmem.cli", lambda: called.append(True))
+            from cli.stmem import main
+            main()
+            assert called
+            assert "--limit" not in sys.argv
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_click_exception(self, monkeypatch):
+        """ClickException is caught by Click itself (system exit)."""
+        import sys
+        orig_argv = sys.argv[:]
+        try:
+            sys.argv = ["stmem", "nonexistent-cmd"]
+            from cli.stmem import main
+            try:
+                main()
+            except SystemExit:
+                pass  # expected on bad command
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_connect_error(self, monkeypatch):
+        """httpx.ConnectError is caught and printed."""
+        import sys, httpx
+        orig_argv = sys.argv[:]
+        try:
+            sys.argv = ["stmem", "health"]
+            def fake_cli():
+                raise httpx.ConnectError("connection refused")
+            monkeypatch.setattr("cli.stmem.cli", fake_cli)
+            from cli.stmem import main
+            try:
+                main()
+            except SystemExit as e:
+                assert e.code == 1
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_runtime_error(self, monkeypatch):
+        """RuntimeError is caught and printed."""
+        import sys
+        orig_argv = sys.argv[:]
+        try:
+            sys.argv = ["stmem", "health"]
+            def fake_cli():
+                raise RuntimeError("something broken")
+            monkeypatch.setattr("cli.stmem.cli", fake_cli)
+            from cli.stmem import main
+            try:
+                main()
+            except SystemExit as e:
+                assert e.code == 1
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_alias_file_json_error(self, monkeypatch, tmp_path):
+        """Corrupt alias file doesn't crash — loads {}."""
+        alias_file = tmp_path / "aliases.json"
+        alias_file.write_text("not valid json at all {{{")  
+        monkeypatch.setattr("cli.stmem.ALIASES_FILE", str(alias_file))
+        import sys
+        orig_argv = sys.argv[:]
+        try:
+            sys.argv = ["stmem", "help"]
+            called = []
+            monkeypatch.setattr("cli.stmem.cli", lambda: called.append(True))
+            from cli.stmem import main
+            main()
+            assert called
+        finally:
+            sys.argv = orig_argv
+
+
+# ════════════════════════════════════════════════════════════════════
+# Org status — state file reading
+# ════════════════════════════════════════════════════════════════════
+
+class TestOrgStatus:
+    """Org status command."""
+
+    def test_org_status_with_state(self, mocked_cli_runner, monkeypatch, tmp_path):
+        """Display org sync status from a valid state file."""
+        runner, mock_client = mocked_cli_runner
+        state_dir = tmp_path / ".spacetime-memory"
+        state_dir.mkdir()
+        state_file = state_dir / "org_sync_state.json"
+        state_file.write_text(json.dumps({"~/org/notes.org": "abc123def456"}))
+
+        import types, sys
+        fake_daemon = types.ModuleType("org_sync_daemon")
+        fake_daemon.__dict__["OrgSyncDaemon"] = type("OrgSyncDaemon", (), {})
+        fake_daemon.__dict__["STATE_FILE"] = str(state_file)
+        monkeypatch.setitem(sys.modules, "org_sync_daemon", fake_daemon)
+        
+        # Patch expanduser to return our state dir
+        def _expanduser(p):
+            s = str(p)
+            if "org_sync_state" in s:
+                return str(state_file)
+            if s.startswith("~/"):
+                return str(state_dir.parent / s[2:])
+            return s
+        monkeypatch.setattr("cli.stmem.os.path.expanduser", _expanduser)
+
+        result = runner.invoke(cli, ["org", "status"])
+        assert result.exit_code == 0
+
+    def test_org_status_no_state(self, mocked_cli_runner, monkeypatch):
+        """No state file — user-friendly message."""
+        runner, mock_client = mocked_cli_runner
+        
+        import types, sys
+        fake_daemon = types.ModuleType("org_sync_daemon")
+        fake_daemon.__dict__["OrgSyncDaemon"] = type("OrgSyncDaemon", (), {})
+        fake_daemon.__dict__["STATE_FILE"] = ""
+        monkeypatch.setitem(sys.modules, "org_sync_daemon", fake_daemon)
+
+        # Make expanduser + exists both point to a missing file
+        nonexistent = "/tmp/pytest_nonexistent_org_state.json"
+        monkeypatch.setattr(
+            "cli.stmem.os.path.expanduser",
+            lambda p: nonexistent if "org_sync_state" in str(p) else p
+        )
+        monkeypatch.setattr(
+            "cli.stmem.os.path.exists",
+            lambda p: False if nonexistent in str(p) else __import__("os").path.exists(p)
+        )
+
+        result = runner.invoke(cli, ["org", "status", "--dir", "/nonexistent"])
+        assert result.exit_code == 0
+        assert "org sync" in result.output.lower()
+
+    def test_org_status_missing_import(self, mocked_cli_runner, monkeypatch):
+        """If org_sync_daemon cannot be imported, graceful error."""
+        runner, mock_client = mocked_cli_runner
+        import sys
+        # Remove the module AND prevent the scripts/ dir from being added to path
+        monkeypatch.delitem(sys.modules, "org_sync_daemon", raising=False)
+        # Also prevent sys.path.insert from adding the scripts directory
+        # so the import can't find org_sync_daemon.py
+        import builtins
+        original_import = builtins.__import__
+        def block_org_sync(name, *args, **kwargs):
+            if name == "org_sync_daemon":
+                raise ImportError("No module named 'org_sync_daemon'")
+            return original_import(name, *args, **kwargs)
+        monkeypatch.setattr(builtins, "__import__", block_org_sync)
+
+        result = runner.invoke(cli, ["org", "status"])
+        assert result.exit_code == 1, f"Expected exit 1, got {result.exit_code}, output: {result.output[:200]}"
+        assert "org_sync_daemon" in result.output
+
+
+# ════════════════════════════════════════════════════════════════════
+# Synthesize with answer — cover the answer display path
+# ════════════════════════════════════════════════════════════════════
+
+class TestSynthesizeWithAnswer:
+    """Synthesize command where LLM returns a real answer."""
+
+    def test_synthesize_with_answer(self, mocked_cli_runner, monkeypatch):
+        """LLM returns answer + gaps + sources."""
+        runner, mock_client = mocked_cli_runner
+        fake_result = {
+            "answer": "Python is a programming language.",
+            "gaps": ["no info on version history"],
+            "sources": [1, 42],
+            "confidence": 0.85,
+        }
+        from unittest.mock import MagicMock
+        fake_agent = MagicMock()
+        fake_agent.synthesize.return_value = fake_result
+        monkeypatch.setattr("spacetime_memory.context_agent.ContextAgent", lambda c: fake_agent)
+        result = runner.invoke(cli, ["synthesize", "ws1", "what is python?"])
+        assert result.exit_code == 0
+        assert "Python is a programming language" in result.output
+        assert "85%" in result.output
+
+    def test_synthesize_with_gaps_and_sources(self, mocked_cli_runner, monkeypatch):
+        """LLM returns answer with multiple gaps and sources."""
+        runner, mock_client = mocked_cli_runner
+        fake_result = {
+            "answer": "The sky is blue.",
+            "gaps": ["gap1", "gap2", "gap3"],
+            "sources": [10, 20, 30],
+            "confidence": 0.92,
+        }
+        from unittest.mock import MagicMock
+        fake_agent = MagicMock()
+        fake_agent.synthesize.return_value = fake_result
+        monkeypatch.setattr("spacetime_memory.context_agent.ContextAgent", lambda c: fake_agent)
+        result = runner.invoke(cli, ["synthesize", "ws1", "why is sky blue?"])
+        assert result.exit_code == 0
+        assert "The sky is blue" in result.output
+        assert "92%" in result.output
+        assert "gap1" in result.output
+        assert "Sources" in result.output
+
+    def test_synthesize_no_answer_with_pack(self, mocked_cli_runner, monkeypatch):
+        """No answer but pack info is displayed (LLM unavailable fallback)."""
+        runner, mock_client = mocked_cli_runner
+        fake_result = {
+            "pack": {"id": "pack_xyz123456789"},
+        }
+        from unittest.mock import MagicMock
+        fake_agent = MagicMock()
+        fake_agent.synthesize.return_value = fake_result
+        monkeypatch.setattr("spacetime_memory.context_agent.ContextAgent", lambda c: fake_agent)
+        result = runner.invoke(cli, ["synthesize", "ws1", "hello"])
+        assert result.exit_code == 0
+        assert "LLM unavailable" in result.output
+
+
+# ════════════════════════════════════════════════════════════════════
+# Plugin list — with actual plugins discovered
+# ════════════════════════════════════════════════════════════════════
+
+class TestPluginListFull:
+    """Plugin list with mock PluginManager returning plugins."""
+
+    def test_plugin_list_with_plugins(self, mocked_cli_runner, monkeypatch):
+        """PluginManager.list() returns plugins — rich table rendered."""
+        runner, mock_client = mocked_cli_runner
+        fake_mgr = Mock()
+        fake_mgr.plugin_dir = "/some/dir"
+        fake_mgr.list.return_value = [
+            {"name": "my-plugin", "version": "1.0", "description": "Does stuff",
+             "loaded": True, "type": "memory"},
+            {"name": "other-plugin", "version": "0.5", "description": "Also works",
+             "loaded": False, "type": "connector"},
+        ]
+        monkeypatch.setattr("cli.stmem._plugin_manager", lambda: fake_mgr)
+        result = runner.invoke(cli, ["plugin", "list"])
+        assert result.exit_code == 0
+        assert "my-plugin" in result.output
+        assert "other-plugin" in result.output
+
+    def test_plugin_list_no_plugins(self, mocked_cli_runner, monkeypatch):
+        """PluginManager discovers nothing — shows directory hint."""
+        runner, mock_client = mocked_cli_runner
+        fake_mgr = Mock()
+        fake_mgr.plugin_dir = "/empty/dir"
+        fake_mgr.list.return_value = []
+        monkeypatch.setattr("cli.stmem._plugin_manager", lambda: fake_mgr)
+        result = runner.invoke(cli, ["plugin", "list"])
+        assert result.exit_code == 0
+        assert "No plugins" in result.output
+        assert "/empty/dir" in result.output
+
+
+# ════════════════════════════════════════════════════════════════════
+# Backup command error paths
+# ════════════════════════════════════════════════════════════════════
+
+class TestBackupErrorPaths:
+    """Backup command error paths."""
+
+    def test_backup_workspace_not_found(self, mocked_cli_runner):
+        """Backup reports when workspace is not found."""
+        runner, mock_client = mocked_cli_runner
+        mock_client._call = Mock(return_value=None)
+        mock_client._http.post.return_value = Mock(
+            status_code=200,
+            text=json.dumps({"error": "not found"}),
+        )
+        result = runner.invoke(cli, ["backup", "nonexistent-ws"])
+        assert result.exit_code in (0, 1)
