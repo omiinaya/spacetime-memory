@@ -1760,3 +1760,98 @@ class TestMemoryUpdateBranches:
             "memory", "batch-update", "ws1", "--tier", "L0",
         ])
         assert result.exit_code in (0, 1, 2)
+
+
+# ════════════════════════════════════════════════════════════════════
+# Batch-update branch coverage — confidence, tier, is-active, no-updates
+# ════════════════════════════════════════════════════════════════════
+
+class TestBatchUpdateBranches:
+    """Batch update command additional branch coverage."""
+
+    def test_batch_update_confidence(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "batch-update", "ws1", "m1",
+            "--confidence", "0.85",
+        ])
+        assert result.exit_code == 0
+
+    def test_batch_update_is_active(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "batch-update", "ws1", "m1",
+            "--is-active", "true",
+        ])
+        assert result.exit_code == 0
+
+    def test_batch_update_no_updates_specified(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "batch-update", "ws1", "m1,m2",
+        ])
+        assert result.exit_code == 0
+        assert "No updates" in result.output
+
+
+# ════════════════════════════════════════════════════════════════════
+# Decay run — weibull model branch
+# ════════════════════════════════════════════════════════════════════
+
+class TestDecayRunBranches:
+    """Decay run command branch coverage."""
+
+    def test_decay_run_weibull(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client.get_decay_config = Mock(return_value={
+            "decay_model": "weibull",
+            "weibull_shape": 0.6,
+            "weibull_scale": 30.0,
+        })
+        result = runner.invoke(cli, ["decay", "run", "ws1"])
+        assert result.exit_code == 0
+
+    def test_decay_show_json(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client.get_decay_config = Mock(return_value={
+            "decay_model": "linear",
+            "decay_rate": 0.005,
+            "max_decay_days": 90,
+        })
+        result = runner.invoke(cli, [
+            "--output", "json", "decay", "show", "ws1",
+        ])
+        assert result.exit_code == 0
+
+
+# ════════════════════════════════════════════════════════════════════
+# Apikey revoke — JSON output
+# ════════════════════════════════════════════════════════════════════
+
+class TestApikeyRevokeJson:
+    """Apikey revoke with --output json."""
+
+    def test_apikey_revoke_json(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client.deactivate_api_key = Mock(return_value={"status": "ok"})
+        result = runner.invoke(cli, [
+            "--output", "json", "apikey", "revoke", "key1",
+        ])
+        assert result.exit_code == 0
+
+
+# ════════════════════════════════════════════════════════════════════
+# _sdk_client RuntimeError catch
+# ════════════════════════════════════════════════════════════════════
+
+class TestSdkClient:
+    """_sdk_client() auto-register and RuntimeError catch."""
+
+    def test_sdk_client_runtime_error(self, monkeypatch):
+        """_sdk_client catches RuntimeError from auto-register."""
+        from cli.stmem import _sdk_client
+        monkeypatch.setattr("cli.stmem.Client", lambda **kw: Mock())
+        # The _sdk_client calls _call("register", ...) which will fail
+        # on the mock, but it catches RuntimeError
+        result = _sdk_client()
+        assert result is not None
