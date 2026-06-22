@@ -1559,3 +1559,85 @@ class TestBackupErrorPaths:
         )
         result = runner.invoke(cli, ["backup", "nonexistent-ws"])
         assert result.exit_code in (0, 1)
+
+
+# ════════════════════════════════════════════════════════════════════
+# Shell completion — bash/zsh/fish
+# ════════════════════════════════════════════════════════════════════
+
+class TestCompletion:
+    """Shell completion command."""
+
+    def test_completion_bash(self, runner):
+        result = runner.invoke(cli, ["completion", "bash"])
+        assert result.exit_code == 0
+        assert "eval" in result.output
+        assert "bash_source" in result.output
+
+    def test_completion_zsh(self, runner):
+        result = runner.invoke(cli, ["completion", "zsh"])
+        assert result.exit_code == 0
+        assert "eval" in result.output
+        assert "zsh_source" in result.output
+
+    def test_completion_fish(self, runner):
+        result = runner.invoke(cli, ["completion", "fish"])
+        assert result.exit_code == 0
+        assert "eval" in result.output
+        assert "fish_source" in result.output
+
+    def test_completion_bad_shell(self, runner):
+        result = runner.invoke(cli, ["completion", "nushell"])
+        assert result.exit_code != 0
+
+
+# ════════════════════════════════════════════════════════════════════
+# --no-color flag
+# ════════════════════════════════════════════════════════════════════
+
+class TestNoColor:
+    """--no-color CLI flag."""
+
+    def test_no_color_flag(self, runner):
+        result = runner.invoke(cli, ["--no-color", "health"])
+        assert result.exit_code == 0
+
+
+# ════════════════════════════════════════════════════════════════════
+# API key create with JSON output
+# ════════════════════════════════════════════════════════════════════
+
+class TestApiKeyJson:
+    """API key create with --output json."""
+
+    def test_apikey_create_json_output(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client.create_api_key = Mock(return_value={"api_key": "sk-test", "id": "k1"})
+        result = runner.invoke(cli, [
+            "--output", "json", "apikey", "create", "ws1", "testkey",
+        ])
+        assert result.exit_code == 0
+
+
+# ════════════════════════════════════════════════════════════════════
+# JSON flag validation
+# ════════════════════════════════════════════════════════════════════
+
+class TestJsonFlagValidation:
+    """parse_json_flag callback."""
+
+    def test_bad_json_flag_rejected(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "store", "ws1", "p1", "content",
+            "--entities-json", "not valid json",
+        ])
+        assert result.exit_code != 0
+
+    def test_valid_json_flag_accepted(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "store", "ws1", "p1", "content",
+            "--entities-json", '["a","b"]',
+        ])
+        assert result.exit_code == 0
