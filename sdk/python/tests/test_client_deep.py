@@ -4729,3 +4729,605 @@ class TestStoreBatchIndexing:
         c.store_batch("ws", [{"content":"x1","summary":"s","memory_type":"e","peer_id":"p"}])
         ic = [a[0][0] for a in c._call.call_args_list if a[0][0] == "index_entity"]
         assert len(ic) == 1
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# search_with_filters coverage (lines 1950-1968)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestSearchWithFiltersUnit:
+    """Cover search_with_filters metadata and location filter paths."""
+
+    def test_metadata_filter_matching(self):
+        """Metadata filter: rows with matching metadata_json get included (lines 1954-1964)."""
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c.search = Mock(return_value=[
+            {"content": "hello world", "metadata_json": '{"key": "val"}'},
+            {"content": "other", "metadata_json": '{"key": "other_val"}'},
+        ])
+        result = c.search_with_filters("ws", query="test", metadata_filter='{"key": "val"}')
+        assert len(result) == 1
+        assert result[0]["content"] == "hello world"
+
+    def test_metadata_filter_invalid_json(self):
+        """Metadata filter: invalid metadata_json raises json.JSONDecodeError (not RuntimeError — line 1959 is dead code)."""
+        # The code only catches RuntimeError, but json.loads raises JSONDecodeError.
+        # This test documents that this is currently dead code.
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c.search = Mock(return_value=[
+            {"content": "hello world", "metadata_json": "not json"},
+        ])
+        # json.JSONDecodeError is NOT caught → propagates
+        with pytest.raises(json.JSONDecodeError if hasattr(json, 'JSONDecodeError') else ValueError):
+            c.search_with_filters("ws", query="test", metadata_filter='{"key": "val"}')
+
+    def test_metadata_filter_dict_input(self):
+        """Metadata filter: dict input (not string) works directly (line 1953)."""
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c.search = Mock(return_value=[
+            {"content": "hello", "metadata_json": '{"tag": "greeting"}'},
+        ])
+        result = c.search_with_filters("ws", query="test", metadata_filter={"tag": "greeting"})
+        assert len(result) == 1
+
+    def test_location_filter(self):
+        """Location filter: case-insensitive substring match on content/summary (lines 1965-1967)."""
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c.search = Mock(return_value=[
+            {"content": "Paris is beautiful", "summary": "France"},
+            {"content": "London bridge", "summary": "UK"},
+        ])
+        result = c.search_with_filters("ws", query="test", location_filter="paris")
+        assert len(result) == 1
+        assert "Paris" in result[0]["content"]
+
+    def test_location_filter_in_summary(self):
+        """Location filter matches against summary field too."""
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c.search = Mock(return_value=[
+            {"content": "Data center", "summary": "Tokyo facility"},
+        ])
+        result = c.search_with_filters("ws", query="test", location_filter="tokyo")
+        assert len(result) == 1
+
+    def test_combined_filters(self):
+        """Both metadata and location filters applied (lines 1951-1968)."""
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c.search = Mock(return_value=[
+            {"content": "Paris cafe", "summary": "France visit", "metadata_json": '{"tag": "food"}'},
+            {"content": "Paris museum", "summary": "France culture", "metadata_json": '{"tag": "art"}'},
+            {"content": "London pub", "summary": "UK food", "metadata_json": '{"tag": "food"}'},
+        ])
+        result = c.search_with_filters("ws", query="test",
+                                        metadata_filter='{"tag": "food"}',
+                                        location_filter="paris")
+        assert len(result) == 1
+        assert "cafe" in result[0]["content"]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Workspace config + Peer reputation (lines 1810-1845)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestConfigAndReputation:
+    """Cover get_workspace_config and get_peer_reputation."""
+
+    def test_get_decay_config_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[{"id": "ws", "decay_model": "linear"}])
+        result = c.get_decay_config("ws")
+        assert result == {"id": "ws", "decay_model": "linear"}
+
+    def test_get_decay_config_not_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[])
+        result = c.get_decay_config("ws")
+        assert result is None
+
+    def test_get_peer_reputation_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[{"id": "peer1", "reputation": 0.85}])
+        result = c.get_peer_reputation("peer1")
+        assert result == {"id": "peer1", "reputation": 0.85}
+
+    def test_get_peer_reputation_not_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[])
+        result = c.get_peer_reputation("peer1")
+        assert result is None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Document operations (lines 1884-1903)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestDocumentOps:
+    """Cover get_document, list_documents, get_document_chunks, delete_document."""
+
+    def test_get_document_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[{"id": "doc1", "title": "Test Doc"}])
+        result = c.get_document("doc1")
+        assert result == {"id": "doc1", "title": "Test Doc"}
+
+    def test_get_document_not_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[])
+        result = c.get_document("doc1")
+        assert result is None
+
+    def test_list_documents(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[{"id": "doc1"}, {"id": "doc2"}])
+        result = c.list_documents("ws")
+        c._query.assert_called_with("document", filter_dict={"workspace_id": "ws"})
+        assert len(result) == 2
+
+    def test_get_document_chunks_sorted(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[
+            {"id": "c2", "chunk_index": 2},
+            {"id": "c1", "chunk_index": 1},
+        ])
+        result = c.get_document_chunks("doc1")
+        assert result[0]["chunk_index"] == 1
+        assert result[1]["chunk_index"] == 2
+
+    def test_delete_document(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        result = c.delete_document("doc1")
+        c._call.assert_called_with("delete_document", ["doc1"])
+        assert result == {"status": "ok"}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# KG stats (lines 1931-1936)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestKgStats:
+    """Cover compute_kg_stats."""
+
+    def test_compute_kg_stats_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._query = Mock(return_value=[{"workspace_id": "ws", "node_count": 10}])
+        result = c.compute_kg_stats("ws")
+        c._call.assert_called_with("compute_kg_stats", ["ws"])
+        assert result["node_count"] == 10
+
+    def test_compute_kg_stats_not_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._query = Mock(return_value=[])
+        result = c.compute_kg_stats("ws")
+        assert result is None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Directory operations (lines 1699-1734)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestDirectoryOps:
+    """Cover list_directory, traverse_directory, get_directory, link/unlink."""
+
+    def test_list_directory(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[{"name": "file1"}, {"name": "dir1"}])
+        result = c.list_directory("dir1")
+        c._call.assert_called_with("get_children", ["dir1", True])
+        assert len(result) == 2
+
+    def test_traverse_directory(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[{"name": "deep_file", "depth": 2}])
+        result = c.traverse_directory("ws", "root")
+        c._call.assert_called_with("traverse_recursive", ["ws", "root"])
+        assert len(result) == 1
+
+    def test_get_directory(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[{"name": "target_dir", "depth": 0}])
+        result = c.get_directory("ws", "/path/to/dir")
+        c._call.assert_called_with("get_directory", ["ws", "/path/to/dir"])
+        assert len(result) == 1
+
+    def test_link_memory_to_directory(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        result = c.link_memory_to_directory("dir1", "mem1", "ws")
+        c._call.assert_called_with("link_memory_to_directory", ["dir1", "mem1", "ws"])
+
+    def test_unlink_memory_from_directory(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        result = c.unlink_memory_from_directory("dir1", "mem1")
+        c._call.assert_called_with("unlink_memory_from_directory", ["dir1", "mem1"])
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Note operations with embedding (lines 2469-2491)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestNoteEmbedOps:
+    """Cover create_note and update_note with embed=True."""
+
+    def test_create_note_with_embed(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[0.1, 0.2, 0.3])
+        result = c.create_note("ws", "Title", "Content here", embed=True)
+        c._embed.assert_called_once()
+        c._call.assert_called_once()
+        args = c._call.call_args[0][1]
+        assert "Content here" in args
+
+    def test_create_note_embed_empty_content(self):
+        """Embed empty content — _embed not called, embedding_json stays '[]'."""
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock()
+        result = c.create_note("ws", "Title", "  ", embed=True)
+        c._embed.assert_not_called()
+        assert result == {"status": "ok"}
+
+    def test_update_note_with_embed(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[0.4, 0.5])
+        result = c.update_note("note1", title="New", content="Body", embed=True)
+        c._embed.assert_called_once()
+        assert result == {"status": "ok"}
+
+    def test_update_note_embed_returns_none(self):
+        """Embed returns None — embedding_json stays '[]'."""
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[])
+        result = c.update_note("note1", content="Body", embed=True)
+        assert result == {"status": "ok"}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Backlinks + outgoing links (lines 2522-2534)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestNoteBacklinks:
+    """Cover get_backlinks and get_outgoing_links."""
+
+    def test_get_backlinks(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock()
+        c._query.side_effect = [
+            [{"id": "bl1", "source_note_id": "src1", "target_note_id": "tgt1"}],
+            [{"id": "src1", "title": "Source Title"}],
+        ]
+        result = c.get_backlinks("tgt1")
+        assert len(result) == 1
+        assert result[0]["source_title"] == "Source Title"
+
+    def test_get_backlinks_empty_source(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock()
+        c._query.side_effect = [
+            [{"id": "bl1", "source_note_id": "missing"}],
+            [],
+        ]
+        result = c.get_backlinks("tgt1")
+        assert result[0]["source_title"] == ""
+
+    def test_get_outgoing_links(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock()
+        c._query.side_effect = [
+            [{"id": "bl1", "source_note_id": "src1", "target_note_id": "tgt1"}],
+            [{"id": "tgt1", "title": "Target Title"}],
+        ]
+        result = c.get_outgoing_links("src1")
+        assert len(result) == 1
+        assert result[0]["target_title"] == "Target Title"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Session listing (lines 2218-2227)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestSessionListing:
+    """Cover get_peer_sessions."""
+
+    def test_get_peer_sessions(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock()
+        c._query.side_effect = [
+            [{"session_id": "s1", "peer_id": "p1", "role": "owner", "joined_at": 100}],
+            [{"id": "s1", "title": "Test Session", "created_at": 200}],
+        ]
+        result = c.get_peer_sessions("p1")
+        assert len(result) == 1
+        assert result[0]["role"] == "owner"
+        assert result[0]["title"] == "Test Session"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# list_profiles (lines 2277-2284)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestListProfiles:
+    """Cover list_profiles."""
+
+    def test_list_profiles(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[{"id": "peer1"}, {"id": "peer2"}])
+        c.get_profile = Mock(side_effect=[
+            {"id": "peer1", "static_facts": "[]"},
+            None,
+        ])
+        result = c.list_profiles("ws")
+        assert len(result) == 1
+        assert result[0]["id"] == "peer1"
+
+    def test_list_profiles_no_peers(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[])
+        result = c.list_profiles("ws")
+        assert result == []
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# API key create response (lines 2390-2397)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestApiKeyCreate:
+    """Cover create_api_key response parsing."""
+
+    def test_create_api_key_with_key_id(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[{"api_key_id": "key-id-123", "name": "Test Key", "permissions": "[\"read\"]"}])
+        result = c.create_api_key("ws", "Test Key")
+        # api_key is generated internally via secrets — just verify shape
+        assert result["api_key"].startswith("sk-")
+        assert result["id"] == "key-id-123"
+        assert result["status"] == "ok"
+
+    def test_create_api_key_no_rows(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[])
+        result = c.create_api_key("ws", "Test Key")
+        assert result["id"] == ""
+        assert result["api_key"].startswith("sk-")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Fuzzy get empty text skip (line 1522)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestFuzzyGetEdgeCases:
+    """Cover fuzzy_get empty field path."""
+
+    def test_fuzzy_get_empty_text_skip(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[
+            {"content": "", "summary": "something"},
+            {"content": "pizza is good", "summary": ""},
+        ])
+        result = c.fuzzy_get("ws", "pizza", threshold=0.5)
+        assert result is not None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Memory history (line 1765)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestMemoryHistory:
+    """Cover get_memory_history."""
+
+    def test_get_memory_history_found(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[{
+            "id": "h1", "content": "old version", "updated_at": 100
+        }])
+        result = c.get_memory_history("mem1")
+        assert len(result) == 1
+        assert result[0]["content"] == "old version"
+
+    def test_get_memory_history_empty(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._query = Mock(return_value=[])
+        result = c.get_memory_history("mem1")
+        assert result == []
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Batch embed error handling (line 980)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestBatchEmbedError:
+    """Cover batch embed RuntimeError path."""
+
+    def test_batch_embed_error(self):
+        """When embedder raises RuntimeError, emb_list stays empty and batch proceeds."""
+        from unittest.mock import Mock, MagicMock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._query = Mock(return_value=[{"id": "b1", "content": "x1", "created_at": 1}])
+        c._extract_and_store_entities = Mock()
+
+        # Make _http.post raise RuntimeError
+        c._http = Mock()
+        c._http.post = Mock(side_effect=RuntimeError("embed fail"))
+        c.embedder_url = "http://localhost:9090"
+
+        c.store_batch("ws", [{"content": "x1", "summary": "s", "memory_type": "e", "peer_id": "p"}])
+        # Should not raise — error is caught
+        assert c._call.called
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# create_node with embedding (lines 1998-2008)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestCreateNodeEmbed:
+    """Cover create_node embedding + indexing path."""
+
+    def test_create_node_with_embed_indexed(self):
+        from unittest.mock import Mock
+        import json
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[0.1, 0.2])
+        c._query = Mock(return_value=[{"id": "node1"}])
+        result = c.create_node("ws", "TestNode", summary="A test")
+        assert result == {"status": "ok"}
+        # _query should have been called for kg_node
+        c._query.assert_called()
+        # index_entity should have been called
+        index_calls = [a for a in c._call.call_args_list
+                       if a[0][0] == "index_entity"]
+        assert len(index_calls) == 1
+
+    def test_create_node_no_embed_available(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[])
+        result = c.create_node("ws", "TestNode")
+        assert result == {"status": "ok"}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# create_edge with source_memory_id (line 2033)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestCreateEdge:
+    """Cover create_edge with source_memory_id."""
+
+    def test_create_edge_with_source_memory(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        result = c.create_edge("ws", "src", "tgt", "related_to",
+                               source_memory_id="mem1")
+        args = c._call.call_args[0][1]
+        assert args[7] == "mem1"  # source_memory_id is 8th arg (after workspace_id, src, tgt, relation, weight, confidence, metadata)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Reranker "not found" handling (lines 1600-1602) + fuzzy get edge
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestRerankerErrorHandling:
+    """Cover reranker error paths."""
+
+    def test_reranker_not_found_error(self):
+        """When RuntimeError contains 'not found', return graceful message."""
+        from unittest.mock import Mock
+        from spacetime_memory.client import Client
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[{"content": "sky is blue", "summary": "",
+                                      "id": "mem1", "score": 0.5, "strategy": "semantic"}])
+
+        # Make _call("rerank_search_results") raise "not found"
+        orig_call = c._call
+        def call_side_effect(reducer, args):
+            if reducer == "rerank_search_results":
+                raise RuntimeError("Reranker not found")
+            return orig_call(reducer, args)
+        c._call = Mock(side_effect=call_side_effect)
+
+        result = c.search("ws", "sky", rerank=True)
+        assert result is not None
+
+    def test_delete_memory_reraises_unknown_error(self):
+        """When delete_memory gets RuntimeError without 'not found', re-raise (line 1602)."""
+        from unittest.mock import Mock
+        from spacetime_memory.client import Client
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(side_effect=RuntimeError("Database connection failed"))
+        with pytest.raises(RuntimeError, match="Database connection failed"):
+            c.delete_memory("mem1")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Query cache invalidation (line 810) + get_user_memories (line 1691)
+# ═══════════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestQueryCacheInvalidation:
+    """Cover query cache invalidation on store."""
+
+    def test_store_invalidates_query_cache(self):
+        from unittest.mock import Mock
+        mock_cache = Mock()
+        c = Client(host="localhost", port=3001, query_cache=mock_cache)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[])
+        result = c.store("ws", "p1", "p1", "experience", "test content")
+        mock_cache.invalidate.assert_called_with(workspace_id="ws")
+
+    def test_get_user_memories(self):
+        from unittest.mock import Mock
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[{"id": "m1", "content": "test"}])
+        result = c.get_user_memories("user1", "ws")
+        assert len(result) == 1
+        assert result[0]["content"] == "test"
