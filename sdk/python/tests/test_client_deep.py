@@ -4526,3 +4526,157 @@ class TestEmbedMethods:
         c._http = _mk_embed_success([0.5, 0.6])
         with patch.dict(os.environ, self._env):
             assert c._embed("hi") == [0.5, 0.6]
+
+
+# ── Entity extraction coverage (lines 875-910) ──────────────────────
+
+class TestExtractEntities:
+    """Mock-based tests for _extract_and_store_entities."""
+
+    def test_extract_entities_with_llm(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"ok": True})
+        class ML:
+            available = True
+            def extract_entities_llm(self, content):
+                return [{"name":"Alice","entity_type":"person","aliases":["Al"],"description":"A person"}]
+        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+            c._extract_and_store_entities("ws-1", "mem-1", "Alice went")
+        create_calls = [a[0][0] for a in c._call.call_args_list if a[0][0] == "create_entity_link"]
+        assert len(create_calls) == 1
+
+    def test_extract_entities_runtime_error_resilience(self):
+        c = Client(host="localhost", port=3001)
+        log = []
+        def mc(r, a):
+            log.append(r)
+            if r == "create_entity_link": raise RuntimeError("exists")
+            return {"ok": True}
+        c._call = mc
+        class ML:
+            available = True
+            def extract_entities_llm(self, c): return [{"name":"Bob","entity_type":"person","aliases":[],"description":"B"}]
+        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+            c._extract_and_store_entities("ws","mem","Bob")
+        assert "link_entity_to_memory" in log
+
+    def test_extract_entities_regex_fallback(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"ok": True})
+        class ML:
+            available = False
+            def extract_entities_llm(self, c): return None
+        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+            c._extract_and_store_entities("ws","mem","content")
+        ec = [a[0][0] for a in c._call.call_args_list if a[0][0] == "extract_entities"]
+        assert len(ec) == 1
+
+    def test_extract_entities_null_llm_result(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"ok": True})
+        class ML:
+            available = True
+            def extract_entities_llm(self, c): return None
+        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+            c._extract_and_store_entities("ws","mem","content")
+        ec = [a[0][0] for a in c._call.call_args_list if a[0][0] == "extract_entities"]
+        assert len(ec) == 1
+
+    def test_extract_entities_regex_error_caught(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(side_effect=RuntimeError("nope"))
+        class ML:
+            available = False
+            def extract_entities_llm(self, c): return None
+        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+            c._extract_and_store_entities("ws","mem","content")
+        # Should not raise
+
+    def test_extract_entities_empty_name_skipped(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"ok": True})
+        class ML:
+            available = True
+            def extract_entities_llm(self, c):
+                return [{"name":"","entity_type":"x","aliases":[],"description":"x"}]
+        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+            c._extract_and_store_entities("ws","mem","content")
+        create6 = [a[0][0] for a in c._call.call_args_list if a[0][0] == "create_entity_link"]
+        assert len(create6) == 0
+
+    def test_extract_entities_link_error_caught(self):
+        c = Client(host="localhost", port=3001)
+        def mc(r, a):
+            if r == "link_entity_to_memory": raise RuntimeError("no link")
+            return {"ok": True}
+        c._call = mc
+        class ML:
+            available = True
+            def extract_entities_llm(self, c):
+                return [{"name":"Eve","entity_type":"person","aliases":[],"description":"E"}]
+        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+            c._extract_and_store_entities("ws","mem","Eve")
+        # Should not raise
+
+
+# ── Store entity extraction coverage (lines 831-853) ────────────────
+
+class TestStoreEntityExtraction:
+    """Mock tests for store() entity extraction + binary cache + indexing."""
+
+    def test_store_with_entity_extraction(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok", "id": "mem-123"})
+        c._query = Mock(return_value=[{"id": "mem-123", "content": "test"}])
+        c._tantivy_index = Mock()
+        c._embed = lambda t: [0.1] * 768
+        class ML:
+            available = True
+            def extract_entities_llm(self, c):
+                return [{"name":"E","entity_type":"concept","aliases":[],"description":"E"}]
+        with patch('spacetime_memory.binary_vectors.binarize', return_value=b'\x00'*32):
+            with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+                c.store("ws", "test", summary="s", memory_type="experience", peer_id="p")
+        calls = [a[0][0] for a in c._call.call_args_list if isinstance(a[0], (list, tuple))]
+        assert "index_entity" in calls
+        assert "index_terms" in calls
+        assert c._tantivy_index.call_count >= 1
+
+    def test_store_binarize_failure_non_critical(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._query = Mock(return_value=[{"id": "mem-456", "content": "test"}])
+        c._tantivy_index = Mock()
+        c._embed = lambda t: [0.1] * 768
+        class ML:
+            available = True
+            def extract_entities_llm(self, c):
+                return [{"name":"E","entity_type":"c","aliases":[],"description":"E"}]
+        with patch('spacetime_memory.binary_vectors.binarize', side_effect=ValueError("bad")):
+            with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+                c.store("ws", "test", summary="s", memory_type="experience", peer_id="p")
+        # Should not raise
+
+    def test_store_with_tier_update(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._query = Mock(return_value=[{"id": "mem-789", "content": "test"}])
+        c._tantivy_index = Mock()
+        c._embed = lambda t: [0.1] * 768
+        class ML:
+            available = True
+            def extract_entities_llm(self, c):
+                return [{"name":"E","entity_type":"c","aliases":[],"description":"E"}]
+        with patch('spacetime_memory.binary_vectors.binarize', return_value=b'\x00'):
+            with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+                c.store("ws", "test", summary="s", memory_type="experience", peer_id="p", tier="L1")
+        tc = [a[0][0] for a in c._call.call_args_list if a[0][0] == "update_memory_tier"]
+        assert len(tc) == 1
+
+    def test_store_no_matching_memory_skips_indexing(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._query = Mock(return_value=[])
+        c._tantivy_index = Mock()
+        c.store("ws", "bare content", summary="s", memory_type="experience", peer_id="p")
+        # Should succeed without indexing
