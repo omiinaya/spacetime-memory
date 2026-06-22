@@ -891,6 +891,32 @@ class TestCliAdmin:
         assert result.exit_code == 0
         assert "admin" in result.output
 
+    # ── token-passing variants ──
+
+    def test_admin_promote_token(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "admin", "promote", "abc123def456", "--token", "jwt-test-token",
+        ])
+        assert result.exit_code == 0
+        assert "promoted" in result.output.lower()
+
+    def test_admin_demote_token(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "admin", "demote", "abc123def456", "--token", "jwt-test-token",
+        ])
+        assert result.exit_code == 0
+        assert "demoted" in result.output.lower()
+
+    def test_admin_list_token(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client._http.post.return_value = Mock(status_code=200, text=json.dumps([]))
+        result = runner.invoke(cli, [
+            "admin", "list", "--token", "jwt-test-token",
+        ])
+        assert result.exit_code == 0
+
 
 class TestCliContext:
     """Context pack and delta commands."""
@@ -1049,6 +1075,13 @@ class TestCliDiagnostics:
     def test_diagnostics_json(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         result = runner.invoke(cli, ["diagnostics", "--json"])
+        assert result.exit_code == 0
+
+    def test_diagnostics_token(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "diagnostics", "--token", "jwt-test-token",
+        ])
         assert result.exit_code == 0
 
 
@@ -1559,6 +1592,20 @@ class TestBackupErrorPaths:
         )
         result = runner.invoke(cli, ["backup", "nonexistent-ws"])
         assert result.exit_code in (0, 1)
+
+    def test_backup_table_runtime_error(self, mocked_cli_runner, tmp_path):
+        """Backup skips a table when _query raises RuntimeError."""
+        runner, mock_client = mocked_cli_runner
+        # Make _query raise RuntimeError for the first table, succeed for others
+        real_query = mock_client._query
+        def fake_query(table, workspace_id=None):
+            if table == "memory":
+                raise RuntimeError("table not accessible")
+            return []  # empty for other tables
+        mock_client._query = fake_query
+        result = runner.invoke(cli, ["backup", "ws1", "--tables", "memory,session"])
+        assert result.exit_code in (0, 1)
+        assert "Skipping" in result.output or "0 rows" in result.output
 
 
 # ════════════════════════════════════════════════════════════════════
