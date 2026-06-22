@@ -975,6 +975,30 @@ class TestCliMental:
         result = runner.invoke(cli, ["mental", "list"])
         assert result.exit_code == 0
 
+    def test_mental_create(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "mental", "create", "ws1", "--memory-ids", "m1,m2,m3",
+        ])
+        assert result.exit_code == 0
+        assert "created" in result.output.lower()
+
+    def test_mental_get(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client._http.post.return_value = Mock(
+            status_code=200,
+            text=make_sql_response([{"id": "mm1", "status": "completed"}]),
+        )
+        result = runner.invoke(cli, ["mental", "get", "mm1"])
+        assert result.exit_code == 0
+
+    def test_mental_synthesize_no_script(self, mocked_cli_runner, monkeypatch):
+        runner, mock_client = mocked_cli_runner
+        monkeypatch.setattr("os.path.exists", lambda p: False)
+        result = runner.invoke(cli, ["mental", "synthesize"])
+        # Script not found exits with error message
+        assert "not found" in result.output.replace("\n", " ") or result.exit_code == 1
+
 
 class TestCliMoreGroups:
     """Help checks for remaining command groups (exercises Click wiring)."""
