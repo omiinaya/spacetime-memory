@@ -185,7 +185,7 @@ class Connector(ABC):
                     )
                     raise
 
-        # Unreachable — keep the type-checker happy.
+        # Keep the type-checker happy — loop always returns or raises above.
         raise RuntimeError("unreachable")
 
     # ── Health reporting ────────────────────────────────────────────

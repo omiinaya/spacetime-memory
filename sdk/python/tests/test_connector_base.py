@@ -721,3 +721,86 @@ class TestConnectorDaemon:
                 daemon.start()
 
         assert "stale-id" not in daemon._runners
+
+    def test_build_connector_error_handling(self):
+        """start() catches _build_connector errors (lines 431-432)."""
+        daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
+
+        configs = [{"id": "bad1", "name": "Bad", "connector_type": "rss",
+                     "config_json": '{"feed_url":"http://ex.com/rss"}',
+                     "workspace_id": "ws-1", "schedule_secs": 300}]
+
+        with mock.patch.object(daemon, "_load_configs", return_value=configs), \
+             mock.patch.object(daemon, "_build_connector", side_effect=RuntimeError("build fail")), \
+             mock.patch("time.sleep") as mock_sleep, \
+             mock.patch("logging.getLogger") as mock_logger:
+            mock_sleep.side_effect = [None, KeyboardInterrupt()]
+            with pytest.raises(KeyboardInterrupt):
+                daemon.start()
+        # Should not crash — error is logged and skipped
+
+    def test_poll_error_handling(self):
+        """start() catches conn.poll() errors (lines 444-445)."""
+        daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
+
+        configs = [{"id": "c1", "name": "RSS", "connector_type": "rss",
+                     "config_json": '{"feed_url":"http://ex.com/rss"}',
+                     "workspace_id": "ws-1", "schedule_secs": 300}]
+
+        bad_conn = TestConnector(poll_side_effect=RuntimeError("poll fail"))
+
+        with mock.patch.object(daemon, "_load_configs", return_value=configs), \
+             mock.patch.object(daemon, "_build_connector", return_value=bad_conn), \
+             mock.patch("time.sleep") as mock_sleep:
+            mock_sleep.side_effect = [None, KeyboardInterrupt()]
+            with pytest.raises(KeyboardInterrupt):
+                daemon.start()
+        # Should not crash — poll error is logged and skipped
+
+    def test_event_handler_error_handling(self):
+        """start() catches conn.on_event errors (lines 440-441)."""
+        daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
+
+        configs = [{"id": "c1", "name": "RSS", "connector_type": "rss",
+                     "config_json": '{"feed_url":"http://ex.com/rss"}',
+                     "workspace_id": "ws-1", "schedule_secs": 300}]
+
+        # Connector that returns events but raises in on_event
+        conn = TestConnector(events=[Event(content="ev1")])
+        orig_on_event = conn.on_event
+        def failing_on_event(ev, client):
+            raise RuntimeError("handler fail")
+        conn.on_event = failing_on_event
+
+        with mock.patch.object(daemon, "_load_configs", return_value=configs), \
+             mock.patch.object(daemon, "_build_connector", return_value=conn), \
+             mock.patch("time.sleep") as mock_sleep:
+            mock_sleep.side_effect = [None, KeyboardInterrupt()]
+            with pytest.raises(KeyboardInterrupt):
+                daemon.start()
+        # Should not crash — event error is logged and skipped
+
+    def test_daemon_tick_error_handling(self):
+        """start() catches outer daemon tick errors (lines 447-448)."""
+        daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
+
+        with mock.patch.object(daemon, "_load_configs", side_effect=RuntimeError("load fail")), \
+             mock.patch("time.sleep") as mock_sleep:
+            mock_sleep.side_effect = [None, KeyboardInterrupt()]
+            with pytest.raises(KeyboardInterrupt):
+                daemon.start()
+        # Should not crash — tick error is logged and loop continues
+
+    def test_start_break_on_stop_during_sleep(self):
+        """start() breaks out of sleep loop when _running is set False (line 452)."""
+        daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=3)
+
+        with mock.patch.object(daemon, "_load_configs", return_value=[]), \
+             mock.patch("time.sleep") as mock_sleep:
+            # After first tick, set _running = False to trigger break
+            def stop_daemon(*a, **kw):
+                daemon._running = False
+            mock_sleep.side_effect = stop_daemon
+
+            daemon.start()  # Should return gracefully, not raise KeyboardInterrupt
+        # If we got here without exception, the break worked

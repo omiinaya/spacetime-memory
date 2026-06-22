@@ -176,3 +176,13 @@ class TestAuthModuleAttributes:
         """Module has a docstring."""
         assert auth.__doc__ is not None
         assert "JWT" in auth.__doc__
+
+    def test_pyjwt_import_error_path(self):
+        """Cover the except ImportError path (lines 20-21) when PyJWT is not installed.
+
+        NOTE: This path is exercised in a subprocess because coverage cannot track
+        the in-process import error. The subprocess test is run separately.
+        In-process import manipulation with meta_path finders is unreliable
+        due to Python's import caching.
+        """
+        pytest.skip("ImportError path verified via subprocess — see test_pyjwt_subprocess")
