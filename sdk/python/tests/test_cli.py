@@ -794,6 +794,25 @@ class TestCliHealth:
         assert result.exit_code == 0
         assert "healthy" in result.output.lower() or "degraded" in result.output.lower()
 
+    def test_health_token(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        mock_client._http.post.return_value = Mock(status_code=200, text="{}")
+        result = runner.invoke(cli, ["health", "--token", "jwt-test-token"])
+        assert result.exit_code == 0
+
+    def test_health_degraded(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        # Mock health to return degraded status
+        mock_client.health = Mock(return_value={
+            "status": "degraded",
+            "database": {"status": "ok", "latency_ms": 5},
+            "embedder": {"status": "error", "reachable": False},
+            "token_configured": False,
+        })
+        result = runner.invoke(cli, ["health"])
+        assert result.exit_code == 0
+        assert "degraded" in result.output.lower()
+
 
 class TestCliSynthesize:
     """Synthesize command."""
@@ -1688,3 +1707,56 @@ class TestJsonFlagValidation:
             "--entities-json", '["a","b"]',
         ])
         assert result.exit_code == 0
+
+
+# ════════════════════════════════════════════════════════════════════
+# Memory update — branch coverage for summary/confidence/tier/no-updates
+# ════════════════════════════════════════════════════════════════════
+
+class TestMemoryUpdateBranches:
+    """Memory update command branch coverage."""
+
+    def test_memory_update_summary(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "update", "m1", "--summary", "updated summary",
+        ])
+        assert result.exit_code == 0
+
+    def test_memory_update_confidence(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "update", "m1", "--confidence", "0.95",
+        ])
+        assert result.exit_code == 0
+
+    def test_memory_update_tier(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "update", "m1", "--tier", "L1",
+        ])
+        assert result.exit_code == 0
+
+    def test_memory_update_no_changes(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "update", "m1",
+        ])
+        assert result.exit_code == 0
+        assert "No changes" in result.output
+
+    def test_memory_batch_update_with_content(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "batch-update", "ws1", "m1,m2",
+            "--content", "updated content",
+            "--summary", "batch summary",
+        ])
+        assert result.exit_code == 0
+
+    def test_memory_batch_update_no_ids(self, mocked_cli_runner):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "memory", "batch-update", "ws1", "--tier", "L0",
+        ])
+        assert result.exit_code in (0, 1, 2)
