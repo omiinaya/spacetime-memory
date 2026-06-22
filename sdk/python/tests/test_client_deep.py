@@ -4416,3 +4416,113 @@ def test_memory_record_from_dict():
     assert rec.id == "mem-1"
     assert rec.content == "hello"
     assert rec.confidence == 0.9
+
+
+# ── Embed method coverage (lines 559-597, 973-978) ──────────────────
+
+def _mk_embed_success(*embeddings):
+    """Mock HTTP client that returns successful embedding responses."""
+    data = {"data": [{"embedding": e} for e in embeddings]}
+    mock_http = Mock(spec=httpx.Client)
+    mock_resp = Mock(spec=httpx.Response, status_code=200)
+    mock_resp.json.return_value = data
+    mock_resp.raise_for_status.return_value = None
+    mock_http.post.return_value = mock_resp
+    return mock_http
+
+def _mk_embed_error(status=500):
+    """Mock HTTP client that raises HTTPStatusError."""
+    mock_http = Mock(spec=httpx.Client)
+    mock_resp = Mock(spec=httpx.Response, status_code=status)
+    mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "error", request=Mock(), response=mock_resp
+    )
+    mock_http.post.return_value = mock_resp
+    return mock_http
+
+def _mk_embed_timeout():
+    mock_http = Mock(spec=httpx.Client)
+    mock_http.post.side_effect = httpx.TimeoutException("timeout")
+    return mock_http
+
+def _mk_embed_badjson():
+    mock_http = Mock(spec=httpx.Client)
+    mock_resp = Mock(spec=httpx.Response, status_code=200)
+    mock_resp.raise_for_status.return_value = None
+    mock_resp.json.side_effect = json.JSONDecodeError("bad", "", 0)
+    mock_http.post.return_value = mock_resp
+    return mock_http
+
+
+class TestEmbedMethods:
+    """Tests for _embed_openai, _embed_batch_openai, and _embed."""
+
+    _env = {"OPENAI_API_KEY": "sk-test", "OPENAI_BASE_URL": "http://mock/v1"}
+
+    def test_embed_openai_success(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_success([0.1, 0.2])
+        with patch.dict(os.environ, self._env):
+            assert c._embed_openai("hello") == [0.1, 0.2]
+
+    def test_embed_openai_no_key(self):
+        c = Client(host="localhost", port=3001)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": ""}, clear=True):
+            assert c._embed_openai("hello") == []
+
+    def test_embed_openai_http_error(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_error(503)
+        with patch.dict(os.environ, self._env):
+            assert c._embed_openai("hello") == []
+
+    def test_embed_openai_timeout(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_timeout()
+        with patch.dict(os.environ, self._env):
+            assert c._embed_openai("hello") == []
+
+    def test_embed_openai_bad_json(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_badjson()
+        with patch.dict(os.environ, self._env):
+            assert c._embed_openai("hello") == []
+
+    def test_embed_batch_success(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_success([1.0, 2.0], [3.0, 4.0])
+        with patch.dict(os.environ, self._env):
+            assert c._embed_batch_openai(["a", "b"]) == [[1.0, 2.0], [3.0, 4.0]]
+
+    def test_embed_batch_empty(self):
+        c = Client(host="localhost", port=3001)
+        assert c._embed_batch_openai([]) == []
+
+    def test_embed_batch_no_key(self):
+        c = Client(host="localhost", port=3001)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": ""}, clear=True):
+            assert c._embed_batch_openai(["x"]) == []
+
+    def test_embed_batch_timeout(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_timeout()
+        with patch.dict(os.environ, self._env):
+            assert c._embed_batch_openai(["x"]) == []
+
+    def test_embed_batch_http_error(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_error(502)
+        with patch.dict(os.environ, self._env):
+            assert c._embed_batch_openai(["x"]) == []
+
+    def test_embed_batch_bad_json(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_badjson()
+        with patch.dict(os.environ, self._env):
+            assert c._embed_batch_openai(["x"]) == []
+
+    def test_embed_success(self):
+        c = Client(host="localhost", port=3001)
+        c._http = _mk_embed_success([0.5, 0.6])
+        with patch.dict(os.environ, self._env):
+            assert c._embed("hi") == [0.5, 0.6]
