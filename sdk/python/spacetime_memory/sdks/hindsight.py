@@ -939,8 +939,6 @@ class Hindsight:
             raise RuntimeError("Hindsight client is closed")
 
         bank_name = name or config.get("name", "default")
-        if not bank_name:
-            bank_name = "default"
 
         # Check if bank already exists
         existing = self._client.list_workspaces()

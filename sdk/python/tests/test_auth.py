@@ -185,4 +185,28 @@ class TestAuthModuleAttributes:
         In-process import manipulation with meta_path finders is unreliable
         due to Python's import caching.
         """
-        pytest.skip("ImportError path verified via subprocess — see test_pyjwt_subprocess")
+        import subprocess
+
+        code = '''
+import sys
+import builtins
+
+_original_import = builtins.__import__
+def _block_jwt(name, *args, **kwargs):
+    if name == "jwt" or name.startswith("jwt."):
+        raise ImportError(f"No module named '{name}'")
+    return _original_import(name, *args, **kwargs)
+builtins.__import__ = _block_jwt
+
+sys.path.insert(0, ".")
+from spacetime_memory import auth
+print("PYJWT_NONE:", auth.pyjwt is None)
+'''
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True, text=True,
+            cwd=str(Path(__file__).resolve().parent.parent),
+            timeout=10,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        assert "PYJWT_NONE: True" in result.stdout, f"Got: {result.stdout}"
