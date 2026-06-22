@@ -4680,3 +4680,52 @@ class TestStoreEntityExtraction:
         c._tantivy_index = Mock()
         c.store("ws", "bare content", summary="s", memory_type="experience", peer_id="p")
         # Should succeed without indexing
+
+
+# ── Store batch indexing coverage (lines 973-1010) ───────────────────
+
+class TestStoreBatchIndexing:
+    """Mock tests for store_batch embedding and indexing."""
+
+    def test_store_batch_with_embeddings(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        mock_resp = Mock(status_code=200)
+        mock_resp.json.return_value = {"embeddings": [[0.1, 0.2], [0.3, 0.4]]}
+        c._http = Mock()
+        c._http.post.return_value = mock_resp
+        c._query = Mock(return_value=[{"id": "b1", "content": "item1", "created_at": 1000}])
+        c._extract_and_store_entities = Mock()
+        items = [
+            {"content":"item1","summary":"s1","memory_type":"experience","peer_id":"p1"},
+            {"content":"item2","summary":"s2","memory_type":"experience","peer_id":"p2"},
+        ]
+        c.store_batch("ws", items)
+        bc = [a[0][0] for a in c._call.call_args_list if a[0][0] == "store_memory_batch"]
+        ic = [a[0][0] for a in c._call.call_args_list if a[0][0] == "index_entity"]
+        assert len(bc) == 1 and len(ic) == 2
+
+    def test_store_batch_embedder_error(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._http = Mock()
+        c._http.post.return_value = Mock(status_code=500)
+        c._query = Mock()
+        c._extract_and_store_entities = Mock()
+        c.store_batch("ws", [{"content":"x","summary":"s","memory_type":"e","peer_id":"p"}])
+        bc = [a[0][0] for a in c._call.call_args_list if a[0][0] == "store_memory_batch"]
+        ic = [a[0][0] for a in c._call.call_args_list if a[0][0] == "index_entity"]
+        assert len(bc) == 1 and len(ic) == 0
+
+    def test_store_batch_single_embedding_response(self):
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        mock = Mock(status_code=200)
+        mock.json.return_value = {"embedding": [0.9]}
+        c._http = Mock()
+        c._http.post.return_value = mock
+        c._query = Mock(return_value=[{"id":"b1","content":"x1","created_at":1}])
+        c._extract_and_store_entities = Mock()
+        c.store_batch("ws", [{"content":"x1","summary":"s","memory_type":"e","peer_id":"p"}])
+        ic = [a[0][0] for a in c._call.call_args_list if a[0][0] == "index_entity"]
+        assert len(ic) == 1
