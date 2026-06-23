@@ -11,6 +11,8 @@ import string
 import time
 from spacetime_memory.client import Client
 
+pytestmark = [pytest.mark.integration]
+
 # The validate_string limit in Rust (lib.rs) is 10000 characters.
 MAX_STRING = 10000
 

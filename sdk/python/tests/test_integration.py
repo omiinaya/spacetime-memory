@@ -370,10 +370,16 @@ class TestErrorHandling:
         with pytest.raises(RuntimeError):
             c.list_workspaces()
 
-    def test_bad_workspace(self, stdb_client):
-        """Non-existent workspace should error clearly."""
+    def test_bad_workspace(self, stdb_session):
+        """Non-existent workspace should error clearly (non-admin)."""
+        # Admin clients bypass workspace access checks — use a regular client.
+        c = Client(
+            host=stdb_session["host"],
+            port=stdb_session["port"],
+            database=stdb_session["database"],
+        )
         with pytest.raises(RuntimeError):
-            stdb_client.store(workspace_id="bad-ws", content="x", peer_id="bot")
+            c.store(workspace_id="bad-ws", content="x", peer_id="bot")
 
     def test_client_reuses_connection(self, stdb_client):
         """Multiple operations on the same client should work."""

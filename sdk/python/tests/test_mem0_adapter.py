@@ -20,6 +20,7 @@ import pytest
 from spacetime_memory import Client, EmbedderUnavailableError
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.skipif(
         not os.environ.get("SPACETIMEDB_HOST"),
         reason="Integration tests require SPACETIMEDB_HOST env var",
