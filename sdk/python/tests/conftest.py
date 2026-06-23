@@ -274,12 +274,14 @@ def stdb_session() -> dict:
     }
 
 
-@pytest.fixture
-def stdb_client(stdb_session) -> Client:
-    """Create a Client connected to the published database, auto-registered as admin.
+@pytest.fixture(scope="session")
+def _admin_token(stdb_session) -> str:
+    """Session-scoped: register a single admin identity for all tests.
 
-    Registers a test account and promotes to admin on first use so that
-    authenticated reducers (require_auth) work for integration tests.
+    Returns the identity token that should be injected into every stdb_client
+    fixture. This ensures *all* tests in the session share the same admin
+    identity, so admin-requiring reducers (dedup, maintenance, communities,
+    etc.) work beyond the first test.
     """
     c = Client(
         host=stdb_session["host"],
@@ -287,14 +289,13 @@ def stdb_client(stdb_session) -> Client:
         database=stdb_session["database"],
     )
 
-    # Register and self-promote to admin for test access
     import os
     suffix = os.urandom(4).hex()
-    uname = f"test_{suffix}"
+    uname = f"admin_test_{suffix}"
     try:
-        c._call("register", [uname, "Test User", "testpass"])
+        c._call("register", [uname, "Test Admin", "testpass"])
     except RuntimeError:
-        pass  # already registered from a prior test in this session
+        pass  # already registered
 
     my_id = c._whoami()
     if my_id:
@@ -302,6 +303,28 @@ def stdb_client(stdb_session) -> Client:
             c._call("set_initial_admin", [my_id])
         except RuntimeError:
             pass  # admin already exists
+
+    return c._identity_token if c._identity_token else "anonymous"
+
+
+@pytest.fixture
+def stdb_client(stdb_session, _admin_token) -> Client:
+    """Create a Client connected to the published database, pre-authenticated
+    as admin.
+
+    All tests in the session share the same admin identity, so admin-requiring
+    reducers work regardless of test execution order.
+    """
+    c = Client(
+        host=stdb_session["host"],
+        port=stdb_session["port"],
+        database=stdb_session["database"],
+    )
+
+    # Inject the session-scoped admin identity token
+    if _admin_token and _admin_token != "anonymous":
+        c._identity_token = _admin_token
+        c._identity_established = True
 
     return c
 

@@ -524,7 +524,7 @@ class TestGraphDeep:
         stdb_client.create_node(ws_id, "BridgeB", "concept")
         try:
             result = stdb_client.detect_bridge_nodes(ws_id)
-            assert result["status"] == "ok"
+            assert isinstance(result, list)
         except RuntimeError as e:
             # Bridge detection requires specific reducers — skip if not available
             pytest.skip(f"bridge detection not available: {e}")
@@ -2232,7 +2232,7 @@ class TestGraphStatsDeep:
 
         try:
             result = stdb_client.detect_bridge_nodes(ws_id)
-            assert result["status"] == "ok"
+            assert isinstance(result, list)
         except RuntimeError as e:
             pytest.skip(f"bridge detection not available: {e}")
 

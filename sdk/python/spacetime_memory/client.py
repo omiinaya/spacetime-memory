@@ -1827,8 +1827,11 @@ class Client:
         self._call("recommend_memories", [
             workspace_id, limit, min_urgency,
         ])
-        return self._query("memory_recommendation",
-                          filter_dict={"workspace_id": workspace_id})
+        # Public result table — queryable via SQL directly
+        return self._sql(
+            "SELECT * FROM memory_recommendation WHERE "
+            f"workspace_id = '{_esc(workspace_id)}'"
+        )
 
     def get_peer_reputation(self, peer_id: str) -> dict[str, Any] | None:
         """Get reputation stats for a peer.
@@ -1915,8 +1918,11 @@ class Client:
         self._call("detect_bridge_nodes", [
             workspace_id, limit, min_communities,
         ])
-        return self._query("bridge_result",
-                          filter_dict={"workspace_id": workspace_id})
+        # Public result table — queryable via SQL directly
+        return self._sql(
+            "SELECT * FROM bridge_result WHERE "
+            f"workspace_id = '{_esc(workspace_id)}'"
+        )
 
     def compute_kg_stats(self, workspace_id: str) -> dict[str, Any] | None:
         """Compute knowledge graph statistics for a workspace.
@@ -1925,8 +1931,11 @@ class Client:
         community_count, orphan_nodes, avg_degree, etc.
         """
         self._call("compute_kg_stats", [workspace_id])
-        rows = self._query("kg_stats_result",
-                          filter_dict={"workspace_id": workspace_id})
+        # Public result table — queryable via SQL directly
+        rows = self._sql(
+            "SELECT * FROM kg_stats_result WHERE "
+            f"workspace_id = '{_esc(workspace_id)}'"
+        )
         if rows:
             return rows[0]
         return None

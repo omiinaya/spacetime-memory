@@ -61,6 +61,7 @@ const ALLOWED_TABLES: &[&str] = &[
     "replication_peer", "replication_log",
     "hierarchy_cluster", "community_hierarchy",
     "proxy_metrics_snapshot",
+    "bridge_result", "kg_stats_result", "memory_recommendation",
 ];
 
 /// Query a private table with auth + workspace enforcement.
