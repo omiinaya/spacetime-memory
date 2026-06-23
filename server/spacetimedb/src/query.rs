@@ -11,6 +11,9 @@ use crate::profile::profile;
 use crate::peer::peer;
 use crate::context_compression::context_pack;
 use crate::connector::connector_config;
+use crate::context_directory::context_directory;
+use crate::context_delta::delta_pack;
+use crate::memory_feedback::peer_reputation;
 
 /// Generic result table for read queries against private tables.
 ///
@@ -50,6 +53,9 @@ const ALLOWED_TABLES: &[&str] = &[
     "context_pack", "context_directory", "directory_memory_link",
     "context_entry",
     "context_delta_pack", // note: Rust struct is DeltaPack
+    "context_delta",      // alias for context_delta_pack (SDK name)
+    "directory",          // alias for context_directory (SDK name)
+    "peer_reputation",
     "consolidation_log", "merge_suggestion", "backup_entry",
     "memory_feedback", "workspace_config",
     "replication_peer", "replication_log",
@@ -117,6 +123,10 @@ pub fn query_table(
         "agent_step" => query_agent_step(ctx, query_id, filter_obj, &columns, now),
         "context_pack" => query_context_pack(ctx, query_id, workspace_id, filter_obj, &columns, now),
         "connector_config" => query_connector_config(ctx, query_id, filter_obj, &columns, now),
+        // Aliases for SDK table names
+        "directory" => query_generic_scan(ctx, &query_id, "context_directory", workspace_id, filter_obj, &columns, now),
+        "context_delta" => query_generic_scan(ctx, &query_id, "delta_pack", workspace_id, filter_obj, &columns, now),
+        "peer_reputation" => query_generic_scan(ctx, &query_id, "peer_reputation", workspace_id, filter_obj, &columns, now),
         _ => query_generic(ctx, &query_id, &table_name, workspace_id, filter_obj, &columns, now),
     }
 }
@@ -485,6 +495,62 @@ fn query_connector_config(
         if filter_matches(&row, filter) {
             insert_row(ctx, &query_id, "connector_config", row_to_json(&row, columns), now);
         }
+    }
+    Ok(())
+}
+
+/// Generic scan for tables that support simple id/workspace_id filtering.
+/// Maps alias table names to their real accessors.
+fn query_generic_scan(
+    ctx: &ReducerContext, query_id: &str, table_name: &str, workspace_id: String,
+    filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
+) -> Result<(), String> {
+    match table_name {
+        "context_directory" => {
+            for row in ctx.db.context_directory().iter().take(crate::MAX_RESULTS) {
+                let val = serde_json::json!({
+                    "id": row.id, "workspace_id": row.workspace_id,
+                    "name": row.name, "path": row.path,
+                    "parent_id": row.parent_id, "description": row.description,
+                    "created_at": row.created_at, "updated_at": row.updated_at,
+                });
+                if filter_matches(&val, filter) && (workspace_id.is_empty() || row.workspace_id == workspace_id) {
+                    insert_row(ctx, query_id, table_name, row_to_json(&val, columns), now);
+                }
+            }
+        }
+        "delta_pack" => {
+            for row in ctx.db.delta_pack().iter().take(crate::MAX_RESULTS) {
+                let val = serde_json::json!({
+                    "id": row.id, "workspace_id": row.workspace_id,
+                    "previous_context_pack_id": row.previous_context_pack_id,
+                    "query_hash": row.query_hash,
+                    "changed_memory_ids_json": row.changed_memory_ids_json,
+                    "removed_memory_ids_json": row.removed_memory_ids_json,
+                    "new_memories_json": row.new_memories_json,
+                    "estimated_tokens": row.estimated_tokens,
+                    "created_at": row.created_at,
+                });
+                if filter_matches(&val, filter) && (workspace_id.is_empty() || row.workspace_id == workspace_id) {
+                    insert_row(ctx, query_id, table_name, row_to_json(&val, columns), now);
+                }
+            }
+        }
+        "peer_reputation" => {
+            for row in ctx.db.peer_reputation().iter().take(crate::MAX_RESULTS) {
+                let val = serde_json::json!({
+                    "id": row.id, "helpful_count": row.helpful_count,
+                    "unhelpful_count": row.unhelpful_count,
+                    "total_feedback": row.total_feedback,
+                    "reputation_score": row.reputation_score,
+                    "last_feedback_at": row.last_feedback_at,
+                });
+                if filter_matches(&val, filter) {
+                    insert_row(ctx, query_id, table_name, row_to_json(&val, columns), now);
+                }
+            }
+        }
+        _ => {}
     }
     Ok(())
 }

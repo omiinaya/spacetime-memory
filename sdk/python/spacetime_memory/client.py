@@ -1699,8 +1699,7 @@ class Client:
         self._call("get_children", [directory_id, True])
         return self._sql(
             "SELECT * FROM directory_result WHERE "
-            f"query_hash = '{_esc(directory_id)}' "
-            "ORDER BY depth ASC, name ASC"
+            f"query_hash = '{_esc(directory_id)}'"
         )
 
     def traverse_directory(self, workspace_id: str, root_directory_id: str) -> list[dict[str, Any]]:
@@ -1708,8 +1707,7 @@ class Client:
         self._call("traverse_recursive", [workspace_id, root_directory_id])
         return self._sql(
             "SELECT * FROM directory_result WHERE "
-            f"query_hash = '{_esc(root_directory_id)}' "
-            "ORDER BY depth ASC, name ASC"
+            f"query_hash = '{_esc(root_directory_id)}'"
         )
 
     def get_directory(self, workspace_id: str, path_or_id: str) -> list[dict[str, Any]]:
@@ -1717,8 +1715,7 @@ class Client:
         self._call("get_directory", [workspace_id, path_or_id])
         return self._sql(
             "SELECT * FROM directory_result WHERE "
-            f"workspace_id = '{_esc(workspace_id)}' "
-            "ORDER BY depth ASC"
+            f"workspace_id = '{_esc(workspace_id)}'"
         )
 
     def create_directory(self, workspace_id: str, name: str, path: str, parent_id: str = "", description: str = "") -> dict[str, Any]:
