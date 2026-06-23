@@ -316,3 +316,40 @@ def _generate_test_token() -> str:
         return generate_token(str(key_path))
     except ImportError:
         return ""
+
+
+@pytest.fixture
+def cli_mock_client():
+    """Return a real Client with mocked HTTP for CLI testing.
+
+    Uses the same pattern as test_cli.py's mock_client fixture.
+    """
+    client = Client(
+        host="localhost",
+        port="3001",
+        database="test-db",
+        embedder_url="http://localhost:9090",
+    )
+    mock_http = MagicMock(spec=httpx.Client)
+    mock_http.post.return_value = Mock(
+        status_code=200,
+        text=json.dumps([]),
+        json=lambda: [],
+    )
+    mock_http.get.return_value = Mock(
+        status_code=200,
+        json=lambda: {"model": "mock"},
+    )
+    client._http = mock_http
+    return client
+
+
+@pytest.fixture
+def mocked_cli_runner(monkeypatch, cli_mock_client):
+    """A CliRunner where the CLI's ``_sdk_client`` returns a mocked Client.
+
+    Returns (runner, mock_client) tuple.
+    """
+    from click.testing import CliRunner
+    monkeypatch.setattr("cli.stmem._sdk_client", lambda **kw: cli_mock_client)
+    return CliRunner(), cli_mock_client
