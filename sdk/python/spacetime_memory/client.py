@@ -1685,8 +1685,7 @@ class Client:
         rows = self._sql(
             "SELECT * FROM user_memory_result WHERE "
             f"user_scope = '{_esc(user_scope)}' AND "
-            f"workspace_id = '{_esc(workspace_id)}' "
-            "ORDER BY created_at DESC"
+            f"workspace_id = '{_esc(workspace_id)}'"
         )
         return rows
 
@@ -2381,8 +2380,7 @@ class Client:
         rows = self._sql(
             "SELECT api_key_id, name, permissions FROM api_key_result WHERE "
             f"request_id = '{_esc(request_id)}' "
-            "AND operation = 'create' "
-            "ORDER BY created_at DESC LIMIT 1"
+            "AND operation = 'create'"
         )
         key_id = rows[0]["api_key_id"] if rows else ""
 
@@ -2422,8 +2420,7 @@ class Client:
             "SELECT api_key_id, name, permissions, is_active, created_at, last_used_at "
             "FROM api_key_result WHERE "
             f"workspace_id = '{_esc(workspace_id)}' "
-            "AND operation = 'list' "
-            "ORDER BY created_at DESC"
+            "AND operation = 'list'"
         )
 
     # -----------------------------------------------------------------------
