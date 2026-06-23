@@ -4992,7 +4992,7 @@ class TestKgStats:
         from unittest.mock import Mock
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
-        c._query = Mock(return_value=[{"workspace_id": "ws", "node_count": 10}])
+        c._sql = Mock(return_value=[{"workspace_id": "ws", "node_count": 10}])
         result = c.compute_kg_stats("ws")
         c._call.assert_called_with("compute_kg_stats", ["ws"])
         assert result["node_count"] == 10
@@ -5001,7 +5001,7 @@ class TestKgStats:
         from unittest.mock import Mock
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
-        c._query = Mock(return_value=[])
+        c._sql = Mock(return_value=[])
         result = c.compute_kg_stats("ws")
         assert result is None
 
