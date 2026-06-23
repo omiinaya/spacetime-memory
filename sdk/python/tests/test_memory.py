@@ -14,7 +14,10 @@ class TestMemoryStore:
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
             text="{}",
+            json=lambda: {"data": [{"embedding": [0.0]}]},
         )
+        # Also stub _embed to avoid the OpenAI embedder path entirely
+        mock_http_client._embed = Mock(return_value=[])
 
         result = mock_http_client.store(
             workspace_id="ws1",

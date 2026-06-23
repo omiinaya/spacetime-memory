@@ -125,7 +125,7 @@ def mock_http_client():
     mock_http.post.return_value = Mock(
         status_code=200,
         text=json.dumps([]),
-        json=lambda: [],
+        json=lambda: {"data": [{"embedding": [0.0]}]},
     )
     # Embedder health endpoint mock: return 200 so health checks pass
     mock_http.get.return_value = Mock(
