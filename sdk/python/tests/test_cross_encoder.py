@@ -24,18 +24,19 @@ def _inject_lazy_deps(monkeypatch):
     """
     import types
 
-    # Mock onnxruntime
-    if "onnxruntime" not in sys.modules:
-        mock_ort = types.ModuleType("onnxruntime")
-        mock_ort.InferenceSession = MagicMock()
-        mock_ort.SessionOptions = MagicMock()
-        sys.modules["onnxruntime"] = mock_ort
+    # Mock onnxruntime — always inject because real package may be installed
+    mock_ort = types.ModuleType("onnxruntime")
+    mock_ort.InferenceSession = MagicMock()
+    mock_ort.SessionOptions = MagicMock()
+    sys.modules["onnxruntime"] = mock_ort
 
-    # Mock tokenizers
-    if "tokenizers" not in sys.modules:
-        mock_tokenizers = types.ModuleType("tokenizers")
-        mock_tokenizers.Tokenizer = MagicMock()
-        sys.modules["tokenizers"] = mock_tokenizers
+    # Mock tokenizers — always inject because real tokenizers may be installed
+    mock_tokenizers = types.ModuleType("tokenizers")
+    mock_tok_cls = MagicMock()
+    mock_tokenizers.Tokenizer = mock_tok_cls
+    # Patch from_file at module level so all tests get it
+    mock_tok_cls.from_file = MagicMock()
+    sys.modules["tokenizers"] = mock_tokenizers
 
     yield
 
