@@ -51,7 +51,7 @@ pub struct WorkspaceConfig {
 ///
 /// Aggregates feedback on memories authored by a peer to compute
 /// a reputation score (0.0–1.0) that influences trust in new memories.
-#[table(accessor = peer_reputation)]
+#[table(accessor = peer_reputation, public)]
 #[derive(Debug, Clone)]
 pub struct PeerReputation {
     #[primary_key]

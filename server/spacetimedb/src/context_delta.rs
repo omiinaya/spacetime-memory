@@ -13,7 +13,7 @@ use std::hash::{Hash, Hasher};
 /// A delta context pack for token-budgeted retrieval.
 /// Agents request a compact context pack within a token budget, and on
 /// subsequent requests only delta (changed) context is returned.
-#[table(accessor = delta_pack)]
+#[table(accessor = delta_pack, public)]
 #[derive(Debug, Clone)]
 pub struct DeltaPack {
     #[primary_key]
