@@ -357,7 +357,9 @@ def cli_mock_client():
     mock_http.post.return_value = Mock(
         status_code=200,
         text=json.dumps([]),
-        json=lambda: [],
+        # Return a valid OpenAI embedding structure so _embed_openai
+        # doesn't choke on resp.json()["data"][0]["embedding"].
+        json=lambda: {"data": [{"embedding": [0.0]}]},
     )
     mock_http.get.return_value = Mock(
         status_code=200,

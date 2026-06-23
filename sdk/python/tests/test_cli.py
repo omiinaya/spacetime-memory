@@ -38,7 +38,8 @@ def mock_client():
         embedder_url="http://localhost:9090",
     )
     mock_http = MagicMock(spec=httpx.Client)
-    mock_http.post.return_value = Mock(status_code=200, text=json.dumps([]), json=lambda: [])
+    mock_http.post.return_value = Mock(status_code=200, text=json.dumps([]),
+                                       json=lambda: {"data": [{"embedding": [0.0]}]})
     mock_http.get.return_value = Mock(
         status_code=200,
         json=lambda: {"model": "mock"},
@@ -100,6 +101,8 @@ class TestCliWorkspace:
     def test_workspace_list_with_data(self, mocked_cli_runner):
         """workspace list shows workspace JSON."""
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "1", "name": "ws1"}]),
@@ -111,9 +114,11 @@ class TestCliWorkspace:
     def test_workspace_create(self, mocked_cli_runner):
         """workspace create calls the reducer and prints status."""
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
-            text="{}",
+            text='{"status": "ok"}',
         )
         result = runner.invoke(cli, ["workspace", "create", "my-workspace"])
         assert result.exit_code == 0
@@ -126,10 +131,15 @@ class TestCliMemory:
     def test_memory_store(self, mocked_cli_runner):
         """memory store calls the store_memory reducer."""
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
-            text="{}",
+            text='{"status": "ok"}',
         )
+        # Ensure _embed returns [] so store() doesn't try to call
+        # the embedding API (which would hit resp.json() → Mock subscript error)
+        mock_client._embed = Mock(return_value=[])
         result = runner.invoke(cli, [
             "memory", "store", "ws1", "cli-test", "hello world",
         ])
@@ -139,6 +149,8 @@ class TestCliMemory:
     def test_memory_list_empty(self, mocked_cli_runner):
         """memory list shows '(no memories)' when empty."""
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=json.dumps([]),
@@ -150,6 +162,8 @@ class TestCliMemory:
     def test_memory_list_with_data(self, mocked_cli_runner):
         """memory list shows memory JSON."""
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "m1", "content": "test"}]),
@@ -173,6 +187,7 @@ class TestCliMemory:
             resp.json = lambda: []
             return resp
 
+        mock_client._http.post.side_effect = side_effect
         result = runner.invoke(cli, [
             "memory", "search", "ws1", "test query",
         ])
@@ -267,6 +282,8 @@ class TestCliApikey:
 
     def test_apikey_list_with_data(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "k1", "name": "my-key"}]),
@@ -293,6 +310,8 @@ class TestCliPeer:
 
     def test_peer_list_with_data(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "p1", "name": "alice"}]),
@@ -340,6 +359,8 @@ class TestCliMemoryExtended:
 
     def test_memory_get_found(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "m1", "content": "hello world"}]),
@@ -418,6 +439,8 @@ class TestCliDecay:
 
     def test_decay_show_with_config(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"decay_model": "linear", "decay_rate": 0.005}]),
@@ -428,6 +451,8 @@ class TestCliDecay:
 
     def test_decay_run_linear(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"decay_model": "linear", "decay_rate": 0.005}]),
@@ -448,6 +473,8 @@ class TestCliRecommend:
 
     def test_recommend_with_data(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"memory_id": "m1", "action": "review"}]),
@@ -463,6 +490,8 @@ class TestCliPeerReputation:
 
     def test_peer_reputation(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"helpful": 5, "unhelpful": 1}]),
@@ -483,6 +512,8 @@ class TestCliDirectory:
 
     def test_directory_list_with_data(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"name": "subdir", "type": "directory"}]),
@@ -493,6 +524,8 @@ class TestCliDirectory:
 
     def test_directory_tree(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"name": "child", "depth": 1}]),
@@ -525,6 +558,8 @@ class TestCliProfile:
 
     def test_profile_get(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"peer_id": "peer1", "name": "Alice"}]),
@@ -576,6 +611,8 @@ class TestCliFact:
 
     def test_fact_get(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "f1", "content": "likes python"}]),
@@ -609,6 +646,8 @@ class TestCliKg:
 
     def test_kg_query(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "n1", "label": "python"}]),
@@ -618,6 +657,8 @@ class TestCliKg:
 
     def test_kg_neighbors(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "n2", "label": "neighbor"}]),
@@ -627,6 +668,8 @@ class TestCliKg:
 
     def test_kg_bridges(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "n3", "communities": 3}]),
@@ -636,6 +679,8 @@ class TestCliKg:
 
     def test_kg_stats(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"nodes": 10, "edges": 5}]),
@@ -655,6 +700,8 @@ class TestCliSession:
 
     def test_session_messages(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "msg1", "content": "hello"}]),
@@ -700,6 +747,8 @@ class TestCliConnector:
 
     def test_connector_list_with_data(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([
@@ -826,6 +875,8 @@ class TestCliSynthesize:
 
     def test_synthesize_with_error(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=json.dumps({"error": "no memories found"}),
@@ -845,6 +896,8 @@ class TestCliOutputFormats:
 
     def test_workspace_list_csv(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "ws1", "name": "test"}]),
@@ -854,6 +907,8 @@ class TestCliOutputFormats:
 
     def test_workspace_list_quiet(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "ws1", "name": "test"}]),
@@ -902,6 +957,8 @@ class TestCliAdmin:
 
     def test_admin_list_with_data(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"identity": "abc", "username": "admin"}]),
@@ -942,6 +999,8 @@ class TestCliContext:
 
     def test_context_pack(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "pack-1", "query": "test"}]),
@@ -951,6 +1010,8 @@ class TestCliContext:
 
     def test_context_delta(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "d1", "pack_id": "p1"}]),
@@ -977,6 +1038,8 @@ class TestCliReplication:
 
     def test_replication_peers(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"peer_id": "r1", "status": "active"}]),
@@ -1001,6 +1064,8 @@ class TestCliReplication:
 
     def test_replication_status(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"json_data": '{"synced": true}'}]),
@@ -1014,6 +1079,8 @@ class TestCliMental:
 
     def test_mental_list(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200, text=json.dumps([]),
         )
@@ -1030,6 +1097,8 @@ class TestCliMental:
 
     def test_mental_get(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
+        mock_client._identity_established = True
+        mock_client._identity_token = "test-token"
         mock_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([{"id": "mm1", "status": "completed"}]),

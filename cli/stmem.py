@@ -3031,6 +3031,7 @@ def aaak() -> None:
 @click.option("--pipe", "-p", is_flag=True, help="Read from stdin")
 def aaak_compress_cmd(text: str | None, file: str | None, pipe: bool) -> None:
     """Compress text using AAAK shorthand."""
+    from pathlib import Path
     from spacetime_memory.aaak import aaak_compress as _compress, aaak_ratio
 
     if pipe or (not text and not file and sys.stdin.isatty() is False):
@@ -3064,6 +3065,7 @@ def aaak_compress_cmd(text: str | None, file: str | None, pipe: bool) -> None:
 @click.option("--pipe", "-p", is_flag=True, help="Read from stdin")
 def aaak_decompress_cmd(text: str | None, file: str | None, pipe: bool) -> None:
     """Partially decompress AAAK shorthand (categories + phrases only)."""
+    from pathlib import Path
     from spacetime_memory.aaak import aaak_decompress as _decompress
 
     if pipe or (not text and not file and sys.stdin.isatty() is False):
@@ -3088,6 +3090,7 @@ def aaak_decompress_cmd(text: str | None, file: str | None, pipe: bool) -> None:
 @click.option("--pipe", "-p", is_flag=True, help="Read from stdin")
 def aaak_ratio_cmd(text: str | None, file: str | None, pipe: bool) -> None:
     """Show AAAK compression ratio for text."""
+    from pathlib import Path
     from spacetime_memory.aaak import aaak_ratio as _ratio
 
     if pipe or (not text and not file and sys.stdin.isatty() is False):
