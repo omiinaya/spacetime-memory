@@ -11,6 +11,12 @@ and works the top pending item each tick.
 ### STDB 2% fatal error under heavy concurrent load
 Despite the UUID collision fix, some concurrent stress scenarios still
 trigger WASM fatal errors. Need root cause analysis with replicator.
+
+**Progress (Jun 24):** Added `uuid_v4_uniq()` helper in lib.rs with
+collision-check + retry closure for any table. Migrated memory.rs,
+change_event.rs, knowledge_graph.rs, and workspace.rs to use it.
+Remaining tables (consolidation.rs, document.rs, etc.) still use
+raw `uuid_v4()` without retry.
 Files: server/spacetimedb/src/lib.rs, tests/concurrent/
 Difficulty: Hard
 Est: 4-8h
@@ -49,17 +55,17 @@ Successfully bumped and verified:
 - `UniqueColumn::update()` still present in v2.6 — no migration needed yet
 - Fixed pre-existing unused import warning in knowledge_graph.rs
 - `new_uuid_v4()` / `new_uuid_v7()` now stable behind default `rand` feature
-Commit: (pending push)
+Commit: d1d147f
 
-### ✅ OpenTelemetry / observability integration
-P0: Python SDK — DONE (Jun 24)
+### ✅ OpenTelemetry / observability integration (Jun 24)
+P0: Python SDK — DONE
   - Tracer class, get_tracer(), start_span() context manager, instrument_method()
   - Optional OTLP HTTP export, graceful degradation when OTel packages absent
   - `otel` optional dependency group in pyproject.toml
   - Instrumented client.py: _call, _sql, _embed, _embed_openai, store, search, etc.
   - All 186 unit tests pass.
   Commit: 5398f8f
-P1: Rust server module — DONE (Jun 24)
+P1: Rust server module — DONE
   - TracingSpan table (public), record_span() helper, trace_span! macro
   - Instrumented key reducers in memory.rs and hybrid_query.rs
   - `cargo check --target wasm32-unknown-unknown` passes.
@@ -83,16 +89,15 @@ Package builds with correct packages-dir, twine verification step,
 and __version__ attribute. v* tag triggers publish workflow.
 Commit: e1ba6fe
 
-### ✅ Knowledge graph visualization in frontend
+### ✅ Knowledge graph visualization in frontend (Jun 24)
 Two visual graph explorers implemented and routed:
 - **KnowledgeGraph** (`/graph`, vis-network): interactive graph with search,
   node selection, relation labels, community colors, PageRank, dendrogram.
 - **GraphViz** (`/graph-viz`, D3-force): force-directed layout, type-based
   coloring, highlighting, filtering, minimap, node tooltips.
 Both have Vitest smoke tests and navigation entries.
-Routes: `/graph` and `/graph-viz` in App.tsx.
 
-### ✅ Query expansion unit tests
+### ✅ Query expansion unit tests (Jun 24)
 `query_expansion.py` already has 31 unit tests covering:
 - Basic expansion, custom endpoint/model, API key headers, timeout, temperature
 - Content edge cases (too short, same as query, empty, None, whitespace)
@@ -100,7 +105,7 @@ Routes: `/graph` and `/graph-viz` in App.tsx.
 - Network errors (connect, timeout, protocol, HTTP 500, generic HTTP)
 - Environment variable fallback chain
 - Whitespace trimming, empty query
-All pass cleanly as part of the 1805 unit test suite.
+All pass cleanly as part of the unit test suite.
 
 ---
 

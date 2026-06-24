@@ -1,6 +1,6 @@
 use spacetimedb::*;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4, uuid_v4_uniq};
 use crate::auth::require_auth;
 use crate::auth::require_admin;
 use crate::workspace::check_space_access;
@@ -93,7 +93,7 @@ pub fn store_memory_batch(ctx: &ReducerContext, items_json: String) -> Result<()
         let now = now_micros(ctx);
         for item in items {
             check_space_access(ctx, &item.workspace_id, &caller, "editor")?;
-            let id = uuid_v4(ctx);
+        let id = uuid_v4_uniq(ctx, |id| ctx.db.memory().id().find(id).is_none(), 3);
             let mem = Memory {
                 id: id.clone(),
                 workspace_id: item.workspace_id.clone(),
@@ -150,16 +150,7 @@ pub fn store_memory(
         let caller = ctx.sender().to_hex();
         check_space_access(ctx, &ws_id, &caller, "editor")?;
         let now = now_micros(ctx);
-        // Retry UUID generation to avoid collisions under concurrent load.
-        // STDB .insert() panics on duplicate key (errno 12), so we verify
-        // uniqueness before inserting. Up to 3 attempts.
-        let mut id = uuid_v4(ctx);
-        for _ in 0..3 {
-            if ctx.db.memory().id().find(&id).is_none() {
-                break;
-            }
-            id = uuid_v4(ctx);
-        }
+        let id = uuid_v4_uniq(ctx, |id| ctx.db.memory().id().find(id).is_none(), 3);
         let ws_id = workspace_id.clone();
 
         let mem = Memory {

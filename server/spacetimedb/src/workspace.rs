@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4, uuid_v4_uniq};
 use crate::auth;
 
 /// A workspace representing a project, agent-world, or sandbox.
@@ -42,7 +42,7 @@ pub struct SpacePermission {
 pub fn create_workspace(ctx: &ReducerContext, name: String, description: String, id: String) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let workspace_id = if id.is_empty() { uuid_v4(ctx) } else { id };
+    let workspace_id = if id.is_empty() { uuid_v4_uniq(ctx, |id| ctx.db.workspace().id().find(id).is_none(), 3) } else { id };
     let caller = ctx.sender().to_hex().to_string();
 
     ctx.db.workspace().insert(Workspace {

@@ -3,7 +3,7 @@ use crate::auth::require_auth;
 use crate::auth::require_admin;
 use crate::workspace::check_space_access;
 use crate::change_event;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4, uuid_v4_uniq};
 /// A node in the knowledge graph, representing a concept, entity, or document.
 #[table(accessor = kg_node)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -87,7 +87,7 @@ pub fn create_node(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.kg_node().id().find(id).is_none(), 3);
     let ws_id = workspace_id.clone();
 
     // Validate node_type
@@ -165,7 +165,7 @@ pub fn create_edge(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.kg_node().id().find(id).is_none(), 3);
     let ws_id = workspace_id.clone();
 
     // Validate confidence
@@ -297,7 +297,7 @@ pub fn update_edge(
     );
 
     // Create a new edge version
-    let new_id = uuid_v4(ctx);
+    let new_id = uuid_v4_uniq(ctx, |id| ctx.db.kg_edge().id().find(id).is_none(), 3);
     let new_edge = KgEdge {
         id: new_id.clone(),
         workspace_id: current.workspace_id,

@@ -70,6 +70,30 @@ pub fn uuid_v4(ctx: &spacetimedb::ReducerContext) -> String {
     )
 }
 
+/// Generate a UUID v4 with collision retry.
+///
+/// STDB's `ctx.rng()` is deterministic per-module, so two reducers in the
+/// same transaction batch may produce identical UUIDs. This function checks
+/// for existing rows via `is_unique` (a closure that returns `true` if the
+/// generated ID is available) and retries up to `max_attempts` times.
+///
+/// Use this for every table INSERT that uses a UUID primary key generated
+/// by `uuid_v4`, especially under concurrent load.
+pub fn uuid_v4_uniq(
+    ctx: &spacetimedb::ReducerContext,
+    is_unique: impl Fn(&String) -> bool,
+    max_attempts: usize,
+) -> String {
+    let mut id = uuid_v4(ctx);
+    for _ in 0..max_attempts {
+        if is_unique(&id) {
+            return id;
+        }
+        id = uuid_v4(ctx);
+    }
+    id
+}
+
 /// Get current timestamp in microseconds from the reducer context.
 /// Safe for WASM — uses `ctx.timestamp` instead of `std::time::SystemTime`.
 pub fn now_micros(ctx: &spacetimedb::ReducerContext) -> i64 {
