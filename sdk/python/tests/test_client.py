@@ -1128,3 +1128,96 @@ class TestWhoami:
         ident = c._whoami()
         assert ident == "c200abc123"
         c._http.get.assert_called_once()
+
+
+# ── Remaining stubs ────────────────────────────────────────────────────
+
+
+class TestMethodStubs:
+    """Remaining delegation stubs (<10 lines each)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._sql = Mock(return_value=[])
+        return c
+
+    def test_get_citations(self, client):
+        client.get_citations("ws1", "entity-1", "concept")
+        client._call.assert_called_with("get_citations", ["ws1", "entity-1", "concept"])
+        client._sql.assert_called_once()
+
+    def test_add_node_citation(self, client):
+        client.add_node_citation("ws1", "node-1", "mem-1", "citation desc")
+        client._call.assert_called_with("add_node_citation", ["ws1", "node-1", "mem-1", "citation desc"])
+
+    def test_add_edge_citation(self, client):
+        client.add_edge_citation("ws1", "src", "tgt", "desc")
+        client._call.assert_called_with("add_edge_citation", ["ws1", "src", "tgt", "desc"])
+
+    def test_create_document(self, client):
+        client.create_document("ws1", "title", "content", "md", "/path", "url", {"key": "val"})
+        client._call.assert_called()
+
+    def test_detect_communities(self, client):
+        client.detect_communities("ws1")
+        client._call.assert_called_with("detect_communities", ["ws1"])
+
+    def test_seed_communities(self, client):
+        client.seed_communities("ws1")
+        client._call.assert_called_with("seed_communities", ["ws1"])
+
+    def test_get_edges_with_labels(self, client):
+        """get_neighbors resolves node IDs to labels."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value=[
+            {"source_node_id": "n1", "target_node_id": "n2", "weight": 1.0},
+        ])
+        # _query side-effect: edges_src, edges_tgt, then node resolutions
+        calls = []
+        def mock_query(*args, **kw):
+            calls.append((args, kw))
+            if "source_node_id" in str(kw.get("filter_dict", {})):
+                return [{"id": "e1", "source_node_id": "n1", "target_node_id": "n2", "weight": 1.0}]
+            if "target_node_id" in str(kw.get("filter_dict", {})):
+                return []
+            # Node ID resolution — return both labels
+            filt = kw.get("filter_dict", {})
+            nid = filt.get("id", "")
+            return [{"id": nid, "label": f"Label-{nid}"}]
+        c._query = mock_query
+
+        edges = c.get_neighbors("n1", "ws1")
+        assert len(edges) == 1
+        assert edges[0]["source_label"] == "Label-n1"
+        assert edges[0]["target_label"] == "Label-n2"
+
+    def test_run_maintenance(self, client):
+        client.run_maintenance()
+        client._call.assert_called_with("manual_maintenance", [])
+
+    def test_dedup(self, client):
+        client.dedup("ws1")
+        client._call.assert_called_with("dedup_memories", ["ws1"])
+
+    def test_suggest_merges(self, client):
+        client.suggest_merges("ws1", 0.85)
+        client._call.assert_called_with("suggest_merges", ["ws1", 0.85])
+
+    def test_get_profile_context(self, client):
+        """get_profile_context calls the reducer and reads the result table."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._sql = Mock(return_value=[{"peer_id": "p1", "context": "profile data"}])
+        result = c.get_profile_context("p1")
+        c._call.assert_called_with("get_profile_context", ["p1"])
+        assert result["context"] == "profile data"
+
+    def test_get_profile_context_empty(self, client):
+        """get_profile_context returns None when no rows."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._sql = Mock(return_value=[])
+        result = c.get_profile_context("unknown")
+        assert result is None
