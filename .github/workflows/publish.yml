@@ -8,8 +8,6 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write   # for trusted publishing via PyPI
 
     defaults:
       run:
@@ -23,13 +21,16 @@ jobs:
           python-version: "3.11"
 
       - name: Install build tools
-        run: pip install build
+        run: pip install build twine
 
       - name: Build wheel and sdist
         run: python -m build
+
+      - name: Verify distribution
+        run: twine check dist/*
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
-          packages-dir: sdk/python/dist/
+          packages-dir: dist/
