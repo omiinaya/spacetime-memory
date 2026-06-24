@@ -194,3 +194,139 @@ class TestClientWorkspace:
         assert len(workspaces) == 2
         assert workspaces[0]["name"] == "ws-one"
         assert workspaces[1]["name"] == "ws-two"
+
+
+class TestRequestRetry:
+    """_request_with_retry — retry logic and circuit breaker."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._http = Mock()
+        return c
+
+    def test_server_error_retries(self, client):
+        """HTTP 502 is retried, then succeeds on retry."""
+        client._http.post.side_effect = [
+            Mock(status_code=502),
+            Mock(status_code=200),
+        ]
+        resp = client._request_with_retry("POST", "http://test/call/x")
+        assert resp.status_code == 200
+        assert client._consecutive_failures == 0
+        assert client._circuit_open_until == 0.0
+
+    def test_connect_error_retries(self, client):
+        """httpx.ConnectError is retried."""
+        client._http.post.side_effect = [
+            httpx.ConnectError("refused"),
+            Mock(status_code=200),
+        ]
+        resp = client._request_with_retry("POST", "http://test/call/x")
+        assert resp.status_code == 200
+
+    def test_client_error_not_retried(self, client):
+        """HTTP 400 is NOT retried — returned immediately."""
+        client._http.post.return_value = Mock(status_code=400)
+        resp = client._request_with_retry("POST", "http://test/call/x")
+        assert resp.status_code == 400
+        # Only one call (no retries)
+        assert client._http.post.call_count == 1
+
+    def test_http_530_not_retried(self, client):
+        """HTTP 530 (application error) is NOT retried."""
+        client._http.post.return_value = Mock(status_code=530)
+        resp = client._request_with_retry("POST", "http://test/call/x")
+        assert resp.status_code == 530
+        assert client._http.post.call_count == 1
+
+    def test_all_retries_exhausted(self, client):
+        """After max_retries+1 attempts, circuit breaker trips."""
+        client.max_retries = 2
+        client._circuit_breaker_threshold = 2
+        client._consecutive_failures = 1  # one prior failure
+
+        client._http.post.return_value = Mock(status_code=502)
+        with pytest.raises(RuntimeError, match="Request failed after"):
+            client._request_with_retry("POST", "http://test/call/x")
+
+        # Circuit should be tripped (consecutive_failures=2 >= threshold=2)
+        assert client._consecutive_failures == 2
+        assert client._circuit_open_until > 0
+
+    def test_circuit_breaker_open(self, client):
+        """When circuit is open, fails fast without attempting request."""
+        import time
+        client._circuit_open_until = time.time() + 60  # open for 60s
+        client._consecutive_failures = 5
+
+        with pytest.raises(RuntimeError, match="circuit breaker is open"):
+            client._request_with_retry("POST", "http://test/call/x")
+
+        # No HTTP call was made
+        client._http.post.assert_not_called()
+
+    def test_circuit_resets_on_success(self, client):
+        """A successful request after failures resets the circuit."""
+        client._consecutive_failures = 3
+        client._circuit_open_until = 0.0
+
+        # Server error, then success
+        client._http.post.side_effect = [
+            Mock(status_code=502),
+            Mock(status_code=200),
+        ]
+        resp = client._request_with_retry("POST", "http://test/call/x")
+        assert resp.status_code == 200
+        assert client._consecutive_failures == 0
+        assert client._circuit_open_until == 0.0
+
+    def test_get_method_routing(self, client):
+        """GET method routes to _http.get."""
+        client._http.get.return_value = Mock(status_code=200)
+        resp = client._request_with_retry("GET", "http://test/health")
+        assert resp.status_code == 200
+        client._http.get.assert_called_once()
+
+    def test_other_method_routing(self, client):
+        """Non-POST/GET methods route to _http.request."""
+        client._http.request.return_value = Mock(status_code=200)
+        resp = client._request_with_retry("PUT", "http://test/resource")
+        assert resp.status_code == 200
+        client._http.request.assert_called_once_with("PUT", "http://test/resource")
+
+
+class TestErrorMapping:
+    """_map_reducer_error and _map_sql_error."""
+
+    @pytest.fixture
+    def client(self):
+        return Client(host="localhost", port="3001", database="test-db")
+
+    def test_map_reducer_error_known(self, client):
+        """Known reducer errors are mapped to friendly messages."""
+        msg = client._map_reducer_error("not found: memory abc-123")
+        assert "Record not found" in msg
+        assert "raw:" in msg
+
+    def test_map_reducer_error_unknown(self, client):
+        """Unknown reducer errors get generic message."""
+        msg = client._map_reducer_error("Something went wrong")
+        assert msg.startswith("Reducer error:")
+
+    def test_map_sql_error_known(self, client):
+        """Known SQL errors are mapped with friendly message + raw."""
+        msg = client._map_sql_error("syntax error near SELECT")
+        assert "SQL syntax error" in msg
+        assert "raw:" in msg
+
+    def test_map_sql_error_unknown(self, client):
+        """Unknown SQL errors get generic prefix."""
+        msg = client._map_sql_error("random database problem")
+        assert msg.startswith("Database error:")
+
+    def test_map_sql_error_truncates(self, client):
+        """Long error messages are truncated to 300 chars."""
+        long_error = "x" * 500
+        msg = client._map_sql_error(long_error)
+        assert len(msg) < 500
