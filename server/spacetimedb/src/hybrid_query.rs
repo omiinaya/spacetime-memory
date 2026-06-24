@@ -9,6 +9,8 @@ use crate::retrieval::{
 };
 use crate::workspace::workspace;
 use crate::{now_micros, uuid_v4, MAX_RESULTS};
+use crate::tracing::TracingSpanKind;
+use crate::trace_span;
 
 // ---------------------------------------------------------------------------
 // Tables
@@ -173,7 +175,8 @@ pub fn hybrid_search(
     _polyphonic: bool,
     mmr_lambda: f64,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
+    trace_span!(ctx, "hybrid_search", TracingSpanKind::Read, &workspace_id, {
+        let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let qhash = query_hash(&query);
     let query_lower = query.to_lowercase();
@@ -693,7 +696,8 @@ pub fn hybrid_search(
         }
     }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------

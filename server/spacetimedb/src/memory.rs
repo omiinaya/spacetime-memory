@@ -5,6 +5,8 @@ use crate::auth::require_auth;
 use crate::auth::require_admin;
 use crate::workspace::check_space_access;
 use crate::change_event;
+use crate::tracing::TracingSpanKind;
+use crate::trace_span;
 
 /// A memory entry storing world facts, experiences, or mental models
 /// for an AI agent within a workspace.
@@ -82,58 +84,50 @@ pub struct StoreMemoryItem {
 }
 
 #[reducer]
-pub fn store_memory_batch(
-    ctx: &ReducerContext,
-    items_json: String,
-) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let items: Vec<StoreMemoryItem> = serde_json::from_str(&items_json)
-        .map_err(|e| format!("Invalid batch items JSON: {}", e))?;
-    let caller = ctx.sender().to_hex();
-    let now = now_micros(ctx);
-    for item in items {
-        check_space_access(ctx, &item.workspace_id, &caller, "editor")?;
-        let id = uuid_v4(ctx);
-        let mem = Memory {
-            id: id.clone(),
-            workspace_id: item.workspace_id.clone(),
-            peer_id: item.peer_id,
-            observer_id: item.observer_id,
-            memory_type: item.memory_type,
-            content: item.content,
-            summary: item.summary,
-            context: String::new(),
-            entities_json: item.entities_json,
-            confidence: item.confidence,
-            source_session_id: item.source_session_id,
-            source_message_id: item.source_message_id,
-            is_active: true,
-            created_at: now,
-            expires_at: 0,
-            updated_at: now,
-            tier: String::from("L1"),
-            access_count: 0,
-            strength: 0.5,
-            version: 1,
-            valid_from: 0,
-            parent_directory_id: String::new(),
-            consolidated_to: String::new(),
-            trust_score: 0.5,
-            feedback_count: 0,
-            user_scope: String::new(),
-        };
-        let mem_json = change_event::record_to_json(&mem);
-        ctx.db.memory().insert(mem);
-        change_event::log_change(
-            ctx,
-            &item.workspace_id,
-            "memory",
-            "insert",
-            &id,
-            &mem_json,
-        );
-    }
-    Ok(())
+pub fn store_memory_batch(ctx: &ReducerContext, items_json: String) -> Result<(), String> {
+    trace_span!(ctx, "store_memory_batch", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let items: Vec<StoreMemoryItem> = serde_json::from_str(&items_json)
+            .map_err(|e| format!("Invalid batch items JSON: {}", e))?;
+        let caller = ctx.sender().to_hex();
+        let now = now_micros(ctx);
+        for item in items {
+            check_space_access(ctx, &item.workspace_id, &caller, "editor")?;
+            let id = uuid_v4(ctx);
+            let mem = Memory {
+                id: id.clone(),
+                workspace_id: item.workspace_id.clone(),
+                peer_id: item.peer_id,
+                observer_id: item.observer_id,
+                memory_type: item.memory_type,
+                content: item.content,
+                summary: item.summary,
+                context: String::new(),
+                entities_json: item.entities_json,
+                confidence: item.confidence,
+                source_session_id: item.source_session_id,
+                source_message_id: item.source_message_id,
+                is_active: true,
+                created_at: now,
+                expires_at: 0,
+                updated_at: now,
+                tier: String::from("L1"),
+                access_count: 0,
+                strength: 0.5,
+                version: 1,
+                valid_from: 0,
+                parent_directory_id: String::new(),
+                consolidated_to: String::new(),
+                trust_score: 0.5,
+                feedback_count: 0,
+                user_scope: String::new(),
+            };
+            let mem_json = change_event::record_to_json(&mem);
+            ctx.db.memory().insert(mem);
+            change_event::log_change(ctx, &item.workspace_id, "memory", "insert", &id, &mem_json);
+        }
+        Ok(())
+    })
 }
 
 #[reducer]
@@ -150,59 +144,60 @@ pub fn store_memory(
     source_session_id: String,
     source_message_id: String,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let caller = ctx.sender().to_hex();
-    check_space_access(ctx, &workspace_id, &caller, "editor")?;
-    let now = now_micros(ctx);
-    // Retry UUID generation to avoid collisions under concurrent load.
-    // STDB .insert() panics on duplicate key (errno 12), so we verify
-    // uniqueness before inserting. Up to 3 attempts.
-    let mut id = uuid_v4(ctx);
-    for _ in 0..3 {
-        if ctx.db.memory().id().find(&id).is_none() {
-            break;
-        }
-        id = uuid_v4(ctx);
-    }
     let ws_id = workspace_id.clone();
+    trace_span!(ctx, "store_memory", TracingSpanKind::Write, &ws_id, {
+        let _account = require_auth(ctx)?;
+        let caller = ctx.sender().to_hex();
+        check_space_access(ctx, &ws_id, &caller, "editor")?;
+        let now = now_micros(ctx);
+        // Retry UUID generation to avoid collisions under concurrent load.
+        // STDB .insert() panics on duplicate key (errno 12), so we verify
+        // uniqueness before inserting. Up to 3 attempts.
+        let mut id = uuid_v4(ctx);
+        for _ in 0..3 {
+            if ctx.db.memory().id().find(&id).is_none() {
+                break;
+            }
+            id = uuid_v4(ctx);
+        }
+        let ws_id = workspace_id.clone();
 
-    let mem = Memory {
-        id: id.clone(),
-        workspace_id,
-        peer_id,
-        observer_id,
-        memory_type,
-        content,
-        summary,
-        context: String::new(),
-        entities_json,
-        confidence,
-        source_session_id,
-        source_message_id,
-        is_active: true,
-        created_at: now,
-        expires_at: 0,
-        updated_at: now,
+        let mem = Memory {
+            id: id.clone(),
+            workspace_id,
+            peer_id,
+            observer_id,
+            memory_type,
+            content,
+            summary,
+            context: String::new(),
+            entities_json,
+            confidence,
+            source_session_id,
+            source_message_id,
+            is_active: true,
+            created_at: now,
+            expires_at: 0,
+            updated_at: now,
 
-        // OpenViking + RetainDB fields
-        tier: String::from("L1"),
-        access_count: 0,
-        strength: 0.5,
-        version: 1,
-        valid_from: 0,
-        parent_directory_id: String::new(),
-        consolidated_to: String::new(),
-        trust_score: 0.5,
-        feedback_count: 0,
-        user_scope: String::new(),
-    };
+            // OpenViking + RetainDB fields
+            tier: String::from("L1"),
+            access_count: 0,
+            strength: 0.5,
+            version: 1,
+            valid_from: 0,
+            parent_directory_id: String::new(),
+            consolidated_to: String::new(),
+            trust_score: 0.5,
+            feedback_count: 0,
+            user_scope: String::new(),
+        };
 
-    let mem_json = change_event::record_to_json(&mem);
-    ctx.db.memory().insert(mem);
-    change_event::log_change(
-        ctx, &ws_id, "memory", "insert", &id, &mem_json,
-    );
-    Ok(())
+        let mem_json = change_event::record_to_json(&mem);
+        ctx.db.memory().insert(mem);
+        change_event::log_change(ctx, &ws_id, "memory", "insert", &id, &mem_json);
+        Ok(())
+    })
 }
 
 #[reducer]
@@ -213,81 +208,81 @@ pub fn update_memory(
     summary: String,
     confidence: f64,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let mut mem = ctx
-        .db
-        .memory()
-        .id()
-        .find(&id)
-        .ok_or_else(|| format!("Memory '{}' not found", id))?;
-    let caller = ctx.sender().to_hex();
-    check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
+    trace_span!(ctx, "update_memory", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let mut mem = ctx
+            .db
+            .memory()
+            .id()
+            .find(&id)
+            .ok_or_else(|| format!("Memory '{}' not found", id))?;
+        let caller = ctx.sender().to_hex();
+        check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
 
-    mem.content = content;
-    mem.summary = summary;
-    mem.confidence = confidence;
-    mem.updated_at = now_micros(ctx);
+        mem.content = content;
+        mem.summary = summary;
+        mem.confidence = confidence;
+        mem.updated_at = now_micros(ctx);
 
-    let ws_id = mem.workspace_id.clone();
-    let mem_id = mem.id.clone();
-    let mem_json = change_event::record_to_json(&mem);
-    ctx.db.memory().id().update(mem);
-    change_event::log_change(
-        ctx, &ws_id, "memory", "update", &mem_id, &mem_json,
-    );
-    Ok(())
-}
-
-#[reducer]
-pub fn deactivate_memory(ctx: &ReducerContext, id: String) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let mut mem = ctx
-        .db
-        .memory()
-        .id()
-        .find(&id)
-        .ok_or_else(|| format!("Memory '{}' not found", id))?;
-    let caller = ctx.sender().to_hex();
-    check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
-
-    mem.is_active = false;
-    mem.updated_at = now_micros(ctx);
-
-    let ws_id = mem.workspace_id.clone();
-    let mem_id = mem.id.clone();
-    let mem_json = change_event::record_to_json(&mem);
-    ctx.db.memory().id().update(mem);
-    change_event::log_change(
-        ctx, &ws_id, "memory", "update", &mem_id, &mem_json,
-    );
-    Ok(())
-}
-
-#[reducer]
-pub fn expire_memories(ctx: &ReducerContext) -> Result<(), String> {
-    let _admin = require_admin(ctx)?;
-    let now = now_micros(ctx);
-
-    let expired: Vec<_> = ctx
-        .db
-        .memory()
-        .iter()
-        .filter(|m| m.expires_at > 0 && m.expires_at < now)
-        .collect();
-
-    for mut mem in expired {
-        mem.is_active = false;
-        mem.updated_at = now;
         let ws_id = mem.workspace_id.clone();
         let mem_id = mem.id.clone();
         let mem_json = change_event::record_to_json(&mem);
         ctx.db.memory().id().update(mem);
-        change_event::log_change(
-            ctx, &ws_id, "memory", "update", &mem_id, &mem_json,
-        );
-    }
+        change_event::log_change(ctx, &ws_id, "memory", "update", &mem_id, &mem_json);
+        Ok(())
+    })
+}
 
-    Ok(())
+#[reducer]
+pub fn deactivate_memory(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    trace_span!(ctx, "deactivate_memory", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let mut mem = ctx
+            .db
+            .memory()
+            .id()
+            .find(&id)
+            .ok_or_else(|| format!("Memory '{}' not found", id))?;
+        let caller = ctx.sender().to_hex();
+        check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
+
+        mem.is_active = false;
+        mem.updated_at = now_micros(ctx);
+
+        let ws_id = mem.workspace_id.clone();
+        let mem_id = mem.id.clone();
+        let mem_json = change_event::record_to_json(&mem);
+        ctx.db.memory().id().update(mem);
+        change_event::log_change(ctx, &ws_id, "memory", "update", &mem_id, &mem_json);
+        Ok(())
+    })
+}
+
+#[reducer]
+pub fn expire_memories(ctx: &ReducerContext) -> Result<(), String> {
+    trace_span!(ctx, "expire_memories", TracingSpanKind::Admin, "", {
+        let _admin = require_admin(ctx)?;
+        let now = now_micros(ctx);
+
+        let expired: Vec<_> = ctx
+            .db
+            .memory()
+            .iter()
+            .filter(|m| m.expires_at > 0 && m.expires_at < now)
+            .collect();
+
+        for mut mem in expired {
+            mem.is_active = false;
+            mem.updated_at = now;
+            let ws_id = mem.workspace_id.clone();
+            let mem_id = mem.id.clone();
+            let mem_json = change_event::record_to_json(&mem);
+            ctx.db.memory().id().update(mem);
+            change_event::log_change(ctx, &ws_id, "memory", "update", &mem_id, &mem_json);
+        }
+
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------

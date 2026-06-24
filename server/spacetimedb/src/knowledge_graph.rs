@@ -4,7 +4,7 @@ use crate::auth::require_admin;
 use crate::workspace::check_space_access;
 use crate::change_event;
 use crate::{now_micros, uuid_v4};
-
+use crate::MAX_RESULTS;
 /// A node in the knowledge graph, representing a concept, entity, or document.
 #[table(accessor = kg_node)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
