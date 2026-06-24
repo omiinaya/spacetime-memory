@@ -8,31 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### OpenTelemetry / observability integration
-Add OpenTelemetry tracing/metrics to the client SDK and server module.
-Instrument search latency, embedding calls, and STDB write times.
-Reference: open-telemetry/opentelemetry-python
-Files: sdk/python/spacetime_memory/client.py, server/spacetimedb/src/
-Difficulty: Medium
-Est: 3-4h
-
-P0: Python SDK — DONE (Jun 24)
-  - Created sdk/python/spacetime_memory/tracer.py: Tracer class, get_tracer(),
-    start_span() context manager, instrument_method() decorator, optional
-    OTLP HTTP export, graceful degradation when OTel packages absent.
-  - Added `otel` optional dependency group in pyproject.toml.
-  - Exported Tracer/get_tracer/start_span from __init__.py.
-  - Instrumented client.py: _call (all reducer calls), _sql, _embed,
-    _embed_openai, _embed_batch, _embed_batch_openai, check_embedder_health,
-    store (reducer call), store_batch (reducer call), search (hybrid search).
-  - All 186 unit tests pass.
-  Commit: 5398f8f
-
-P1: Rust server module — NOT STARTED
-  - Add tracing spans to server/spacetimedb/src/ reducers using
-    spacetimedb::log::info or custom metrics table.
-  - Reference: SpacetimeDB v2.4 SDK logging API.
-
 ### STDB 2% fatal error under heavy concurrent load
 Despite the UUID collision fix, some concurrent stress scenarios still
 trigger WASM fatal errors. Need root cause analysis with replicator.
@@ -55,6 +30,30 @@ Difficulty: Medium
 Est: 3h
 
 ## Recently Completed
+
+### ✅ OpenTelemetry / observability integration
+P0: Python SDK — DONE (Jun 24)
+  - Created sdk/python/spacetime_memory/tracer.py: Tracer class, get_tracer(),
+    start_span() context manager, instrument_method() decorator, optional
+    OTLP HTTP export, graceful degradation when OTel packages absent.
+  - Added `otel` optional dependency group in pyproject.toml.
+  - Exported Tracer/get_tracer/start_span from __init__.py.
+  - Instrumented client.py: _call (all reducer calls), _sql, _embed,
+    _embed_openai, _embed_batch, _embed_batch_openai, check_embedder_health,
+    store (reducer call), store_batch (reducer call), search (hybrid search).
+  - All 186 unit tests pass.
+  Commit: 5398f8f
+P1: Rust server module — DONE (Jun 24)
+  - Created server/spacetimedb/src/tracing.rs: `TracingSpan` table (public),
+    `record_span()` helper, `trace_span!` macro for automatic timing.
+  - Instrumented key hot-path reducers: `store_memory`, `store_memory_batch`,
+    `update_memory`, `deactivate_memory`, `expire_memories` (in memory.rs),
+    and `hybrid_search` (in hybrid_query.rs).
+  - Spans recorded to both `log::info!()` (STDB host logging) and the
+    queryable `TracingSpan` table for dashboard/observability use.
+  - `cargo check --target wasm32-unknown-unknown` passes (0 errors).
+  - Reference: SpacetimeDB v2.4 SDK logging API + custom metrics table.
+  Commit: 54fe3ab
 
 ### ✅ .env stale config cleanup
 EMBEDDER_TYPE=local/openai/auto had no effect since the codebase migrated
