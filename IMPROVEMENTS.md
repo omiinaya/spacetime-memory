@@ -54,19 +54,32 @@ Files: server/spacetimedb/src/consolidation.rs, document.rs, auth.rs, ...
 Difficulty: Medium
 Est: 2-3h
 
-### Unit test coverage for Rust helper functions
-No Rust unit tests exist for `uuid_v4()`, `uuid_v4_uniq()`, `now_micros()`,
-or `default_expires_at()`. These are pure functions (no STDB dependency)
-and could be unit-tested on the host target.
+### Fix non-standard UUID format (8-4-4-4-8 → standard 8-4-4-4-12)
+Discovered during unit test work: `format_uuid_v4()` produces a legacy
+28-hex-char UUID (8-4-4-4-8, 112 bits) instead of the standard 32-hex-char
+format (8-4-4-4-12, 128 bits). The upper 4 hex digits from `high` are
+unused. This doesn't affect uniqueness (the retry mechanism handles
+collisions), but fixing it before the UUID v7 migration would reduce
+tech debt.
+
+Approach: change `&rand_hex[8..]` to include the remaining 4 hex digits
+from `ts_part` (which currently go unused). This would change every
+existing UUID in the database — requires a data migration or a flag day.
 Files: server/spacetimedb/src/lib.rs
-Difficulty: Easy
-Est: 0.5h
+Difficulty: Medium
+Est: 1h (plus migration planning)
 
 ---
 
 ## Recently Completed
 
-### ✅ Upgrade STDB dependency from 2.4 → 2.6 (Jun 24)
+### ✅ Unit test coverage for Rust helper functions (Jun 24)
+Extracted pure computation helpers (`format_uuid_v4`, `micros_from_timestamp`,
+`compute_expires_at`) from context-dependent functions and added 21 tests.
+All 156 unit tests pass. WASM build check passes.
+Commits: 7bb4ff3
+
+### ✅ STDB dependency upgrade 2.4 → 2.6 (Jun 24)
 Successfully bumped and verified:
 - spacetimedb resolved from 2.4.1 → 2.6.0
 - `cargo check --target wasm32-unknown-unknown` passes (zero warnings)
@@ -106,24 +119,6 @@ Commit: ec81a0b
 Package builds with correct packages-dir, twine verification step,
 and __version__ attribute. v* tag triggers publish workflow.
 Commit: e1ba6fe
-
-### ✅ Knowledge graph visualization in frontend (Jun 24)
-Two visual graph explorers implemented and routed:
-- **KnowledgeGraph** (`/graph`, vis-network): interactive graph with search,
-  node selection, relation labels, community colors, PageRank, dendrogram.
-- **GraphViz** (`/graph-viz`, D3-force): force-directed layout, type-based
-  coloring, highlighting, filtering, minimap, node tooltips.
-Both have Vitest smoke tests and navigation entries.
-
-### ✅ Query expansion unit tests (Jun 24)
-`query_expansion.py` already has 31 unit tests covering:
-- Basic expansion, custom endpoint/model, API key headers, timeout, temperature
-- Content edge cases (too short, same as query, empty, None, whitespace)
-- Reasoning model fallback (o1/deepseek-r1 style)
-- Network errors (connect, timeout, protocol, HTTP 500, generic HTTP)
-- Environment variable fallback chain
-- Whitespace trimming, empty query
-All pass cleanly as part of the unit test suite.
 
 ---
 
