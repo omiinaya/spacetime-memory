@@ -47,8 +47,9 @@ def fail(label: str, err: str = ""):
 
 # ── Setup ───────────────────────────────────────────────────────────
 
-print("=" * 60)
-print(f"Spacetime Memory E2E Smoke Test — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+if __name__ == "__main__":
+    print("=" * 60)
+    print(f"Spacetime Memory E2E Smoke Test — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 print(f"Host: {HOST}:{PORT}  DB: {DB[:16]}...")
 print("=" * 60)
 

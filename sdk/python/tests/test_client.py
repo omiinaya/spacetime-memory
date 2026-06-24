@@ -992,3 +992,139 @@ class TestBatchUpdateMemoriesSuccess:
         result = c.batch_update_memories("ws1", ["m1"], {"content": "new"})
         assert result["status"] == "partial"
         assert result["errors"]
+
+
+# ── Profile stubs ──────────────────────────────────────────────────────
+
+
+class TestProfileStubs:
+    """Simple profile delegation methods (lines 2294, 2298, 2320-2328)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        return c
+
+    def test_add_profile_fact(self, client):
+        client.add_profile_fact("peer-1", "likes coffee")
+        client._call.assert_called_with("add_profile_fact", ["peer-1", "likes coffee"])
+
+    def test_add_dynamic_context(self, client):
+        client.add_dynamic_context("peer-1", "just woke up")
+        client._call.assert_called_with("add_dynamic_context", ["peer-1", "just woke up"])
+
+    def test_search_profiles(self, client):
+        """search_profiles filters client-side by static_facts_json."""
+        client.list_profiles = Mock(return_value=[
+            {"peer_id": "p1", "static_facts_json": "likes coffee"},
+            {"peer_id": "p2", "static_facts_json": "prefers tea"},
+        ])
+        results = client.search_profiles("ws1", "coffee")
+        assert len(results) == 1
+        assert results[0]["peer_id"] == "p1"
+
+
+# ── Tour stubs ─────────────────────────────────────────────────────────
+
+
+class TestTourStubs:
+    """Simple tour delegation methods (lines 2591, 2595, 2599)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        return c
+
+    def test_create_tour(self, client):
+        client.create_tour("ws1", "My Tour", "A nice tour")
+        client._call.assert_called_with("create_tour", ["ws1", "My Tour", "A nice tour"])
+
+    def test_add_tour_stop(self, client):
+        client.add_tour_stop("tour-1", "node-1", "Stop 1", "desc")
+        client._call.assert_called_with("add_tour_stop", ["tour-1", "node-1", "Stop 1", "desc"])
+
+    def test_delete_tour(self, client):
+        client.delete_tour("tour-1")
+        client._call.assert_called_with("delete_tour", ["tour-1"])
+
+
+# ── Entity link stubs ──────────────────────────────────────────────────
+
+
+class TestEntityLinkStubs:
+    """Simple entity-link delegation methods (lines 2613, 2619, 2623)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        return c
+
+    def test_create_entity_link(self, client):
+        client.create_entity_link("ws1", "Alice", "person", "Alice in Wonderland")
+        client._call.assert_called_with("create_entity_link", [
+            "ws1", "Alice", "[]", "person", "Alice in Wonderland",
+        ])
+
+    def test_add_alias(self, client):
+        client.add_alias("link-1", "Alias")
+        client._call.assert_called_with("add_alias", ["link-1", "Alias"])
+
+    def test_resolve_entity(self, client):
+        client.resolve_entity("ws1", "Alice")
+        client._call.assert_called_with("resolve_entity", ["ws1", "Alice"])
+
+
+# ── get_context_chain ──────────────────────────────────────────────────
+
+
+class TestGetContextChain:
+    """get_context_chain() method (lines 1615-1632)."""
+
+    def test_returns_context(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._query = Mock(side_effect=[
+            [{"id": "mem-1", "workspace_id": "ws1", "context": "mem context"}],
+            [{"id": "ws1", "context": "ws context"}],
+        ])
+        result = c.get_context_chain("mem-1")
+        assert result["memory_context"] == "mem context"
+        assert result["workspace_context"] == "ws context"
+
+    def test_memory_not_found_returns_empty(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._query = Mock(return_value=[])
+        result = c.get_context_chain("nonexistent")
+        assert result["workspace_context"] == ""
+        assert result["memory_context"] == ""
+
+    def test_no_workspace_context(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._query = Mock(side_effect=[
+            [{"id": "mem-1", "workspace_id": "ws1", "context": "mem ctx"}],
+            [],  # workspace lookup returns empty
+        ])
+        result = c.get_context_chain("mem-1")
+        assert result["memory_context"] == "mem ctx"
+        assert result["workspace_context"] == ""
+
+
+# ── _whoami ────────────────────────────────────────────────────────────
+
+
+class TestWhoami:
+    """_whoami() method (line 266)."""
+
+    def test_returns_identity_header(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        mock_resp = Mock()
+        mock_resp.headers.get.return_value = "c200abc123"
+        c._ensure_identity = Mock()
+        c._http.get = Mock(return_value=mock_resp)
+        c._headers = Mock(return_value={})
+
+        ident = c._whoami()
+        assert ident == "c200abc123"
+        c._http.get.assert_called_once()
