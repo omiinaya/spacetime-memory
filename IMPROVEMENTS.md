@@ -13,13 +13,13 @@ Despite the UUID collision fix, some concurrent stress scenarios still
 trigger WASM fatal errors. Need root cause analysis with replicator.
 
 **Progress (Jun 24):** Added `uuid_v4_uniq()` helper in lib.rs with
-collision-check + retry closure for any table. Migrated memory.rs,
-change_event.rs, knowledge_graph.rs, and workspace.rs to use it.
-Remaining tables (consolidation.rs, document.rs, etc.) still use
-raw `uuid_v4()` without retry.
-Files: server/spacetimedb/src/lib.rs, tests/concurrent/
-Difficulty: Hard
-Est: 4-8h
+collision-check + retry closure for any table. Migrated ALL remaining tables
+(consolidation.rs, auth.rs, insight.rs, profile.rs, replication.rs,
+document.rs, note.rs, change_event.rs, knowledge_graph.rs, workspace.rs,
+memory.rs). Zero raw `uuid_v4()` calls remain for primary key inserts.
+**Files:** server/spacetimedb/src/lib.rs, tests/concurrent/
+**Difficulty:** Hard
+**Est:** 4-8h
 
 ### Multi-region / failover support
 No tests or code for multi-region STDB deployment. Need to document
@@ -44,16 +44,6 @@ Files: server/spacetimedb/src/lib.rs
 Difficulty: Medium
 Est: 1-2h
 
-### Extend uuid_v4_uniq() to remaining tables
-The new `uuid_v4_uniq()` helper was added to lib.rs and deployed to
-memory.rs, change_event.rs, knowledge_graph.rs, and workspace.rs.
-Remaining tables that still use raw `uuid_v4()` for primary key inserts
-without retry: consolidation.rs (10+ sites), document.rs (3 sites),
-auth.rs (4 sites), note.rs, insight.rs, profile.rs, etc.
-Files: server/spacetimedb/src/consolidation.rs, document.rs, auth.rs, ...
-Difficulty: Medium
-Est: 2-3h
-
 ### Fix non-standard UUID format (8-4-4-4-8 → standard 8-4-4-4-12)
 Discovered during unit test work: `format_uuid_v4()` produces a legacy
 28-hex-char UUID (8-4-4-4-8, 112 bits) instead of the standard 32-hex-char
@@ -72,6 +62,11 @@ Est: 1h (plus migration planning)
 ---
 
 ## Recently Completed
+
+### ✅ Extend uuid_v4_uniq() to remaining tables (Jun 24)
+All 27 no-longer-raw `uuid_v4()` call sites migrated in consolidation.rs,
+auth.rs, insight.rs, profile.rs, replication.rs. Zero compiler warnings.
+Commit: 6cdb64d
 
 ### ✅ Unit test coverage for Rust helper functions (Jun 24)
 Extracted pure computation helpers (`format_uuid_v4`, `micros_from_timestamp`,
