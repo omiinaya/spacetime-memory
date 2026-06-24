@@ -330,3 +330,143 @@ class TestErrorMapping:
         long_error = "x" * 500
         msg = client._map_sql_error(long_error)
         assert len(msg) < 500
+
+
+# ── Glob / wildcard memory search ──────────────────────────────
+
+
+class TestGlobGet:
+    """Unit tests for client.glob_get()."""
+
+    @pytest.fixture
+    def client(self):
+        return Client(host="localhost", port="3001", database="test-db")
+
+    def test_glob_matches_content(self, client: Client):
+        """Glob pattern matches memory content field."""
+        client._query = lambda *a, **kw: [
+            {"id": "a", "content": "hello world"},
+            {"id": "b", "content": "goodbye"},
+        ]
+        results = client.glob_get("ws1", "hello*", field="content")
+        assert len(results) == 1
+        assert results[0]["id"] == "a"
+
+    def test_glob_case_insensitive(self, client: Client):
+        """Case-insensitive matching."""
+        client._query = lambda *a, **kw: [
+            {"id": "a", "content": "HELLO WORLD"},
+        ]
+        results = client.glob_get("ws1", "hello*", field="content")
+        assert len(results) == 1
+
+    def test_glob_no_matches(self, client: Client):
+        """No matches returns empty list."""
+        client._query = lambda *a, **kw: [
+            {"id": "a", "content": "hello"},
+        ]
+        results = client.glob_get("ws1", "xyz*", field="content")
+        assert results == []
+
+    def test_glob_custom_field(self, client: Client):
+        """Match against a custom field (summary)."""
+        client._query = lambda *a, **kw: [
+            {"id": "a", "content": "stuff", "summary": "Important note"},
+            {"id": "b", "content": "stuff", "summary": "random"},
+        ]
+        results = client.glob_get("ws1", "Important*", field="summary")
+        assert len(results) == 1
+        assert results[0]["id"] == "a"
+
+    def test_glob_honours_limit(self, client: Client):
+        """Honours the limit parameter."""
+        client._query = lambda *a, **kw: [
+            {"id": f"item{i}", "content": f"item{i}"} for i in range(10)
+        ]
+        results = client.glob_get("ws1", "item*", field="id", limit=3)
+        assert len(results) == 3
+
+    def test_glob_default_field_is_id(self, client: Client):
+        """Default field is 'id'."""
+        client._query = lambda *a, **kw: [
+            {"id": "user-1", "content": "stuff"},
+            {"id": "admin-2", "content": "other"},
+        ]
+        results = client.glob_get("ws1", "user-*")
+        assert len(results) == 1
+        assert results[0]["id"] == "user-1"
+
+
+# ── Backup ───────────────────────────────────────────────────────
+
+
+class TestBackup:
+    """Unit tests for client.backup()."""
+
+    @pytest.fixture
+    def client(self):
+        return Client(host="localhost", port="3001", database="test-db")
+
+    def test_backup_writes_json(self, client: Client):
+        """Backup creates a JSON file with table data."""
+        import tempfile
+
+        client._query = lambda *a, **kw: [
+            {"id": "ws1", "name": "default"},
+        ]
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tf:
+            out_path = tf.name
+        try:
+            result = client.backup(output_path=out_path)
+            assert result["status"] == "ok"
+            assert result["path"] == out_path
+            assert result["total_rows"] > 0
+
+            with open(out_path) as f:
+                data = json.load(f)
+            assert data["version"] == "0.3.0"
+            assert "tables" in data
+        finally:
+            import os
+            os.unlink(out_path)
+
+    def test_backup_default_path(self, client: Client):
+        """Backup with default path uses today's date."""
+        import datetime
+        client._query = lambda *a, **kw: []
+
+        result = client.backup()
+        assert result["status"] == "ok"
+        date = datetime.date.today().isoformat()
+        assert date in result["path"]
+        import os
+        os.unlink(result["path"])
+
+    def test_backup_runtime_error_skipped(self, client: Client):
+        """Tables that raise RuntimeError are skipped."""
+        call_count = [0]
+
+        def side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 2:
+                raise RuntimeError("no such table")
+            return []
+
+        client._query = side_effect
+        result = client.backup(output_path="/tmp/test_backup_skip.json")
+        assert result["status"] == "ok"
+
+    def test_backup_plugin_dispatch(self, client: Client):
+        """Backup dispatches to plugin_manager if set."""
+        client._query = lambda *a, **kw: [
+            {"id": "ws1", "name": "default"},
+        ]
+        pm = Mock()
+        client.plugin_manager = pm
+
+        result = client.backup(output_path="/tmp/test_backup_plugin.json")
+        assert result["status"] == "ok"
+        pm.dispatch_export.assert_called_once()
+        import os
+        os.unlink(result["path"])
