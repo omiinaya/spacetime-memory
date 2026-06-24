@@ -1736,10 +1736,34 @@ class Client:
     def batch_update_memories(self, workspace_id: str, memory_ids: list[str], updates: dict[str, Any]) -> dict[str, Any]:
         """Batch update multiple memories. Mem0 parity.
         updates can contain: content, summary, confidence, tier, is_active
+
+        Performs client-side batching: loops over each memory_id and
+        calls the existing ``update_memory`` reducer individually.
         """
-        return self._call("batch_update_memories", [
-            workspace_id, json.dumps(memory_ids), json.dumps(updates)
-        ])
+        updated = 0
+        errors: list[str] = []
+        for mem_id in memory_ids:
+            try:
+                # Fetch current memory to preserve unchanged fields
+                current_rows = self._query(
+                    "memory",
+                    filter_dict={"id": mem_id, "workspace_id": workspace_id},
+                )
+                if not current_rows:
+                    errors.append(f"Memory '{mem_id}' not found")
+                    continue
+                current = current_rows[0]
+                content = updates.get("content", current.get("content", ""))
+                summary = updates.get("summary", current.get("summary", ""))
+                confidence = updates.get("confidence", current.get("confidence", 0.8))
+                self.update_memory(mem_id, content, summary, confidence)
+                updated += 1
+            except Exception as e:
+                errors.append(f"Memory '{mem_id}': {e}")
+
+        if errors:
+            return {"status": "partial", "updated": updated, "errors": errors}
+        return {"status": "ok", "updated": updated}
 
     def get_memory_history(self, memory_id: str) -> list[dict[str, Any]]:
         """Get version history for a memory. Mem0 parity.

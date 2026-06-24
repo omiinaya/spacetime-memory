@@ -338,7 +338,8 @@ fn query_note(
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
     for n in ctx.db.note().iter().filter(|n: &crate::note::Note| {
-        n.workspace_id == workspace_id && n.is_active
+        let ws_ok = workspace_id.is_empty() || n.workspace_id == workspace_id;
+        ws_ok && n.is_active
     }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
             "id": n.id, "workspace_id": n.workspace_id,
