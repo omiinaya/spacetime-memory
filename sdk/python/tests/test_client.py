@@ -470,3 +470,196 @@ class TestBackup:
         pm.dispatch_export.assert_called_once()
         import os
         os.unlink(result["path"])
+
+
+# ── Store with veracity tier ────────────────────────────────────────────
+
+
+class TestStoreVeracity:
+    """store() veracity tier handling (lines 786-791)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[])  # empty → skip post-store indexing
+        c._emit_event = Mock()
+        c._query_cache = None
+        c.plugin_manager = None
+        return c
+
+    def test_store_with_veracity_tier(self, client):
+        """store with veracity_tier='stated' computes compound confidence."""
+        result = client.store("ws1", content="hello", veracity_tier="stated", veracity_sources=2)
+        assert result["status"] == "ok"
+        client._call.assert_called()
+        args_list = client._call.call_args[0][1]
+        # confidence is index 7 in the reducer args list
+        confidence = args_list[7]
+        # "stated" tier has base ~0.9, compounded with 2 sources
+        assert confidence > 0.8
+
+    def test_store_unknown_tier_skips_compound(self, client):
+        """store with veracity_tier='unknown' keeps default confidence."""
+        result = client.store("ws1", content="hello", veracity_tier="unknown")
+        assert result["status"] == "ok"
+        args_list = client._call.call_args[0][1]
+        confidence = args_list[7]
+        assert confidence == 0.8  # default
+
+    def test_store_invalid_tier_falls_back(self, client):
+        """Invalid veracity tier string → ValueError caught, default used."""
+        result = client.store("ws1", content="hello", veracity_tier="bogus_tier")
+        assert result["status"] == "ok"
+        args_list = client._call.call_args[0][1]
+        confidence = args_list[7]
+        assert confidence == 0.8  # default, ValueError caught
+
+
+# ── Store with plugin manager ──────────────────────────────────────────
+
+
+class TestStorePluginDispatch:
+    """store() plugin manager dispatch (line 801)."""
+
+    def test_store_dispatches_to_plugin_manager(self):
+        """When plugin_manager is set, dispatch_store is called."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[])  # empty → skip post-store indexing
+        c._emit_event = Mock()
+        c._query_cache = None
+
+        pm = Mock()
+        pm.dispatch_store.return_value = ("modified content", {"extra": True})
+        c.plugin_manager = pm
+
+        result = c.store("ws1", content="hello")
+        assert result["status"] == "ok"
+        pm.dispatch_store.assert_called_once()
+        assert pm.dispatch_store.call_args[0][0] == "hello"
+
+
+# ── Batch store response parsing ───────────────────────────────────────
+
+
+class TestStoreBatchResponse:
+    """store_batch() response parsing (lines 973-978)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value=[{"status": "ok"}])
+        c._embed_batch = Mock(return_value=[[0.1] * 1024, [0.2] * 1024])
+        c._embed = Mock(return_value=[[0.1] * 1024])
+        c._query = Mock(return_value=[])
+        c._tantivy_index = Mock()
+        c._extract_and_store_entities = Mock()
+        c._binary_cache = {}
+        c._emit_event = Mock()
+        # Mock the entire _http attribute
+        c._http = Mock()
+        return c
+
+    def test_batch_store_with_embeddings_response(self, client):
+        """Batch store parses 'embeddings' key from LLM embedder response."""
+        mock_resp = Mock(status_code=200)
+        mock_resp.json.return_value = {"embeddings": [[0.1] * 1024, [0.2] * 1024]}
+        client._http.post.return_value = mock_resp
+
+        items = [
+            {"content": "a", "memory_type": "experience"},
+            {"content": "b", "memory_type": "experience"},
+        ]
+        result = client.store_batch("ws1", items)
+        assert isinstance(result, list)
+
+    def test_batch_single_embedding_fallback(self, client):
+        """Batch store handles 'embedding' (singular) response key."""
+        mock_resp = Mock(status_code=200)
+        mock_resp.json.return_value = {"embedding": [0.5] * 1024}
+        client._http.post.return_value = mock_resp
+
+        items = [
+            {"content": "single", "memory_type": "experience"},
+        ]
+        result = client.store_batch("ws1", items)
+        assert isinstance(result, list)
+
+
+# ── LLM rerank rate-limit handling ─────────────────────────────────────
+
+
+class TestLLMRerankRateLimit:
+    """llm_rerank() rate-limit retry (lines 3027-3045)."""
+
+    def test_rate_limit_retry_then_success(self):
+        """Rate-limited → retries → succeeds."""
+        import httpx
+        from spacetime_memory.client import llm_rerank
+
+        call_count = [0]
+
+        def mock_post(*args, **kwargs):
+            call_count[0] += 1
+            resp = Mock(spec=httpx.Response)
+            if call_count[0] < 3:
+                resp.status_code = 429
+                resp.request = Mock()
+            else:
+                resp.status_code = 200
+                resp.json.return_value = {
+                    "choices": [{"message": {"content": '[{"index":0,"score":9.0}]'}}]
+                }
+                resp.request = Mock()
+            return resp
+
+        with pytest.MonkeyPatch().context() as mp:
+            mp.setattr("httpx.post", mock_post)
+            mp.setattr("time.sleep", lambda s: None)
+            results = llm_rerank(
+                "query", [{"id": "a", "content": "x"}], api_key="sk-test"
+            )
+            assert len(results) >= 1
+            assert results[0]["score"] == pytest.approx(0.9)
+
+    def test_rate_limit_exhausted_falls_back(self):
+        """All retries rate-limited → falls back to original results."""
+        from spacetime_memory.client import llm_rerank
+
+        resp_429 = Mock()
+        resp_429.status_code = 429
+        resp_429.request = Mock()
+
+        with pytest.MonkeyPatch().context() as mp:
+            mp.setattr("httpx.post", Mock(return_value=resp_429))
+            mp.setattr("time.sleep", lambda s: None)
+            original = [{"id": "a", "content": "x", "score": 0.5}]
+            results = llm_rerank(
+                "query", original, api_key="sk-test"
+            )
+            # Falls back to original results
+            assert results == original
+
+    def test_reasoning_model_fallback(self):
+        """Reasoning models put output in reasoning_content, not content."""
+        import httpx
+        from spacetime_memory.client import llm_rerank
+
+        resp = Mock(spec=httpx.Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "choices": [{"message": {
+                "content": "",
+                "reasoning_content": '[{"index":0,"score":8.8}]',
+            }}]
+        }
+        resp.request = Mock()
+
+        with pytest.MonkeyPatch().context() as mp:
+            mp.setattr("httpx.post", Mock(return_value=resp))
+            results = llm_rerank(
+                "query", [{"id": "r1", "content": "reasoning test"}], api_key="sk-test"
+            )
+            assert len(results) >= 1
+            assert results[0]["score"] == pytest.approx(0.88)
