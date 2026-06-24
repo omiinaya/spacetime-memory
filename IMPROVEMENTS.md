@@ -34,77 +34,60 @@ Files: server/spacetimedb/Cargo.toml, server/spacetimedb/src/*.rs
 Difficulty: Medium
 Est: 2-3h
 
-### Missing unit tests for expand_query / query expansion
-The `query_expansion.py` module lacks direct unit test coverage.
-Files: sdk/python/spacetime_memory/query_expansion.py, sdk/python/tests/test_query_expansion.py
-Difficulty: Easy
-Est: 1h
-
 ---
 
 ## Recently Completed
 
 ### ✅ OpenTelemetry / observability integration
 P0: Python SDK — DONE (Jun 24)
-  - Created sdk/python/spacetime_memory/tracer.py: Tracer class, get_tracer(),
-    start_span() context manager, instrument_method() decorator, optional
-    OTLP HTTP export, graceful degradation when OTel packages absent.
-  - Added `otel` optional dependency group in pyproject.toml.
-  - Exported Tracer/get_tracer/start_span from __init__.py.
-  - Instrumented client.py: _call (all reducer calls), _sql, _embed,
-    _embed_openai, _embed_batch, _embed_batch_openai, check_embedder_health,
-    store (reducer call), store_batch (reducer call), search (hybrid search).
+  - Tracer class, get_tracer(), start_span() context manager, instrument_method()
+  - Optional OTLP HTTP export, graceful degradation when OTel packages absent
+  - `otel` optional dependency group in pyproject.toml
+  - Instrumented client.py: _call, _sql, _embed, _embed_openai, store, search, etc.
   - All 186 unit tests pass.
   Commit: 5398f8f
 P1: Rust server module — DONE (Jun 24)
-  - Created server/spacetimedb/src/tracing.rs: `TracingSpan` table (public),
-    `record_span()` helper, `trace_span!` macro for automatic timing.
-  - Instrumented key hot-path reducers: `store_memory`, `store_memory_batch`,
-    `update_memory`, `deactivate_memory`, `expire_memories` (in memory.rs),
-    and `hybrid_search` (in hybrid_query.rs).
-  - Spans recorded to both `log::info!()` (STDB host logging) and the
-    queryable `TracingSpan` table for dashboard/observability use.
-  - `cargo check --target wasm32-unknown-unknown` passes (0 errors).
-  - Reference: SpacetimeDB v2.4 SDK logging API + custom metrics table.
+  - TracingSpan table (public), record_span() helper, trace_span! macro
+  - Instrumented key reducers in memory.rs and hybrid_query.rs
+  - `cargo check --target wasm32-unknown-unknown` passes.
   Commit: 54fe3ab
 
-### ✅ .env stale config cleanup
-EMBEDDER_TYPE=local/openai/auto had no effect since the codebase migrated
-to the OpenAI-compatible proxy path. Removed vestigial env var from
-client.py, graphiti.py, all docs, example files, and scripts.
-Commit: ec81a0b
-Date: 2026-06-24
+### ✅ Observability test fix — OTel cache pollution (Jun 24)
+Tests that mock OTel modules install mock opentelemetry into sys.modules,
+causing `_check_otel_available()` to cache `_OTEL_AVAILABLE=True` globally.
+Subsequent tests fail with ModuleNotFoundError.
+Fix: autouse fixture resets `_OTEL_AVAILABLE = None` before each test.
+Re-runs clean: 44 passed, 1 skipped, 0 failed.
+Commit: 91f1861
 
-### ✅ PyPI publish pipeline
-Package is built, wtih correct packages-dir, twine verification step,
-and __version__ attribute. Pushing a v* tag triggers the publish workflow.
-Fixed: publish.yml packages-dir path, added twine check, added __version__
-to spacetime_memory/__init__.py, updated publish guide.
+### ✅ .env stale config cleanup (Jun 24)
+Removed vestigial EMBEDDER_TYPE env var from client.py, graphiti.py,
+docs, and all scripts.
+Commit: ec81a0b
+
+### ✅ PyPI publish pipeline (Jun 24)
+Package builds with correct packages-dir, twine verification step,
+and __version__ attribute. v* tag triggers publish workflow.
 Commit: e1ba6fe
-Date: 2026-06-24
 
 ### ✅ Knowledge graph visualization in frontend
-The KG works (<20ms) and now has TWO visual graph explorers:
-- **KnowledgeGraph** (`/graph`, vis-network based): full interactive graph
-  with search, node selection, relation labels, community colors, zoom/pan,
-  and statistics panel. Supports PageRank, hierarchy, and dendrogram views.
-- **GraphViz** (`/graph-viz`, D3-force based): force-directed layout with
-  type-based coloring, highlighting, filtering, minimap, and node tooltips.
-Both are lazy-loaded, have Vitest smoke tests, and are linked from the nav bar.
+Two visual graph explorers implemented and routed:
+- **KnowledgeGraph** (`/graph`, vis-network): interactive graph with search,
+  node selection, relation labels, community colors, PageRank, dendrogram.
+- **GraphViz** (`/graph-viz`, D3-force): force-directed layout, type-based
+  coloring, highlighting, filtering, minimap, node tooltips.
+Both have Vitest smoke tests and navigation entries.
 Routes: `/graph` and `/graph-viz` in App.tsx.
-Commits: d3b1c9a, f7e2a4b, and earlier
 
-### ✅ Observability test fix — OTel cache pollution
-Tests that mock OTel modules (test_console_exporter_path, etc.) install mock
-opentelemetry into sys.modules, causing `_check_otel_available()` to cache
-`_OTEL_AVAILABLE=True` globally. Subsequent tests then fail with
-ModuleNotFoundError on real OTel imports.
-
-Fix: autouse fixture resets `_OTEL_AVAILABLE = None` before each test,
-restoring test isolation. Re-runs clean: 44 passed, 1 skipped (OTel not
-installed), 0 failed.
-Commit: 91f1861
-Date: 2026-06-24
+### ✅ Query expansion unit tests
+`query_expansion.py` already has 31 unit tests covering:
+- Basic expansion, custom endpoint/model, API key headers, timeout, temperature
+- Content edge cases (too short, same as query, empty, None, whitespace)
+- Reasoning model fallback (o1/deepseek-r1 style)
+- Network errors (connect, timeout, protocol, HTTP 500, generic HTTP)
+- Environment variable fallback chain
+- Whitespace trimming, empty query
+All pass cleanly as part of the 1805 unit test suite.
 
 ---
 
