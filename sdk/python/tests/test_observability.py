@@ -10,6 +10,22 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "sdk" / "python"))
 
+# ---------------------------------------------------------------------------
+# Global fixture: reset OTel availability cache before each test to prevent
+# cross-test pollution from mock-OTel tests that set _OTEL_AVAILABLE = True.
+# ---------------------------------------------------------------------------
+import spacetime_memory.tracer as _tracer_mod
+
+
+@pytest.fixture(autouse=True)
+def _reset_otel_available_cache() -> None:
+    """Reset the module-level _OTEL_AVAILABLE cache so each test starts clean.
+    Tests that want to test caching behavior can set it explicitly.
+    """
+    _tracer_mod._OTEL_AVAILABLE = None
+    yield
+
+
 from spacetime_memory.client import Client, JSONFormatter, configure_logging
 from spacetime_memory.metrics import MetricsCollector
 
@@ -532,7 +548,9 @@ class TestTracerStartSpan:
             assert span is _NOOP_SPAN
 
     def test_start_span_enabled_path(self, monkeypatch):
-        from spacetime_memory.tracer import Tracer
+        from spacetime_memory.tracer import Tracer, _check_otel_available
+        if not _check_otel_available():
+            pytest.skip("OpenTelemetry not installed — install with: pip install spacetime-memory[otel]")
         t = Tracer(enabled=True)
         t._enabled = True
         # is_enabled is True because OTel is now installed
