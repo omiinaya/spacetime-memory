@@ -12,9 +12,26 @@ and works the top pending item each tick.
 Add OpenTelemetry tracing/metrics to the client SDK and server module.
 Instrument search latency, embedding calls, and STDB write times.
 Reference: open-telemetry/opentelemetry-python
-Files: client/spacetime_memory/client.py, server/spacetimedb/src/
+Files: sdk/python/spacetime_memory/client.py, server/spacetimedb/src/
 Difficulty: Medium
 Est: 3-4h
+
+P0: Python SDK — DONE (Jun 24)
+  - Created sdk/python/spacetime_memory/tracer.py: Tracer class, get_tracer(),
+    start_span() context manager, instrument_method() decorator, optional
+    OTLP HTTP export, graceful degradation when OTel packages absent.
+  - Added `otel` optional dependency group in pyproject.toml.
+  - Exported Tracer/get_tracer/start_span from __init__.py.
+  - Instrumented client.py: _call (all reducer calls), _sql, _embed,
+    _embed_openai, _embed_batch, _embed_batch_openai, check_embedder_health,
+    store (reducer call), store_batch (reducer call), search (hybrid search).
+  - All 186 unit tests pass.
+  Commit: pending
+
+P1: Rust server module — NOT STARTED
+  - Add tracing spans to server/spacetimedb/src/ reducers using
+    spacetimedb::log::info or custom metrics table.
+  - Reference: SpacetimeDB v2.4 SDK logging API.
 
 ### STDB 2% fatal error under heavy concurrent load
 Despite the UUID collision fix, some concurrent stress scenarios still
@@ -37,16 +54,14 @@ Files: web/src/pages/
 Difficulty: Medium
 Est: 3h
 
-### .env stale config cleanup
-EMBEDDER_TYPE=local has no effect — the code ignores it. Clean up
-vestigial env vars and validate the config schema.
-Files: client/spacetime_memory/config.py
-Difficulty: Easy
-Est: 20 min
-
----
-
 ## Recently Completed
+
+### ✅ .env stale config cleanup
+EMBEDDER_TYPE=local/openai/auto had no effect since the codebase migrated
+to the OpenAI-compatible proxy path. Removed vestigial env var from
+client.py, graphiti.py, all docs, example files, and scripts.
+Commit: ec81a0b
+Date: 2026-06-24
 
 ### ✅ PyPI publish pipeline
 Package is built, wtih correct packages-dir, twine verification step,

@@ -2,7 +2,7 @@
 
 Provides a high-level Client class that wraps the SpacetimeDB HTTP SQL API,
 the reducer-call endpoint, and embedder support (OpenAI-compatible proxy → NVIDIA NIM).
-API fallback).
+API fallback.
 """
 
 from __future__ import annotations
@@ -21,6 +21,27 @@ import re
 logger = logging.getLogger(__name__)
 
 from .query_expansion import expand_query  # noqa: E402 — intentional late import
+
+# ---------------------------------------------------------------------------
+# OpenTelemetry tracer — optional, degrades gracefully
+# ---------------------------------------------------------------------------
+
+try:
+    from .tracer import get_tracer, start_span as _start_span
+
+    _TRACER = get_tracer(setup=True)
+
+    def _tracing_span(name: str, **attrs: Any) -> Any:
+        """Start a span with the given attributes. No-op if OTel unavailable."""
+        return _start_span(name, attributes=attrs if attrs else None)
+
+except ImportError:
+
+    def _tracing_span(name: str, **attrs: Any) -> Any:
+        from contextlib import nullcontext
+        return nullcontext()
+
+    _TRACER = None
 
 # ---------------------------------------------------------------------------
 # Error message mapping (human-readable)
@@ -376,29 +397,30 @@ class Client:
         are now private and SQL queries against them will fail. This method
         remains for public result tables (hybrid_result, etc.).
         """
-        self._ensure_identity()
-        headers = self._headers()
-        headers["Content-Type"] = "text/plain"
+        with _tracing_span("sql", query=query[:200]):
+            self._ensure_identity()
+            headers = self._headers()
+            headers["Content-Type"] = "text/plain"
 
-        def _do_sql() -> httpx.Response:
-            return self._request_with_retry(
-                "POST", self.sql_url, content=query, headers=headers,
-            )
-
-        if self._metrics is not None:
-            resp = self._metrics.record("sql", _do_sql)
-        else:
-            resp = _do_sql()
-
-        if resp.status_code >= 400:
-            error_text = resp.text[:500]
-            if self.verbose:
-                raise RuntimeError(
-                    f"SQL error (HTTP {resp.status_code}): {error_text}"
+            def _do_sql() -> httpx.Response:
+                return self._request_with_retry(
+                    "POST", self.sql_url, content=query, headers=headers,
                 )
-            friendly = self._map_sql_error(error_text)
-            raise RuntimeError(friendly)
-        return _parse_sql_response(resp.text)
+
+            if self._metrics is not None:
+                resp = self._metrics.record("sql", _do_sql)
+            else:
+                resp = _do_sql()
+
+            if resp.status_code >= 400:
+                error_text = resp.text[:500]
+                if self.verbose:
+                    raise RuntimeError(
+                        f"SQL error (HTTP {resp.status_code}): {error_text}"
+                    )
+                friendly = self._map_sql_error(error_text)
+                raise RuntimeError(friendly)
+            return _parse_sql_response(resp.text)
 
     def _query(
         self,
@@ -453,29 +475,30 @@ class Client:
 
     def _call(self, reducer: str, args: list[Any]) -> dict[str, Any]:
         """Call a SpacetimeDB reducer with positional JSON args."""
-        self._ensure_identity()
-        headers = self._headers()
-        headers["Content-Type"] = "application/json"
+        with _tracing_span(f"reducer:{reducer}", reducer=reducer, arg_count=len(args)):
+            self._ensure_identity()
+            headers = self._headers()
+            headers["Content-Type"] = "application/json"
 
-        def _do_call() -> httpx.Response:
-            return self._request_with_retry(
-                "POST", f"{self.reducer_url}/{reducer}",
-                content=json.dumps(args), headers=headers,
-            )
-
-        if self._metrics is not None:
-            resp = self._metrics.record(f"reducer:{reducer}", _do_call)
-        else:
-            resp = _do_call()
-
-        if resp.status_code >= 400:
-            error_text = resp.text[:500]
-            if self.verbose:
-                raise RuntimeError(
-                    f"Reducer error (HTTP {resp.status_code}): {error_text}"
+            def _do_call() -> httpx.Response:
+                return self._request_with_retry(
+                    "POST", f"{self.reducer_url}/{reducer}",
+                    content=json.dumps(args), headers=headers,
                 )
-            friendly = self._map_reducer_error(error_text)
-            raise RuntimeError(friendly)
+
+            if self._metrics is not None:
+                resp = self._metrics.record(f"reducer:{reducer}", _do_call)
+            else:
+                resp = _do_call()
+
+            if resp.status_code >= 400:
+                error_text = resp.text[:500]
+                if self.verbose:
+                    raise RuntimeError(
+                        f"Reducer error (HTTP {resp.status_code}): {error_text}"
+                    )
+                friendly = self._map_reducer_error(error_text)
+                raise RuntimeError(friendly)
 
         # Capture updated identity token from response (e.g. after register/login)
         new_token = resp.headers.get("spacetime-identity-token", "")
@@ -493,45 +516,47 @@ class Client:
         Uses the OpenAI-compatible proxy path (bge-m3 through
         spacetime-llm proxy → NVIDIA NIM, 1024-dim).
         """
-        return self._embed_openai(text)
+        with _tracing_span("embed", text_length=len(text)):
+            return self._embed_openai(text)
 
     def _embed_openai(self, text: str) -> list[float]:
         """Embed via OpenAI API."""
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
-            return []
-        try:
-            base_url = os.environ.get(
-                "OPENAI_BASE_URL",
-                "https://api.openai.com/v1"
-            ).rstrip("/")
-            resp = self._http.post(
-                f"{base_url}/embeddings",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "input": text,
-                    "model": os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large"),
-                }
-                | (
-                    {}
-                    if not os.environ.get("EMBEDDING_DIMENSIONS")
-                    else {"dimensions": int(os.environ["EMBEDDING_DIMENSIONS"])}
-                ),
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data["data"][0]["embedding"]
-        except httpx.TimeoutException:
-            logger.warning("OpenAI embedder timed out for text (len=%d)", len(text))
-            return []
-        except (json.JSONDecodeError, httpx.HTTPError, KeyError, IndexError, ValueError):
-            logger.exception("OpenAI embedder failed for text (len=%d)", len(text))
-            return []
+        with _tracing_span("embed.openai", text_length=len(text)):
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
+                return []
+            try:
+                base_url = os.environ.get(
+                    "OPENAI_BASE_URL",
+                    "https://api.openai.com/v1"
+                ).rstrip("/")
+                resp = self._http.post(
+                    f"{base_url}/embeddings",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "input": text,
+                        "model": os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large"),
+                    }
+                    | (
+                        {}
+                        if not os.environ.get("EMBEDDING_DIMENSIONS")
+                        else {"dimensions": int(os.environ["EMBEDDING_DIMENSIONS"])}
+                    ),
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return data["data"][0]["embedding"]
+            except httpx.TimeoutException:
+                logger.warning("OpenAI embedder timed out for text (len=%d)", len(text))
+                return []
+            except (json.JSONDecodeError, httpx.HTTPError, KeyError, IndexError, ValueError):
+                logger.exception("OpenAI embedder failed for text (len=%d)", len(text))
+                return []
 
     def _embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings for multiple texts.
@@ -540,61 +565,64 @@ class Client:
         """
         if not texts:
             return []
-        return self._embed_batch_openai(texts)
+        with _tracing_span("embed.batch", batch_size=len(texts)):
+            return self._embed_batch_openai(texts)
 
     def _embed_batch_openai(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings for multiple texts via OpenAI API."""
         if not texts:
             return []
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
-            return []
-        try:
-            base_url = os.environ.get(
-                "OPENAI_BASE_URL",
-                "https://api.openai.com/v1"
-            ).rstrip("/")
-            resp = self._http.post(
-                f"{base_url}/embeddings",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "input": texts,
-                    "model": os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large"),
-                }
-                | (
-                    {}
-                    if not os.environ.get("EMBEDDING_DIMENSIONS")
-                    else {"dimensions": int(os.environ["EMBEDDING_DIMENSIONS"])}
-                ),
-                timeout=60,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            # OpenAI returns data in order matching input
-            results = [item["embedding"] for item in data["data"]]
-            return results
-        except httpx.TimeoutException:
-            logger.warning("OpenAI embedder timed out for batch (count=%d)", len(texts))
-            return []
-        except (json.JSONDecodeError, httpx.HTTPError, KeyError, IndexError, ValueError):
-            logger.exception("OpenAI embedder failed for batch (count=%d)", len(texts))
-            return []
+        with _tracing_span("embed.batch.openai", batch_size=len(texts)):
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
+                return []
+            try:
+                base_url = os.environ.get(
+                    "OPENAI_BASE_URL",
+                    "https://api.openai.com/v1"
+                ).rstrip("/")
+                resp = self._http.post(
+                    f"{base_url}/embeddings",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "input": texts,
+                        "model": os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large"),
+                    }
+                    | (
+                        {}
+                        if not os.environ.get("EMBEDDING_DIMENSIONS")
+                        else {"dimensions": int(os.environ["EMBEDDING_DIMENSIONS"])}
+                    ),
+                    timeout=60,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                # OpenAI returns data in order matching input
+                results = [item["embedding"] for item in data["data"]]
+                return results
+            except httpx.TimeoutException:
+                logger.warning("OpenAI embedder timed out for batch (count=%d)", len(texts))
+                return []
+            except (json.JSONDecodeError, httpx.HTTPError, KeyError, IndexError, ValueError):
+                logger.exception("OpenAI embedder failed for batch (count=%d)", len(texts))
+                return []
 
     def check_embedder_health(self) -> dict[str, Any]:
         """Check if the embedder sidecar is running. Returns status info."""
-        try:
-            resp = self._http.get(f"{self.embedder_url}/health", timeout=5.0)
-            if resp.status_code == 200:
-                embedder_status = resp.json()
-                embedder_status["reachable"] = True
-                return embedder_status
-            return {"status": "error", "code": resp.status_code, "reachable": True}
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
-            return {"status": "error", "message": str(e), "reachable": False}
+        with _tracing_span("embedder.health"):
+            try:
+                resp = self._http.get(f"{self.embedder_url}/health", timeout=5.0)
+                if resp.status_code == 200:
+                    embedder_status = resp.json()
+                    embedder_status["reachable"] = True
+                    return embedder_status
+                return {"status": "error", "code": resp.status_code, "reachable": True}
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+                return {"status": "error", "message": str(e), "reachable": False}
 
     # ── Tantivy BM25 keyword search sidecar ──
 
@@ -788,11 +816,13 @@ class Client:
         if self.plugin_manager is not None:
             content, metadata = self.plugin_manager.dispatch_store(content, metadata)
 
-        result = self._call("store_memory", [
-            workspace_id, peer_id, observer_id,
-            memory_type, content, summary, entities_json,
-            confidence, source_session_id, source_message_id,
-        ])
+        # ── Reducer call: store_memory ──
+        with _tracing_span("store.call", workspace_id=workspace_id, memory_type=memory_type):
+            result = self._call("store_memory", [
+                workspace_id, peer_id, observer_id,
+                memory_type, content, summary, entities_json,
+                confidence, source_session_id, source_message_id,
+            ])
         # ── Invalidate query cache for this workspace ──
         if self._query_cache is not None:
             self._query_cache.invalidate(workspace_id=workspace_id)
@@ -969,7 +999,8 @@ class Client:
 
         # Call batch reducer — pass items as JSON string
         import json as _j
-        self._call("store_memory_batch", [_j.dumps(clean_items)])
+        with _tracing_span("store_batch.call", workspace_id=workspace_id, batch_size=len(clean_items)):
+            self._call("store_memory_batch", [_j.dumps(clean_items)])
 
         # Index each item with its embedding
         for i, item in enumerate(clean_items):
@@ -1248,12 +1279,18 @@ class Client:
             fetch_limit = max(limit * 4, 60)
             fusion_limit = max(limit * 3, 20)
 
-            self._call("hybrid_search", [
-                workspace_id, search_query, emb_json,
-                memory_type, tier, fetch_limit, strategies,
-                polyphonic,
-                mmr_lambda,
-            ])
+            with _tracing_span(
+                "search.hybrid",
+                workspace_id=workspace_id,
+                query_length=len(search_query),
+                fetch_limit=fetch_limit,
+            ):
+                self._call("hybrid_search", [
+                    workspace_id, search_query, emb_json,
+                    memory_type, tier, fetch_limit, strategies,
+                    polyphonic,
+                    mmr_lambda,
+                ])
             qhash = _query_hash(search_query)
             rows = self._sql(
                 "SELECT * FROM hybrid_result "
