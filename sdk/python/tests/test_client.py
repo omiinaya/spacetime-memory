@@ -587,6 +587,42 @@ class TestStoreBatchResponse:
         assert isinstance(result, list)
 
 
+# ── Batch store indexing loop ──────────────────────────────────────────
+
+
+class TestStoreBatchIndexing:
+    """store_batch() post-indexing loop (lines 998-1009)."""
+
+    def test_batch_store_indexes_each_item(self):
+        """When embeddings are available, each item gets indexed."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value=[{"status": "ok"}])
+        c._embed_batch = Mock(return_value=[[0.1] * 1024, [0.2] * 1024])
+        c._embed = Mock(return_value=[[0.1] * 1024])
+        c._query = Mock(return_value=[
+            {"id": "mem-1", "created_at": 200},
+            {"id": "mem-2", "created_at": 100},
+        ])
+        c._tantivy_index = Mock()
+        c._extract_and_store_entities = Mock()
+        c._binary_cache = {}
+        c._emit_event = Mock()
+        c._http = Mock()
+
+        mock_resp = Mock(status_code=200)
+        mock_resp.json.return_value = {"embeddings": [[0.1] * 1024, [0.2] * 1024]}
+        c._http.post.return_value = mock_resp
+
+        items = [
+            {"content": "first item", "memory_type": "experience"},
+            {"content": "second", "memory_type": "experience"},
+        ]
+        result = c.store_batch("ws1", items)
+        assert isinstance(result, list)
+        # Should have called index_entity and index_terms for each item
+        assert c._call.call_count >= 4  # store_memory_batch + 2× index_entity + 2× index_terms
+
+
 # ── LLM rerank rate-limit handling ─────────────────────────────────────
 
 
