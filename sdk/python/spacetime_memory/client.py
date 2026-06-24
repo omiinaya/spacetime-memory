@@ -169,8 +169,11 @@ class Client:
         self.host = host or os.environ.get("SPACETIMEDB_HOST", "localhost")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
         self.database = database or os.environ.get(
-            "SPACETIMEDB_DB", "c200e409f602c06527d0aa66dc2d05718a6b62c4c3317b5498951cea41782713"
+            "SPACETIMEDB_DB", "c20082e7643347e8d36302b550bb98c7343f9ea2a268f3bee58ee58d3c3dcbf1"
         )
+        # Bypass HTTP proxy for localhost — the system http_proxy
+        # routes through isp.decodo.com which blocks STDB reducer calls.
+        os.environ.setdefault("no_proxy", "localhost,127.0.0.1,127.0.0.1,.local")
         self.embedder_url = (
             embedder_url
             or os.environ.get("EMBEDDER_URL", "http://localhost:9090")

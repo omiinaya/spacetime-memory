@@ -14,6 +14,11 @@ import sys
 import time
 from typing import Any
 
+# Bypass HTTP proxy for localhost STDB connections.
+# The system has http_proxy set to isp.decodo.com:10001 which
+# returns 403 Forbidden for reducer calls.
+os.environ.setdefault("no_proxy", "localhost,127.0.0.1,127.0.0.1,.local")
+
 # Allow running from project root or cron (hermes/scripts)
 for prefix in (".", "..", "/home/user/spacetime-memory"):
     sdk_path = os.path.join(prefix, "sdk/python")
@@ -27,7 +32,7 @@ from spacetime_memory import Client
 HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get("SPACETIMEDB_DB",
-                     "c2007f52296c94e0c7fb057d3cca532ce42a97a15b4820e0c60476a956be95ff")
+                     "c20082e7643347e8d36302b550bb98c7343f9ea2a268f3bee58ee58d3c3dcbf1")
 
 _client: Client | None = None
 

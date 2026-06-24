@@ -156,7 +156,35 @@ class ReplicationDaemon:
     @staticmethod
     def _build_local_client() -> Client:
         """Build a Client from the same env vars the SDK uses."""
-        return Client()
+        client = Client()
+        # Ensure identity is registered (same flow as consolidation cron)
+        _TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".replication_identity_token")
+        if os.path.exists(_TOKEN_FILE):
+            try:
+                with open(_TOKEN_FILE) as f:
+                    client._identity_token = f.read().strip()
+                    client._identity_established = True
+                    return client
+            except Exception:
+                pass
+        import uuid as _uuid
+        user = f"repl_{_uuid.uuid4().hex[:8]}"
+        try:
+            client._call("register", [user, "Replication", "replpass123"])
+        except RuntimeError:
+            pass
+        try:
+            my_id = client._whoami()
+            client._call("set_initial_admin", [my_id])
+        except RuntimeError:
+            pass
+        if getattr(client, "_identity_token", None):
+            try:
+                with open(_TOKEN_FILE, "w") as f:
+                    f.write(client._identity_token)
+            except Exception:
+                pass
+        return client
 
     @staticmethod
     def _build_remote_client(
