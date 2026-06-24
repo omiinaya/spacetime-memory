@@ -26,7 +26,7 @@ P0: Python SDK — DONE (Jun 24)
     _embed_openai, _embed_batch, _embed_batch_openai, check_embedder_health,
     store (reducer call), store_batch (reducer call), search (hybrid search).
   - All 186 unit tests pass.
-  Commit: pending
+  Commit: 5398f8f
 
 P1: Rust server module — NOT STARTED
   - Add tracing spans to server/spacetimedb/src/ reducers using
