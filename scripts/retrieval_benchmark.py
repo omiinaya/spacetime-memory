@@ -12,7 +12,6 @@ os.environ.pop("LITELLM_MASTER_KEY", None)
 os.environ["OPENAI_API_KEY"] = "REDACTED"
 os.environ["OPENAI_BASE_URL"] = "http://localhost:4000/v1"
 os.environ["EMBEDDING_MODEL"] = "baai/bge-m3"
-os.environ["EMBEDDER_TYPE"] = "openai"
 
 from spacetime_memory import Client
 

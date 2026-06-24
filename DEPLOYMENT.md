@@ -166,7 +166,6 @@ All configuration uses environment variables. See [CONFIG.md](CONFIG.md) for the
 Embeddings are routed through the spacetime-llm proxy (localhost:4000) → NVIDIA NIM (bge-m3, 1024-dim).
 
 ```env
-EMBEDDER_TYPE=openai
 EMBEDDING_MODEL=baai/bge-m3
 OPENAI_BASE_URL=http://localhost:4000/v1
 OPENAI_API_KEY=sk-...

@@ -58,8 +58,6 @@ When the embedder sidecar is not running, operations fall back exponentially:
 - Semantic search: falls back to keyword (~11ms)
 - Hybrid search: ~15ms (no semantic component)
 
-To disable embedding, set `EMBEDDER_TYPE=keyword` in your environment.
-
 ## Database Size Impact
 
 Measured against a clean database. At 10K+ memories, keyword search may slow

@@ -434,7 +434,6 @@ class Graphiti:
         database: str | None = None,
         token: str | None = None,
         embedder_url: str | None = None,
-        embedder_type: str | None = None,
         client: Client | None = None,
     ) -> None:
         """
@@ -444,7 +443,6 @@ class Graphiti:
             database: SpacetimeDB database identity.
             token: JWT token for authenticated requests.
             embedder_url: Embedder sidecar URL (default: http://localhost:9090).
-            embedder_type: Embedder type (local, openai, auto).
             client: An existing Client instance (overrides other params).
         """
         if client is not None:
@@ -456,7 +454,6 @@ class Graphiti:
                 database=database,
                 token=token,
                 embedder_url=embedder_url,
-                embedder_type=embedder_type,
             )
         self.clients = self._client
         # Cache: group_id (str) -> workspace_id (str)

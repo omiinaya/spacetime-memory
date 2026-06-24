@@ -157,7 +157,6 @@ class Client:
         port: int | str | None = None,
         database: str | None = None,
         embedder_url: str | None = None,
-        embedder_type: str | None = None,
         timeout: float = 30.0,
         verbose: bool = False,
         token: str | None = None,
@@ -180,10 +179,6 @@ class Client:
         )
         self.tantivy_url = os.environ.get(
             "TANTIVY_URL", "http://localhost:9091"
-        )
-        self.embedder_type = (
-            embedder_type
-            or os.environ.get("EMBEDDER_TYPE") or self._default_embedder_type()
         )
         self.verbose = verbose
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
@@ -490,16 +485,6 @@ class Client:
 
         return {"status": "ok"}
 
-    @staticmethod
-    def _default_embedder_type() -> str:
-        """Choose a sensible default based on environment.
-        If OPENAI_API_KEY is set, default to openai so the sidecar
-        is not tried first on every store call.
-        """
-        if os.environ.get('OPENAI_API_KEY'):
-            return 'openai'
-        return 'auto'
-
     _DEFAULT_EMBEDDER_URL = 'http://localhost:9090'
 
     def _embed(self, text: str) -> list[float]:
@@ -551,7 +536,7 @@ class Client:
     def _embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Get embeddings for multiple texts.
 
-        Behaviour follows ``embedder_type`` — see :meth:`_embed`.
+        Uses the OpenAI-compatible proxy path through _embed_batch_openai.
         """
         if not texts:
             return []

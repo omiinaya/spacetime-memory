@@ -3540,25 +3540,6 @@ class TestClientUnitCoverage:
         with pytest.raises(RuntimeError, match="Reducer error"):
             client._call("bad_reducer", [])
 
-    # ── _default_embedder_type (line 497) ──
-
-    def test_default_embedder_type_openai_key_set(self):
-        """Line 496-497: _default_embedder_type returns 'openai' when key set."""
-        from unittest.mock import patch
-
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-fake"}, clear=False):
-            result = Client._default_embedder_type()
-            assert result == "openai"
-
-    def test_default_embedder_type_no_key(self):
-        """_default_embedder_type returns 'auto' when no OPENAI_API_KEY."""
-        with patch.dict(os.environ, {}, clear=True):
-            # clear=True wipes env, but we only care about OPENAI_API_KEY
-            if "OPENAI_API_KEY" in os.environ:
-                del os.environ["OPENAI_API_KEY"]
-            result = Client._default_embedder_type()
-            assert result == "auto"
-
     # ── _embed_batch empty (lines 553-554) ──
 
     def test_embed_batch_empty(self):

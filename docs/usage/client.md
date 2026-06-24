@@ -167,7 +167,6 @@ See the [full list of reducers](../index.md#reducer-api) for available operation
 | `SPACETIMEDB_DB` | (module address) | Database identity |
 | `SPACETIMEDB_TOKEN` | — | JWT auth token |
 | `EMBEDDER_URL` | `http://localhost:9090` | Embedder sidecar URL |
-| `EMBEDDER_TYPE` | `auto` | Embedder type |
 | `OPENAI_API_KEY` | — | OpenAI API key for embeddings |
 | `STMEM_MAX_RETRIES` | `3` | Max HTTP retries |
 

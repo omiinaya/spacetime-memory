@@ -101,7 +101,7 @@
 ### The Embedding Reality (Updated June 22 — FIXED)
 
 - **Now working**: bge-m3 via `spacetime-llm` proxy → NVIDIA NIM (1024-dim). Model `baai/bge-m3` registered in proxy.
-- **Config**: `EMBEDDER_TYPE=openai`, `OPENAI_BASE_URL=http://localhost:4000/v1`, `EMBEDDING_MODEL=baai/bge-m3`
+- **Config**: `EMBEDDER_URL=http://localhost:4000`, `OPENAI_BASE_URL=http://localhost:4000/v1`, `EMBEDDING_MODEL=baai/bge-m3`
 - **ONNX sidecar**: Fallback only. Proxy is the primary path.
 - **81.3% P@5, 0.960 MRR** — measured with real embeddings. All 295 tests pass with live embeddings.
 - **Proxy model registration**: `POST /admin/test/create-model` with credential `NVIDIA_NIM_KEY_1`
@@ -176,7 +176,7 @@
 - **LLM reranking: working, two-tier**
 
 ### What's Real But Not Ideal
-- **`.env` stale**: `EMBEDDER_TYPE=local` has no effect — code ignores it (cosmetic)
+- **`.env` stale**: `EMBEDDER_TYPE` env var was vestigial — removed (cleaned up June 24)
 - **STDB ~2% fatal error rate under 50-thread concurrent load** — documented concurrency limit
 
 ### Structural Debt — Real Issues (June 22, 2026 Audit)

@@ -1221,3 +1221,101 @@ class TestMethodStubs:
         c._sql = Mock(return_value=[])
         result = c.get_profile_context("unknown")
         assert result is None
+
+
+# ── More stubs ─────────────────────────────────────────────────────────
+
+
+class TestMoreStubs:
+    """Remaining one-liner stubs."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._query = Mock(return_value=[])
+        return c
+
+    def test_list_memories(self, client):
+        client.list_memories("ws1", memory_type="experience")
+        client._query.assert_called()
+
+    def test_list_memories_no_filter(self, client):
+        client.list_memories("ws1")
+        client._query.assert_called()
+
+    def test_set_decay_model_raises_on_bad_model(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        with pytest.raises(ValueError, match="model"):
+            c.set_decay_model("ws1", "bad_model")
+
+    def test_set_decay_model_linear(self, client):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value={"status": "ok"})
+        result = c.set_decay_model("ws1", "linear")
+        assert result["status"] == "ok"
+
+    def test_set_decay_model_weibull(self, client):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value={"status": "ok"})
+        result = c.set_decay_model("ws1", "weibull", weibull_shape=0.8, weibull_scale=25.0)
+        assert result["status"] == "ok"
+
+    def test_approve_merge(self, client):
+        client.approve_merge("sug-1")
+        client._call.assert_called_with("approve_merge", ["sug-1"])
+
+    def test_reject_merge(self, client):
+        client.reject_merge("sug-1")
+        client._call.assert_called_with("reject_merge", ["sug-1"])
+
+    def test_get_node(self, client):
+        client.get_node("node-1")
+        client._query.assert_called_with("kg_node", filter_dict={"id": "node-1"})
+
+    def test_get_community(self, client):
+        client.get_community(42)
+        client._query.assert_any_call("kg_community", filter_dict={"id": "42"})
+        client._query.assert_any_call("kg_node", filter_dict={"community_id": "42"})
+
+
+# ── Note CRUD ──────────────────────────────────────────────────────────
+
+
+class TestNoteCrudStubs:
+    """Note CRUD methods (lines 2525, 2531-2548)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._query = Mock(return_value=[])
+        return c
+
+    def test_delete_note(self, client):
+        client.delete_note("note-1")
+        client._call.assert_called_with("delete_note", ["note-1"])
+
+    def test_list_notes(self, client):
+        client.list_notes("ws1")
+        client._query.assert_called()
+
+    def test_list_notes_include_inactive(self, client):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._query = Mock(return_value=[])
+        c.list_notes("ws1", include_inactive=True)
+        c._query.assert_called()
+
+    def test_get_note(self, client):
+        client.get_note("note-1")
+        client._query.assert_called_with("note", filter_dict={"id": "note-1"})
+
+    def test_get_note_by_date(self, client):
+        client.get_note_by_date("2026-06-22")
+        client._query.assert_called_with("note", filter_dict={
+            "note_date": "2026-06-22", "is_active": "true"})
+
+    def test_get_note_by_title(self, client):
+        client.get_note_by_title("My Note")
+        client._query.assert_called_with("note", filter_dict={
+            "title": "My Note", "is_active": "true"})
