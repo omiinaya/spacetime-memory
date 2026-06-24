@@ -663,3 +663,240 @@ class TestLLMRerankRateLimit:
             )
             assert len(results) >= 1
             assert results[0]["score"] == pytest.approx(0.88)
+
+
+# ── Post-store indexing ────────────────────────────────────────────────
+
+
+class TestStorePostIndexing:
+    """store() post-store indexing path (lines 834-856)."""
+
+    def test_store_indexes_entities_when_embedding_available(self):
+        """When _embed returns non-empty, post-store indexing runs."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[0.1] * 1024)  # non-empty → triggers indexing
+        c._query = Mock(return_value=[
+            {"id": "mem-1", "content": "hello world"},
+        ])
+        c._tantivy_index = Mock()
+        c._extract_and_store_entities = Mock()
+        c._binary_cache = {}
+        c._emit_event = Mock()
+        c._query_cache = None
+        c.plugin_manager = None
+
+        result = c.store("ws1", content="hello world")
+        assert result["status"] == "ok"
+        # Verify indexing calls — check actual call args
+        calls = [args[0] for args, _ in c._call.call_args_list]
+        assert "index_entity" in calls
+        assert "index_terms" in calls
+        c._tantivy_index.assert_called_once()
+        c._extract_and_store_entities.assert_called_once()
+
+    def test_store_with_tier_L0(self):
+        """store with tier='L0' triggers update_memory_tier."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[])  # skip indexing
+        c._query = Mock(return_value=[{"id": "mem-1"}])
+        c._emit_event = Mock()
+        c._query_cache = None
+        c.plugin_manager = None
+
+        result = c.store("ws1", content="test", peer_id="user1", tier="L0")
+        assert result["status"] == "ok"
+        c._call.assert_any_call("update_memory_tier", ["mem-1", "L0"])
+
+
+# ── Entity extraction ──────────────────────────────────────────────────
+
+
+class TestExtractAndStoreEntities:
+    """_extract_and_store_entities() (lines 878-913)."""
+
+    def test_llm_extraction_with_entities(self):
+        """LLM available → extracts and stores entities."""
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+
+        mock_llm = Mock()
+        mock_llm.available = True
+        mock_llm.extract_entities_llm.return_value = [
+            {"name": "Alice", "entity_type": "person", "aliases": ["Al"], "description": "A person"},
+            {"name": "Bob", "entity_type": "person", "aliases": [], "description": "Another"},
+        ]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=mock_llm):
+            c._extract_and_store_entities("ws1", "mem-1", "Alice and Bob met")
+
+        # create_entity_link should be called for each entity
+        assert c._call.call_count >= 2
+
+    def test_regex_fallback_when_llm_unavailable(self):
+        """LLM unavailable → falls back to regex extraction reducer."""
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+
+        mock_llm = Mock()
+        mock_llm.available = False
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=mock_llm):
+            c._extract_and_store_entities("ws1", "mem-1", "some content")
+
+        c._call.assert_called_with("extract_entities", ["ws1", "some content"])
+
+    def test_entity_link_error_caught(self):
+        """RuntimeError in create_entity_link is caught, not propagated."""
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        # First call fails, others succeed
+        c._call = Mock(side_effect=[RuntimeError("fail"), None, None])
+
+        mock_llm = Mock()
+        mock_llm.available = True
+        mock_llm.extract_entities_llm.return_value = [
+            {"name": "Bad", "entity_type": "concept"},
+        ]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=mock_llm):
+            c._extract_and_store_entities("ws1", "mem-1", "Bad entity")
+
+        # Should have tried create_entity_link (failed) and link_entity_to_memory
+        assert c._call.call_count >= 2
+
+
+# ── Entity extraction edge cases ───────────────────────────────────────
+
+
+class TestExtractEntitiesSkip:
+    """Entity extraction skips invalid names."""
+
+    def test_skips_short_names(self):
+        """Names <2 chars are skipped."""
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+
+        mock_llm = Mock()
+        mock_llm.available = True
+        mock_llm.extract_entities_llm.return_value = [
+            {"name": "A", "entity_type": "letter"},  # too short
+            {"name": "OK", "entity_type": "word"},   # ok
+        ]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=mock_llm):
+            c._extract_and_store_entities("ws1", "mem-1", "A and OK")
+
+        # Only "OK" should trigger a call
+        # create_entity_link for OK + link_entity_to_memory for OK = 2 calls
+        assert c._call.call_count == 2
+
+    def test_skips_empty_names(self):
+        """Empty names are skipped."""
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+
+        mock_llm = Mock()
+        mock_llm.available = True
+        mock_llm.extract_entities_llm.return_value = [
+            {"name": "", "entity_type": "empty"},
+            {"name": None, "entity_type": "none"},
+        ]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=mock_llm):
+            c._extract_and_store_entities("ws1", "mem-1", "nothing useful")
+
+        assert c._call.call_count == 0  # all skipped
+
+
+# ── Graph traversal ────────────────────────────────────────────────────
+
+
+class TestGraphTraversal:
+    """Graph traversal methods (lines 2573-2583)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        return c
+
+    def test_graph_bfs(self, client):
+        client.graph_bfs("ws1", "node-1", max_depth=3)
+        client._call.assert_called_with("graph_bfs", ["ws1", "node-1", 3])
+
+    def test_shortest_path(self, client):
+        client.shortest_path("ws1", "src", "tgt", max_hops=4)
+        client._call.assert_called_with("shortest_path", ["ws1", "src", "tgt", 4])
+
+    def test_get_neighbors_via_reducer(self, client):
+        client.get_neighbors_via_reducer("ws1", "node-1")
+        client._call.assert_called_with("get_neighbors", ["ws1", "node-1"])
+
+
+# ── Pattern detection ──────────────────────────────────────────────────
+
+
+class TestPatternDetection:
+    """detect_memory_patterns() (lines 1432-1440)."""
+
+    def test_detects_patterns(self):
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._query = Mock(return_value=[
+            {"id": "1", "content": "a"},
+            {"id": "2", "content": "b"},
+        ])
+
+        mock_detect = Mock(return_value={"patterns": [], "clusters": []})
+        with patch("spacetime_memory.pattern_detection.detect_patterns", mock_detect):
+            result = c.detect_patterns("ws1", limit=10)
+            mock_detect.assert_called_once()
+            assert isinstance(result, dict)
+
+
+# ── Batch update memories ──────────────────────────────────────────────
+
+
+class TestBatchUpdateMemoriesSuccess:
+    """batch_update_memories() success path (lines 1758-1769)."""
+
+    def test_batch_update_success(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._query = Mock(return_value=[
+            {"id": "m1", "content": "old", "summary": "s", "confidence": 0.5},
+        ])
+        c.update_memory = Mock(return_value={"status": "ok"})
+
+        result = c.batch_update_memories("ws1", ["m1"], {"content": "new"})
+        c.update_memory.assert_called_once_with("m1", "new", "s", 0.5)
+        assert result["status"] == "ok"
+
+    def test_batch_update_missing_memory(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._query = Mock(return_value=[])  # memory not found
+        c.update_memory = Mock()
+
+        result = c.batch_update_memories("ws1", ["missing"], {"content": "new"})
+        c.update_memory.assert_not_called()
+        assert result["status"] == "partial"
+        assert "not found" in result["errors"][0]
+
+    def test_batch_update_exception(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._query = Mock(side_effect=RuntimeError("boom"))
+
+        result = c.batch_update_memories("ws1", ["m1"], {"content": "new"})
+        assert result["status"] == "partial"
+        assert result["errors"]
