@@ -211,6 +211,21 @@ class TestAsk:
 
         assert "llm_answer" not in result
 
+    def test_ask_non_list_non_dict_pack_json(self, agent):
+        """pack_json that is neither list nor dict → empty entries (line 100)."""
+        agent._client._call = Mock()
+        agent._client._query.return_value = [{
+            "id": "p1",
+            "pack_json": '"just a string"',
+            "created_at": 1,
+        }]
+
+        with patch.object(agent, "_call_llm", return_value=None):
+            result = agent.ask("q", "ws1")
+
+        # packs is not empty (got a pack), but entries parsing falls to else branch
+        assert result["entries"] == []
+
 
 # ── synthesize ───────────────────────────────────────────────────────────────
 
@@ -292,6 +307,22 @@ class TestSynthesize:
         }):
             result = agent.synthesize("q", "ws1")
         assert result["answer"] == "from dict"
+
+    def test_synthesize_invalid_json_fallback(self, agent):
+        """Invalid JSON in pack_json → empty list fallback (lines 220-221)."""
+        agent._client._call = Mock()
+        agent._client._query.return_value = [{
+            "id": "p1",
+            "pack_json": "not-valid-json{{{",
+            "created_at": 1,
+        }]
+
+        with patch.object(agent, "_call_llm_with_gaps", return_value=None):
+            result = agent.synthesize("q", "ws1")
+
+        # Falls back to empty entries, no LLM call, fills defaults
+        assert result["answer"] is None
+        assert result["gaps"] == []
 
 
 # ── _call_llm ────────────────────────────────────────────────────────────────

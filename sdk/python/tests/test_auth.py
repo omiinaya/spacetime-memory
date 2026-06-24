@@ -110,3 +110,37 @@ class TestGenerateToken:
             assert payload["sub"] == ident
             assert payload["iss"] == ident
             assert payload["exp"] - payload["iat"] == 42
+
+
+class TestMissingPyJWT:
+    """Cover the module-level except ImportError path (lines 20-21)."""
+
+    def test_import_error_sets_pyjwt_to_none(self):
+        """When 'import jwt' fails, pyjwt is set to None (simulated via subprocess)."""
+        import subprocess
+        import sys
+
+        code = """\
+import sys
+# Block jwt import
+class Blocker:
+    def find_module(self, fullname, path=None):
+        if fullname == 'jwt' or fullname.startswith('jwt.'):
+            return self
+        return None
+    def load_module(self, fullname):
+        raise ImportError("Blocked for testing")
+sys.meta_path.insert(0, Blocker())
+
+# Now import auth
+from spacetime_memory.auth import generate_token
+import spacetime_memory.auth as auth_mod
+assert auth_mod.pyjwt is None, f"Expected None, got {auth_mod.pyjwt}"
+print("OK")
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True, text=True,
+            cwd="/home/user/spacetime-memory/sdk/python",
+        )
+        assert "OK" in result.stdout, f"Failed: {result.stderr}"

@@ -56,6 +56,30 @@ class TestInit:
         assert "cross-encoder-tokenizer.json" in r._tokenizer_path
 
 
+# ── _ensure_loaded validation ─────────────────────────────────────────────────
+
+
+class TestEnsureLoaded:
+    """_ensure_loaded() — file existence checks."""
+
+    def test_missing_tokenizer_raises(self, tmp_path):
+        """When model exists but tokenizer is missing, FileNotFoundError."""
+        import os
+        from spacetime_memory.cross_encoder import CrossEncoderReranker
+
+        model = tmp_path / "model.onnx"
+        model.write_text("fake onnx")
+        tokenizer = tmp_path / "no_such_file.json"
+
+        r = CrossEncoderReranker(
+            model_path=str(model),
+            tokenizer_path=str(tokenizer),
+        )
+        r._loaded = False
+        with pytest.raises(FileNotFoundError, match="tokenizer not found"):
+            r._ensure_loaded()
+
+
 # ── CrossEncoderReranker.rerank ──────────────────────────────────────────────
 
 
