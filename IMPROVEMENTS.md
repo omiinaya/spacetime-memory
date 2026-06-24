@@ -22,12 +22,25 @@ Files: client/spacetime_memory/client.py
 Difficulty: Medium
 Est: 4h
 
-### Knowledge graph visualization in frontend
-The KG works (<20ms) but has no visual graph explorer in the web UI.
-Add a D3/vis.js graph viewer for exploring nodes and connections.
-Files: web/src/pages/
+### Upgrade STDB dependency from 2.4 → 2.6
+STDB v2.6.0 is available on crates.io (currently pinned at "2.4", resolves to 2.4.1).
+Key changes to audit:
+- UUID generation (v4/v7) stabilized — no longer behind `unstable` feature flag
+- `ProcedureContext` methods (`sleep_until`, `with_tx`, `try_with_tx`) now take `&mut self`
+- `update()` method removed from `UniqueIndex` — migrate to delete + insert pattern
+- Edition 2024, minimum Rust version bumped to 1.93.0
+- `new_uuid_v4()` / `new_uuid_v7()` now return `Result` (previously `anyhow::Result`)
+Files: server/spacetimedb/Cargo.toml, server/spacetimedb/src/*.rs
 Difficulty: Medium
-Est: 3h
+Est: 2-3h
+
+### Missing unit tests for expand_query / query expansion
+The `query_expansion.py` module lacks direct unit test coverage.
+Files: sdk/python/spacetime_memory/query_expansion.py, sdk/python/tests/test_query_expansion.py
+Difficulty: Easy
+Est: 1h
+
+---
 
 ## Recently Completed
 
@@ -68,6 +81,29 @@ and __version__ attribute. Pushing a v* tag triggers the publish workflow.
 Fixed: publish.yml packages-dir path, added twine check, added __version__
 to spacetime_memory/__init__.py, updated publish guide.
 Commit: e1ba6fe
+Date: 2026-06-24
+
+### ✅ Knowledge graph visualization in frontend
+The KG works (<20ms) and now has TWO visual graph explorers:
+- **KnowledgeGraph** (`/graph`, vis-network based): full interactive graph
+  with search, node selection, relation labels, community colors, zoom/pan,
+  and statistics panel. Supports PageRank, hierarchy, and dendrogram views.
+- **GraphViz** (`/graph-viz`, D3-force based): force-directed layout with
+  type-based coloring, highlighting, filtering, minimap, and node tooltips.
+Both are lazy-loaded, have Vitest smoke tests, and are linked from the nav bar.
+Routes: `/graph` and `/graph-viz` in App.tsx.
+Commits: d3b1c9a, f7e2a4b, and earlier
+
+### ✅ Observability test fix — OTel cache pollution
+Tests that mock OTel modules (test_console_exporter_path, etc.) install mock
+opentelemetry into sys.modules, causing `_check_otel_available()` to cache
+`_OTEL_AVAILABLE=True` globally. Subsequent tests then fail with
+ModuleNotFoundError on real OTel imports.
+
+Fix: autouse fixture resets `_OTEL_AVAILABLE = None` before each test,
+restoring test isolation. Re-runs clean: 44 passed, 1 skipped (OTel not
+installed), 0 failed.
+Commit: 91f1861
 Date: 2026-06-24
 
 ---
