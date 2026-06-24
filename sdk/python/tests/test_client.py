@@ -709,6 +709,27 @@ class TestStorePostIndexing:
         assert result["status"] == "ok"
         c._call.assert_any_call("update_memory_tier", ["mem-1", "L0"])
 
+    def test_store_binary_compression_error_caught(self):
+        """Binary compression error in post-store indexing is caught (lines 841-842)."""
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value={"status": "ok"})
+        c._embed = Mock(return_value=[0.1] * 1024)
+        c._query = Mock(return_value=[
+            {"id": "mem-1", "content": "hello world"},
+        ])
+        c._tantivy_index = Mock()
+        c._extract_and_store_entities = Mock()
+        c._binary_cache = {}
+        c._emit_event = Mock()
+        c._query_cache = None
+        c.plugin_manager = None
+
+        with patch("spacetime_memory.binary_vectors.binarize", side_effect=ValueError("bad")):
+            result = c.store("ws1", content="hello world")
+            assert result["status"] == "ok"  # store still succeeds
+
 
 # ── Entity extraction ──────────────────────────────────────────────────
 
@@ -770,6 +791,41 @@ class TestExtractAndStoreEntities:
 
         # Should have tried create_entity_link (failed) and link_entity_to_memory
         assert c._call.call_count >= 2
+
+    def test_link_entity_error_caught(self):
+        """RuntimeError in link_entity_to_memory is caught (lines 906-907)."""
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        # create_entity_link succeeds, link_entity_to_memory fails
+        c._call = Mock(side_effect=[{"status": "ok"}, RuntimeError("link fail")])
+
+        mock_llm = Mock()
+        mock_llm.available = True
+        mock_llm.extract_entities_llm.return_value = [
+            {"name": "Entity", "entity_type": "concept"},
+        ]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=mock_llm):
+            c._extract_and_store_entities("ws1", "mem-1", "Entity content")
+
+        assert c._call.call_count == 2  # both called
+
+    def test_regex_fallback_error_caught(self):
+        """RuntimeError in extract_entities fallback is caught (lines 912-913)."""
+        from unittest.mock import patch
+
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(side_effect=RuntimeError("extract fail"))
+
+        mock_llm = Mock()
+        mock_llm.available = False  # triggers fallback
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=mock_llm):
+            c._extract_and_store_entities("ws1", "mem-1", "content")
+
+        # Called extract_entities (which failed) but no exception propagated
+        c._call.assert_called_once_with("extract_entities", ["ws1", "content"])
 
 
 # ── Entity extraction edge cases ───────────────────────────────────────
