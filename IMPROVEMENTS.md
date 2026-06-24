@@ -44,6 +44,24 @@ Files: server/spacetimedb/src/lib.rs
 Difficulty: Medium
 Est: 1-2h
 
+### Extend uuid_v4_uniq() to remaining tables
+The new `uuid_v4_uniq()` helper was added to lib.rs and deployed to
+memory.rs, change_event.rs, knowledge_graph.rs, and workspace.rs.
+Remaining tables that still use raw `uuid_v4()` for primary key inserts
+without retry: consolidation.rs (10+ sites), document.rs (3 sites),
+auth.rs (4 sites), note.rs, insight.rs, profile.rs, etc.
+Files: server/spacetimedb/src/consolidation.rs, document.rs, auth.rs, ...
+Difficulty: Medium
+Est: 2-3h
+
+### Unit test coverage for Rust helper functions
+No Rust unit tests exist for `uuid_v4()`, `uuid_v4_uniq()`, `now_micros()`,
+or `default_expires_at()`. These are pure functions (no STDB dependency)
+and could be unit-tested on the host target.
+Files: server/spacetimedb/src/lib.rs
+Difficulty: Easy
+Est: 0.5h
+
 ---
 
 ## Recently Completed
