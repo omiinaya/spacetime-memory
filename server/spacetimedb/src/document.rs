@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4_uniq};
 use crate::workspace::check_space_access;
 
 /// A document ingested into the workspace.
@@ -57,7 +57,7 @@ pub fn create_document(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.document().id().find(id).is_none(), 3);
 
     // Validate content_type
     match content_type.as_str() {
@@ -101,7 +101,7 @@ pub fn create_document(
         let chunks = chunk_text(&doc_content, 500, 50);
         for (i, chunk_text) in chunks.iter().enumerate() {
             let chunk = DocChunk {
-                id: uuid_v4(ctx),
+                id: uuid_v4_uniq(ctx, |id| ctx.db.doc_chunk().id().find(id).is_none(), 3),
                 document_id: id.clone(),
                 content: chunk_text.clone(),
                 chunk_index: i as u32,
@@ -162,7 +162,7 @@ pub fn add_chunk(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.doc_chunk().id().find(id).is_none(), 3);
 
     // Verify that the parent document exists
     let mut doc = ctx

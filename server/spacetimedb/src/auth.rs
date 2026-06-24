@@ -1,5 +1,5 @@
 use spacetimedb::*;
-use crate::{uuid_v4, now_micros};
+use crate::{uuid_v4_uniq, now_micros};
 use crate::workspace::workspace;
 use sha2::{Sha256, Digest};
 use pbkdf2::pbkdf2_hmac;
@@ -259,7 +259,7 @@ pub fn create_api_key(
         return Err("permissions must be a valid JSON array of strings".to_string());
     }
 
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.api_key().id().find(id).is_none(), 3);
     let now = now_micros(ctx);
 
     ctx.db.api_key().insert(ApiKey {
@@ -275,7 +275,7 @@ pub fn create_api_key(
 
     // Publish metadata to public result table so SDK can read back the ID
     ctx.db.api_key_result().insert(ApiKeyResult {
-        id: uuid_v4(ctx),
+        id: uuid_v4_uniq(ctx, |id| ctx.db.api_key_result().id().find(id).is_none(), 3),
         api_key_id: id.clone(),
         workspace_id,
         name,
@@ -331,7 +331,7 @@ pub fn list_api_keys(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
         .filter(|k: &ApiKey| k.workspace_id == workspace_id)
     {
         ctx.db.api_key_result().insert(ApiKeyResult {
-            id: uuid_v4(ctx),
+            id: uuid_v4_uniq(ctx, |id| ctx.db.api_key_result().id().find(id).is_none(), 3),
             api_key_id: key.id.clone(),
             workspace_id: workspace_id.clone(),
             name: key.name.clone(),
@@ -525,7 +525,7 @@ pub fn list_admins(ctx: &ReducerContext) -> Result<(), String> {
     let now = now_micros(ctx);
     for account in ctx.db.account().iter().take(crate::MAX_RESULTS).filter(|a: &Account| a.role == "admin" && a.is_active) {
         ctx.db.admin_list_result().insert(AdminListResult {
-            id: uuid_v4(ctx),
+            id: uuid_v4_uniq(ctx, |id| ctx.db.admin_list_result().id().find(id).is_none(), 3),
             identity: account.id.clone(),
             username: account.username.clone(),
             display_name: account.display_name.clone(),

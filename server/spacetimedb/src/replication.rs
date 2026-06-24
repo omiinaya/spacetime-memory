@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_admin;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4_uniq};
 
 // Re-import table structs for direct manipulation in replicate_incoming
 use crate::memory::{memory, Memory};
@@ -90,7 +90,7 @@ pub fn add_replication_peer(
 ) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.replication_peer().id().find(id).is_none(), 3);
 
     let peer = ReplicationPeer {
         id: id.clone(),
@@ -128,7 +128,7 @@ pub fn remove_replication_peer(ctx: &ReducerContext, id: String) -> Result<(), S
 pub fn list_replication_peers(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
-    let result_id = uuid_v4(ctx);
+    let result_id = uuid_v4_uniq(ctx, |id| ctx.db.replication_result().id().find(id).is_none(), 3);
 
     // Query peers for this workspace
     let peers: Vec<_> = ctx
@@ -187,7 +187,7 @@ pub fn mark_log_synced(ctx: &ReducerContext, log_ids_json: String) -> Result<(),
 pub fn get_unsynced_entries(ctx: &ReducerContext, workspace_id: String, limit: i64) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
-    let result_id = uuid_v4(ctx);
+    let result_id = uuid_v4_uniq(ctx, |id| ctx.db.replication_result().id().find(id).is_none(), 3);
 
     let entries: Vec<_> = ctx
         .db
@@ -228,7 +228,7 @@ pub fn get_unsynced_entries(ctx: &ReducerContext, workspace_id: String, limit: i
 pub fn get_replication_status(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
-    let result_id = uuid_v4(ctx);
+    let result_id = uuid_v4_uniq(ctx, |id| ctx.db.replication_result().id().find(id).is_none(), 3);
 
     let total_peers = ctx
         .db
@@ -345,7 +345,7 @@ pub fn replicate_incoming(
             }
             Err(e) => {
                 // Store a replication_result so the daemon can read errors
-                let err_id = uuid_v4(ctx);
+                let err_id = uuid_v4_uniq(ctx, |id| ctx.db.replication_result().id().find(id).is_none(), 3);
                 let err_result = ReplicationResult {
                     id: err_id.clone(),
                     workspace_id: workspace_id.clone(),
@@ -376,7 +376,7 @@ pub fn replicate_incoming(
 
     // Store a sync receipt for this peer
     let receipt = ReplicationLog {
-        id: uuid_v4(ctx),
+        id: uuid_v4_uniq(ctx, |id| ctx.db.replication_log().id().find(id).is_none(), 3),
         workspace_id: workspace_id.clone(),
         table_name: "__sync_receipt__".to_string(),
         operation: "received".to_string(),
@@ -716,7 +716,7 @@ pub fn get_replication_peer_by_id(ctx: &ReducerContext, peer_id: String) -> Resu
         .find(&peer_id)
         .ok_or_else(|| format!("Replication peer '{}' not found", peer_id))?;
 
-    let result_id = uuid_v4(ctx);
+    let result_id = uuid_v4_uniq(ctx, |id| ctx.db.replication_result().id().find(id).is_none(), 3);
     let json_data = serde_json::to_string(&peer).unwrap_or_else(|_| "{}".to_string());
 
     let result = ReplicationResult {

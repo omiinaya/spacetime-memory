@@ -1,6 +1,6 @@
 use spacetimedb::*;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4_uniq};
 use crate::auth::require_auth;
 use crate::workspace::check_space_access;
 
@@ -108,7 +108,7 @@ pub fn create_note(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.note().id().find(id).is_none(), 3);
 
     // Normalise note_date: if non-empty, must be YYYY-MM-DD
     if !note_date.is_empty() && !is_date_format(&note_date) {
@@ -486,7 +486,7 @@ fn resolve_block_refs(ctx: &ReducerContext, note_id: &str, blocks: &[String], no
                 };
 
                 ctx.db.block_reference().insert(BlockReference {
-                    id: uuid_v4(ctx),
+                    id: uuid_v4_uniq(ctx, |id| ctx.db.block_reference().id().find(id).is_none(), 3),
                     source_note_id: note_id.to_string(),
                     source_block_id: source_block_id.clone(),
                     target_block_id: full_target_id.clone(),
@@ -925,7 +925,7 @@ fn resolve_backlinks(ctx: &ReducerContext, source_id: &str, content: &str, now: 
 
         for target_id in &matches {
             let bl = NoteBacklink {
-                id: uuid_v4(ctx),
+                id: uuid_v4_uniq(ctx, |id| ctx.db.note_backlink().id().find(id).is_none(), 3),
                 source_note_id: source_id.to_string(),
                 target_note_id: target_id.clone(),
                 display_text: _display.to_string(),

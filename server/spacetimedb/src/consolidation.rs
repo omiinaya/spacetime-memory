@@ -1,6 +1,6 @@
 use spacetimedb::*;
 
-use crate::{uuid_v4, now_micros};
+use crate::{uuid_v4_uniq, now_micros};
 use crate::context_directory::{context_directory, directory_memory_link};
 use crate::hybrid_query::{cosine_similarity, parse_embedding_json};
 use crate::knowledge_graph::{kg_community, kg_edge, kg_node};
@@ -39,7 +39,7 @@ pub fn consolidate_memories(
 ) -> Result<(), String> {
     let _admin = crate::auth::require_admin(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.consolidation_log().id().find(id).is_none(), 3);
 
     // Parse source IDs from JSON array
     let source_ids: Vec<String> = serde_json::from_str(&source_ids_json)
@@ -89,7 +89,7 @@ pub fn consolidate_memories(
 
     // Log the consolidation
     let log = ConsolidationLog {
-        id: uuid_v4(ctx),
+        id: uuid_v4_uniq(ctx, |id| ctx.db.consolidation_log().id().find(id).is_none(), 3),
         workspace_id,
         consolidation_type: String::from("rollup"),
         source_memory_ids: source_ids_json,
@@ -138,7 +138,7 @@ pub fn decay_weak_memories(
         let ids_json = serde_json::to_string(&source_ids)
             .unwrap_or_else(|_| "[]".to_string());
         let log = ConsolidationLog {
-            id: uuid_v4(ctx),
+            id: uuid_v4_uniq(ctx, |id| ctx.db.consolidation_log().id().find(id).is_none(), 3),
             workspace_id,
             consolidation_type: String::from("decay"),
             source_memory_ids: ids_json,
@@ -263,7 +263,7 @@ pub fn suggest_merges(
             );
 
             ctx.db.merge_suggestion().insert(MergeSuggestion {
-                id: uuid_v4(ctx),
+                id: uuid_v4_uniq(ctx, |id| ctx.db.merge_suggestion().id().find(id).is_none(), 3),
                 workspace_id: workspace_id.clone(),
                 source_id,
                 target_id,
@@ -325,7 +325,7 @@ pub fn approve_merge(ctx: &ReducerContext, suggestion_id: String) -> Result<(), 
     let source_ids_json = serde_json::to_string(&[source_id])
         .unwrap_or_else(|_| "[]".to_string());
     let log = ConsolidationLog {
-        id: uuid_v4(ctx),
+        id: uuid_v4_uniq(ctx, |id| ctx.db.consolidation_log().id().find(id).is_none(), 3),
         workspace_id,
         consolidation_type: String::from("approved_merge"),
         source_memory_ids: source_ids_json,
@@ -615,7 +615,7 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
         let ids_json =
             serde_json::to_string(&source_ids).unwrap_or_else(|_| "[]".to_string());
         ctx.db.consolidation_log().insert(ConsolidationLog {
-            id: uuid_v4(ctx),
+            id: uuid_v4_uniq(ctx, |id| ctx.db.consolidation_log().id().find(id).is_none(), 3),
             workspace_id: ws.id.clone(),
             consolidation_type: String::from("decay"),
             source_memory_ids: ids_json,
@@ -629,7 +629,7 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
         if let Err(e) = dedup_memories(ctx, ws.id.clone()) {
             // Log but don't halt maintenance on dedup error
             ctx.db.consolidation_log().insert(ConsolidationLog {
-                id: uuid_v4(ctx),
+                id: uuid_v4_uniq(ctx, |id| ctx.db.consolidation_log().id().find(id).is_none(), 3),
                 workspace_id: ws.id.clone(),
                 consolidation_type: String::from("dedup_error"),
                 source_memory_ids: e,
@@ -649,7 +649,7 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
         ) {
             // Log but don't halt maintenance on decay error
             ctx.db.consolidation_log().insert(ConsolidationLog {
-                id: uuid_v4(ctx),
+                id: uuid_v4_uniq(ctx, |id| ctx.db.consolidation_log().id().find(id).is_none(), 3),
                 workspace_id: ws.id.clone(),
                 consolidation_type: String::from("decay_error"),
                 source_memory_ids: e,
@@ -713,7 +713,7 @@ pub fn export_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
 
     let insert_entry = |table_name: &str, record_id: String, data_json: String| {
         ctx.db.backup_entry().insert(BackupEntry {
-            id: uuid_v4(ctx),
+            id: uuid_v4_uniq(ctx, |id| ctx.db.backup_entry().id().find(id).is_none(), 3),
             workspace_id: workspace_id.clone(),
             table_name: table_name.to_string(),
             record_id,

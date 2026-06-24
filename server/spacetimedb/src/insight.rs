@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4_uniq};
 use crate::workspace::check_space_access;
 
 /// An insight represents a Hindsight reflect-style reasoning result.
@@ -35,7 +35,7 @@ pub fn create_insight(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.insight().id().find(id).is_none(), 3);
 
     let ins = Insight {
         id: id.clone(),
@@ -104,7 +104,7 @@ pub fn synthesize_mental_models(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.insight().id().find(id).is_none(), 3);
 
     // Validate that memory_ids_json is valid JSON
     if let Err(e) = serde_json::from_str::<Vec<String>>(&memory_ids_json) {

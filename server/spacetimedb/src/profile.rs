@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4_uniq};
 
 /// A profile accumulates static facts and dynamic context about a peer.
 #[table(accessor = profile)]
@@ -45,7 +45,7 @@ pub fn upsert_profile(
         ctx.db.profile().id().update(p);
     } else {
         // Create new profile
-        let id = uuid_v4(ctx);
+        let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
         let p = Profile {
             id: id.clone(),
             peer_id,
@@ -77,7 +77,7 @@ pub fn add_profile_fact(ctx: &ReducerContext, peer_id: String, fact: String) -> 
         ctx.db.profile().id().update(p);
     } else {
         // Create a new profile with just this fact
-        let id = uuid_v4(ctx);
+        let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
         let facts = format!("[\"{}\"]", fact.replace('"', "\\\""));
         let p = Profile {
             id: id.clone(),
@@ -114,7 +114,7 @@ pub fn add_dynamic_context(
         ctx.db.profile().id().update(p);
     } else {
         // Create a new profile with just this context entry
-        let id = uuid_v4(ctx);
+        let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
         let context_entry = serde_json::to_string(&vec![&context]).unwrap_or_else(|_| "[]".to_string());
         let p = Profile {
             id: id.clone(),
@@ -185,7 +185,7 @@ pub fn add_fact(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.fact().id().find(id).is_none(), 3);
 
     // Determine expires_at: L0=30d, L1=90d, L2=365d from now (in micros)
     let expires_offset: i64 = match tier.as_str() {
@@ -315,7 +315,7 @@ pub fn list_facts(
 
     let json_data = serde_json::to_string(&facts).unwrap_or_else(|_| "[]".to_string());
     let query_hash = format!("{}:{}:{}:{}:{}", workspace_id, peer_id, fact_type, tier, category);
-    let result_id = uuid_v4(ctx);
+    let result_id = uuid_v4_uniq(ctx, |id| ctx.db.fact_result().id().find(id).is_none(), 3);
 
     let result = FactResult {
         id: result_id,
@@ -358,7 +358,7 @@ pub fn search_facts(
         .collect();
 
     let json_data = serde_json::to_string(&facts).unwrap_or_else(|_| "[]".to_string());
-    let result_id = uuid_v4(ctx);
+    let result_id = uuid_v4_uniq(ctx, |id| ctx.db.fact_result().id().find(id).is_none(), 3);
 
     let result = FactResult {
         id: result_id,
