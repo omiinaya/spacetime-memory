@@ -22,21 +22,34 @@ Files: client/spacetime_memory/client.py
 Difficulty: Medium
 Est: 4h
 
-### Upgrade STDB dependency from 2.4 → 2.6
-STDB v2.6.0 is available on crates.io (currently pinned at "2.4", resolves to 2.4.1).
-Key changes to audit:
-- UUID generation (v4/v7) stabilized — no longer behind `unstable` feature flag
-- `ProcedureContext` methods (`sleep_until`, `with_tx`, `try_with_tx`) now take `&mut self`
-- `update()` method removed from `UniqueIndex` — migrate to delete + insert pattern
-- Edition 2024, minimum Rust version bumped to 1.93.0
-- `new_uuid_v4()` / `new_uuid_v7()` now return `Result` (previously `anyhow::Result`)
-Files: server/spacetimedb/Cargo.toml, server/spacetimedb/src/*.rs
+### Track STDB UniqueColumn::update() deprecation
+STDB v2.6 still has `.id().update()` on UniqueColumn, but it may be
+removed in a future version. Monitor upstream and plan delete+insert
+migration when removal is confirmed.
+Files: server/spacetimedb/src/*.rs (60+ call sites)
+Difficulty: Easy (tracking)
+Est: 0.5h
+
+### Migrate to sortable UUID v7 for index performance
+`ctx.new_uuid_v7()` is now stable in STDB v2.6 (behind `rand` default feature).
+Sortable UUIDs improve B-tree index locality vs v4 random UUIDs.
+Could replace or supplement `uuid_v4()` in lib.rs.
+Files: server/spacetimedb/src/lib.rs
 Difficulty: Medium
-Est: 2-3h
+Est: 1-2h
 
 ---
 
 ## Recently Completed
+
+### ✅ Upgrade STDB dependency from 2.4 → 2.6 (Jun 24)
+Successfully bumped and verified:
+- spacetimedb resolved from 2.4.1 → 2.6.0
+- `cargo check --target wasm32-unknown-unknown` passes (zero warnings)
+- `UniqueColumn::update()` still present in v2.6 — no migration needed yet
+- Fixed pre-existing unused import warning in knowledge_graph.rs
+- `new_uuid_v4()` / `new_uuid_v7()` now stable behind default `rand` feature
+Commit: (pending push)
 
 ### ✅ OpenTelemetry / observability integration
 P0: Python SDK — DONE (Jun 24)
