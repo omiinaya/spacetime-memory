@@ -52,7 +52,7 @@ across 21 source files. Uses `ctx.new_uuid_v7().to_string()` which produces
 standard 8-4-4-4-12 format UUIDs with time-ordered prefixes for better
 B-tree index locality. Remaining `uuid_v4(ctx)` calls in lib.rs are inside
 `uuid_v4_uniq()` (the v4 retry wrapper) and are intentionally preserved.
-Commit: pending
+Commit: cc3f49a
 
 ### ✅ Multi-region / failover support (Jun 24)
 Added `SPACETIMEDB_HOSTS` env var for comma-separated host:port pairs.
