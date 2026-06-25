@@ -769,3 +769,245 @@ class TestComparisonPage:
         )
         assert result["note"]["id"] == "n1"
 
+
+class TestExportWorkspace:
+    """Tests for Compounder.export_workspace()."""
+
+    def test_empty_workspace_returns_zero(self, tmp_path):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = []
+        cp = Compounder(client)
+        result = cp.export_workspace(
+            output_dir=str(tmp_path),
+            workspace_id="ws1",
+        )
+        assert result["files_written"] == 0
+
+    def test_exports_notes_as_markdown(self, tmp_path):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        # _query for notes, then edges, then _log_activity
+        client._query.side_effect = [
+            [
+                {"id": "n1", "title": "Test Note", "content": "Hello world.",
+                 "created_at": "2026-06-25", "updated_at": "2026-06-25"},
+                {"id": "n2", "title": "Another Note", "content": "More text.",
+                 "created_at": "2026-06-24", "updated_at": "2026-06-24"},
+            ],
+            [],  # edges (no backlinks)
+        ]
+        cp = Compounder(client)
+        result = cp.export_workspace(
+            output_dir=str(tmp_path),
+            workspace_id="ws1",
+        )
+        assert result["files_written"] == 2
+        # Check files exist
+        files = list(tmp_path.iterdir())
+        assert len(files) == 2
+
+    def test_exports_yaml_frontmatter(self, tmp_path):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [
+                {"id": "n1", "title": "My Page", "content": "Content here.",
+                 "created_at": "2026-06-25", "updated_at": ""},
+            ],
+            [],  # edges
+        ]
+        cp = Compounder(client)
+        result = cp.export_workspace(
+            output_dir=str(tmp_path),
+            workspace_id="ws1",
+        )
+        assert result["files_written"] == 1
+        content = (tmp_path / "My Page.md").read_text()
+        assert "---" in content
+        assert 'id: "n1"' in content
+        assert 'title: "My Page"' in content
+        assert "Content here." in content
+
+    def test_skips_system_notes_by_default(self, tmp_path):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [
+                {"id": "n1", "title": "_index", "content": "Index",
+                 "created_at": "", "updated_at": ""},
+                {"id": "n2", "title": "Real Note", "content": "Real",
+                 "created_at": "", "updated_at": ""},
+            ],
+            [],  # edges
+        ]
+        cp = Compounder(client)
+        result = cp.export_workspace(
+            output_dir=str(tmp_path),
+            workspace_id="ws1",
+        )
+        assert result["files_written"] == 1
+        assert not (tmp_path / "_index.md").exists()
+
+    def test_includes_system_notes_when_requested(self, tmp_path):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [
+                {"id": "n1", "title": "_log", "content": "Log entry",
+                 "created_at": "", "updated_at": ""},
+                {"id": "n2", "title": "Real Note", "content": "Real",
+                 "created_at": "", "updated_at": ""},
+            ],
+            [],  # edges
+        ]
+        cp = Compounder(client)
+        result = cp.export_workspace(
+            output_dir=str(tmp_path),
+            workspace_id="ws1",
+            include_system_notes=True,
+        )
+        assert result["files_written"] == 2
+        assert (tmp_path / "_log.md").exists()
+
+    def test_export_kg_nodes(self, tmp_path):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        # First call: notes, Second call: edges, Third call: nodes
+        client._query.side_effect = [
+            [],  # notes
+            [],  # edges
+            [
+                {"id": "kg1", "label": "Alice", "node_type": "person",
+                 "summary": "A researcher."},
+                {"id": "kg2", "label": "RLHF", "node_type": "concept",
+                 "summary": "A training method."},
+            ],
+        ]
+        cp = Compounder(client)
+        result = cp.export_workspace(
+            output_dir=str(tmp_path),
+            workspace_id="ws1",
+            include_kg=True,
+        )
+        kg_dir = tmp_path / "_kg_nodes"
+        assert kg_dir.exists()
+        assert result["files_written"] == 2
+
+    def test_sanitizes_filenames(self, tmp_path):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [
+                {"id": "n1", "title": "Special: chars/here?",
+                 "content": "test", "created_at": "", "updated_at": ""},
+            ],
+            [],
+        ]
+        cp = Compounder(client)
+        result = cp.export_workspace(
+            output_dir=str(tmp_path),
+            workspace_id="ws1",
+        )
+        assert result["files_written"] == 1
+        # Should have sanitized the filename
+        files = list(tmp_path.iterdir())
+        assert len(files) == 1
+        assert "?" not in files[0].name
+        assert "/" not in files[0].name
+
+
+class TestGenerateOverview:
+    """Tests for Compounder.generate_overview_page()."""
+
+    def test_empty_workspace_returns_empty(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = []
+        cp = Compounder(client)
+        result = cp.generate_overview_page(workspace_id="ws1")
+        assert result["note"] == {}
+
+    def test_creates_overview_note(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [
+                {"id": "n1", "title": "Test Note", "content": "Some content",
+                 "created_at": "", "updated_at": ""},
+            ],
+            [
+                {"id": "kg1", "label": "Alice", "node_type": "person",
+                 "summary": "A researcher."},
+            ],
+            [],  # edges
+            [],  # _log_activity: query for existing _log
+        ]
+        client.create_note.return_value = {"id": "overview_1"}
+        mock_llm = MagicMock()
+        mock_llm.available = False
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp.generate_overview_page(workspace_id="ws1")
+        assert result["note"]["id"] == "overview_1"
+        # Check the note content — use first create_note call
+        first_note_call = client.create_note.call_args_list[0]
+        assert first_note_call[1]["title"] == "_overview"
+        assert "Workspace Overview" in first_note_call[1]["content"]
+        assert "**1** notes" in first_note_call[1]["content"]
+        assert "A researcher" in first_note_call[1]["content"]  # from node summary
+
+    def test_includes_entity_tables(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [
+                {"id": "n1", "title": "Source: Article", "content": "type: article",
+                 "created_at": "", "updated_at": ""},
+            ],
+            [
+                {"id": "kg1", "label": "Alice", "node_type": "person",
+                 "summary": "A researcher in AI."},
+                {"id": "kg2", "label": "Bob", "node_type": "person",
+                 "summary": "A developer."},
+            ],
+            [
+                {"source_node_id": "kg1", "target_node_id": "kg2",
+                 "relation_type": "collaborates"},
+            ],
+            [],  # _log_activity: query for existing _log
+        ]
+        client.create_note.return_value = {"id": "ov_1"}
+        mock_llm = MagicMock()
+        mock_llm.available = False
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp.generate_overview_page(workspace_id="ws1")
+        assert result["note"]["id"] == "ov_1"
+        content = client.create_note.call_args_list[0][1]["content"]
+        assert "Alice" in content
+        assert "Bob" in content
+        assert "collaborates" in content
+        assert "Orphan" not in content  # No orphans (both connected)
+
+    def test_detects_orphan_nodes(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [],  # notes
+            [
+                {"id": "kg1", "label": "OrphanNode", "node_type": "concept",
+                 "summary": "Alone."},
+            ],
+            [],  # no edges → orphan
+            [],  # _log_activity: query for existing _log
+        ]
+        client.create_note.return_value = {"id": "ov_1"}
+        mock_llm = MagicMock()
+        mock_llm.available = False
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp.generate_overview_page(workspace_id="ws1")
+        content = client.create_note.call_args_list[0][1]["content"]
+        assert "orphan" in content.lower()
+

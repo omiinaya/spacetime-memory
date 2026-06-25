@@ -1500,6 +1500,99 @@ def _run_ingest(text: str, title: str, workspace: str,
         print_json(result)
 
 
+# ── Export ────────────────────────────────────────────────────────────────────
+
+@cli.group()
+def export() -> None:
+    """Export wiki data to external formats.
+
+    Examples:
+      stmem export markdown ./my-vault/ --workspace default
+      stmem export markdown ./my-vault/ --include-kg
+    """
+
+
+@export.command(name="markdown")
+@click.argument("output_dir", type=click.Path())
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--include-kg", is_flag=True,
+              help="Also export KG nodes as markdown entity pages")
+@click.option("--include-system", is_flag=True,
+              help="Include _index and _log notes")
+def export_markdown(output_dir: str, workspace: str,
+                    include_kg: bool, include_system: bool) -> None:
+    """Export all notes as markdown files with YAML frontmatter.
+
+    Each note becomes a ``.md`` file with frontmatter (id, title,
+    created, updated, backlinks).  The output directory is ready
+    for Obsidian or git-based wiki browsing.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    client = _sdk_client()
+    cp = Compounder(client)
+
+    with console.status(
+        f"Exporting workspace '{workspace}' to {output_dir}..."
+    ):
+        result = cp.export_workspace(
+            output_dir=output_dir,
+            workspace_id=workspace,
+            include_kg=include_kg,
+            include_system_notes=include_system,
+        )
+
+    errors = result.get("errors", [])
+    files = result.get("files_written", 0)
+
+    if errors:
+        for err in errors:
+            console.print(f"  [red]✗[/red] {err}")
+
+    _quiet_print(
+        f"[green]Exported {files} files to {output_dir}/[/green]"
+    )
+    if _current_output_format == "json":
+        print_json(result)
+
+
+# ── Overview ──────────────────────────────────────────────────────────────────
+
+@cli.command(name="overview")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--no-embed", is_flag=True,
+              help="Skip semantic embedding for the overview note")
+def overview_cmd(workspace: str, no_embed: bool) -> None:
+    """Generate a workspace overview/synthesis page.
+
+    Creates a ``_overview`` note with stats, entity tables, recent
+    activity, and (if LLM available) an AI-written synthesis.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    client = _sdk_client()
+    cp = Compounder(client)
+
+    with console.status(
+        f"Generating overview for workspace '{workspace}'..."
+    ):
+        result = cp.generate_overview_page(
+            workspace_id=workspace,
+            embed=not no_embed,
+        )
+
+    note = result.get("note", {})
+    if note.get("id"):
+        _quiet_print(
+            f"[green]Overview generated:[/green] `{note['id'][:16]}...`"
+        )
+    else:
+        console.print("[yellow]Workspace is empty. Nothing to generate.[/yellow]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
 # ===================================================================
 # connector — external data sources
 # ===================================================================
