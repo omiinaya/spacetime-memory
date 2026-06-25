@@ -579,6 +579,11 @@ class Compounder:
             result["contradictions"] = self._find_contradictions(
                 workspace_id, limit,
             )
+            # Auto-create notes for any contradictions found
+            if result["contradictions"]:
+                self._create_contradiction_notes(
+                    workspace_id, result["contradictions"],
+                )
 
         result["summary"] = {
             "orphan_count": len(result["orphans"]),
@@ -778,3 +783,34 @@ class Compounder:
             f"Checked {checked} pairs, found {len(contradictions)} contradictions",
         )
         return contradictions
+
+    def _create_contradiction_notes(
+        self,
+        workspace_id: str,
+        contradictions: list[dict[str, Any]],
+    ) -> None:
+        """Create notes documenting each contradiction found during lint.
+
+        Each note records the two conflicting memories and the LLM's
+        explanation, helping the user review and resolve the conflict.
+        """
+        for i, c in enumerate(contradictions):
+            title = f"Contradiction #{i + 1}: {c.get('id_a', '?')[:8]} ↔ {c.get('id_b', '?')[:8]}"
+            content = (
+                f"## Contradiction Detected\n\n"
+                f"**Memory A**: `{c.get('id_a', '')}`\n"
+                f"> {c.get('content_a', '')}\n\n"
+                f"**Memory B**: `{c.get('id_b', '')}`\n"
+                f"> {c.get('content_b', '')}\n\n"
+                f"**Explanation**: {c.get('explanation', 'No explanation provided.')}\n\n"
+                f"---\n*Auto-detected by Compounder lint*"
+            )
+            try:
+                self._client.create_note(
+                    workspace_id=workspace_id,
+                    title=title,
+                    content=content,
+                    embed=True,
+                )
+            except RuntimeError:
+                continue

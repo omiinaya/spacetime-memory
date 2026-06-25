@@ -46,6 +46,18 @@ Est: N/A (blocked)
 
 ## Recently Completed
 
+### ✅ Knowledge Compounder — all 7 patterns implemented (Jun 25)
+Compounder operations now use real reducers (``create_edge``, ``update_node``).
+``lint_workspace()`` auto-creates contradiction notes. Full 30-test suite.
+Commits: 62834b3, 39f6f01, 6ba5195, dad454b
+
+### ✅ update_node reducer added to Rust module (Jun 25)
+New ``#[reducer] pub fn update_node(...)`` in ``knowledge_graph.rs``.
+Updates label, type, summary, metadata_json, source_memory_id on an
+existing KG node. Uses ``ctx.db.kg_node().id().update()`` — preserves
+ID, workspace, community, embedding, and timestamps.
+Commit: dad454b
+
 ### ✅ Knowledge Compounder — persist answers as wiki pages (Jun 24)
 New ``Compounder`` class (``client.compounder``) that implements the
 LLM Wiki pattern: every search synthesis becomes a persistent note + KG
