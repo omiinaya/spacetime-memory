@@ -1225,7 +1225,13 @@ class Compounder:
             except RuntimeError:
                 pass
 
-        # 4. Log
+        # 4. Update index
+        self._update_index(
+            workspace_id, name, note,
+            summary=description[:100],
+        )
+
+        # 5. Log
         self._log_activity(
             workspace_id, "create_entity_page",
             f"'{name}' ({entity_type})",
@@ -1303,6 +1309,12 @@ class Compounder:
             except RuntimeError:
                 pass
 
+        # Update index
+        self._update_index(
+            workspace_id, f"Concept: {concept}", note,
+            summary=definition[:100],
+        )
+
         self._log_activity(
             workspace_id, "create_concept_page", concept,
         )
@@ -1371,6 +1383,15 @@ class Compounder:
             title=f"Comparison: {title}",
             content=content,
             embed=embed,
+        )
+
+        # Update index
+        item_names = ", ".join(
+            i.get("name", "") for i in items[:5]
+        )
+        self._update_index(
+            workspace_id, f"Comparison: {title}", note,
+            summary=item_names[:100],
         )
 
         self._log_activity(
