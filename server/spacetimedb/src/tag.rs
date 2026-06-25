@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 /// A tag that can be attached to memories and other entities.
 #[table(accessor = tag)]
@@ -37,7 +37,7 @@ pub fn create_tag(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     let tag = Tag {
         id: id.clone(),

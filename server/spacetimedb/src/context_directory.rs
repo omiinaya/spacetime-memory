@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{memory::memory, now_micros, uuid_v4};
+use crate::{memory::memory, now_micros, uuid_v7};
 
 // ---------------------------------------------------------------------------
 // Tables
@@ -72,7 +72,7 @@ pub fn create_directory(
     let _account = require_auth(ctx)?;
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     let dir = ContextDirectory {
         id: id.clone(),
@@ -132,7 +132,7 @@ pub fn get_children(
         .iter()
         .filter(|d| d.parent_id == directory_id)
     {
-        let id = uuid_v4(ctx);
+        let id = uuid_v7(ctx);
         ctx.db.directory_result().insert(DirectoryResult {
             id,
             workspace_id: workspace_id.clone(),
@@ -156,7 +156,7 @@ pub fn get_children(
             .filter(|l| l.directory_id == directory_id)
         {
             if let Some(mem) = ctx.db.memory().id().find(&link.memory_id) {
-                let id = uuid_v4(ctx);
+                let id = uuid_v7(ctx);
                 ctx.db.directory_result().insert(DirectoryResult {
                     id,
                     workspace_id: workspace_id.clone(),
@@ -216,7 +216,7 @@ pub fn traverse_recursive(
             if !visited.contains(&child.id) {
                 visited.insert(child.id.clone());
 
-                let id = uuid_v4(ctx);
+                let id = uuid_v7(ctx);
                 ctx.db.directory_result().insert(DirectoryResult {
                     id,
                     workspace_id: workspace_id.clone(),
@@ -250,7 +250,7 @@ pub fn get_directory(
     let _account = require_auth(ctx)?;
     // Try lookup by id first
     if let Some(dir) = ctx.db.context_directory().id().find(&path_or_id) {
-        let id = uuid_v4(ctx);
+        let id = uuid_v7(ctx);
         ctx.db.directory_result().insert(DirectoryResult {
             id,
             workspace_id,
@@ -273,7 +273,7 @@ pub fn get_directory(
         .iter()
         .find(|d| d.path == path_or_id && d.workspace_id == workspace_id)
     {
-        let id = uuid_v4(ctx);
+        let id = uuid_v7(ctx);
         ctx.db.directory_result().insert(DirectoryResult {
             id,
             workspace_id,
@@ -332,7 +332,7 @@ pub fn link_memory_to_directory(
         ));
     }
 
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
     ctx.db.directory_memory_link().insert(DirectoryMemoryLink {
         id,
         directory_id,

@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 /// An entry in the search index, holding pre-computed embeddings and
 /// text for retrieval. Since SpacetimeDB cannot perform native vector
@@ -41,7 +41,7 @@ pub fn index_entity(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     // Validate entity_type
     match entity_type.as_str() {

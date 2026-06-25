@@ -2,7 +2,7 @@ use spacetimedb::*;
 use crate::auth::require_admin;
 use crate::auth::require_auth;
 
-use crate::{memory::memory, now_micros, uuid_v4};
+use crate::{memory::memory, now_micros, uuid_v7};
 use crate::workspace::workspace;
 
 /// Records user feedback on a memory for trust scoring.
@@ -119,7 +119,7 @@ pub fn rate_memory(
 
     // Record the feedback
     let feedback = MemoryFeedback {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         memory_id: memory_id.clone(),
         rating: rating.clone(),
         score,
@@ -487,7 +487,7 @@ pub fn recommend_memories(
 
     for (mem_id, content, trust, fb_count, action, urgency) in &recommendations {
         ctx.db.memory_recommendation().insert(MemoryRecommendation {
-            id: uuid_v4(ctx),
+            id: uuid_v7(ctx),
             workspace_id: workspace_id.clone(),
             memory_id: mem_id.clone(),
             content: content.clone(),

@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 use crate::workspace::check_space_access;
 
 /// A session represents a conversation or interaction within a workspace.
@@ -73,7 +73,7 @@ pub fn create_session(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     ctx.db.session().insert(Session {
         id: id.clone(),
@@ -204,7 +204,7 @@ pub fn add_agent_step(
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     // Verify session exists
     ctx.db

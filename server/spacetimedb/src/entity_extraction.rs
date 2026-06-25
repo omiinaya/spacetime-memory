@@ -13,7 +13,7 @@ use crate::auth::require_auth;
 use crate::entity_linking::{entity_link, EntityLink};
 use crate::knowledge_graph::{kg_edge, kg_node, KgEdge, KgNode};
 use crate::workspace::check_space_access;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 // ---------------------------------------------------------------------------
 // Pattern matching (no regex crate — SpacetimeDB WASM constraint)
@@ -254,7 +254,7 @@ fn ensure_entity(
         if existing.workspace_id == workspace_id && existing.label == mention.name {
             // Found existing node — ensure entity_link exists too
             if link_id.is_none() {
-                let eid = uuid_v4(ctx);
+                let eid = uuid_v7(ctx);
                 let link = EntityLink {
                     id: eid.clone(),
                     workspace_id: workspace_id.into(),
@@ -272,7 +272,7 @@ fn ensure_entity(
 
     // Create new entity_link if needed
     let needs_link = link_id.is_none();
-    let eid = if let Some(id) = link_id { id } else { uuid_v4(ctx) };
+    let eid = if let Some(id) = link_id { id } else { uuid_v7(ctx) };
     if needs_link {
         let link = EntityLink {
             id: eid.clone(),
@@ -287,7 +287,7 @@ fn ensure_entity(
     }
 
     // Create new kg_node
-    let nid = uuid_v4(ctx);
+    let nid = uuid_v7(ctx);
     let node = KgNode {
         id: nid.clone(),
         workspace_id: workspace_id.into(),
@@ -313,7 +313,7 @@ fn create_edge(
     relation: &str,
     now: i64,
 ) {
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
     let edge = KgEdge {
         id,
         workspace_id: workspace_id.into(),

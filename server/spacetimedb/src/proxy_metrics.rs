@@ -10,7 +10,7 @@
 use spacetimedb::*;
 
 use crate::auth::require_auth;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 /// Single snapshot of proxy /metrics data.
 #[table(accessor = proxy_metrics_snapshot, public)]
@@ -62,7 +62,7 @@ pub fn push_proxy_metrics(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     let snapshot = ProxyMetricsSnapshot {
         id,

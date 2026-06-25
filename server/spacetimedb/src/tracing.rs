@@ -35,7 +35,7 @@
 use spacetimedb::*;
 
 use crate::now_micros;
-use crate::uuid_v4;
+use crate::uuid_v7;
 
 // ---------------------------------------------------------------------------
 // Kinds of traced operations
@@ -118,7 +118,7 @@ pub fn record_span(
 ) {
     let now = now_micros(ctx);
     let span = TracingSpan {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         operation: operation.to_string(),
         kind: kind.as_str().to_string(),
         workspace_id: workspace_id.to_string(),

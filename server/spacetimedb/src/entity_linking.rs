@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 /// An entity link stores a canonical entity name with aliases,
 /// providing Mem0-style entity resolution for the knowledge graph.
@@ -32,7 +32,7 @@ pub fn create_entity_link(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     let el = EntityLink {
         id: id.clone(),

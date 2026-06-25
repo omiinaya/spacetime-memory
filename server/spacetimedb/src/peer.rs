@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 use crate::workspace::check_space_access;
 
 /// A peer represents a user, AI agent, or other entity participating in sessions.
@@ -43,7 +43,7 @@ pub fn create_peer(
     }
 
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     ctx.db.peer().insert(Peer {
         id: id.clone(),

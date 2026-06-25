@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 use crate::workspace::check_space_access;
 
 /// A harmonized belief produced by the SHMR resonance engine.
@@ -99,7 +99,7 @@ pub fn store_harmonic_beliefs(
             .and_then(|v| v.as_f64())
             .unwrap_or(0.5);
 
-        let id = uuid_v4(ctx);
+        let id = uuid_v7(ctx);
 
         ctx.db.harmonic_belief().insert(HarmonicBelief {
             id,
@@ -177,7 +177,7 @@ pub fn log_resonance_session(
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
     let now = now_micros(ctx);
 
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
     ctx.db.resonance_log().insert(ResonanceLog {
         id,
         workspace_id,

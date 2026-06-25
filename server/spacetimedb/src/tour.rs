@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 /// A guided tour that walks through a sequence of KG nodes.
 #[table(accessor = tour)]
@@ -41,7 +41,7 @@ pub fn create_tour(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
     ctx.db.tour().insert(Tour {
         id: id.clone(),
         workspace_id,
@@ -73,7 +73,7 @@ pub fn add_tour_stop(
         .unwrap_or(0);
 
     ctx.db.tour_stop().insert(TourStop {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         tour_id,
         node_id,
         stop_order: max_order + 1,

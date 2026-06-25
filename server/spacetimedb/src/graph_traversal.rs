@@ -2,7 +2,7 @@ use spacetimedb::*;
 use crate::auth::require_auth;
 
 use crate::knowledge_graph::{kg_edge, kg_node};
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 
 /// Stores the result of a BFS/DFS traversal.
@@ -88,7 +88,7 @@ pub fn graph_bfs(
         let path_json = serde_json::to_string(&path).unwrap_or_default();
 
         ctx.db.graph_traversal_result().insert(GraphTraversalResult {
-            id: uuid_v4(ctx),
+            id: uuid_v7(ctx),
             workspace_id: workspace_id.clone(),
             query_id: qid.clone(),
             node_id: current.clone(),
@@ -195,7 +195,7 @@ pub fn shortest_path(
             let ntype = label_type.map(|(_, t)| t.as_str()).unwrap_or("");
 
             ctx.db.shortest_path_result().insert(ShortestPathResult {
-                id: uuid_v4(ctx),
+                id: uuid_v7(ctx),
                 workspace_id: workspace_id.clone(),
                 query_id: qid.clone(),
                 step_order: i as u32,
@@ -256,7 +256,7 @@ pub fn get_neighbors(
         let ntype = label_type.map(|(_, t)| t.as_str()).unwrap_or("");
 
         ctx.db.graph_traversal_result().insert(GraphTraversalResult {
-            id: uuid_v4(ctx),
+            id: uuid_v7(ctx),
             workspace_id: workspace_id.clone(),
             query_id: qid.clone(),
             node_id: neighbor_id,
@@ -421,7 +421,7 @@ pub fn detect_bridge_nodes(
 
     for (node_id, label, ntype, count, score, cids_json) in &bridges {
         ctx.db.bridge_result().insert(BridgeResult {
-            id: uuid_v4(ctx),
+            id: uuid_v7(ctx),
             workspace_id: workspace_id.clone(),
             node_id: node_id.clone(),
             node_label: label.clone(),
@@ -530,7 +530,7 @@ pub fn compute_kg_stats(
     }
 
     ctx.db.kg_stats_result().insert(KgStatsResult {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         workspace_id,
         node_count,
         edge_count,

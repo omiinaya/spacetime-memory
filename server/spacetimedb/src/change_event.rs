@@ -2,7 +2,7 @@ use spacetimedb::*;
 use crate::auth::require_auth;
 use crate::auth::require_admin;
 
-use crate::{now_micros, uuid_v4, uuid_v4_uniq};
+use crate::{now_micros, uuid_v4_uniq, uuid_v7};
 
 // ---------------------------------------------------------------------------
 // ChangeEvent — real-time change data capture (CDC) table
@@ -121,7 +121,7 @@ pub fn get_changes_since(
         .map(|e| e.created_at)
         .unwrap_or(since_cursor);
 
-    let result_id = uuid_v4(ctx);
+    let result_id = uuid_v7(ctx);
     let result = ChangeEventResult {
         id: result_id.clone(),
         since_cursor,
@@ -161,7 +161,7 @@ pub fn get_latest_change_cursor(ctx: &ReducerContext) -> Result<(), String> {
         .max()
         .unwrap_or(0);
 
-    let result_id = uuid_v4(ctx);
+    let result_id = uuid_v7(ctx);
     let result = ChangeEventResult {
         id: result_id.clone(),
         since_cursor: 0,

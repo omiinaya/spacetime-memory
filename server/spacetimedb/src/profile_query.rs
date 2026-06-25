@@ -6,7 +6,7 @@ use crate::insight::insight;
 use crate::memory::memory;
 use crate::profile::profile;
 use crate::session::session_participant;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 // ---------------------------------------------------------------------------
 // Result tables (client reads these after a reducer call)
@@ -75,7 +75,7 @@ pub fn get_profile_context(ctx: &ReducerContext, peer_id: String) -> Result<(), 
         .ok_or_else(|| format!("Profile for peer '{}' not found", peer_id))?;
 
     let result = ProfileContextResult {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         peer_id: profile.peer_id.clone(),
         static_facts_json: profile.static_facts_json.clone(),
         dynamic_context_json: profile.dynamic_context_json.clone(),
@@ -113,7 +113,7 @@ pub fn search_profiles(
 
     for p in &matches {
         let result = ProfileContextResult {
-            id: uuid_v4(ctx),
+            id: uuid_v7(ctx),
             peer_id: p.peer_id.clone(),
             static_facts_json: p.static_facts_json.clone(),
             dynamic_context_json: p.dynamic_context_json.clone(),
@@ -190,7 +190,7 @@ pub fn get_peer_memory_summary(ctx: &ReducerContext, peer_id: String) -> Result<
     let latest_activity = latest_memory.max(latest_insight).max(latest_session);
 
     let summary = PeerSummaryResult {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         peer_id,
         memory_count,
         insight_count,
@@ -286,7 +286,7 @@ pub fn search_directory_contents(
     };
 
     let result = DirectoryContentResult {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         workspace_id,
         directory_path,
         directory_id: root_id,

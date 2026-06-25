@@ -8,29 +8,15 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Multi-region / failover support
-No tests or code for multi-region STDB deployment. Need to document
-and implement failover connectivity in the client SDK.
-Files: client/spacetime_memory/client.py
-Difficulty: Medium
-Est: 4h
-
-### Migrate all uuid_v4() call sites to uuid_v7() for sortable UUIDs
-UUID v7 is now available via `ctx.new_uuid_v7()` in STDB v2.6. Sortable
-UUIDs improve B-tree index locality. The build-block functions (`uuid_v7()`
-and `uuid_v7_uniq()`) are implemented in lib.rs. Need to migrate ~50 call
-sites across all modules to use the new v7 functions.
-Files: server/spacetimedb/src/*.rs (50+ call sites)
-Difficulty: Medium
-Est: 2-3h
-
 ### Track STDB UniqueColumn::update() deprecation
-STDB v2.6 still has `.id().update()` on UniqueColumn, but it may be
-removed in a future version. Monitor upstream and plan delete+insert
-migration when removal is confirmed.
-Files: server/spacetimedb/src/*.rs (60+ call sites)
+**RESOLVED: UniqueColumn::update() is NOT deprecated in STDB v2.6.0.**  
+Source code review of STDB 2.6.0 confirms that `update()` on `UniqueColumn` is
+still the standard upsert mechanism. No deprecation warning or removal
+notice exists. Item kept for periodic re-check but moved to low priority.
+Files: server/spacetimedb/src/*.rs (50+ call sites)
 Difficulty: Easy (tracking)
 Est: 0.5h
+Status: Research complete — no action needed
 
 ### Fix non-standard UUID format (8-4-4-4-8 → standard 8-4-4-4-12)
 Discovered during unit test work: `format_uuid_v4()` produces a legacy
@@ -59,6 +45,22 @@ Est: N/A (blocked)
 ---
 
 ## Recently Completed
+
+### ✅ Migrate all uuid_v4() call sites to uuid_v7() for sortable UUIDs (Jun 24)
+Replaced `uuid_v4(ctx)` with `uuid_v7(ctx)` at all 57 non-retry call sites
+across 21 source files. Uses `ctx.new_uuid_v7().to_string()` which produces
+standard 8-4-4-4-12 format UUIDs with time-ordered prefixes for better
+B-tree index locality. Remaining `uuid_v4(ctx)` calls in lib.rs are inside
+`uuid_v4_uniq()` (the v4 retry wrapper) and are intentionally preserved.
+Commit: pending
+
+### ✅ Multi-region / failover support (Jun 24)
+Added `SPACETIMEDB_HOSTS` env var for comma-separated host:port pairs.
+`_try_failover()` cycles to next host on connection failure.
+`_request_with_retry` fails over after all retries exhausted.
+`_ensure_identity` probes all hosts, pins to first responsive one.
+6 new tests. Backward compatible.
+Commit: b595739
 
 ### ✅ uuid_v7() + uuid_v7_uniq() build-block functions (Jun 24)
 Added `uuid_v7()` (returns `ctx.new_uuid_v7().to_string()`) and

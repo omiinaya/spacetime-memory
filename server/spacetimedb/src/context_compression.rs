@@ -3,7 +3,7 @@ use crate::auth::require_admin;
 use crate::auth::require_auth;
 
 use crate::memory::memory;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 /// A cached compressed context pack (RetainDB-style).
 /// Allows cache-lookup via `query_hash` so repeated queries reuse
@@ -34,7 +34,7 @@ pub fn store_context_pack(
 ) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
     let now = now_micros(ctx);
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
 
     // Remove any existing pack with the same workspace_id + query_hash
     let existing: Vec<_> = ctx

@@ -8,7 +8,7 @@ use crate::retrieval::{
     search_index, term_index, bm25_idf, bm25_score,
 };
 use crate::workspace::workspace;
-use crate::{now_micros, uuid_v4, MAX_RESULTS};
+use crate::{now_micros, uuid_v7, MAX_RESULTS};
 use crate::tracing::TracingSpanKind;
 use crate::trace_span;
 
@@ -268,7 +268,7 @@ pub fn hybrid_search(
                     let context_json = make_context_json(&workspace_context, &memory_context);
 
                     ctx.db.hybrid_result().insert(HybridResult {
-                        id: uuid_v4(ctx),
+                        id: uuid_v7(ctx),
                         workspace_id: workspace_id.clone(),
                         query_hash: qhash.clone(),
                         entity_type: si.entity_type.clone(),
@@ -397,7 +397,7 @@ pub fn hybrid_search(
                     let context_json = make_context_json(&workspace_context, &memory_context);
 
                     ctx.db.hybrid_result().insert(HybridResult {
-                        id: uuid_v4(ctx),
+                        id: uuid_v7(ctx),
                         workspace_id: workspace_id.clone(),
                         query_hash: qhash.clone(),
                         entity_type: "memory".to_string(),
@@ -474,7 +474,7 @@ pub fn hybrid_search(
                         let context_json = make_context_json(&workspace_context, "");
 
                         ctx.db.hybrid_result().insert(HybridResult {
-                            id: uuid_v4(ctx),
+                            id: uuid_v7(ctx),
                             workspace_id: workspace_id.clone(),
                             query_hash: qhash.clone(),
                             entity_type: "node".to_string(),
@@ -493,7 +493,7 @@ pub fn hybrid_search(
                         if let Some(node) = ctx.db.kg_node().id().find(node_id) {
                             let context_json = make_context_json(&workspace_context, "");
                             ctx.db.hybrid_result().insert(HybridResult {
-                                id: uuid_v4(ctx),
+                                id: uuid_v7(ctx),
                                 workspace_id: workspace_id.clone(),
                                 query_hash: qhash.clone(),
                                 entity_type: "node".to_string(),
@@ -553,7 +553,7 @@ pub fn hybrid_search(
                     let context_json = make_context_json(&workspace_context, &m.context);
 
                     ctx.db.hybrid_result().insert(HybridResult {
-                        id: uuid_v4(ctx),
+                        id: uuid_v7(ctx),
                         workspace_id: workspace_id.clone(),
                         query_hash: qhash.clone(),
                         entity_type: "memory".to_string(),
@@ -788,7 +788,7 @@ pub fn compute_god_nodes(
     // Insert new GodNode entries
     for (node_id, edge_count) in &sorted {
         ctx.db.god_node().insert(GodNode {
-            id: uuid_v4(ctx),
+            id: uuid_v7(ctx),
             workspace_id: workspace_id.clone(),
             node_id: node_id.clone(),
             edge_count: *edge_count,
@@ -883,7 +883,7 @@ pub fn search_sessions_semantic(
             .unwrap_or_else(|| ws_id.clone());
 
         ctx.db.session_search_result().insert(SessionSearchResult {
-            id: uuid_v4(ctx),
+            id: uuid_v7(ctx),
             query_hash: qhash.clone(),
             workspace_id: ws_id.clone(),
             session_name,

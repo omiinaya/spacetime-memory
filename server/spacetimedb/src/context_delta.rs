@@ -5,7 +5,7 @@ use crate::context_compression::context_pack;
 use crate::context_compression::ContextPack;
 use crate::memory::memory;
 use crate::memory::Memory;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v7};
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -154,7 +154,7 @@ fn upsert_context_pack(
         ctx.db.context_pack().id().delete(&p.id);
     }
 
-    let id = uuid_v4(ctx);
+    let id = uuid_v7(ctx);
     let pack = ContextPack {
         id: id.clone(),
         workspace_id,
@@ -261,7 +261,7 @@ pub fn generate_context_pack(
             serde_json::to_string(&new_entries).unwrap_or_else(|_| String::from("[]"));
 
         // 3. Insert the DeltaPack
-        let delta_id = uuid_v4(ctx);
+        let delta_id = uuid_v7(ctx);
         let delta = DeltaPack {
             id: delta_id,
             workspace_id: workspace_id.clone(),

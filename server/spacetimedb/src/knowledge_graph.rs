@@ -3,7 +3,7 @@ use crate::auth::require_auth;
 use crate::auth::require_admin;
 use crate::workspace::check_space_access;
 use crate::change_event;
-use crate::{now_micros, uuid_v4, uuid_v4_uniq};
+use crate::{now_micros, uuid_v4_uniq, uuid_v7};
 /// A node in the knowledge graph, representing a concept, entity, or document.
 #[table(accessor = kg_node)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -198,7 +198,7 @@ pub fn create_edge(
         valid_at: now,
         invalid_at: 0,
         version: 1,
-        edge_group_id: uuid_v4(ctx),
+        edge_group_id: uuid_v7(ctx),
     };
 
     let edge_json = change_event::record_to_json(&edge);
@@ -551,7 +551,7 @@ pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<()
         ctx.db.kg_community().insert(KgCommunity {
             id: 0, // auto-increment
             workspace_id: workspace_id.clone(),
-            name: format!("Community {}", uuid_v4(ctx).get(..8).unwrap_or("new")),
+            name: format!("Community {}", uuid_v7(ctx).get(..8).unwrap_or("new")),
             summary: String::new(),
             created_at: now,
         });
@@ -739,7 +739,7 @@ pub fn compute_pagerank(
     // Insert new results
     for (i, (nid, nlabel)) in nodes.iter().enumerate() {
         ctx.db.pagerank_result().insert(PagerankResult {
-            id: uuid_v4(ctx),
+            id: uuid_v7(ctx),
             workspace_id: workspace_id.clone(),
             node_id: nid.clone(),
             node_label: nlabel.clone(),
@@ -858,7 +858,7 @@ pub fn compute_community_hierarchy(
             let mut set = std::collections::HashSet::new();
             set.insert(*cid);
             Cluster {
-                id: uuid_v4(ctx),
+                id: uuid_v7(ctx),
                 depth: 0,
                 community_set: set,
             }
@@ -949,7 +949,7 @@ pub fn compute_community_hierarchy(
             .copied()
             .collect();
 
-        let parent_id = uuid_v4(ctx);
+        let parent_id = uuid_v7(ctx);
 
         // Insert HierarchyCluster for the new merged cluster
         let community_ids: Vec<String> = parent_set.iter().map(|c| c.to_string()).collect();
@@ -966,7 +966,7 @@ pub fn compute_community_hierarchy(
             ctx.db
                 .community_hierarchy()
                 .insert(CommunityHierarchy {
-                    id: uuid_v4(ctx),
+                    id: uuid_v7(ctx),
                     workspace_id: workspace_id.clone(),
                     parent_cluster_id: parent_id.clone(),
                     child_cluster_id: child.id.clone(),
@@ -1039,7 +1039,7 @@ pub fn add_node_citation(
     let now = now_micros(ctx);
 
     ctx.db.citation().insert(Citation {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         workspace_id,
         entity_id: node_id,
         entity_type: "node".to_string(),
@@ -1064,7 +1064,7 @@ pub fn add_edge_citation(
     let now = now_micros(ctx);
 
     ctx.db.citation().insert(Citation {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         workspace_id,
         entity_id: edge_id,
         entity_type: "edge".to_string(),
@@ -1085,7 +1085,7 @@ pub fn get_citations(
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "reader")?;
-    let qid = uuid_v4(ctx);
+    let qid = uuid_v7(ctx);
 
     for c in ctx.db.citation().iter().take(crate::MAX_RESULTS) {
         if c.entity_id == entity_id && c.entity_type == entity_type && c.workspace_id == workspace_id {

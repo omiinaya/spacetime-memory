@@ -1,5 +1,5 @@
 use spacetimedb::*;
-use crate::{uuid_v4, now_micros};
+use crate::{uuid_v7, now_micros};
 use crate::auth::require_auth;
 use crate::workspace::{check_space_access, workspace};
 use crate::memory::memory;
@@ -136,7 +136,7 @@ pub fn query_table(
 
 fn insert_row(ctx: &ReducerContext, query_id: &str, table_name: &str, row_json: String, now: i64) {
     ctx.db.query_result().insert(GenericQueryResult {
-        id: uuid_v4(ctx),
+        id: uuid_v7(ctx),
         query_id: query_id.to_string(),
         table_name: table_name.to_string(),
         row_json,
