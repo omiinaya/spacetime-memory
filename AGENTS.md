@@ -121,10 +121,15 @@ Run `compounder.lint_workspace()` periodically (weekly or after every ~10 ingest
 | Cross-link | `compounder.cross_link(workspace_id)` | Auto-link related but unconnected memories |
 | Suggest connections | `compounder.suggest_connections(workspace_id)` | Find node pairs that should be linked |
 | Lint | `compounder.lint_workspace(workspace_id, ...)` | Health-check: orphans, crossrefs, contradictions |
+| Export | `compounder.export_workspace(output_dir, ...)` | Export wiki as markdown files for Obsidian/git |
+| Overview | `compounder.generate_overview_page(workspace_id)` | Generate _overview with stats, entities, activity |
 | Search | `client.search(workspace_id, query, ...)` | Semantic + keyword search across all stores |
 | Create note | `client.create_note(workspace_id, title, content, ...)` | Add a wiki page |
 | Create node | `client.create_node(workspace_id, label, node_type, ...)` | Add a KG entity |
 | Create edge | `client._call("create_edge", [workspace_id, src, tgt, ...])` | Link two nodes |
+| Entity page | `compounder.create_entity_page(name, description, ...)` | Structured entity wiki page + KG node |
+| Concept page | `compounder.create_concept_page(concept, definition, ...)` | Concept definition with [[wiki-links]] |
+| Comparison page | `compounder.create_comparison_page(title, items, ...)` | Markdown comparison table |
 
 ---
 
