@@ -1,7 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
-use crate::{now_micros, uuid_v4, uuid_v4_uniq};
+use crate::{now_micros, uuid_v4_uniq};
 use crate::auth;
 
 /// A workspace representing a project, agent-world, or sandbox.
@@ -57,7 +57,7 @@ pub fn create_workspace(ctx: &ReducerContext, name: String, description: String,
 
     // Auto-grant owner access to the workspace creator
     ctx.db.space_permission().insert(SpacePermission {
-        id: uuid_v4(ctx),
+        id: uuid_v4_uniq(ctx, |id| ctx.db.space_permission().id().find(id).is_none(), 3),
         workspace_id: workspace_id.clone(),
         peer_id: caller.to_string(),
         permission: "owner".to_string(),
@@ -148,12 +148,14 @@ pub fn get_workspace_context(
         .find(&workspace_id)
         .ok_or_else(|| format!("Workspace '{}' not found", workspace_id))?;
 
-    ctx.db.workspace_context_result().insert(WorkspaceContextResult {
-        id: uuid_v4(ctx),
-        workspace_id: workspace_id.clone(),
-        context: ws.context.clone(),
-        queried_at: now_micros(ctx),
-    });
+    ctx.db
+            .workspace_context_result()
+            .insert(WorkspaceContextResult {
+                id: uuid_v4_uniq(ctx, |id| ctx.db.workspace_context_result().id().find(id).is_none(), 3),
+                workspace_id: workspace_id.clone(),
+                context: ws.context.clone(),
+                queried_at: now_micros(ctx),
+            });
 
     Ok(())
 }
@@ -335,7 +337,7 @@ pub fn grant_space_access(
     } else {
         // Insert new permission
         ctx.db.space_permission().insert(SpacePermission {
-            id: uuid_v4(ctx),
+            id: uuid_v4_uniq(ctx, |id| ctx.db.space_permission().id().find(id).is_none(), 3),
             workspace_id: workspace_id.clone(),
             peer_id: peer_id.clone(),
             permission: permission.clone(),
@@ -434,7 +436,7 @@ pub fn list_space_members(ctx: &ReducerContext, workspace_id: String) -> Result<
     let now = now_micros(ctx);
     for member in &members {
         ctx.db.space_member_result().insert(SpaceMemberResult {
-            id: uuid_v4(ctx),
+            id: uuid_v4_uniq(ctx, |id| ctx.db.space_member_result().id().find(id).is_none(), 3),
             workspace_id: workspace_id.clone(),
             peer_id: member.peer_id.clone(),
             permission: member.permission.clone(),

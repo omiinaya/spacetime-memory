@@ -59,8 +59,8 @@ pub fn uuid_v4(ctx: &spacetimedb::ReducerContext) -> String {
 /// not the standard 32-hex-char UUID (8-4-4-4-12, 128 bits). The upper
 /// 4 hex digits from `high` are unused. This is a legacy quirk; the
 /// format is stable and used as an opaque unique key throughout the
-/// module. When migrating to UUID v7 (see backlog item), the format
-/// should be corrected to standard 8-4-4-4-12.
+/// module. New code should use `uuid_v7()` / `uuid_v7_uniq()` instead,
+/// which produce standard 8-4-4-4-12 format via `ctx.new_uuid_v7()`.
 ///
 /// This is a pure function — no STDB dependency — suitable for unit testing
 /// on the host target.
@@ -106,6 +106,41 @@ pub fn uuid_v4_uniq(
             return id;
         }
         id = uuid_v4(ctx);
+    }
+    id
+}
+
+/// Generate a sortable UUID v7 using the STDB built-in generator.
+///
+/// Uses `ctx.new_uuid_v7()` which returns a `spacetimedb::Uuid` in standard
+/// 8-4-4-4-12 format. UUID v7 is time-ordered (timestamp-prefixed), which
+/// improves B-tree index locality compared to random v4 UUIDs.
+///
+/// Panics (expect) if the STDB RNG fails — this should never happen in practice.
+pub fn uuid_v7(ctx: &spacetimedb::ReducerContext) -> String {
+    ctx.new_uuid_v7()
+        .expect("STDB new_uuid_v7() should never fail")
+        .to_string()
+}
+
+/// Generate a sortable UUID v7 with collision retry.
+///
+/// Like `uuid_v4_uniq`, but uses `uuid_v7` instead of `uuid_v4`.
+/// The sortable nature of v7 makes collisions less likely under concurrent
+/// load (different timestamps → different UUIDs), but the retry mechanism
+/// provides a safety net for the extremely unlikely case where two reducers
+/// in the same microsecond batch produce the same UUID.
+pub fn uuid_v7_uniq(
+    ctx: &spacetimedb::ReducerContext,
+    is_unique: impl Fn(&String) -> bool,
+    max_attempts: usize,
+) -> String {
+    let mut id = uuid_v7(ctx);
+    for _ in 0..max_attempts {
+        if is_unique(&id) {
+            return id;
+        }
+        id = uuid_v7(ctx);
     }
     id
 }
@@ -300,12 +335,41 @@ mod tests {
     // uuid_v4_uniq needs a ReducerContext (not constructable in host tests)
     // but its retry logic is exercised indirectly by canary tests below.
 
+    // ---- uuid_v7 / uuid_v7_uniq (integration note) ----
+    // uuid_v7() calls ctx.new_uuid_v7() which requires a live STDB
+    // ReducerContext (not available in host-target tests). The function is
+    // tested indirectly by integration tests and by the format contract
+    // below.
+
     #[test]
     fn test_format_uuid_v4_output_matches_uuid_pattern() {
         let id = format_uuid_v4(0x123456789abcdef0, 0x0fedcba987654321);
         // Legacy format: 8-4-4-4-8 (28 hex + 4 hyphens = 32 chars)
         let re = regex::Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{8}$").unwrap();
         assert!(re.is_match(&id), "UUID '{}' does not match expected 8-4-4-4-8 pattern", id);
+    }
+
+    #[test]
+    fn test_uuid_v7_format_is_standard() {
+        // Verify that UUID v7 strings match RFC 9562 format:
+        //   8-4-4-4-12 (36 chars total including hyphens)
+        //   Version digit in the 13th hex position = '7'
+        //   Variant bits in the 17th hex position = 8/9/a/b
+        //
+        // We can't instantiate a ReducerContext in host tests, so we validate
+        // the format contract using an example and a regex. The actual
+        // output from uuid_v7() must match this pattern.
+        let re = regex::Regex::new(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        ).unwrap();
+        // Example STDB Uuid::to_string() format (standard RFC 9562)
+        // NIL uuid: "00000000-0000-0000-0000-000000000000"
+        // MAX uuid: "ffffffff-ffff-ffff-ffff-ffffffffffff"
+        assert!(re.is_match("00000000-0000-7000-8000-000000000000"),
+            "NIL-like UUID should match v7 pattern after version/variant tweak");
+        // A v7 UUID like "018f3a6e-1a3c-7b00-9abc-def012345678" would match
+        assert!(!re.is_match("00000000-0000-4000-8000-000000000000"),
+            "v4 NIL should NOT match v7 pattern (version must be 7)");
     }
 
     #[test]

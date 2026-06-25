@@ -364,7 +364,7 @@ pub fn get_edge_history(ctx: &ReducerContext, edge_group_id: String) -> Result<(
         .filter(|e: &KgEdge| e.edge_group_id == edge_group_id)
     {
         ctx.db.edge_history_result().insert(EdgeHistoryResult {
-            id: uuid_v4(ctx),
+            id: uuid_v4_uniq(ctx, |id| ctx.db.edge_history_result().id().find(id).is_none(), 3),
             edge_id: edge.id,
             workspace_id: edge.workspace_id,
             source_node_id: edge.source_node_id,

@@ -1,6 +1,6 @@
 use spacetimedb::*;
 
-use crate::{now_micros, uuid_v4, uuid_v4_uniq};
+use crate::{now_micros, uuid_v4_uniq};
 use crate::auth::require_auth;
 use crate::auth::require_admin;
 use crate::workspace::check_space_access;
@@ -379,7 +379,7 @@ pub fn get_user_memories(
     for mem in ctx.db.memory().iter().take(crate::MAX_RESULTS) {
         if mem.user_scope == user_scope && mem.workspace_id == workspace_id {
             ctx.db.user_memory_result().insert(UserMemoryResult {
-                id: uuid_v4(ctx),
+                id: uuid_v4_uniq(ctx, |id| ctx.db.user_memory_result().id().find(id).is_none(), 3),
                 user_scope: user_scope.clone(),
                 workspace_id: workspace_id.clone(),
                 memory_id: mem.id.clone(),

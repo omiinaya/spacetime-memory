@@ -1,5 +1,5 @@
 use spacetimedb::*;
-use crate::{now_micros, uuid_v4};
+use crate::{now_micros, uuid_v4_uniq};
 use crate::auth;
 
 /// A persistent connector configuration.
@@ -35,7 +35,7 @@ pub fn register_connector(
 
     let now = now_micros(ctx);
     ctx.db.connector_config().insert(ConnectorConfig {
-        id: uuid_v4(ctx),
+        id: uuid_v4_uniq(ctx, |id| ctx.db.connector_config().id().find(id).is_none(), 3),
         name,
         connector_type,
         config_json,
