@@ -1319,3 +1319,101 @@ class TestNoteCrudStubs:
         client.get_note_by_title("My Note")
         client._query.assert_called_with("note", filter_dict={
             "title": "My Note", "is_active": "true"})
+
+
+# ── Multi-region / Failover ────────────────────────────────────────────
+
+
+class TestMultiRegionFailover:
+    """Fallback between multiple STDB hosts."""
+
+    def test_init_single_host_default(self):
+        """Client._hosts defaults to [host:port] when SPACETIMEDB_HOSTS is unset."""
+        c = Client(host="myhost", port="3001", database="test-db")
+        assert c._hosts == ["myhost:3001"]
+        assert c.host == "myhost"
+        assert c.port == "3001"
+        assert c.sql_url == "http://myhost:3001/v1/database/test-db/sql"
+
+    def test_init_multi_hosts_from_env(self, monkeypatch):
+        """Client parses SPACETIMEDB_HOSTS into _hosts list."""
+        monkeypatch.setenv("SPACETIMEDB_HOSTS", "host1:3001,host2:4000,host3:5000")
+        c = Client(database="test-db")
+        assert c._hosts == ["host1:3001", "host2:4000", "host3:5000"]
+        assert c.host == "host1"
+        assert c.port == "3001"
+
+    def test_try_failover_noop_when_single_host(self):
+        """_try_failover returns False when only one host is configured."""
+        c = Client(host="h", port="1", database="d")
+        assert c._try_failover() is False
+        assert c.host == "h"
+
+    def test_try_failover_switches_host(self):
+        """_try_failover switches to next host in the list."""
+        c = Client(host="host1", port="3001", database="test-db")
+        c._hosts = ["host1:3001", "host2:4000"]
+        c._current_host_index = 0
+
+        assert c._try_failover() is True
+        assert c.host == "host2"
+        assert c.port == "4000"
+        assert c._current_host_index == 1
+        # URL rebuild
+        assert "host2" in c.sql_url
+        assert "4000" in c.reducer_url
+        # Circuit breaker reset
+        assert c._consecutive_failures == 0
+        assert c._circuit_open_until == 0.0
+
+    def test_request_with_retry_failover_on_connect_error(self, monkeypatch):
+        """_request_with_retry fails over to next host on ConnectError."""
+        monkeypatch.setenv("SPACETIMEDB_HOSTS", "host1:3001,host2:3001")
+        monkeypatch.setenv("STMEM_MAX_RETRIES", "1")  # Min retries to speed test
+        c = Client(database="test-db")
+        # Track which host each call targets
+        call_history: list[str] = []
+
+        def mock_post(url, **kw):
+            call_history.append(url[:30])  # Just host prefix
+            if "host1" in url:
+                raise httpx.ConnectError("Connection refused to host1")
+            return Mock(status_code=200, text=json.dumps([]))
+
+        c._http.post = mock_post
+        c._http.get = Mock(return_value=Mock(status_code=200, headers={}))
+
+        # This should succeed via failover to host2
+        resp = c._request_with_retry("POST", c.sql_url, content="test")
+        assert resp.status_code == 200
+        # Should have switched to host2
+        assert c.host == "host2"
+        # First calls went to host1, final call to host2
+        assert any("host2" in url for url in call_history)
+
+    def test_ensure_identity_tries_all_hosts(self, monkeypatch):
+        """_ensure_identity tries all hosts, pins to first responsive one."""
+        monkeypatch.setenv("SPACETIMEDB_HOSTS", "dead:3001,alive:4000")
+        c = Client(database="test-db")
+        c._identity_established = False
+        c._identity_token = None
+
+        call_log = []
+
+        def mock_get(url, **kw):
+            call_log.append(url)
+            if "dead" in url:
+                raise httpx.ConnectError("dead host")
+            return Mock(status_code=200, headers={
+                "spacetime-identity-token": "tok123",
+            })
+
+        c._http.get = mock_get
+
+        c._ensure_identity()
+        assert c._identity_established is True
+        assert c._identity_token == "tok123"
+        # Pinned to second host
+        assert c.host == "alive"
+        assert c.port == "4000"
+        assert c._current_host_index == 1

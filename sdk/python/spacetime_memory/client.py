@@ -222,10 +222,61 @@ class Client:
         self._query_cache = query_cache
         self.local_llm = local_llm
 
+        # ---- Multi-region / failover host list ----
+        hosts_env = os.environ.get("SPACETIMEDB_HOSTS", "")
+        if hosts_env:
+            self._hosts = [h.strip() for h in hosts_env.split(",") if h.strip()]
+        else:
+            self._hosts = [f"{self.host}:{self.port}"]
+        self._current_host_index = 0
+        self._apply_current_host(timeout)
+        self._http = httpx.Client(timeout=timeout)
+        self._update_urls()
+
+    def _apply_current_host(self, timeout: float = 30.0) -> None:
+        """Set self.host and self.port from the current host list entry.
+
+        Does NOT recreate ``self._http`` — the existing client is reused
+        (the target host is determined by the URL we send).  Callers that
+        need a fresh client (e.g. after a host switch) can do so explicitly.
+        """
+        hostport = self._hosts[self._current_host_index]
+        if ":" in hostport:
+            self.host, self.port = hostport.split(":", 1)
+        else:
+            self.host = hostport
+            self.port = "3001"
+
+    def _update_urls(self) -> None:
+        """Rebuild sql_url and reducer_url for the current host."""
         base = f"http://{self.host}:{self.port}"
         self.sql_url = f"{base}/v1/database/{self.database}/sql"
         self.reducer_url = f"{base}/v1/database/{self.database}/call"
-        self._http = httpx.Client(timeout=timeout)
+
+    def _try_failover(self) -> bool:
+        """Switch to the next host in the list.
+
+        Returns True if a new host was selected, False if there is
+        only one host configured (no failover possible).
+        """
+        if len(self._hosts) <= 1:
+            return False
+        next_idx = (self._current_host_index + 1) % len(self._hosts)
+        # Don't cycle back to ourselves if there are exactly 2 hosts — try the other
+        if next_idx == self._current_host_index:
+            return False
+        self._current_host_index = next_idx
+        self._apply_current_host()
+        self._update_urls()
+        # Reset circuit breaker state for the new host
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+        logger.info(
+            "Failed over to %s:%s (host #%d/%d)",
+            self.host, self.port,
+            self._current_host_index + 1, len(self._hosts),
+        )
+        return True
 
     def _headers(self) -> dict[str, str]:
         """Return common HTTP headers, including auth if a token is set."""
@@ -253,22 +304,44 @@ class Client:
 
         Makes an anonymous request to capture the identity token
         from the response, then uses it for all subsequent calls.
+        Tries all configured hosts (for multi-region failover).
         Only needed when no explicit JWT token is configured.
         """
         if self._identity_established or self.token:
             return
-        try:
-            resp = self._http.get(
-                f"http://{self.host}:{self.port}/v1/database/{self.database}",
-                timeout=5.0,
-            )
-            token = resp.headers.get("spacetime-identity-token", "")
-            if token:
-                self._identity_token = token
-            self._identity_established = True
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
-            # If the handshake fails, proceed without identity
-            self._identity_established = True
+        for host_idx in range(len(self._hosts)):
+            hostport = self._hosts[host_idx]
+            if ":" in hostport:
+                h, p = hostport.split(":", 1)
+            else:
+                h, p = hostport, "3001"
+            try:
+                resp = self._http.get(
+                    f"http://{h}:{p}/v1/database/{self.database}",
+                    timeout=5.0,
+                )
+                token = resp.headers.get("spacetime-identity-token", "")
+                if token:
+                    self._identity_token = token
+                # Pin to the first responsive host
+                self.host = h
+                self.port = p
+                self._current_host_index = host_idx
+                self._update_urls()
+                self._identity_established = True
+                return
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
+                logger.info(
+                    "Identity handshake failed for %s (host #%d/%d), trying next...",
+                    hostport, host_idx + 1, len(self._hosts),
+                )
+                continue
+        # All hosts failed — proceed without identity
+        logger.warning(
+            "Identity handshake failed on all %d hosts — proceeding without identity",
+            len(self._hosts),
+        )
+        self._identity_established = True
 
     def _whoami(self) -> str:
         """Return the SpacetimeDB identity used by this client."""
@@ -334,6 +407,10 @@ class Client:
         Includes circuit breaker: after ``_circuit_breaker_threshold`` consecutive
         failures, further requests fail fast (without attempting) for
         ``_circuit_breaker_reset_secs`` seconds.
+
+        When all retries to the current host are exhausted, automatically
+        fails over to the next host in ``self._hosts`` (if configured via
+        the ``SPACETIMEDB_HOSTS`` environment variable).
         """
         import random as _random
         import time as _time
@@ -378,7 +455,21 @@ class Client:
                 )
                 _time.sleep(delay)
 
-        # All retries exhausted — trip circuit breaker
+        # All retries exhausted — try failover to next host before giving up
+        if self._try_failover():
+            logger.info(
+                "Failover to %s:%s — re-trying %s %s",
+                self.host, self.port, method, url,
+            )
+            # Rebuild URL for the new host by replacing the host:port portion
+            new_url = re.sub(
+                r"http://[^/]+",
+                f"http://{self.host}:{self.port}",
+                url,
+            )
+            return self._request_with_retry(method, new_url, **kwargs)
+
+        # No more hosts to try — trip circuit breaker
         self._consecutive_failures += 1
         if self._consecutive_failures >= self._circuit_breaker_threshold:
             self._circuit_open_until = _time.time() + self._circuit_breaker_reset_secs
