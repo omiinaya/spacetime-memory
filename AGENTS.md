@@ -131,6 +131,20 @@ Run `compounder.lint_workspace()` periodically (weekly or after every ~10 ingest
 | Concept page | `compounder.create_concept_page(concept, definition, ...)` | Concept definition with [[wiki-links]] |
 | Comparison page | `compounder.create_comparison_page(title, items, ...)` | Markdown comparison table |
 
+### Available via MCP tools
+
+When the agent is connected via MCP (``stmem serve``), these tools are
+automatically available without importing the SDK:
+
+| Tool | What it does |
+|------|-------------|
+| `ingest_source` | Full LLM Wiki ingest: summarize, extract entities, create KG nodes, link, ripple, check contradictions |
+| `create_entity_page` | Create entity wiki page + KG node with YAML frontmatter |
+| `create_concept_page` | Create concept definition page with [[wiki-links]] |
+| `lint_workspace` | Health-check: orphans, missing crossrefs, contradictions |
+| `generate_overview` | Generate workspace overview/synthesis page |
+| `store_answer` | Persist an LLM answer as a wiki page |
+
 ---
 
 ## Tips
