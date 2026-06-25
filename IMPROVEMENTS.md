@@ -60,38 +60,38 @@ Est: N/A (blocked)
 
 ## Recently Completed
 
-|### ✅ uuid_v7() + uuid_v7_uniq() build-block functions (Jun 24)
-|Added `uuid_v7()` (returns `ctx.new_uuid_v7().to_string()`) and
-|`uuid_v7_uniq()` (with collision retry) to lib.rs. Runs alongside
-|existing v4 functions. Standard 8-4-4-4-12 UUID format.
-|Commit: <pending>
+### ✅ uuid_v7() + uuid_v7_uniq() build-block functions (Jun 24)
+Added `uuid_v7()` (returns `ctx.new_uuid_v7().to_string()`) and
+`uuid_v7_uniq()` (with collision retry) to lib.rs. Runs alongside
+existing v4 functions. Standard 8-4-4-4-12 UUID format.
+Commit: 202e47f
 
-|### ✅ Extend uuid_v4_uniq() to remaining tables (Jun 24)
-|All 27 no-longer-raw `uuid_v4()` call sites migrated in consolidation.rs,
-|auth.rs, insight.rs, profile.rs, replication.rs. Zero compiler warnings.
-|Commit: 6cdb64d
+### ✅ Extend uuid_v4_uniq() to remaining tables (Jun 24)
+All 27 no-longer-raw `uuid_v4()` call sites migrated in consolidation.rs,
+auth.rs, insight.rs, profile.rs, replication.rs. Zero compiler warnings.
+Commit: 6cdb64d
 
-|### ✅ Unit test coverage for Rust helper functions (Jun 24)
-|Extracted pure computation helpers (`format_uuid_v4`, `micros_from_timestamp`,
-|`compute_expires_at`) from context-dependent functions and added 21 tests.
-|All 156 unit tests pass. WASM build check passes.
-|Commits: 7bb4ff3
+### ✅ Unit test coverage for Rust helper functions (Jun 24)
+Extracted pure computation helpers (`format_uuid_v4`, `micros_from_timestamp`,
+`compute_expires_at`) from context-dependent functions and added 21 tests.
+All 156 unit tests pass. WASM build check passes.
+Commits: 7bb4ff3
 
-|### ✅ STDB dependency upgrade 2.4 → 2.6 (Jun 24)
-|Commit: d1d147f
+### ✅ STDB dependency upgrade 2.4 → 2.6 (Jun 24)
+Commit: d1d147f
 
-|### ✅ OpenTelemetry / observability integration (Jun 24)
-|P0: Python SDK + P1: Rust server module.
-|Commits: 5398f8f, 54fe3ab
+### ✅ OpenTelemetry / observability integration (Jun 24)
+P0: Python SDK + P1: Rust server module.
+Commits: 5398f8f, 54fe3ab
 
-|### ✅ Observability test fix — OTel cache pollution (Jun 24)
-|Commit: 91f1861
+### ✅ Observability test fix — OTel cache pollution (Jun 24)
+Commit: 91f1861
 
-|### ✅ .env stale config cleanup (Jun 24)
-|Commit: ec81a0b
+### ✅ .env stale config cleanup (Jun 24)
+Commit: ec81a0b
 
-|### ✅ PyPI publish pipeline (Jun 24)
-|Commit: e1ba6fe
+### ✅ PyPI publish pipeline (Jun 24)
+Commit: e1ba6fe
 
 ---
 
