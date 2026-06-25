@@ -151,10 +151,11 @@ class TestLocalLLMAuto:
         assert llm.model_path == str(model_file)
         assert llm._available is True
 
-    def test_env_var_nonexistent_skipped(self, monkeypatch):
+    def test_env_var_nonexistent_skipped(self, monkeypatch, tmp_path):
         monkeypatch.setenv("LOCAL_LLM_MODEL_PATH", "/nonexistent/model.gguf")
-        llm = LocalLLM.auto()
-        assert llm._available is False
+        with patch.object(Path, "home", return_value=tmp_path):
+            llm = LocalLLM.auto()
+            assert llm._available is False
 
     def test_home_models_glob(self, tmp_path):
         models_dir = tmp_path / "models"

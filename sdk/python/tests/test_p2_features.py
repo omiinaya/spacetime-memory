@@ -324,15 +324,18 @@ def test_plugin_manager_error_isolation():
 
 # ── LocalLLM unit tests (model-free) ────────────────────────────────────
 
-def test_local_llm_auto_no_models():
+def test_local_llm_auto_no_models(tmp_path):
     """When no GGUF files exist, auto() returns unavailable instance."""
     from spacetime_memory.local_llm import LocalLLM
     import os
+    from pathlib import Path
+    from unittest.mock import patch
     # Ensure no models in search paths
     old_env = os.environ.pop("LOCAL_LLM_MODEL_PATH", None)
     try:
-        llm = LocalLLM.auto()
-        assert llm.available is False
+        with patch.object(Path, "home", return_value=tmp_path):
+            llm = LocalLLM.auto()
+            assert llm.available is False
     finally:
         if old_env:
             os.environ["LOCAL_LLM_MODEL_PATH"] = old_env
