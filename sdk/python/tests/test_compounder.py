@@ -125,17 +125,22 @@ class TestCompounderStoreAnswer:
         client.create_note.return_value = {"id": "note_1"}
         client._query.return_value = [
             {"id": "idx_1", "content": "# Index\n\n- [Old](old)\n"}
-        ]  # Existing index
+        ]  # Existing index (will also be found for _log query)
 
         mock_llm = MagicMock()
+        mock_llm.available = False
         mock_llm.extract_entities_llm.return_value = None
 
         cp = Compounder(client, llm=mock_llm)
         cp.store_answer(query="q", answer="ans.", workspace_id="ws1")
 
         # Should update existing index (append)
-        client.update_note.assert_called_once()
-        new_content = client.update_note.call_args[1]["content"]
+        idx_calls = [
+            c for c in client.update_note.call_args_list
+            if c[1].get("title") == "_index"
+        ]
+        assert len(idx_calls) >= 1
+        new_content = idx_calls[0][1]["content"]
         assert "Old" in new_content
 
     def test_long_query_uses_first_answer_line(self):
@@ -270,3 +275,148 @@ class TestCompounderInternal:
         ]
         assert cp._node_label("n1", nodes) == "Alice"
         assert cp._node_label("n3", nodes) == "n3"[:12]  # fallback to truncated ID
+
+
+class TestLogActivity:
+    """Tests for _log_activity()."""
+
+    def test_creates_log_note_when_none_exists(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = []  # No existing log
+        cp = Compounder(client)
+        cp._log_activity("ws1", "test", "detail")
+        # Should create a _log note
+        create_calls = [c for c in client.create_note.call_args_list
+                        if c[1].get("title") == "_log"]
+        assert len(create_calls) == 1
+
+    def test_appends_to_existing_log(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = [
+            {"id": "log_1", "content": "# Log\n\n## [old] prior | entry\n"}
+        ]
+        cp = Compounder(client)
+        cp._log_activity("ws1", "store_answer", "test detail")
+        assert client.update_note.call_count >= 1
+
+
+class TestLintWorkspace:
+    """Tests for lint_workspace()."""
+
+    def test_orphan_detection(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        # _log_activity also calls _query — provide extra entries
+        client._query.side_effect = [
+            [{"id": "C", "label": "Orphan", "node_type": "concept"}],  # nodes (from _find_orphan_nodes)
+            [{"source_node_id": "A", "target_node_id": "B"}],  # edges (from _find_orphan_nodes)
+            [],  # _log_activity: query for existing _log note
+        ]
+        cp = Compounder(client)
+        result = cp.lint_workspace("ws1", check_orphans=True,
+                                    check_missing_crossrefs=False,
+                                    check_contradictions=False)
+        assert len(result["orphans"]) == 1
+        assert result["orphans"][0]["label"] == "Orphan"
+        assert result["summary"]["orphan_count"] == 1
+
+    def test_no_orphans_when_all_connected(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [{"id": "A", "label": "A"}],  # nodes
+            [{"source_node_id": "A", "target_node_id": "B"}],  # edges
+            [],  # _log_activity
+        ]
+        cp = Compounder(client)
+        result = cp.lint_workspace("ws1", check_orphans=True,
+                                    check_missing_crossrefs=False,
+                                    check_contradictions=False)
+        assert result["summary"]["orphan_count"] == 0
+
+    def test_missing_crossrefs(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [{"id": "n1", "label": "ImportantConcept"}],  # kg_node
+            [],  # kg_edge — no existing links
+            [{"id": "mem_1", "content": "This mentions ImportantConcept in passing"}],  # memory
+            [{"id": "note_1", "content": "Also mentions ImportantConcept"}],  # note
+            [],  # _log_activity
+        ]
+        cp = Compounder(client)
+        result = cp.lint_workspace("ws1", check_orphans=False,
+                                    check_missing_crossrefs=True,
+                                    check_contradictions=False)
+        assert len(result["missing_crossrefs"]) >= 1
+        assert result["summary"]["missing_crossref_count"] >= 1
+
+    def test_contradiction_detection_requires_llm(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        cp = Compounder(client)  # LLM not configured (default)
+        result = cp.lint_workspace("ws1", check_contradictions=True)
+        assert result["contradictions"] == []
+
+    def test_contradiction_with_llm(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        mock_llm.chat.return_value = '{"is_contradiction": true, "explanation": "They say opposite things"}'
+        client._query.return_value = [
+            {"id": "m1", "content": "The sky is blue.", "created_at": 100},
+            {"id": "m2", "content": "The sky is green.", "created_at": 200},
+        ]
+        cp = Compounder(client, llm=mock_llm)
+        result = cp.lint_workspace("ws1", check_contradictions=True,
+                                    check_orphans=False, check_missing_crossrefs=False)
+        assert len(result["contradictions"]) == 1
+        assert result["contradictions"][0]["explanation"] == "They say opposite things"
+
+
+class TestRippleUpdate:
+    """Tests for _ripple_update_entity()."""
+
+    def test_skips_when_llm_unavailable(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        mock_llm = MagicMock()
+        mock_llm.available = False
+        cp = Compounder(client, llm=mock_llm)
+        cp._ripple_update_entity("ws1", "Alice", "new info", "note_1")
+        client._query.assert_not_called()
+
+    def test_skips_when_no_node_found(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        client._query.return_value = []  # No matching node
+        cp = Compounder(client, llm=mock_llm)
+        cp._ripple_update_entity("ws1", "UnknownEntity", "info", "n1")
+        # Should not crash
+        assert True
+
+    def test_uses_llm_to_merge_existing_summary(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        mock_llm.summarize.return_value = "Updated summary with new info integrated."
+        client._query.return_value = [
+            {"id": "node_1", "label": "Alice", "summary": "Original summary",
+             "node_type": "person"},
+        ]
+        cp = Compounder(client, llm=mock_llm)
+        cp._ripple_update_entity("ws1", "Alice",
+                                  "Alice published a new paper on RL.",
+                                  "note_1")
+        # Should call update_node reducer
+        client._call.assert_called_once()
+        args = client._call.call_args
+        assert args[0][0] == "update_node"
+        assert "Updated summary" in str(args[0][1])
+

@@ -26,6 +26,7 @@ Usage::
 
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 from typing import Any
@@ -129,6 +130,21 @@ class Compounder:
 
         # 4. Update workspace index
         self._update_index(workspace_id, generated_title, note)
+
+        # 5. Ripple update — update existing entity summaries with new info
+        if entities:
+            for ent in entities:
+                self._ripple_update_entity(
+                    workspace_id, ent.get("name", ""),
+                    answer, note.get("id", ""),
+                )
+
+        # 6. Log the activity
+        self._log_activity(
+            workspace_id, "store_answer",
+            f"'{generated_title}' ({len(result['entities'])} entities, "
+            f"{len(result['links'])} links)",
+        )
 
         logger.info(
             "Stored answer note '%s' (%d entities, %d links)",
@@ -380,3 +396,375 @@ class Compounder:
             if n.get("id") == node_id:
                 return n.get("label", node_id)
         return node_id[:12]
+
+    # ------------------------------------------------------------------
+    # Ripple update — update entity summary with new information
+    # ------------------------------------------------------------------
+
+    def _ripple_update_entity(
+        self,
+        workspace_id: str,
+        entity_name: str,
+        new_information: str,
+        source_note_id: str,
+    ) -> None:
+        """Find an existing KG node for *entity_name* and update its
+        summary to incorporate *new_information* (if LLM available).
+
+        Gracefully degrades when the LLM is not configured — simply
+        skips the update.
+        """
+        if not entity_name.strip():
+            return
+        if not self._llm.available:
+            return
+
+        # Find the node
+        nodes = self._client._query(
+            "kg_node",
+            workspace_id=workspace_id,
+            filter_dict={"label": entity_name},
+        )
+        if not nodes:
+            return
+
+        node = nodes[-1]
+        node_id = node.get("id", "")
+        existing_summary = node.get("summary", "")
+
+        # Use LLM to merge the new info into existing summary
+        if existing_summary:
+            prompt = (
+                f"Existing summary: {existing_summary}\n\n"
+                f"New information: {new_information[:1000]}\n\n"
+                "Merge the new information into a concise updated summary "
+                f"for '{entity_name}'. Keep it to 2-3 sentences."
+                " Return ONLY the updated summary text, no explanation."
+            )
+        else:
+            prompt = (
+                f"Summarize this information about '{entity_name}' in "
+                f"2-3 sentences:\n\n{new_information[:1000]}"
+            )
+
+        new_summary = self._llm.summarize(prompt)
+        if new_summary and new_summary != existing_summary:
+            try:
+                self._client._call("update_node", [
+                    node_id, entity_name,
+                    node.get("node_type", "concept"),
+                    new_summary, "{}", source_note_id,
+                ])
+                logger.info(
+                    "Ripple-updated node '%s' (%s) with new summary",
+                    entity_name, node_id[:12],
+                )
+            except RuntimeError:
+                pass
+
+    # ------------------------------------------------------------------
+    # Chronological log (_log note)
+    # ------------------------------------------------------------------
+
+    def _log_activity(
+        self,
+        workspace_id: str,
+        event_type: str,
+        detail: str,
+    ) -> None:
+        """Append a timestamped entry to the workspace chronological log.
+
+        Creates a ``_log`` note if one doesn't exist.  Each entry uses a
+        parseable prefix: ``## [YYYY-MM-DD] event_type | detail`` so the
+        log is searchable with simple tools like ``grep``.
+        """
+        log_title = "_log"
+        now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        entry = f"## [{now}] {event_type} | {detail}\n"
+
+        existing = self._client._query(
+            "note",
+            workspace_id=workspace_id,
+            filter_dict={"title": log_title},
+        )
+        if existing:
+            idx_note = existing[0]
+            new_content = idx_note.get("content", "") + entry
+            try:
+                self._client.update_note(
+                    note_id=idx_note.get("id", ""),
+                    title=log_title,
+                    content=new_content,
+                    embed=False,
+                )
+            except RuntimeError:
+                pass
+        else:
+            header = "# Workspace Log\n\nChronological record of compounder activity.\n\n"
+            try:
+                self._client.create_note(
+                    workspace_id=workspace_id,
+                    title=log_title,
+                    content=header + entry,
+                    embed=False,
+                )
+            except RuntimeError:
+                pass
+
+    # ------------------------------------------------------------------
+    # lint_workspace — health-check the workspace wiki
+    # ------------------------------------------------------------------
+
+    def lint_workspace(
+        self,
+        workspace_id: str = "default",
+        *,
+        check_orphans: bool = True,
+        check_missing_crossrefs: bool = True,
+        check_contradictions: bool = False,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """Health-check the workspace wiki and report issues.
+
+        Scans for:
+        - **Orphan nodes** — KG nodes with zero edges (no connections to
+          anything). These are candidates for cleanup or linking.
+        - **Missing cross-references** — notes/memories whose content
+          mentions a KG node label but have no edge to that node.
+        - **Contradictions** — (requires LLM) pairs of semantically
+          similar memories that express conflicting claims.
+
+        Args:
+            workspace_id: Target workspace.
+            check_orphans: Find nodes with no edges.
+            check_missing_crossrefs: Find content that mentions but
+                doesn't link to existing KG nodes.
+            check_contradictions: Use LLM to find conflicting claims
+                between semantically similar memories (slower).
+            limit: Max items to scan.
+
+        Returns:
+            Dict with ``orphans``, ``missing_crossrefs``,
+            ``contradictions`` lists and a summary.
+        """
+        result: dict[str, Any] = {
+            "orphans": [],
+            "missing_crossrefs": [],
+            "contradictions": [],
+            "summary": {},
+        }
+
+        # ── Orphan detection ──
+        if check_orphans:
+            result["orphans"] = self._find_orphan_nodes(workspace_id)
+
+        # ── Missing cross-references ──
+        if check_missing_crossrefs:
+            result["missing_crossrefs"] = self._find_missing_crossrefs(
+                workspace_id, limit,
+            )
+
+        # ── Contradiction detection ──
+        if check_contradictions:
+            result["contradictions"] = self._find_contradictions(
+                workspace_id, limit,
+            )
+
+        result["summary"] = {
+            "orphan_count": len(result["orphans"]),
+            "missing_crossref_count": len(result["missing_crossrefs"]),
+            "contradiction_count": len(result["contradictions"]),
+            "total_issues": (
+                len(result["orphans"])
+                + len(result["missing_crossrefs"])
+                + len(result["contradictions"])
+            ),
+        }
+
+        self._log_activity(
+            workspace_id, "lint",
+            f"{result['summary']['total_issues']} issues found "
+            f"({result['summary']['orphan_count']} orphans, "
+            f"{result['summary']['missing_crossref_count']} missing crossrefs, "
+            f"{result['summary']['contradiction_count']} contradictions)",
+        )
+        return result
+
+    def _find_orphan_nodes(self, workspace_id: str) -> list[dict[str, Any]]:
+        """Find KG nodes with no edges to any other node."""
+        nodes = self._client._query(
+            "kg_node", workspace_id=workspace_id, filter_dict={},
+        )
+        edges = self._client._query(
+            "kg_edge", workspace_id=workspace_id, filter_dict={},
+        )
+        connected: set[str] = set()
+        for e in edges:
+            src = e.get("source_node_id", "")
+            tgt = e.get("target_node_id", "")
+            if src:
+                connected.add(src)
+            if tgt:
+                connected.add(tgt)
+
+        orphans = []
+        for n in nodes:
+            nid = n.get("id", "")
+            if nid and nid not in connected:
+                orphans.append({
+                    "id": nid,
+                    "label": n.get("label", nid[:12]),
+                    "node_type": n.get("node_type", "unknown"),
+                })
+        return orphans
+
+    def _find_missing_crossrefs(
+        self, workspace_id: str, limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Find notes/memories whose content mentions a KG node label
+        but has no edge to that node."""
+        # Get all KG nodes and their labels
+        nodes = self._client._query(
+            "kg_node", workspace_id=workspace_id, filter_dict={},
+        )
+        # Get all edges to know what's already connected
+        edges = self._client._query(
+            "kg_edge", workspace_id=workspace_id, filter_dict={},
+        )
+        linked_labels: set[str] = set()
+        # Also track which memory IDs are linked to which nodes
+        mem_to_node: dict[str, set[str]] = {}
+        for e in edges:
+            src = e.get("source_node_id", "")
+            tgt = e.get("target_node_id", "")
+            if src:
+                mem_to_node.setdefault(src, set()).add(tgt)
+            if tgt:
+                mem_to_node.setdefault(tgt, set()).add(src)
+
+        # Build a map of labels → node IDs
+        label_map: dict[str, str] = {}
+        for n in nodes:
+            label = (n.get("label", "") or "").lower().strip()
+            if label:
+                label_map[label] = n.get("id", "")
+
+        if not label_map:
+            return []
+
+        # Scan memories and notes
+        missing: list[dict[str, Any]] = []
+        memories = self._client._query(
+            "memory", workspace_id=workspace_id, filter_dict={},
+        )[:limit]
+        notes = self._client._query(
+            "note", workspace_id=workspace_id, filter_dict={},
+        )[:limit]
+
+        for mem in memories:
+            content = (mem.get("content", "") or "").lower()
+            mid = mem.get("id", "")
+            if not content or not mid:
+                continue
+            for label_lower, node_id in label_map.items():
+                if label_lower in content:
+                    # Check if already linked
+                    if node_id not in mem_to_node.get(mid, set()):
+                        missing.append({
+                            "entity_id": mid,
+                            "entity_type": "memory",
+                            "mentioned_label": label_lower,
+                            "target_node_id": node_id,
+                        })
+
+        for note in notes:
+            content = (note.get("content", "") or "").lower()
+            nid = note.get("id", "")
+            if not content or not nid:
+                continue
+            for label_lower, node_id in label_map.items():
+                if label_lower in content:
+                    if node_id not in mem_to_node.get(nid, set()):
+                        missing.append({
+                            "entity_id": nid,
+                            "entity_type": "note",
+                            "mentioned_label": label_lower,
+                            "target_node_id": node_id,
+                        })
+
+        return missing
+
+    def _find_contradictions(
+        self, workspace_id: str, limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Use LLM to find contradictory claims between semantically
+        similar memories.
+
+        Works in pairs: groups memories by semantic similarity, then
+        asks the LLM whether each pair contains contradictory claims.
+
+        Returns:
+            List of contradiction dicts with ``id_a``, ``id_b``,
+            ``content_a``, ``content_b``, ``explanation``.
+        """
+        if not self._llm.available:
+            return []
+
+        memories = self._client._query(
+            "memory", workspace_id=workspace_id, filter_dict={},
+        )
+        if len(memories) < 2:
+            return []
+
+        # Take the most recent N
+        memories = sorted(
+            memories, key=lambda r: r.get("created_at", 0), reverse=True
+        )[:limit]
+
+        contradictions: list[dict[str, Any]] = []
+        checked = 0
+
+        for i in range(min(len(memories), 10)):  # Limit pairs to avoid LLM flood
+            for j in range(i + 1, min(len(memories), i + 3)):  # Adjacent pairs
+                mem_a = memories[i]
+                mem_b = memories[j]
+                content_a = mem_a.get("content", "")
+                content_b = mem_b.get("content", "")
+                if not content_a or not content_b:
+                    continue
+
+                checked += 1
+                prompt = (
+                    f"Memory A: {content_a[:500]}\n\n"
+                    f"Memory B: {content_b[:500]}\n\n"
+                    "Do these two statements contain contradictory claims? "
+                    "Reply with a JSON object: "
+                    '{"is_contradiction": bool, "explanation": str}. '
+                    "Return ONLY valid JSON, no markdown."
+                )
+                result = self._llm.chat(
+                    [{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    temperature=0.1,
+                    max_tokens=256,
+                )
+                if not result:
+                    continue
+                try:
+                    data = json.loads(result)
+                    if data.get("is_contradiction"):
+                        contradictions.append({
+                            "id_a": mem_a.get("id", ""),
+                            "id_b": mem_b.get("id", ""),
+                            "content_a": content_a[:200],
+                            "content_b": content_b[:200],
+                            "explanation": data.get("explanation", ""),
+                        })
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+        self._log_activity(
+            workspace_id, "contradiction_check",
+            f"Checked {checked} pairs, found {len(contradictions)} contradictions",
+        )
+        return contradictions
