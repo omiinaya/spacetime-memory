@@ -212,6 +212,7 @@ class Client:
         self._circuit_open_until: float = 0.0
         self._metrics: Any = None  # Set via set_metrics_collector()
         self._delta_sync: Any = None  # Lazy DeltaSync instance
+        self._compounder: Any = None  # Lazy Compounder instance
         self.request_id: str = os.urandom(4).hex()  # Unique per-client instance
         self._identity_token: str | None = None
         self._identity_established: bool = False
@@ -2897,6 +2898,28 @@ class Client:
 
             self._delta_sync = DeltaSync(self)
         return self._delta_sync
+
+    @property
+    def compounder(self):
+        """Lazy-initialised ``Compounder`` instance for compound knowledge.
+
+        Usage::
+
+            client.compounder.store_answer(
+                query="What is RLHF?",
+                answer="Reinforcement Learning from Human Feedback is...",
+                source_memory_ids=["mem_123"],
+            )
+
+        The ``Compounder`` uses the ``LLMClient`` for entity extraction
+        and summary generation.  All methods degrade gracefully when no
+        API key is configured.
+        """
+        if self._compounder is None:
+            from .compounder import Compounder
+
+            self._compounder = Compounder(self)
+        return self._compounder
 
 
 # ---------------------------------------------------------------------------

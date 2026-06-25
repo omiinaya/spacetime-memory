@@ -46,6 +46,21 @@ Est: N/A (blocked)
 
 ## Recently Completed
 
+### ✅ Knowledge Compounder — persist answers as wiki pages (Jun 24)
+New ``Compounder`` class (``client.compounder``) that implements the
+LLM Wiki pattern: every search synthesis becomes a persistent note + KG
+nodes + index entry, so knowledge compounds rather than disappearing
+into chat history. Methods: ``store_answer()``, ``cross_link()``,
+``suggest_connections()``. 20 unit tests. All 1700 unit tests pass.
+Commits: 62834b3, 53f2f86
+
+### ✅ tracer.py 51% → 100% coverage (Jun 24)
+35 new unit tests covering _NoOpSpan, _check_otel_available(), Tracer
+init/setup/is_enabled/start_span/instrument_method, get_tracer(), and
+module-level start_span(). Needed: mock OTel SDK hierarchy for the
+full setup() path, auto-mock-module pattern for sub-imports.
+Commit: 62834b3
+
 ### ✅ Migrate all uuid_v4() call sites to uuid_v7() for sortable UUIDs (Jun 24)
 Replaced `uuid_v4(ctx)` with `uuid_v7(ctx)` at all 57 non-retry call sites
 across 21 source files. Uses `ctx.new_uuid_v7().to_string()` which produces
