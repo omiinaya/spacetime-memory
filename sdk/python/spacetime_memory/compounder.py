@@ -102,7 +102,7 @@ class Compounder:
 
         result: dict[str, Any] = {"note": note, "entities": [], "links": []}
 
-        # 2. Extract entities and create KG nodes
+        # 2. Extract entities and create KG nodes + entity pages
         entities = self._llm.extract_entities_llm(answer)
         if entities:
             for ent in entities:
@@ -115,6 +115,21 @@ class Compounder:
                         source_memory_id=note.get("id", ""),
                     )
                     result["entities"].append(node)
+
+                    # Auto-create an entity wiki page for new entities
+                    ent_name = ent.get("name", "")
+                    ent_desc = ent.get("description", "")
+                    if ent_name and ent_desc:
+                        try:
+                            self.create_entity_page(
+                                name=ent_name,
+                                description=ent_desc,
+                                entity_type=ent.get("entity_type", "concept"),
+                                workspace_id=workspace_id,
+                                embed=True,
+                            )
+                        except RuntimeError:
+                            continue
                 except RuntimeError:
                     continue  # best-effort
 
