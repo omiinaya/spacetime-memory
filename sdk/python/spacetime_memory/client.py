@@ -2153,6 +2153,30 @@ class Client:
                 ])
         return result
 
+    def update_node(
+        self,
+        node_id: str,
+        label: str,
+        node_type: str = "concept",
+        summary: str = "",
+        metadata_json: str = "{}",
+        source_memory_id: str = "",
+    ) -> dict[str, Any]:
+        """Update an existing knowledge-graph node's mutable fields.
+
+        Args:
+            node_id: The ID of the node to update.
+            label: New label (display name).
+            node_type: Type category (default: ``"concept"``).
+            summary: Updated summary text.
+            metadata_json: Updated JSON metadata string.
+            source_memory_id: Optional source memory ID.
+        """
+        return self._call("update_node", [
+            node_id, label, node_type, summary, metadata_json,
+            source_memory_id,
+        ])
+
     def create_edge(
         self,
         workspace_id: str,

@@ -118,12 +118,18 @@ class Compounder:
                 except RuntimeError:
                     continue  # best-effort
 
-        # 3. Link to source memories
+        # 3. Link to source memories (via create_edge if note has a KG node)
         if source_memory_ids:
             note_id = note.get("id", "")
             for mid in source_memory_ids:
                 try:
-                    self._client._call("link_entities", [note_id, mid, "informed_by"])
+                    self._client._call(
+                        "create_edge", [
+                            workspace_id, note_id, mid,
+                            "informed_by", 1.0, "INFERRED",
+                            "{}", "",
+                        ],
+                    )
                     result["links"].append(mid)
                 except RuntimeError:
                     continue
@@ -219,7 +225,11 @@ class Compounder:
                 if score >= similarity_threshold:
                     try:
                         self._client._call(
-                            "link_entities", [mid, match_id, "related_to"]
+                            "create_edge", [
+                                workspace_id, mid, match_id,
+                                "related_to", score, "INFERRED",
+                                "{}", "",
+                            ],
                         )
                         links_created += 1
                     except RuntimeError:

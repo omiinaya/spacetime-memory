@@ -125,6 +125,62 @@ pub fn create_node(
     Ok(())
 }
 
+/// Update an existing KG node's label, type, summary, and metadata.
+///
+/// Preserves the existing node ID, workspace, community, embedding, and
+/// timestamps. Only the mutable text/metadata fields are replaced.
+#[reducer]
+pub fn update_node(
+    ctx: &ReducerContext,
+    node_id: String,
+    label: String,
+    node_type: String,
+    summary: String,
+    metadata_json: String,
+    source_memory_id: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex();
+    let mut node = ctx
+        .db
+        .kg_node()
+        .id()
+        .find(&node_id)
+        .ok_or_else(|| format!("KgNode '{}' not found", node_id))?;
+    check_space_access(ctx, &node.workspace_id, &caller, "editor")?;
+
+    // Validate node_type
+    match node_type.as_str() {
+        "code" | "concept" | "entity" | "document" | "topic" => {}
+        _ => {
+            return Err(format!(
+                "Invalid node_type '{}': must be 'code', 'concept', 'entity', 'document', or 'topic'",
+                node_type
+            ));
+        }
+    }
+
+    node.label = label;
+    node.node_type = node_type;
+    node.summary = summary;
+    node.metadata_json = if metadata_json.is_empty() {
+        String::from("{}")
+    } else {
+        metadata_json
+    };
+    if !source_memory_id.is_empty() {
+        node.source_memory_id = source_memory_id;
+    }
+
+    let ws_id = node.workspace_id.clone();
+    let node_json = change_event::record_to_json(&node);
+    ctx.db.kg_node().id().update(node);
+    change_event::log_change(
+        ctx, &ws_id, "kg_node", "update", &node_id, &node_json,
+    );
+    Ok(())
+}
+
 #[reducer]
 pub fn delete_node(ctx: &ReducerContext, id: String) -> Result<(), String> {
     let _account = require_auth(ctx)?;
