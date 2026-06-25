@@ -135,7 +135,8 @@ class Compounder:
                     continue
 
         # 4. Update workspace index
-        self._update_index(workspace_id, generated_title, note)
+        index_summary = query[:100] if len(query) < 100 else query[:97] + "..."
+        self._update_index(workspace_id, generated_title, note, summary=index_summary)
 
         # 5. Ripple update — update existing entity summaries with new info
         if entities:
@@ -350,16 +351,41 @@ class Compounder:
         workspace_id: str,
         title: str,
         note: dict[str, Any],
+        summary: str = "",
     ) -> None:
-        """Append an entry to the workspace index note (or create one)."""
+        """Append an entry to the workspace index note (or create one).
+
+        Each entry follows Karpathy's format:
+        ``- [Title](note_id) — one-line summary``
+
+        If no summary is provided, the first line of the note content
+        is used as a fallback.
+        """
         index_title = "_index"
+        note_id = note.get("id", "")
+
+        # Generate summary from note content if not provided
+        if not summary:
+            content = note.get("content", "")
+            if content:
+                # Try first non-empty, non-separator line
+                for line in content.split("\n"):
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith("---") and not stripped.startswith("#"):
+                        summary = stripped[:120].rstrip(".")
+                        break
+
+        summary_suffix = ""
+        if summary:
+            summary_suffix = f" — {summary}"
+
+        link = f"- [{title}]({note_id}){summary_suffix}\n"
+
         existing = self._client._query(
             "note",
             workspace_id=workspace_id,
             filter_dict={"title": index_title},
         )
-        note_id = note.get("id", "")
-        link = f"- [{title}]({note_id})  \n"
 
         if existing:
             # Append to existing index
@@ -935,7 +961,8 @@ class Compounder:
             )
 
         # 6. Update index
-        self._update_index(workspace_id, f"Source: {source_title}", note)
+        ingest_summary = summary_text[:100] if len(summary_text) < 100 else summary_text[:97] + "..."
+        self._update_index(workspace_id, f"Source: {source_title}", note, summary=ingest_summary)
 
         # 7. Log
         self._log_activity(
