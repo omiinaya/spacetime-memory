@@ -814,3 +814,524 @@ class Compounder:
                 )
             except RuntimeError:
                 continue
+
+    # ------------------------------------------------------------------
+    # ingest_source — end-to-end source ingestion workflow
+    # ------------------------------------------------------------------
+
+    def ingest_source(
+        self,
+        source_text: str,
+        source_title: str,
+        workspace_id: str = "default",
+        source_type: str = "article",
+        embed: bool = True,
+    ) -> dict[str, Any]:
+        """Ingest a source document and integrate it into the wiki.
+
+        Full workflow from Karpathy's LLM Wiki pattern:
+        1. Creates a source-summary note
+        2. Extracts entities and creates KG nodes
+        3. Links entities to the source with ``informed_by`` edges
+        4. Ripple-updates existing entity nodes with new info
+        5. Proactively checks for contradictions with existing knowledge
+        6. Appends to ``_index``
+        7. Appends to ``_log``
+
+        Args:
+            source_text: The full text of the source document.
+            source_title: A concise title for this source.
+            workspace_id: Target workspace.
+            source_type: Type label (``article``, ``paper``,
+                ``transcript``, ``note``, ``podcast``).
+            embed: Whether to embed the note for semantic search.
+
+        Returns:
+            Dict with ``note``, ``entities``, ``links``,
+            ``contradictions`` keys.
+        """
+        if not source_text.strip():
+            return {"note": {}, "entities": [], "links": [],
+                    "contradictions": []}
+
+        result: dict[str, Any] = {
+            "note": {}, "entities": [],
+            "links": [], "contradictions": [],
+        }
+
+        # 1. Summarize and create source-summary note
+        summary_text = source_text
+        if self._llm.available:
+            llm_summary = self._llm.summarize(
+                source_text[:4000],
+                instruction=(
+                    f"Summarize this {source_type} in 3-5 sentences. "
+                    "Focus on key claims, entities, and findings."
+                ),
+            )
+            if llm_summary:
+                summary_text = llm_summary
+
+        content = self._format_source_page(
+            source_title, source_text, summary_text, source_type,
+        )
+        note = self._client.create_note(
+            workspace_id=workspace_id,
+            title=f"Source: {source_title}",
+            content=content,
+            embed=embed,
+        )
+        result["note"] = note
+
+        # 2. Extract entities and create KG nodes
+        if self._llm.available:
+            entities = self._llm.extract_entities_llm(source_text[:4000])
+        else:
+            entities = None
+
+        if entities:
+            for ent in entities:
+                try:
+                    node = self._client.create_node(
+                        workspace_id=workspace_id,
+                        label=ent.get("name", "?"),
+                        node_type=ent.get("entity_type", "concept"),
+                        summary=ent.get("description", ""),
+                        source_memory_id=note.get("id", ""),
+                    )
+                    result["entities"].append(node)
+                except RuntimeError:
+                    continue
+
+        # 3. Link entities to source summary
+        note_id = note.get("id", "")
+        for node in result["entities"]:
+            node_id = node.get("id", "")
+            if node_id and note_id:
+                try:
+                    self._client._call(
+                        "create_edge", [
+                            workspace_id, note_id, node_id,
+                            "informed_by", 1.0, "INFERRED",
+                            "{}", "",
+                        ],
+                    )
+                    result["links"].append(node_id)
+                except RuntimeError:
+                    continue
+
+        # 4. Ripple-update existing entity nodes
+        if self._llm.available and entities:
+            for ent in entities:
+                self._ripple_update_entity(
+                    workspace_id, ent.get("name", ""),
+                    summary_text, note_id,
+                )
+
+        # 5. Proactive contradiction check
+        if self._llm.available:
+            result["contradictions"] = self._check_contradictions_on_ingest(
+                workspace_id, summary_text, note_id,
+            )
+
+        # 6. Update index
+        self._update_index(workspace_id, f"Source: {source_title}", note)
+
+        # 7. Log
+        self._log_activity(
+            workspace_id, "ingest_source",
+            f"'{source_title}' ({len(result['entities'])} entities, "
+            f"{len(result['links'])} links, "
+            f"{len(result['contradictions'])} contradictions)",
+        )
+
+        logger.info(
+            "Ingested source '%s' (%d entities, %d links, %d contradictions)",
+            source_title, len(result["entities"]),
+            len(result["links"]), len(result["contradictions"]),
+        )
+        return result
+
+    def _format_source_page(
+        self,
+        title: str,
+        full_text: str,
+        summary: str,
+        source_type: str,
+    ) -> str:
+        """Format a source document as a structured markdown page."""
+        max_preview = 2000
+        body_preview = full_text[:max_preview]
+        if len(full_text) > max_preview:
+            body_preview += "\n\n*[truncated — full source has "
+            body_preview += f"{len(full_text)} chars]*"
+
+        return (
+            f"## Summary\n\n{summary}\n\n"
+            f"## Source ({source_type}): {title}\n\n"
+            f"{body_preview}\n\n"
+            f"---\n*Auto-imported via ingest_source*"
+        )
+
+    # ------------------------------------------------------------------
+    # Proactive contradiction detection (called during ingest)
+    # ------------------------------------------------------------------
+
+    def _check_contradictions_on_ingest(
+        self,
+        workspace_id: str,
+        new_content: str,
+        source_note_id: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Check if new source content contradicts existing memories.
+
+        Searches for semantically similar existing memories, then asks
+        the LLM whether each pair contains contradictory claims.
+
+        Args:
+            workspace_id: Target workspace.
+            new_content: The new source content to check.
+            source_note_id: The note ID of the newly ingested source
+                (used to link contradiction notes back).
+            limit: Max existing memories to check against.
+
+        Returns:
+            List of contradiction dicts with ``memory_id``,
+            ``existing_content``, ``explanation``.
+        """
+        if not self._llm.available or not new_content.strip():
+            return []
+
+        # Find semantically similar existing memories
+        similar = self._client.search(
+            workspace_id, new_content[:1000],
+            limit=limit, semantic=True,
+            memory_type="", tier="",
+        )
+        if not similar:
+            return []
+
+        contradictions: list[dict[str, Any]] = []
+        for match in similar[:5]:  # Check top 5
+            existing_id = match.get("entity_id", "")
+            existing_content = match.get("content", "")
+            if not existing_id or not existing_content:
+                continue
+
+            prompt = (
+                f"New information: {new_content[:800]}\n\n"
+                f"Existing knowledge: {existing_content[:800]}\n\n"
+                "Do these two statements contain contradictory claims? "
+                "Reply with a JSON object: "
+                '{"is_contradiction": bool, "explanation": str}. '
+                "Return ONLY valid JSON, no markdown."
+            )
+            result = self._llm.chat(
+                [{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=256,
+            )
+            if not result:
+                continue
+            try:
+                data = json.loads(result)
+                if data.get("is_contradiction"):
+                    contradictions.append({
+                        "memory_id": existing_id,
+                        "existing_content": existing_content[:200],
+                        "explanation": data.get("explanation", ""),
+                    })
+                    # Create a contradiction note linking source to existing
+                    self._create_ingest_contradiction_note(
+                        workspace_id, source_note_id,
+                        existing_id, data.get("explanation", ""),
+                    )
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+        if contradictions:
+            self._log_activity(
+                workspace_id, "contradiction_on_ingest",
+                f"Found {len(contradictions)} contradictions with existing knowledge",
+            )
+
+        return contradictions
+
+    def _create_ingest_contradiction_note(
+        self,
+        workspace_id: str,
+        new_note_id: str,
+        existing_memory_id: str,
+        explanation: str,
+    ) -> None:
+        """Create a note documenting a contradiction found during ingest."""
+        title = f"Contradiction: new source ↔ {existing_memory_id[:8]}"
+        content = (
+            f"## Contradiction Detected During Ingest\n\n"
+            f"**New source**: `{new_note_id}`\n"
+            f"**Existing memory**: `{existing_memory_id}`\n\n"
+            f"**Explanation**: {explanation}\n\n"
+            f"---\n*Auto-detected during ingest_source*"
+        )
+        try:
+            self._client.create_note(
+                workspace_id=workspace_id,
+                title=title,
+                content=content,
+                embed=True,
+            )
+        except RuntimeError:
+            pass
+
+    # ------------------------------------------------------------------
+    # Page type templates — structured wiki pages
+    # ------------------------------------------------------------------
+
+    def create_entity_page(
+        self,
+        name: str,
+        description: str,
+        entity_type: str = "concept",
+        workspace_id: str = "default",
+        tags: list[str] | None = None,
+        relations: list[dict[str, str]] | None = None,
+        embed: bool = True,
+    ) -> dict[str, Any]:
+        """Create a structured entity wiki page with KG node + note.
+
+        Args:
+            name: Entity name (used as both node label and page title).
+            description: 2-3 sentence description of the entity.
+            entity_type: One of ``person``, ``org``, ``concept``,
+                ``product``, ``location``, ``event``, ``topic``.
+            workspace_id: Target workspace.
+            tags: Optional YAML frontmatter tags.
+            relations: Optional list of related entity dicts with
+                ``name`` and ``relation`` keys (e.g.
+                ``[{"name": "RLHF", "relation": "subfield_of"}]``).
+            embed: Whether to embed the note for semantic search.
+
+        Returns:
+            Dict with ``node`` and ``note`` keys.
+        """
+        # 1. Create or find KG node
+        node = None
+        existing = self._client._query(
+            "kg_node", workspace_id=workspace_id,
+            filter_dict={"label": name},
+        )
+        if existing:
+            node = existing[0]
+        else:
+            try:
+                node = self._client.create_node(
+                    workspace_id=workspace_id,
+                    label=name,
+                    node_type=entity_type,
+                    summary=description,
+                    source_memory_id="",
+                )
+            except RuntimeError:
+                node = None
+
+        # 2. Create the wiki note
+        tag_line = ""
+        if tags:
+            tag_line = "tags: [" + ", ".join(tags) + "]\n"
+
+        rel_lines = ""
+        if relations:
+            rel_lines = "\n## Relations\n\n"
+            for r in relations:
+                rel_lines += f"- **{r.get('relation', 'related_to')}**: {r.get('name', '')}\n"
+
+        content = (
+            f"---\n"
+            f"type: {entity_type}\n"
+            f"{tag_line}"
+            f"sources: []\n"
+            f"created: {datetime.datetime.utcnow().strftime('%Y-%m-%d')}\n"
+            f"---\n\n"
+            f"## Overview\n\n{description}\n\n"
+            f"{rel_lines}"
+            f"---\n*Entity page: {name}*"
+        )
+
+        note_title = name  # Entity pages are titled by entity name
+        try:
+            note = self._client.create_note(
+                workspace_id=workspace_id,
+                title=note_title,
+                content=content,
+                embed=embed,
+            )
+        except RuntimeError:
+            note = {}
+
+        # 3. Link note to KG node
+        if node and note.get("id"):
+            try:
+                self._client._call(
+                    "create_edge", [
+                        workspace_id, note["id"], node["id"],
+                        "describes", 1.0, "INFERRED",
+                        "{}", "",
+                    ],
+                )
+            except RuntimeError:
+                pass
+
+        # 4. Log
+        self._log_activity(
+            workspace_id, "create_entity_page",
+            f"'{name}' ({entity_type})",
+        )
+
+        return {"node": node, "note": note}
+
+    def create_concept_page(
+        self,
+        concept: str,
+        definition: str,
+        workspace_id: str = "default",
+        related_concepts: list[str] | None = None,
+        embed: bool = True,
+    ) -> dict[str, Any]:
+        """Create a concept wiki page with definition and cross-references.
+
+        Args:
+            concept: The concept name.
+            definition: Clear definition text.
+            workspace_id: Target workspace.
+            related_concepts: List of related concept names to
+                cross-reference.
+            embed: Whether to embed the note.
+
+        Returns:
+            Dict with ``node`` and ``note`` keys.
+        """
+        rel_lines = ""
+        if related_concepts:
+            rel_lines = "\n## Related Concepts\n\n"
+            for rc in related_concepts:
+                rel_lines += f"- [[{rc}]]\n"
+
+        content = (
+            f"---\n"
+            f"type: concept\n"
+            f"tags: [concept]\n"
+            f"created: {datetime.datetime.utcnow().strftime('%Y-%m-%d')}\n"
+            f"---\n\n"
+            f"## Definition\n\n{definition}\n\n"
+            f"{rel_lines}"
+            f"---\n*Concept page: {concept}*"
+        )
+
+        note = self._client.create_note(
+            workspace_id=workspace_id,
+            title=f"Concept: {concept}",
+            content=content,
+            embed=embed,
+        )
+
+        # Create KG node for the concept
+        node = None
+        try:
+            node = self._client.create_node(
+                workspace_id=workspace_id,
+                label=concept,
+                node_type="concept",
+                summary=definition[:300],
+                source_memory_id="",
+            )
+        except RuntimeError:
+            pass
+
+        if node and note.get("id"):
+            try:
+                self._client._call(
+                    "create_edge", [
+                        workspace_id, note["id"], node["id"],
+                        "describes", 1.0, "INFERRED",
+                        "{}", "",
+                    ],
+                )
+            except RuntimeError:
+                pass
+
+        self._log_activity(
+            workspace_id, "create_concept_page", concept,
+        )
+        return {"node": node, "note": note}
+
+    def create_comparison_page(
+        self,
+        title: str,
+        items: list[dict[str, str]],
+        workspace_id: str = "default",
+        embed: bool = True,
+    ) -> dict[str, Any]:
+        """Create a comparison table wiki page.
+
+        Args:
+            title: Comparison title (e.g. "RLHF vs DPO").
+            items: List of item dicts. Each has a ``name`` key and
+                arbitrary attribute keys. Example::
+
+                    [
+                        {"name": "RLHF", "type": "reward-based",
+                         "complexity": "High", "stability": "High"},
+                        {"name": "DPO", "type": "direct preference",
+                         "complexity": "Low", "stability": "Medium"},
+                    ]
+            workspace_id: Target workspace.
+            embed: Whether to embed the note.
+
+        Returns:
+            Dict with ``note`` key.
+        """
+        if not items:
+            return {"note": {}}
+
+        # Build a markdown table
+        all_keys = ["name"]
+        for item in items:
+            for k in item:
+                if k != "name" and k not in all_keys:
+                    all_keys.append(k)
+
+        header = "| " + " | ".join(k.capitalize() for k in all_keys) + " |"
+        sep = "| " + " | ".join("---" for _ in all_keys) + " |"
+        rows = []
+        for item in items:
+            row = "| " + " | ".join(
+                item.get(k, "") for k in all_keys
+            ) + " |"
+            rows.append(row)
+
+        table = "\n".join([header, sep] + rows)
+
+        content = (
+            f"---\n"
+            f"type: comparison\n"
+            f"tags: [comparison]\n"
+            f"created: {datetime.datetime.utcnow().strftime('%Y-%m-%d')}\n"
+            f"---\n\n"
+            f"## {title}\n\n"
+            f"{table}\n\n"
+            f"---\n*Comparison page: {title}*"
+        )
+
+        note = self._client.create_note(
+            workspace_id=workspace_id,
+            title=f"Comparison: {title}",
+            content=content,
+            embed=embed,
+        )
+
+        self._log_activity(
+            workspace_id, "create_comparison_page", title,
+        )
+        return {"note": note}

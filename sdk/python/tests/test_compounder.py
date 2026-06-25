@@ -420,3 +420,352 @@ class TestRippleUpdate:
         assert args[0][0] == "update_node"
         assert "Updated summary" in str(args[0][1])
 
+
+class TestIngestSource:
+    """Tests for Compounder.ingest_source()."""
+
+    def test_empty_text_returns_empty(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        cp = Compounder(client)
+        result = cp.ingest_source(source_text="", source_title="Test")
+        assert result["note"] == {}
+        assert result["entities"] == []
+
+    def test_creates_summary_note(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        cp = Compounder(client)
+        result = cp.ingest_source(
+            source_text="This is a test article about AI.",
+            source_title="Test Article",
+        )
+        client.create_note.assert_called_once()
+        call_kw = client.create_note.call_args[1]
+        assert "Source: Test Article" in call_kw["title"]
+        assert "## Summary" in call_kw["content"]
+        assert result["note"]["id"] == "note_1"
+
+    def test_uses_llm_summary_when_available(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        mock_llm.summarize.return_value = "LLM generated summary."
+        mock_llm.extract_entities_llm.return_value = None
+
+        cp = Compounder(client, llm=mock_llm)
+        cp.ingest_source(
+            source_text="Long article text about machine learning.",
+            source_title="ML Article",
+        )
+        # Summary should be LLM-generated
+        call_kw = client.create_note.call_args[1]
+        assert "LLM generated summary" in call_kw["content"]
+
+    def test_extracts_entities_when_llm_available(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        client.create_node.side_effect = [
+            {"id": "node_1"},
+            {"id": "node_2"},
+        ]
+
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        mock_llm.summarize.return_value = None  # Falls back to raw text
+        mock_llm.extract_entities_llm.return_value = [
+            {"name": "GPT-4", "entity_type": "product", "description": "A language model"},
+            {"name": "OpenAI", "entity_type": "org", "description": "AI company"},
+        ]
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp.ingest_source(
+            source_text="GPT-4 by OpenAI is a language model.",
+            source_title="GPT-4 Overview",
+        )
+        assert len(result["entities"]) == 2
+        assert result["entities"][0]["id"] == "node_1"
+
+    def test_links_entities_to_source_note(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        client.create_node.return_value = {"id": "node_1"}
+
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        mock_llm.summarize.return_value = None
+        mock_llm.extract_entities_llm.return_value = [
+            {"name": "GPT-4", "entity_type": "product"},
+        ]
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp.ingest_source(
+            source_text="GPT-4 by OpenAI.",
+            source_title="Test",
+        )
+        assert len(result["links"]) == 1
+
+    def test_checks_contradictions_on_ingest(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        client.search.return_value = [
+            {"entity_id": "mem_1", "content": "The sky is blue."},
+        ]
+
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        mock_llm.summarize.return_value = "Summary text."
+        mock_llm.extract_entities_llm.return_value = None
+        mock_llm.chat.return_value = (
+            '{"is_contradiction": true, '
+            '"explanation": "Colors differ."}'
+        )
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp.ingest_source(
+            source_text="The sky is green.",
+            source_title="Test",
+        )
+        assert len(result["contradictions"]) == 1
+        assert result["contradictions"][0]["explanation"] == "Colors differ."
+
+    def test_no_contradictions_when_llm_unavailable(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        cp = Compounder(client)  # Default LLM — not available
+        result = cp.ingest_source(
+            source_text="Some content.",
+            source_title="Test",
+        )
+        assert result["contradictions"] == []
+
+    def test_updates_index_and_log(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        client._query.return_value = []  # No existing index/log
+        cp = Compounder(client)
+        result = cp.ingest_source(
+            source_text="Content here.",
+            source_title="Log Test",
+        )
+        # Should create index note
+        idx_calls = [c for c in client.create_note.call_args_list
+                     if c[1].get("title") == "_index"]
+        assert len(idx_calls) >= 1
+
+
+class TestProactiveContradiction:
+    """Tests for _check_contradictions_on_ingest()."""
+
+    def test_returns_empty_when_llm_unavailable(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        cp = Compounder(client)
+        result = cp._check_contradictions_on_ingest("ws1", "new content", "n1")
+        assert result == []
+
+    def test_returns_empty_when_no_similar_memories(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.search.return_value = []
+        mock_llm = MagicMock()
+        mock_llm.available = True
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp._check_contradictions_on_ingest("ws1", "new", "n1")
+        assert result == []
+
+    def test_detects_contradiction(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.search.return_value = [
+            {"entity_id": "mem_1", "content": "The sky is blue."},
+        ]
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        mock_llm.chat.return_value = (
+            '{"is_contradiction": true, "explanation": "Opposite claims"}'
+        )
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp._check_contradictions_on_ingest("ws1", "The sky is red.", "src_1")
+        assert len(result) == 1
+        assert result[0]["memory_id"] == "mem_1"
+        # Should create contradiction note
+        client.create_note.assert_called_once()
+
+    def test_skips_non_contradictory(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.search.return_value = [
+            {"entity_id": "mem_1", "content": "Water is wet."},
+        ]
+        mock_llm = MagicMock()
+        mock_llm.available = True
+        mock_llm.chat.return_value = (
+            '{"is_contradiction": false, "explanation": "Consistent"}'
+        )
+
+        cp = Compounder(client, llm=mock_llm)
+        result = cp._check_contradictions_on_ingest("ws1", "Water is liquid.", "src_1")
+        assert result == []
+
+
+class TestEntityPage:
+    """Tests for create_entity_page()."""
+
+    def test_creates_note_and_node(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = []  # No existing node
+        client.create_node.return_value = {"id": "node_1", "label": "Alice"}
+        client.create_note.return_value = {"id": "note_1"}
+
+        cp = Compounder(client)
+        result = cp.create_entity_page(
+            name="Alice",
+            description="A researcher.",
+            entity_type="person",
+        )
+        assert result["node"]["id"] == "node_1"
+        assert result["note"]["id"] == "note_1"
+        client.create_node.assert_called_once()
+        # create_note called for entity page + _log
+        assert client.create_note.call_count >= 1
+        first_call = client.create_note.call_args_list[0]
+        assert "Alice" in first_call[1]["title"]
+
+    def test_reuses_existing_node(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = [
+            {"id": "node_1", "label": "Alice"},
+        ]  # Node already exists
+        client.create_note.return_value = {"id": "note_1"}
+
+        cp = Compounder(client)
+        result = cp.create_entity_page(name="Alice", description="A researcher.")
+        assert result["node"]["id"] == "node_1"
+        client.create_node.assert_not_called()  # Should not re-create
+
+    def test_includes_yaml_frontmatter(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = []
+        client.create_node.return_value = {"id": "n1"}
+        client.create_note.return_value = {"id": "note_1"}
+
+        cp = Compounder(client)
+        cp.create_entity_page(
+            name="Test Entity",
+            description="A test.",
+            tags=["ai", "research"],
+        )
+        call_kw = client.create_note.call_args_list[0][1]
+        assert "type: concept" in call_kw["content"]
+        assert "tags: [ai, research]" in call_kw["content"]
+        assert "## Overview" in call_kw["content"]
+
+    def test_creates_edge_between_note_and_node(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = []
+        client.create_node.return_value = {"id": "node_1"}
+        client.create_note.return_value = {"id": "note_1"}
+
+        cp = Compounder(client)
+        cp.create_entity_page(name="Alice", description="A person.")
+        client._call.assert_called_once()
+        args = client._call.call_args
+        assert args[0][0] == "create_edge"
+        assert "note_1" in str(args[0][1])
+        assert "node_1" in str(args[0][1])
+
+
+class TestConceptPage:
+    """Tests for create_concept_page()."""
+
+    def test_creates_concept_note_with_definition(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        client.create_node.return_value = {"id": "node_1"}
+
+        cp = Compounder(client)
+        result = cp.create_concept_page(
+            concept="RLHF",
+            definition="Reinforcement Learning from Human Feedback.",
+        )
+        assert result["note"]["id"] == "note_1"
+        call_kw = client.create_note.call_args_list[0][1]
+        assert "Concept: RLHF" in call_kw["title"]
+        assert "Reinforcement Learning" in call_kw["content"]
+        assert "type: concept" in call_kw["content"]
+
+    def test_includes_related_concepts(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "n1"}
+        client.create_node.return_value = {"id": "node_1"}
+
+        cp = Compounder(client)
+        cp.create_concept_page(
+            concept="DPO",
+            definition="Direct Preference Optimization.",
+            related_concepts=["RLHF", "PPO"],
+        )
+        call_kw = client.create_note.call_args_list[0][1]
+        assert "[[RLHF]]" in call_kw["content"]
+        assert "[[PPO]]" in call_kw["content"]
+
+
+class TestComparisonPage:
+    """Tests for create_comparison_page()."""
+
+    def test_creates_comparison_table(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+
+        cp = Compounder(client)
+        result = cp.create_comparison_page(
+            title="RLHF vs DPO",
+            items=[
+                {"name": "RLHF", "type": "reward-based", "complexity": "High"},
+                {"name": "DPO", "type": "direct", "complexity": "Low"},
+            ],
+        )
+        assert result["note"]["id"] == "note_1"
+        call_kw = client.create_note.call_args_list[0][1]
+        assert "Comparison: RLHF vs DPO" in call_kw["title"]
+        assert "| Name | Type | Complexity |" in call_kw["content"]
+        assert "| RLHF | reward-based | High |" in call_kw["content"]
+        assert "| DPO | direct | Low |" in call_kw["content"]
+
+    def test_empty_items_returns_empty(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        cp = Compounder(client)
+        result = cp.create_comparison_page(title="Empty", items=[])
+        assert result["note"] == {}
+
+    def test_single_item_still_creates_table(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "n1"}
+
+        cp = Compounder(client)
+        result = cp.create_comparison_page(
+            title="Single",
+            items=[{"name": "Only Item", "value": "42"}],
+        )
+        assert result["note"]["id"] == "n1"
+
