@@ -1061,6 +1061,186 @@ def get_metrics() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Compounder tools — LLM Wiki workflow
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def ingest_source(
+    source_text: str,
+    source_title: str,
+    workspace_id: str = "default",
+    source_type: str = "article",
+) -> str:
+    """Ingest a source document into the wiki.
+
+    Full LLM Wiki workflow: summarize, extract entities, create KG nodes,
+    link, ripple-update entities, and check for contradictions.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    client = get_client()
+    llm_available = bool(os.environ.get("OPENAI_API_KEY", False))
+    cp = Compounder(client)
+    result = cp.ingest_source(
+        source_text=source_text,
+        source_title=source_title,
+        workspace_id=workspace_id,
+        source_type=source_type,
+    )
+    n_entities = len(result.get("entities", []))
+    n_links = len(result.get("links", []))
+    n_contra = len(result.get("contradictions", []))
+    return (
+        f"Ingested '{source_title}' into workspace {workspace_id[:16]}...\n"
+        f"  Entities: {n_entities}, Links: {n_links}, "
+        f"Contradictions: {n_contra}"
+    )
+
+
+@mcp.tool()
+@require_api_key
+def create_entity_page(
+    name: str,
+    description: str,
+    entity_type: str = "concept",
+    workspace_id: str = "default",
+) -> str:
+    """Create a structured entity wiki page with KG node + YAML frontmatter.
+
+    Entity types: person, org, concept, product, location, event, topic.
+    Creates both a wiki note and a knowledge graph node.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    result = cp.create_entity_page(
+        name=name,
+        description=description,
+        entity_type=entity_type,
+        workspace_id=workspace_id,
+    )
+    note_id = result.get("note", {}).get("id", "")[:16]
+    return f"Entity page '{name}' created (note: {note_id}...)"
+
+
+@mcp.tool()
+@require_api_key
+def create_concept_page(
+    concept: str,
+    definition: str,
+    workspace_id: str = "default",
+    related_concepts: str = "",
+) -> str:
+    """Create a concept wiki page with definition and [[wiki-links]].
+
+    Args:
+        concept: The concept name.
+        definition: Clear definition text.
+        workspace_id: Target workspace.
+        related_concepts: Comma-separated list of related concept names.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    rel_list = [c.strip() for c in related_concepts.split(",") if c.strip()]
+    cp = Compounder(get_client())
+    result = cp.create_concept_page(
+        concept=concept,
+        definition=definition,
+        workspace_id=workspace_id,
+        related_concepts=rel_list or None,
+    )
+    note_id = result.get("note", {}).get("id", "")[:16]
+    return f"Concept page '{concept}' created (note: {note_id}...)"
+
+
+@mcp.tool()
+@require_api_key
+def lint_workspace(
+    workspace_id: str = "default",
+    check_contradictions: bool = False,
+) -> str:
+    """Health-check the workspace wiki.
+
+    Scans for orphans (KG nodes with no edges) and missing
+    cross-references.  Set check_contradictions=True (slower)
+    to also detect contradictory claims using the LLM.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    result = cp.lint_workspace(
+        workspace_id=workspace_id,
+        check_contradictions=check_contradictions,
+    )
+    summary = result.get("summary", {})
+    return (
+        f"Lint complete for workspace {workspace_id[:16]}...\n"
+        f"  Orphans: {summary.get('orphan_count', 0)}\n"
+        f"  Missing crossrefs: {summary.get('missing_crossref_count', 0)}\n"
+        f"  Contradictions: {summary.get('contradiction_count', 0)}\n"
+        f"  Total issues: {summary.get('total_issues', 0)}"
+    )
+
+
+@mcp.tool()
+@require_api_key
+def generate_overview(workspace_id: str = "default") -> str:
+    """Generate a workspace overview/synthesis page (_overview).
+
+    Creates a note with workspace stats, entity tables, recent activity,
+    and (if LLM available) an AI-written synthesis.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    result = cp.generate_overview_page(workspace_id=workspace_id)
+    note = result.get("note", {})
+    if note.get("id"):
+        return f"Overview generated: `{note['id'][:16]}...`"
+    return "Workspace is empty. Nothing to generate."
+
+
+@mcp.tool()
+@require_api_key
+def store_answer(
+    query: str,
+    answer: str,
+    workspace_id: str = "default",
+    source_memory_ids: str = "",
+) -> str:
+    """Persist an LLM-synthesized answer as a wiki page.
+
+    Creates a note, extracts entities, creates KG nodes, links to
+    source memories, ripple-updates entity summaries, and logs the
+    activity.
+
+    Args:
+        query: The question that prompted the answer.
+        answer: The synthesized answer text.
+        workspace_id: Target workspace.
+        source_memory_ids: Comma-separated list of source memory/node IDs.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    ids = [s.strip() for s in source_memory_ids.split(",") if s.strip()]
+    cp = Compounder(get_client())
+    result = cp.store_answer(
+        query=query,
+        answer=answer,
+        workspace_id=workspace_id,
+        source_memory_ids=ids or None,
+    )
+    note_id = result.get("note", {}).get("id", "")[:16]
+    n_entities = len(result.get("entities", []))
+    return (
+        f"Answer stored (note: {note_id}...)\n"
+        f"  Entities extracted: {n_entities}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
 
