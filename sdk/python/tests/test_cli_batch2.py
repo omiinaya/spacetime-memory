@@ -1013,3 +1013,225 @@ class TestMainErrorPaths:
             from cli.stmem import main
             main()
         assert exc_info.value.code == 1
+
+
+# ====================================================================
+# Compounder CLI commands — lint, cross-link, suggest-connections,
+# store-answer, entity-page, concept-page, comparison-page
+# ====================================================================
+
+
+class TestLintCLI:
+    """stmem lint"""
+
+    def test_lint_help(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["lint", "--help"])
+        assert result.exit_code == 0
+        assert "orphan" in result.output.lower() or "health-check" in result.output.lower()
+
+    def test_lint_basic(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["lint", "--workspace", "test", "--no-contradictions", "--no-crossrefs"])
+        assert result.exit_code == 0
+
+    def test_lint_json_output(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["--output", "json", "lint", "-w", "test", "--no-contradictions"])
+        assert result.exit_code == 0
+
+
+class TestCrossLinkCLI:
+    """stmem cross-link"""
+
+    def test_cross_link_help(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["cross-link", "--help"])
+        assert result.exit_code == 0
+
+    def test_cross_link_basic(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["cross-link", "-w", "test"])
+        assert result.exit_code == 0
+
+    def test_cross_link_json(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["--output", "json", "cross-link", "-w", "test"])
+        assert result.exit_code == 0
+
+
+class TestSuggestConnectionsCLI:
+    """stmem suggest-connections"""
+
+    def test_suggest_connections_help(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["suggest-connections", "--help"])
+        assert result.exit_code == 0
+
+    def test_suggest_connections_basic(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["suggest-connections", "-w", "test"])
+        assert result.exit_code == 0
+
+    def test_suggest_connections_json(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["--output", "json", "suggest-connections", "-w", "test"])
+        assert result.exit_code == 0
+
+
+class TestStoreAnswerCLI:
+    """stmem store-answer"""
+
+    def test_store_answer_help(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["store-answer", "--help"])
+        assert result.exit_code == 0
+
+    def test_store_answer_basic(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answer", "-w", "test",
+            "--query", "What is testing?",
+            "--answer", "Testing verifies behavior.",
+        ])
+        assert result.exit_code == 0
+
+    def test_store_answer_with_source_ids(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answer", "-w", "test",
+            "-q", "What is testing?",
+            "-a", "Testing verifies behavior.",
+            "-s", "mem1,mem2",
+        ])
+        assert result.exit_code == 0
+
+    def test_store_answer_missing_required(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["store-answer"])
+        assert result.exit_code != 0
+
+
+class TestEntityPageCLI:
+    """stmem entity-page"""
+
+    def test_entity_page_help(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["entity-page", "--help"])
+        assert result.exit_code == 0
+
+    def test_entity_page_basic(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "entity-page",
+            "--name", "Neural Network",
+            "--description", "A computational model inspired by biological neurons.",
+            "-w", "test",
+        ])
+        assert result.exit_code == 0
+
+    def test_entity_page_with_type(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "entity-page",
+            "-n", "Alan Turing",
+            "-d", "British mathematician and computer scientist.",
+            "-t", "person",
+            "--tags", "AI,history",
+            "--related", "Turing Test,Enigma",
+        ])
+        assert result.exit_code == 0
+
+    def test_entity_page_json(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "--output", "json", "entity-page", "-n", "Test", "-d", "A test entity.",
+        ])
+        assert result.exit_code == 0
+
+    def test_entity_page_missing_required(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["entity-page"])
+        assert result.exit_code != 0
+
+
+class TestConceptPageCLI:
+    """stmem concept-page"""
+
+    def test_concept_page_help(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["concept-page", "--help"])
+        assert result.exit_code == 0
+
+    def test_concept_page_basic(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "concept-page",
+            "--concept", "Backpropagation",
+            "--definition", "Algorithm for computing gradients in neural networks.",
+            "-w", "test",
+        ])
+        assert result.exit_code == 0
+
+    def test_concept_page_with_related(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "concept-page",
+            "-c", "Gradient Descent",
+            "-d", "First-order iterative optimization algorithm.",
+            "--related", "Backpropagation,Learning Rate",
+        ])
+        assert result.exit_code == 0
+
+    def test_concept_page_json(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "--output", "json", "concept-page", "-c", "Test", "-d", "A test concept.",
+        ])
+        assert result.exit_code == 0
+
+    def test_concept_page_missing_required(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["concept-page"])
+        assert result.exit_code != 0
+
+
+class TestComparisonPageCLI:
+    """stmem comparison-page"""
+
+    def test_comparison_page_help(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["comparison-page", "--help"])
+        assert result.exit_code == 0
+
+    def test_comparison_page_basic(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "comparison-page",
+            "--title", "PyTorch vs TensorFlow",
+            "--items", "PyTorch,TensorFlow",
+            "-w", "test",
+        ])
+        assert result.exit_code == 0
+
+    def test_comparison_page_with_criteria(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "comparison-page",
+            "-t", "React vs Vue vs Svelte",
+            "-i", "React,Vue,Svelte",
+            "-c", "performance,learning curve,ecosystem,bundle size",
+        ])
+        assert result.exit_code == 0
+
+    def test_comparison_page_json(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "--output", "json", "comparison-page", "-t", "Test", "-i", "A,B",
+        ])
+        assert result.exit_code == 0
+
+    def test_comparison_page_missing_required(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["comparison-page"])
+        assert result.exit_code != 0

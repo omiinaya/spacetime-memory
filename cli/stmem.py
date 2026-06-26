@@ -1621,7 +1621,7 @@ def lint_cmd(workspace: str, no_contradictions: bool, no_crossrefs: bool) -> Non
         result = cp.lint_workspace(
             workspace_id=workspace,
             check_contradictions=not no_contradictions,
-            check_crossrefs=not no_crossrefs,
+            check_missing_crossrefs=not no_crossrefs,
         )
 
     orphans = result.get("orphans", [])
@@ -1728,7 +1728,7 @@ def suggest_connections_cmd(workspace: str, limit: int) -> None:
             limit=limit,
         )
 
-    suggestions = result.get("suggestions", [])
+    suggestions = result if isinstance(result, list) else result.get("suggestions", [])
     if suggestions:
         console.print(
             f"\n[bold]Suggested connections ({len(suggestions)}):[/bold]"
@@ -1823,7 +1823,7 @@ def entity_page_cmd(name: str, description: str, entity_type: str,
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     rel_list = (
-        [{"target": r.strip(), "relation": "related_to"}
+        [{"name": r.strip(), "relation": "related_to"}
          for r in related.split(",") if r.strip()]
         if related else None
     )

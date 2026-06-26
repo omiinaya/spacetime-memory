@@ -47,7 +47,7 @@ pub fn uuid_v4(ctx: &spacetimedb::ReducerContext) -> String {
     format_uuid_v4(high, low)
 }
 
-/// Format two raw u64 values into an RFC 4122 v4 UUID string.
+/// Format two raw u64 values into a standard RFC 4122 v4 UUID string.
 ///
 /// `high` contributes the time-low and time-mid hex parts.
 /// `low` contributes the time-high-and-version, clock-seq, and node parts.
@@ -55,12 +55,11 @@ pub fn uuid_v4(ctx: &spacetimedb::ReducerContext) -> String {
 /// Version bits (4) and variant bits (10xx) are set in the appropriate
 /// positions per RFC 4122 §4.4.
 ///
-/// NOTE: The output is 28 hex characters (8-4-4-4-8 format, 112 bits),
-/// not the standard 32-hex-char UUID (8-4-4-4-12, 128 bits). The upper
-/// 4 hex digits from `high` are unused. This is a legacy quirk; the
-/// format is stable and used as an opaque unique key throughout the
-/// module. New code should use `uuid_v7()` / `uuid_v7_uniq()` instead,
-/// which produce standard 8-4-4-4-12 format via `ctx.new_uuid_v7()`.
+/// Output is 32 hex characters (8-4-4-4-12 format, 128 bits), matching
+/// the standard UUID format. Previously this function produced a legacy
+/// 28-hex-char format (8-4-4-4-8, 112 bits) where the upper 4 hex digits
+/// from `high` were unused. That has been fixed — the unused quad is now
+/// incorporated into the node field.
 ///
 /// This is a pure function — no STDB dependency — suitable for unit testing
 /// on the host target.
@@ -76,13 +75,17 @@ fn format_uuid_v4(high: u64, low: u64) -> String {
     let vc = match var { 0 => '8', 1 => '9', 2 => 'a', _ => 'b' };
     rand_hex.replace_range(4..5, &vc.to_string());
 
+    // Node part: previously unused 4 hex digits from `high` + 8 hex from `low`
+    // This gives us the standard 12-hex node field (48 bits).
+    let node = format!("{}{}", &ts_part[12..], &rand_hex[8..]);
+
     format!(
         "{}-{}-{}-{}-{}",
         &ts_part[..8],
         &ts_part[8..12],
         &rand_hex[..4],
         &rand_hex[4..8],
-        &rand_hex[8..]
+        &node
     )
 }
 
@@ -187,8 +190,8 @@ mod tests {
     #[test]
     fn test_format_uuid_v4_has_correct_length() {
         let id = format_uuid_v4(0x0123456789abcdef, 0xfedcba9876543210);
-        // Legacy format: 8-4-4-4-8 = 28 hex + 4 hyphens = 32 chars
-        assert_eq!(id.len(), 32);
+        // Standard format: 8-4-4-4-12 = 32 hex + 4 hyphens = 36 chars
+        assert_eq!(id.len(), 36);
     }
 
     #[test]
@@ -234,7 +237,7 @@ mod tests {
     fn test_format_uuid_v4_all_zero_input() {
         let id = format_uuid_v4(0, 0);
         // Should still produce a valid-looking UUID with version=4 and variant set
-        assert_eq!(id.len(), 32);
+        assert_eq!(id.len(), 36);
         let parts: Vec<&str> = id.split('-').collect();
         assert_eq!(parts[2].chars().next().unwrap(), '4');
     }
@@ -344,9 +347,9 @@ mod tests {
     #[test]
     fn test_format_uuid_v4_output_matches_uuid_pattern() {
         let id = format_uuid_v4(0x123456789abcdef0, 0x0fedcba987654321);
-        // Legacy format: 8-4-4-4-8 (28 hex + 4 hyphens = 32 chars)
-        let re = regex::Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{8}$").unwrap();
-        assert!(re.is_match(&id), "UUID '{}' does not match expected 8-4-4-4-8 pattern", id);
+        // Standard format: 8-4-4-4-12 (32 hex + 4 hyphens = 36 chars)
+        let re = regex::Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$").unwrap();
+        assert!(re.is_match(&id), "UUID '{}' does not match expected 8-4-4-4-12 pattern", id);
     }
 
     #[test]

@@ -1323,9 +1323,10 @@ class Compounder:
     def create_comparison_page(
         self,
         title: str,
-        items: list[dict[str, str]],
+        items: list[dict[str, str]] | list[str],
         workspace_id: str = "default",
         embed: bool = True,
+        criteria: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create a comparison table wiki page.
 
@@ -1340,8 +1341,13 @@ class Compounder:
                         {"name": "DPO", "type": "direct preference",
                          "complexity": "Low", "stability": "Medium"},
                     ]
+
+                Can also be a flat list of item name strings, in which case
+                ``criteria`` is used to add column headers (with empty cells).
             workspace_id: Target workspace.
             embed: Whether to embed the note.
+            criteria: List of criteria names for the comparison columns.
+                Only used when ``items`` is a list of strings.
 
         Returns:
             Dict with ``note`` key.
@@ -1349,9 +1355,21 @@ class Compounder:
         if not items:
             return {"note": {}}
 
+        # Normalise: convert list[str] to list[dict] with optional criteria cols
+        if items and isinstance(items[0], str):
+            str_items: list[str] = items  # type: ignore[assignment]
+            items = [{"name": s} for s in str_items]
+            if criteria:
+                for item in items:
+                    for c in criteria:
+                        item[c] = ""
+
+        # After normalisation, items is always list[dict[str, str]]
+        dict_items: list[dict[str, str]] = items  # type: ignore[assignment]
+
         # Build a markdown table
         all_keys = ["name"]
-        for item in items:
+        for item in dict_items:
             for k in item:
                 if k != "name" and k not in all_keys:
                     all_keys.append(k)
@@ -1359,7 +1377,7 @@ class Compounder:
         header = "| " + " | ".join(k.capitalize() for k in all_keys) + " |"
         sep = "| " + " | ".join("---" for _ in all_keys) + " |"
         rows = []
-        for item in items:
+        for item in dict_items:
             row = "| " + " | ".join(
                 item.get(k, "") for k in all_keys
             ) + " |"
@@ -1387,7 +1405,7 @@ class Compounder:
 
         # Update index
         item_names = ", ".join(
-            i.get("name", "") for i in items[:5]
+            i.get("name", "") for i in dict_items[:5]
         )
         self._update_index(
             workspace_id, f"Comparison: {title}", note,
