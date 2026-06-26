@@ -152,6 +152,147 @@ class TestCompounderStoreAnswer:
         assert "First" in title
 
 
+class TestFindNearDuplicates:
+    """Tests for Compounder.find_near_duplicates()."""
+
+    def test_empty_content_returns_empty(self):
+        from spacetime_memory.compounder import Compounder
+        cp = Compounder(MagicMock())
+        assert cp.find_near_duplicates("") == []
+        assert cp.find_near_duplicates("   ") == []
+
+    def test_calls_search_with_content(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.search.return_value = []
+        cp = Compounder(client)
+        result = cp.find_near_duplicates("test content", workspace_id="ws1")
+        client.search.assert_called_once()
+        args, kwargs = client.search.call_args
+        # workspace_id is positional (arg 0 after self), query is keyword
+        assert args[0] == "ws1"
+        assert kwargs["query"] == "test content"
+        assert kwargs["semantic"] is True
+        assert kwargs["limit"] == 5
+        assert result == []
+
+    def test_filters_by_threshold(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.search.return_value = [
+            {"entity_id": "m1", "content": "similar A", "score": 0.95, "entity_type": "memory"},
+            {"entity_id": "m2", "content": "similar B", "score": 0.88, "entity_type": "memory"},
+            {"entity_id": "m3", "content": "similar C", "score": 0.73, "entity_type": "memory"},
+        ]
+        cp = Compounder(client)
+        # Default threshold 0.92 — only 0.95 passes
+        dupes = cp.find_near_duplicates("test", threshold=0.92)
+        assert len(dupes) == 1
+        assert dupes[0]["entity_id"] == "m1"
+
+    def test_all_below_threshold_returns_empty(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.search.return_value = [
+            {"entity_id": "m1", "content": "vaguely related", "score": 0.45},
+        ]
+        cp = Compounder(client)
+        assert cp.find_near_duplicates("test", threshold=0.92) == []
+
+    def test_zero_threshold_returns_all(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.search.return_value = [
+            {"entity_id": "m1", "score": 0.1},
+            {"entity_id": "m2", "score": 0.2},
+        ]
+        cp = Compounder(client)
+        dupes = cp.find_near_duplicates("test", threshold=0.0)
+        assert len(dupes) == 2
+
+    def test_custom_limit_passed_to_search(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.search.return_value = []
+        cp = Compounder(client)
+        cp.find_near_duplicates("content", limit=10)
+        _, kwargs = client.search.call_args
+        assert kwargs["limit"] == 10
+
+
+class TestStoreAnswerSkipDuplicates:
+    """Tests for Compounder.store_answer() skip_duplicates parameter."""
+
+    def test_skip_duplicates_true_finds_and_returns_early(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        # Simulate finding a near-duplicate
+        client.search.return_value = [
+            {"entity_id": "existing_note_1", "content": "Similar content", "score": 0.95, "entity_type": "note"},
+        ]
+        cp = Compounder(client)
+        result = cp.store_answer(
+            query="What is X?",
+            answer="X is a concept that involves many things.",
+            skip_duplicates=True,
+            duplicate_threshold=0.92,
+        )
+        # Should return early without creating a note
+        client.create_note.assert_not_called()
+        assert result["duplicate_of"] == "existing_note_1"
+        assert result["duplicate_score"] == 0.95
+        assert result["note"] is not None
+
+    def test_skip_duplicates_false_creates_note_normally(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1", "title": "What is X?"}
+        client.search.return_value = [
+            {"entity_id": "existing", "content": "similar", "score": 0.95},
+        ]
+        cp = Compounder(client)
+        result = cp.store_answer(
+            query="What is X?",
+            answer="X is a concept.",
+            skip_duplicates=False,
+        )
+        # Should create note regardless of near-duplicate
+        client.create_note.assert_called_once()
+        assert "duplicate_of" not in result
+
+    def test_skip_duplicates_no_match_creates_note(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        # No near-duplicate found
+        client.search.return_value = []
+        cp = Compounder(client)
+        result = cp.store_answer(
+            query="What is Y?",
+            answer="Y is something else entirely.",
+            skip_duplicates=True,
+        )
+        client.create_note.assert_called_once()
+        assert "duplicate_of" not in result
+
+    def test_skip_duplicates_custom_threshold(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        # Scores below custom threshold of 0.97
+        client.search.return_value = [
+            {"entity_id": "m1", "content": "somewhat similar", "score": 0.93},
+        ]
+        cp = Compounder(client)
+        result = cp.store_answer(
+            query="Q", answer="A",
+            skip_duplicates=True,
+            duplicate_threshold=0.97,
+        )
+        # 0.93 < 0.97, so should create note
+        client.create_note.assert_called_once()
+        assert "duplicate_of" not in result
+
+
 class TestCompounderStoreAnswers:
     """Tests for Compounder.store_answers()."""
 
@@ -188,7 +329,8 @@ class TestCompounderStoreAnswers:
         call_count = 0
 
         def mock_store(query, answer, workspace_id="default",
-                       source_memory_ids=None, title=None, embed=True):
+                       source_memory_ids=None, title=None, embed=True,
+                       skip_duplicates=True, duplicate_threshold=0.92):
             nonlocal call_count
             call_count += 1
             if call_count == 2:

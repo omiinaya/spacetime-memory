@@ -163,6 +163,53 @@ class Compounder:
         return merged[:limit]
 
     # ------------------------------------------------------------------
+    # find_near_duplicates — detect semantically similar existing content
+    # ------------------------------------------------------------------
+
+    def find_near_duplicates(
+        self,
+        content: str,
+        workspace_id: str = "default",
+        threshold: float = 0.92,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Find memories with semantically similar content.
+
+        Uses the existing hybrid search pipeline to find content that
+        is nearly identical to *content*.  A threshold of 0.92 (default)
+        catches rephrasings of the same fact while letting novel content
+        through.
+
+        Args:
+            content: The text to check for duplicates.
+            workspace_id: Target workspace.
+            threshold: Minimum similarity score to consider a duplicate
+                (0.0-1.0).  Default 0.92 works well for BGE-M3 embeddings.
+            limit: Max candidate duplicates to return.
+
+        Returns:
+            List of matching memory/note dicts with keys ``entity_id``,
+            ``content``, ``score``, ``entity_type``.  Empty list when
+            no near-duplicates are found.
+        """
+        if not content.strip():
+            return []
+
+        results = self._client.search(
+            workspace_id,
+            query=content,
+            limit=limit,
+            semantic=True,
+            memory_type="",
+            tier="",
+        )
+        duplicates = [
+            r for r in results
+            if r.get("score", 0.0) >= threshold
+        ]
+        return duplicates
+
+    # ------------------------------------------------------------------
     # store_answer — persist an LLM-generated answer as a wiki page
     # ------------------------------------------------------------------
 
@@ -174,6 +221,8 @@ class Compounder:
         source_memory_ids: list[str] | None = None,
         title: str | None = None,
         embed: bool = True,
+        skip_duplicates: bool = True,
+        duplicate_threshold: float = 0.92,
     ) -> dict[str, Any]:
         """Persist a synthesized answer as a note + KG nodes.
 
@@ -192,13 +241,44 @@ class Compounder:
                 informed this answer.
             title: Optional note title (auto-generated if omitted).
             embed: Whether to embed the note for semantic search.
+            skip_duplicates: If True (default), check for near-duplicate
+                content before creating a new note.  When a near-duplicate
+                is found, the new note is NOT created and the result
+                includes the existing note info under a ``duplicate_of`` key.
+            duplicate_threshold: Minimum similarity score to consider
+                content a near-duplicate (0.0-1.0).  Default 0.92 catches
+                rephrased facts while letting novel content through.
 
         Returns:
             Dict with ``note``, ``entities``, and ``links`` keys, or
-            empty dict on failure.
+            empty dict on failure.  If ``skip_duplicates`` is True and a
+            near-duplicate was found, the result includes a
+            ``duplicate_of`` key with info about the existing content.
         """
         if not answer.strip():
             return {}
+
+        # ── Near-duplicate detection ──
+        if skip_duplicates:
+            dupes = self.find_near_duplicates(
+                answer, workspace_id=workspace_id,
+                threshold=duplicate_threshold, limit=3,
+            )
+            if dupes:
+                best = dupes[0]
+                logger.info(
+                    "Skipping store_answer — near-duplicate found "
+                    "(score=%.3f): %s",
+                    best.get("score", 0.0),
+                    str(best.get("content", ""))[:80],
+                )
+                return {
+                    "note": best,
+                    "entities": [],
+                    "links": [],
+                    "duplicate_of": best.get("entity_id", ""),
+                    "duplicate_score": best.get("score", 0.0),
+                }
 
         generated_title = title or self._generate_title(query, answer)
         content = self._format_answer_page(query, answer, source_memory_ids)
@@ -296,6 +376,8 @@ class Compounder:
         workspace_id: str = "default",
         source_memory_ids: list[str] | None = None,
         embed: bool = True,
+        skip_duplicates: bool = True,
+        duplicate_threshold: float = 0.92,
     ) -> list[dict[str, Any]]:
         """Batch-store multiple query/answer pairs as wiki pages.
 
@@ -309,6 +391,10 @@ class Compounder:
             source_memory_ids: Optional list of memory/node IDs that
                 informed *all* answers in this batch.
             embed: Whether to embed notes for semantic search.
+            skip_duplicates: If True (default), check each answer for
+                near-duplicate content before creating a new note.
+            duplicate_threshold: Minimum similarity score to consider
+                content a near-duplicate (0.0-1.0).  Default 0.92.
 
         Returns:
             List of result dicts (one per pair), each with ``note``,
@@ -326,6 +412,8 @@ class Compounder:
                     workspace_id=workspace_id,
                     source_memory_ids=source_memory_ids,
                     embed=embed,
+                    skip_duplicates=skip_duplicates,
+                    duplicate_threshold=duplicate_threshold,
                 )
                 results.append(result)
             except RuntimeError:
