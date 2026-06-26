@@ -8,16 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add entity_types filter parameter to search()
-The `search()` method has `memory_type` and `tier` filters but no way to
-select which content types to return (memory, note, node).  Add an
-`entity_types` parameter (e.g. `entity_types=["memory", "note"]`) that
-filters after fusion so users can scope searches to notes only or exclude
-noisy memory results.  The filter should apply in both semantic and
-keyword-fallback paths.
-Difficulty: Easy
-Est: 15min
-
 ### Add note orphan detection to lint_workspace()
 The `lint_workspace()` method currently checks for KG nodes with no edges
 (orphans) and missing cross-refs between notes and entities.  It does not
@@ -40,6 +30,15 @@ Est: 15min
 ---
 
 ## Recently Completed
+
+### ✅ Add entity_types filter parameter to search() (Jun 26)
+Added `entity_types` parameter to `search()` — filters results by
+`entity_type` after fusion, before reranking. Applied in both hybrid
+and keyword-fallback paths. 4 new unit tests.
+Commit: 4376002
+Files: sdk/python/spacetime_memory/client.py, sdk/python/tests/test_client.py
+Difficulty: Easy
+Est: 15min
 
 ### ✅ Add coverage for compilation-critical Rust modules with doc-tests (Jun 26)
 Added a runnable doc-test to `record_to_json` in change_event.rs (the only pure
@@ -132,6 +131,15 @@ Difficulty: Hard (needs live STDB)
 |
 
 ## Research Log
+
+### Jun 26 — entity_types filter implemented; 2 PENDING items remain
+- Implemented: `entity_types` filter parameter for `search()` in both
+  hybrid and keyword-fallback paths. 4 unit tests, all passing.
+- Next items in queue:
+  1. Note orphan detection in lint_workspace()
+  2. Entity-aware boosting in keyword fallback path
+- STDB 2.6 is latest; no major SDK changes. pip shows spacetimedb-sdk
+  0.7.0 as latest. No new competitor features identified this tick.
 
 ### Jun 26 — Doc-tests added to compilation-critical Rust modules; entity_types filter next
 - Added doc-test to `record_to_json` (change_event.rs) + enhanced `edit_distance` doc
