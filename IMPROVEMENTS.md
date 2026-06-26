@@ -8,16 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add search for wiki notes via the hybrid search pipeline
-The current hybrid search (semantic + keyword + graph + temporal) only searches
-`memory` and `kg_node` via `search_index`. Wiki `note` documents (created by
-Compounder.store_answer, create_entity_page, etc.) are not indexed or returned
-by `client.search()`. Users must call `client._query("note", ...)` separately.
-Add note indexing to the search pipeline so `search()` returns relevant notes
-alongside memories and nodes.
-Difficulty: Medium
-Est: 45min
-
 ### Use entity_link aliases in entity-aware boosting
 The new `_boost_with_entity_signal` matches entities by KG node labels, label
 word-overlap, and summary substring.  The `entity_link` table stores canonical
@@ -39,6 +29,17 @@ Est: 30min
 ---
 
 ## Recently Completed
+
+### ✅ Add search for wiki notes via the hybrid search pipeline (Jun 26)
+Notes created via `create_note`/`update_note` are now indexed into `search_index`,
+`term_index`, and Tantivy BM25, making them discoverable via `search()` (both
+semantic hybrid and keyword fallback). Added `"note"` to valid entity_types in
+Rust `index_entity` reducer. Python `_enrich_content` resolves note title+content
+for entity_type="note". `_keyword_fallback` merges notes with memory results.
+8 new unit tests.
+Commit: 21ca33c
+Files: server/spacetimedb/src/retrieval.rs, sdk/python/spacetime_memory/client.py,
+       sdk/python/tests/test_client.py, sdk/python/tests/test_memory.py
 
 ### ✅ Add entity-aware search result boosting (mem0 v3 multi-signal parity) (Jun 26)
 Added `_boost_with_entity_signal()` method to the `Client` class that detects
@@ -78,55 +79,6 @@ Added `memory_revision` to `ALLOWED_TABLES` whitelist and added
 Files: server/spacetimedb/src/memory.rs, server/spacetimedb/src/query.rs,
        sdk/python/spacetime_memory/client.py,
        sdk/python/tests/test_client.py
-
-### ✅ Add near-duplicate memory detection on store (Jun 26)
-Added `find_near_duplicates()` method to Compounder that uses the
-existing hybrid search pipeline with a configurable threshold (default
-0.92) to detect semantically similar content before creating new notes.
-Integrated into `store_answer()` and `store_answers()` via new
-`skip_duplicates=True` and `duplicate_threshold=0.92` parameters.
-When a near-duplicate is found, the method returns early with a
-`duplicate_of` key instead of creating a new note. 10 new tests added.
-Files: sdk/python/spacetime_memory/compounder.py,
-       sdk/python/tests/test_compounder.py
-
-### ✅ Add integration tests for full compounder pipeline (Jun 26)
-Added 17 integration tests covering the full LLM Wiki pipeline tested
-against real STDB: store_answer, store_answers batch, manual KG
-creation, suggest_connections (2-link graph analysis), lint (orphans +
-missing crossrefs), export (system note filtering, empty workspace),
-and search_entities (label, type, no-match). Also fixed a latent bug
-where store_answer/ingest_source silently dropped note IDs because
-create_note returns {'status': 'ok'} not the note data.
-Files: sdk/python/tests/test_compounder_integration.py,
-       sdk/python/spacetime_memory/compounder.py
-
-### ✅ Add MCP tool tests for core graph/pagerank/community tools (Jun 26)
-Added `mock_mcp_client` fixture and 19 tests for 8 graph/community MCP
-tools: get_node, get_neighbors, get_community, query_graph, shortest_path,
-graph_bfs, compute_pagerank, and compute_community_hierarchy.
-Tools now have coverage for success, empty, and default-parameter paths.
-Files: sdk/python/tests/conftest.py, sdk/python/tests/test_mcp.py
-
-### ✅ Add CLI tests for `store-answers-batch` error paths (Jun 26)
-Added 11 CLI tests for `store-answers-batch` covering: help, valid pairs,
-empty list, single pair, invalid JSON, not-a-list, wrong structure,
-workspace passthrough, source IDs passthrough, file input, and
-file-not-found error path.
-Files: sdk/python/tests/test_cli_batch2.py
-
-### ✅ Fix broken MCP tests — add missing `mock_compounder` fixture (Jun 26)
-The `mock_compounder` fixture referenced by 29 MCP tool tests was never
-defined, causing all test_mcp.py tests to fail with fixture-not-found.
-Added fixture to conftest.py that patches `spacetime_memory.compounder.Compounder`
-so all 39 MCP tests now pass.
-Files: sdk/python/tests/conftest.py
-
-### ✅ Add `store_answers_batch` MCP tool tests (Jun 26)
-Added 10 unit tests for the `store_answers_batch` MCP tool covering:
-valid batches, empty list, single pair, invalid JSON, wrong structure,
-workspace ID passthrough, source_memory_ids parsing, and no-entities.
-Files: sdk/python/tests/test_mcp.py
 
 ---
 
