@@ -708,6 +708,22 @@ class TestComputeCommunityHierarchy:
 
     def test_hierarchy_calls_sql_twice(self, mock_mcp_client):
         from server.mcp.main import compute_community_hierarchy
-        mock_mcp_client._sql.return_value = []
+        mock_mcp_client._sql.side_effect = [[], []]
         compute_community_hierarchy(workspace_id="ws1")
         assert mock_mcp_client._sql.call_count == 2
+
+
+# ── Workspace tools ─────────────────────────────────────────────────────
+
+
+class TestDeleteWorkspace:
+    """Tests for the delete_workspace MCP tool."""
+
+    def test_delete_workspace_calls_client(self, mock_mcp_client):
+        from server.mcp.main import delete_workspace
+        mock_mcp_client.delete_workspace.return_value = {
+            "status": "ok", "id": "ws1",
+        }
+        result = delete_workspace(workspace_id="ws1")
+        assert result["status"] == "ok"
+        mock_mcp_client.delete_workspace.assert_called_once_with("ws1")
