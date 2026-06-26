@@ -342,6 +342,45 @@ def get_memory(id: str) -> list[dict[str, Any]]:
 
 @mcp.tool()
 @require_api_key
+def get_memory_history(memory_id: str) -> list[dict[str, Any]]:
+    """Get version history for a memory (mem0 parity).
+
+    Returns revision history from the memory_revision table,
+    ordered by version ascending. Each entry shows what changed
+    in that revision (previous vs new content/summary/confidence).
+
+    The current (latest) state is appended as the final entry.
+    """
+    return get_client().get_memory_history(memory_id)
+
+
+@mcp.tool()
+@require_api_key
+def update_memory(
+    memory_id: str,
+    content: str = "",
+    summary: str = "",
+    confidence: float = 0.0,
+) -> dict[str, Any]:
+    """Update a memory's content, summary, and/or confidence.
+
+    Only fields with non-empty/non-zero values are updated. Pass
+    empty strings for fields you want to leave unchanged.
+
+    Creates a revision snapshot before updating (version history).
+    """
+    return get_client().update_memory(memory_id, content, summary, confidence)
+
+
+@mcp.tool()
+@require_api_key
+def delete_memory(memory_id: str) -> dict[str, Any]:
+    """Delete (hard-delete) a memory by its ID."""
+    return get_client().delete_memory(memory_id)
+
+
+@mcp.tool()
+@require_api_key
 def reinforce_memory(memory_id: str) -> dict[str, Any]:
     """Reinforce a memory: increment access_count and bump strength."""
     return get_client().reinforce(memory_id)

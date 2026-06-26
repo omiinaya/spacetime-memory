@@ -10,7 +10,43 @@ and works the top pending item each tick.
 
 ---
 
+## Pending
+
+### Fix stale WASM binary causing test_get_memory_history failure
+The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
+is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
+whitelist. `test_get_memory_history` fails against the real STDB server.
+Fix: rebuild WASM module (requires cargo build, currently blocked by OOM).
+Files: server/spacetimedb/src/query.rs
+Difficulty: Medium (needs cargo build)
+Est: N/A (blocked)
+
+---
+
 ## Recently Completed
+
+### ✅ Add `get_memory_history` MCP tool (Jul 2)
+Added `get_memory_history` MCP tool wrapping `Client.get_memory_history()`.
+Returns revision history ordered by version ascending, with current state
+appended as final entry.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 5min
+
+### ✅ Add `update_memory` MCP tool (Jul 2)
+Added `update_memory` MCP tool wrapping `Client.update_memory()`.
+Accepts memory_id, content, summary, confidence. Non-empty/non-zero fields
+are updated; empty strings leave fields unchanged.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 5min
+
+### ✅ Add `delete_memory` MCP tool (Jul 2)
+Added `delete_memory` MCP tool wrapping `Client.delete_memory()`.
+Hard-deletes a memory by its ID.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 5min
 
 ### ✅ Add `entity_types`/`before`/`after` params to MCP search tools (Jul 1)
 Added `entity_types` (list[str]), `before` (float), and `after` (float) parameters
@@ -99,7 +135,7 @@ Difficulty: Hard (needs live STDB)
   - No new competitor features to adopt.
   - No new features in STDB v2.6 changelog that would benefit the module.
 - **Backlog**: 0 PENDING items remaining. All actionable improvements complete.
-- **Commits**: (pending commit — entity_types/before/after MCP params).
+- **Commits**: 4140b3d (entity_types/before/after MCP params).
 
 ### Jun 30 — cross_link/suggest_connections fixed; find_near_duplicates MCP tool added
 - **MCP tools audit**: Fixed `cross_link` (reads `links_created` not `edges_created`)
@@ -148,6 +184,32 @@ Difficulty: Hard (needs live STDB)
 ### Jun 26 — Full backlog cleared; both PENDING items implemented
 - **Note orphan detection** + **Keyword-fallback boosting** both implemented.
 - **Backlog is now empty** — all actionable improvement items complete.
+
+### Jun 27 — Unit tests for _make_snippet() completed; 2 new PENDING items added
+- **_make_snippet unit tests**: 10 tests added covering all edge cases.
+- **Commit**: 137ca81 — 1 file (+83 lines), all 155 client tests passing.
+- **Research**: STDB crate v2.6.0 (unchanged), mem0ai v2.0.8, opentelemetry-sdk 1.43.0.
+- **New PENDING items**: `--output json` flag, `--from`/`--to` date range filter.
+
+### Jul 2 — MCP memory CRUD gaps identified; added get_memory_history/update_memory/delete_memory
+- **MCP tools audit**: Found 3 SDK methods missing MCP tool wrappers:
+  - `Client.get_memory_history(memory_id)` — no MCP tool
+  - `Client.update_memory(...)` — no MCP tool
+  - `Client.delete_memory(memory_id)` — no MCP tool
+- **Test failure discovered**: `test_get_memory_history` fails against live STDB
+  because the published WASM binary is stale (missing `memory_revision` in
+  `ALLOWED_TABLES` whitelist). Requires cargo build + republish.
+- **Research**:
+  - STDB crate v2.6.0 (unchanged since last check, crates.io latest).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Backlog**: 3 PENDING items + 1 blocked item added.
+- **New PENDING items**: get_memory_history MCP tool, update_memory MCP tool,
+  delete_memory MCP tool.
+- **Blocked**: Stale WASM binary needs rebuild.
 
 ### Jun 26 — entity_types filter implemented; 2 PENDING items remain
 
