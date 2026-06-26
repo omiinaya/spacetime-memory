@@ -8,19 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add CLI tests for `store-answers-batch` error paths
-The CLI `store-answers-batch` command exists but has no dedicated tests.
-Add tests for invalid JSON, empty file, and valid pairs input.
-Difficulty: Easy
-Est: 20min
-
-### Add MCP tool tests for core graph/pagerank/community tools
-The MCP server has ~30 untested tools for graph operations (shortest_path,
-compute_pagerank, compute_community_hierarchy, bfs, etc.). Add basic
-unit tests with mocked Compounder (like existing test_mcp.py patterns).
-Difficulty: Medium
-Est: 1-2h
-
 ### Add integration test that exercises the full ingest→search→cross-link pipeline
 Current integration tests cover individual components but not the full
 LLM Wiki workflow end-to-end (ingest source → search → cross-link →
@@ -28,9 +15,34 @@ suggest-connections → export). Add a test that runs the full pipeline.
 Difficulty: Medium
 Est: 1h
 
+### Add memory versioning/history tracking (inspired by mem0 v2.0.4 `history`)
+mem0 v2.0.4 supports per-memory change history tracking. The current
+spacetime-memory system only has `_log_activity` for workspace-wide
+audit tracking. Adding per-memory revision history (via an STDB
+`memory_revision` table + reducer) would enable undo, diff, and
+audit at the individual memory level.
+Difficulty: Medium
+Est: 1-2h
+
 ---
 
 ## Recently Completed
+
+### ✅ Add MCP tool tests for core graph/pagerank/community tools (Jun 26)
+Added `mock_mcp_client` fixture and 19 tests for 8 graph/community MCP
+tools: get_node, get_neighbors, get_community, query_graph, shortest_path,
+graph_bfs, compute_pagerank, and compute_community_hierarchy.
+Tools now have coverage for success, empty, and default-parameter paths.
+Files: sdk/python/tests/conftest.py, sdk/python/tests/test_mcp.py
+Commit: 2263d28
+
+### ✅ Add CLI tests for `store-answers-batch` error paths (Jun 26)
+Added 11 CLI tests for `store-answers-batch` covering: help, valid pairs,
+empty list, single pair, invalid JSON, not-a-list, wrong structure,
+workspace passthrough, source IDs passthrough, file input, and
+file-not-found error path.
+Files: sdk/python/tests/test_cli_batch2.py
+Commit: feada71
 
 ### ✅ Fix broken MCP tests — add missing `mock_compounder` fixture (Jun 26)
 The `mock_compounder` fixture referenced by 29 MCP tool tests was never
