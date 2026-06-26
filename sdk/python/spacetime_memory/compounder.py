@@ -869,6 +869,7 @@ class Compounder:
         check_orphans: bool = True,
         check_missing_crossrefs: bool = True,
         check_contradictions: bool = False,
+        check_note_orphans: bool = True,
         limit: int = 100,
     ) -> dict[str, Any]:
         """Health-check the workspace wiki and report issues.
@@ -878,25 +879,30 @@ class Compounder:
           anything). These are candidates for cleanup or linking.
         - **Missing cross-references** — notes/memories whose content
           mentions a KG node label but have no edge to that node.
+        - **Note orphans** — notes whose content mentions no known KG
+          entities and have no KG edges. Entirely disconnected from the KG.
         - **Contradictions** — (requires LLM) pairs of semantically
           similar memories that express conflicting claims.
 
         Args:
             workspace_id: Target workspace.
-            check_orphans: Find nodes with no edges.
+            check_orphans: Find KG nodes with no edges.
             check_missing_crossrefs: Find content that mentions but
                 doesn't link to existing KG nodes.
             check_contradictions: Use LLM to find conflicting claims
                 between semantically similar memories (slower).
+            check_note_orphans: Find notes entirely disconnected from
+                the knowledge graph.
             limit: Max items to scan.
 
         Returns:
             Dict with ``orphans``, ``missing_crossrefs``,
-            ``contradictions`` lists and a summary.
+            ``note_orphans``, ``contradictions`` lists and a summary.
         """
         result: dict[str, Any] = {
             "orphans": [],
             "missing_crossrefs": [],
+            "note_orphans": [],
             "contradictions": [],
             "summary": {},
         }
@@ -908,6 +914,12 @@ class Compounder:
         # ── Missing cross-references ──
         if check_missing_crossrefs:
             result["missing_crossrefs"] = self._find_missing_crossrefs(
+                workspace_id, limit,
+            )
+
+        # ── Note orphan detection ──
+        if check_note_orphans:
+            result["note_orphans"] = self._find_note_orphans(
                 workspace_id, limit,
             )
 
@@ -925,10 +937,12 @@ class Compounder:
         result["summary"] = {
             "orphan_count": len(result["orphans"]),
             "missing_crossref_count": len(result["missing_crossrefs"]),
+            "note_orphan_count": len(result["note_orphans"]),
             "contradiction_count": len(result["contradictions"]),
             "total_issues": (
                 len(result["orphans"])
                 + len(result["missing_crossrefs"])
+                + len(result["note_orphans"])
                 + len(result["contradictions"])
             ),
         }
@@ -938,6 +952,7 @@ class Compounder:
             f"{result['summary']['total_issues']} issues found "
             f"({result['summary']['orphan_count']} orphans, "
             f"{result['summary']['missing_crossref_count']} missing crossrefs, "
+            f"{result['summary']['note_orphan_count']} note orphans, "
             f"{result['summary']['contradiction_count']} contradictions)",
         )
         return result
@@ -1045,6 +1060,74 @@ class Compounder:
                         })
 
         return missing
+
+    def _find_note_orphans(
+        self, workspace_id: str, limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Find notes entirely disconnected from the knowledge graph.
+
+        A note is considered an orphan if:
+        1. Its content/title mentions no known KG node labels.
+        2. Its ID does not appear in any KG edge (source or target).
+
+        Returns:
+            List of note dicts with ``id``, ``title``, ``reason``.
+        """
+        notes = self._client._query(
+            "note", workspace_id=workspace_id, filter_dict={},
+        )[:limit]
+        if not notes:
+            return []
+
+        # Get KG node labels for content-matching
+        nodes = self._client._query(
+            "kg_node", workspace_id=workspace_id, filter_dict={},
+        )
+        label_map: dict[str, str] = {}
+        for n in nodes:
+            label = (n.get("label", "") or "").lower().strip()
+            if label:
+                label_map[label] = n.get("id", "")
+
+        # Get all edges to check which IDs are connected
+        edges = self._client._query(
+            "kg_edge", workspace_id=workspace_id, filter_dict={},
+        )
+        connected_ids: set[str] = set()
+        for e in edges:
+            src = e.get("source_node_id", "")
+            tgt = e.get("target_node_id", "")
+            if src:
+                connected_ids.add(src)
+            if tgt:
+                connected_ids.add(tgt)
+
+        orphans: list[dict[str, Any]] = []
+        for note in notes:
+            note_id = note.get("id", "")
+            if not note_id:
+                continue
+            # Check if note is connected via edges
+            if note_id in connected_ids:
+                continue
+            # Check if note content/title mentions any KG label
+            content = (note.get("content", "") or "").lower()
+            title = (note.get("title", "") or "").lower()
+            combined = f"{title} {content}"
+            mentions_entity = any(
+                label in combined for label in label_map
+            )
+            if mentions_entity:
+                continue
+            # Note is disconnected from KG
+            orphans.append({
+                "id": note_id,
+                "title": note.get("title", "untitled"),
+                "reason": "Note content and title mention no KG entities, "
+                          "and note has no edges to the KG.",
+            })
+
+        return orphans
 
     def _find_contradictions(
         self, workspace_id: str, limit: int = 50,

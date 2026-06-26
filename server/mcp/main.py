@@ -1247,6 +1247,7 @@ def lint_workspace(
         f"Lint complete for workspace {workspace_id[:16]}...\n"
         f"  Orphans: {summary.get('orphan_count', 0)}\n"
         f"  Missing crossrefs: {summary.get('missing_crossref_count', 0)}\n"
+        f"  Note orphans: {summary.get('note_orphan_count', 0)}\n"
         f"  Contradictions: {summary.get('contradiction_count', 0)}\n"
         f"  Total issues: {summary.get('total_issues', 0)}"
     )

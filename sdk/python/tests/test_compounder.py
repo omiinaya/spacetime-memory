@@ -520,7 +520,8 @@ class TestLintWorkspace:
         cp = Compounder(client)
         result = cp.lint_workspace("ws1", check_orphans=True,
                                     check_missing_crossrefs=False,
-                                    check_contradictions=False)
+                                    check_contradictions=False,
+                                    check_note_orphans=False)
         assert len(result["orphans"]) == 1
         assert result["orphans"][0]["label"] == "Orphan"
         assert result["summary"]["orphan_count"] == 1
@@ -536,7 +537,8 @@ class TestLintWorkspace:
         cp = Compounder(client)
         result = cp.lint_workspace("ws1", check_orphans=True,
                                     check_missing_crossrefs=False,
-                                    check_contradictions=False)
+                                    check_contradictions=False,
+                                    check_note_orphans=False)
         assert result["summary"]["orphan_count"] == 0
 
     def test_missing_crossrefs(self):
@@ -552,7 +554,8 @@ class TestLintWorkspace:
         cp = Compounder(client)
         result = cp.lint_workspace("ws1", check_orphans=False,
                                     check_missing_crossrefs=True,
-                                    check_contradictions=False)
+                                    check_contradictions=False,
+                                    check_note_orphans=False)
         assert len(result["missing_crossrefs"]) >= 1
         assert result["summary"]["missing_crossref_count"] >= 1
 
@@ -560,7 +563,8 @@ class TestLintWorkspace:
         from spacetime_memory.compounder import Compounder
         client = MagicMock()
         cp = Compounder(client)  # LLM not configured (default)
-        result = cp.lint_workspace("ws1", check_contradictions=True)
+        result = cp.lint_workspace("ws1", check_contradictions=True,
+                                    check_note_orphans=False)
         assert result["contradictions"] == []
 
     def test_contradiction_with_llm(self):
@@ -575,9 +579,91 @@ class TestLintWorkspace:
         ]
         cp = Compounder(client, llm=mock_llm)
         result = cp.lint_workspace("ws1", check_contradictions=True,
-                                    check_orphans=False, check_missing_crossrefs=False)
+                                    check_orphans=False, check_missing_crossrefs=False,
+                                    check_note_orphans=False)
         assert len(result["contradictions"]) == 1
         assert result["contradictions"][0]["explanation"] == "They say opposite things"
+
+    def test_note_orphan_detection(self):
+        """Notes with no KG label mentions and no edges are flagged."""
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [{"id": "n1", "title": "Lonely Note", "content": "Just some text with no entities."}],  # notes
+            [{"id": "kg1", "label": "AI"}],  # kg_nodes
+            [],  # edges — no connections
+            [],  # _log_activity
+        ]
+        cp = Compounder(client)
+        result = cp.lint_workspace("ws1", check_note_orphans=True,
+                                    check_orphans=False,
+                                    check_missing_crossrefs=False,
+                                    check_contradictions=False)
+        assert len(result["note_orphans"]) == 1
+        assert result["note_orphans"][0]["title"] == "Lonely Note"
+        assert result["summary"]["note_orphan_count"] == 1
+
+    def test_note_not_orphan_when_content_mentions_entity(self):
+        """Note that mentions a KG label is not an orphan."""
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [{"id": "n1", "title": "About AI", "content": "AI is transforming everything."}],  # notes
+            [{"id": "kg1", "label": "AI"}],  # kg_nodes
+            [],  # edges
+            [],  # _log_activity
+        ]
+        cp = Compounder(client)
+        result = cp.lint_workspace("ws1", check_note_orphans=True,
+                                    check_orphans=False,
+                                    check_missing_crossrefs=False,
+                                    check_contradictions=False)
+        assert result["summary"]["note_orphan_count"] == 0
+
+    def test_note_not_orphan_when_connected_via_edge(self):
+        """Note whose ID appears in an edge is not an orphan."""
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [{"id": "note_42", "title": "Connected", "content": "Some text."}],  # notes
+            [{"id": "kg1", "label": "AI"}],  # kg_nodes
+            [{"source_node_id": "note_42", "target_node_id": "kg1"}],  # edges
+            [],  # _log_activity
+        ]
+        cp = Compounder(client)
+        result = cp.lint_workspace("ws1", check_note_orphans=True,
+                                    check_orphans=False,
+                                    check_missing_crossrefs=False,
+                                    check_contradictions=False)
+        assert result["summary"]["note_orphan_count"] == 0
+
+    def test_no_note_orphans_with_empty_notes(self):
+        """No notes should yield no orphans."""
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.side_effect = [
+            [],  # notes — empty
+            [],  # _log_activity
+        ]
+        cp = Compounder(client)
+        result = cp.lint_workspace("ws1", check_note_orphans=True,
+                                    check_orphans=False,
+                                    check_missing_crossrefs=False,
+                                    check_contradictions=False)
+        assert result["summary"]["note_orphan_count"] == 0
+
+    def test_note_orphans_disabled_via_flag(self):
+        """When check_note_orphans=False, no note orphan check runs."""
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        cp = Compounder(client)
+        result = cp.lint_workspace("ws1", check_note_orphans=False,
+                                    check_orphans=False,
+                                    check_missing_crossrefs=False,
+                                    check_contradictions=False)
+        assert result["summary"]["note_orphan_count"] == 0
+        # _query should only be called for _log_activity
+        assert client._query.call_count == 1
 
 
 class TestRippleUpdate:
