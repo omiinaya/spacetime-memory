@@ -1177,12 +1177,14 @@ class Client:
         rows: list[dict[str, Any]],
         workspace_id: str,
     ) -> list[dict[str, Any]]:
-        """Look up memory/node content from STDB and apply veracity weighting."""
+        """Look up memory/node/note content from STDB and apply veracity weighting."""
         mem_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "memory"]
         node_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "node"]
+        note_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "note"]
         mem_map = {}
         mem_confidences: dict[str, float] = {}
         node_map = {}
+        note_map = {}
         for mid in mem_ids:
             mems = self._query("memory", filter_dict={"id": mid},
                                workspace_id=workspace_id,
@@ -1194,12 +1196,20 @@ class Client:
             nodes = self._query("kg_node", filter_dict={"id": nid}, columns=["id", "label"])
             if nodes:
                 node_map[nid] = nodes[0].get("label", "")
+        for nid in note_ids:
+            notes = self._query("note", filter_dict={"id": nid},
+                                columns=["id", "title", "content"])
+            if notes:
+                note = notes[0]
+                note_map[nid] = note.get("title", "") + "\n\n" + note.get("content", "")
         for r in rows:
             eid = r.get("entity_id", "")
             if r.get("entity_type") == "memory":
                 r["memory_content"] = mem_map.get(eid, "")
             elif r.get("entity_type") == "node":
                 r["memory_content"] = node_map.get(eid, "")
+            elif r.get("entity_type") == "note":
+                r["memory_content"] = note_map.get(eid, "")
             else:
                 r["memory_content"] = ""
             r["score"] = r.get("fused_score", r.get("score", 0.0))
@@ -1218,7 +1228,11 @@ class Client:
         tier: str,
         limit: int,
     ) -> list[dict[str, Any]]:
-        """Non-semantic keyword-only search fallback using client-side filtering."""
+        """Non-semantic keyword-only search fallback using client-side filtering.
+
+        Searches both the ``memory`` table and the ``note`` table, merging
+        results sorted by ``created_at`` descending.
+        """
         clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
         if memory_type:
             clauses.append(f"memory_type = '{_esc(memory_type)}'")
@@ -1232,6 +1246,12 @@ class Client:
                 val = parts[1].strip().strip("'")
                 filt[key] = val
         rows = self._query("memory", workspace_id=workspace_id, filter_dict=filt)
+
+        # Also fetch notes for keyword search
+        note_rows = self._query("note", workspace_id=workspace_id, filter_dict={})
+        for nr in note_rows:
+            nr["entity_type"] = "note"
+            nr["entity_id"] = nr["id"]
 
         if query:
             _STOPWORDS = {
@@ -1257,9 +1277,29 @@ class Client:
                         for kw in keywords
                     )
                 ]
+                note_rows = [
+                    nr for nr in note_rows
+                    if any(
+                        kw in nr.get("content", "").lower()
+                        or kw in nr.get("title", "").lower()
+                        for kw in keywords
+                    )
+                ]
 
-        rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
-        results = rows[:limit]
+        # Tag memory rows with entity_type for consistency
+        for r in rows:
+            r["entity_type"] = r.get("entity_type", "memory")
+        # Merge, deduplicate by (entity_type, entity_id), sort by created_at desc
+        seen: dict[tuple[str, str], dict] = {}
+        for r in rows + note_rows:
+            et = r.get("entity_type", "memory")
+            eid = r.get("entity_id") or r.get("id", "")
+            key = (et, eid)
+            if key not in seen or r.get("created_at", 0) > seen[key].get("created_at", 0):
+                seen[key] = r
+        all_rows = list(seen.values())
+        all_rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
+        results = all_rows[:limit]
         self._emit_event("search.performed", {
             "query": query,
             "result_count": len(results),
@@ -2846,9 +2886,38 @@ class Client:
             emb = self._embed(content[:1024])
             if emb:
                 embedding_json = json.dumps(emb)
-        return self._call("create_note", [
+        result = self._call("create_note", [
             workspace_id, title, content, note_date, embedding_json,
         ])
+
+        # Index the note into search_index so hybrid search finds it
+        if result.get("status") == "ok" and content.strip():
+            try:
+                # Resolve the note ID by content match (same pattern as store_memory)
+                notes = self._query(
+                    "note", workspace_id=workspace_id, filter_dict={},
+                    columns=["id", "content", "title"],
+                )
+                note_id = ""
+                for n in reversed(notes):
+                    if n.get("content", "") == content:
+                        note_id = n["id"]
+                        break
+                if note_id:
+                    index_emb = embedding_json if embedding_json != "[]" else "[]"
+                    self._call("index_entity", [
+                        workspace_id, "note", note_id,
+                        content, index_emb,
+                    ])
+                    # Populate BM25 inverted index
+                    self._call("index_terms", [
+                        workspace_id, "note", note_id, content,
+                    ])
+                    # Index into Tantivy BM25 sidecar
+                    self._tantivy_index(workspace_id, note_id, content, "note")
+            except RuntimeError:
+                pass  # Best-effort indexing
+        return result
 
     def update_note(
         self,
@@ -2863,11 +2932,38 @@ class Client:
             emb = self._embed(content[:1024])
             if emb:
                 embedding_json = json.dumps(emb)
-        return self._call("update_note", [note_id, title, content, embedding_json])
+        result = self._call("update_note", [note_id, title, content, embedding_json])
+
+        # Re-index the note in search_index (best-effort)
+        if result.get("status") == "ok" and content.strip():
+            try:
+                # Resolve workspace_id from the note record
+                note_records = self._query(
+                    "note", filter_dict={"id": note_id},
+                    columns=["id", "workspace_id", "content"],
+                )
+                wid = note_records[0]["workspace_id"] if note_records else "default"
+                # Remove old index entries first
+                self._call("remove_from_index", ["note", note_id])
+                # Re-index with new content
+                index_emb = embedding_json if embedding_json != "[]" else "[]"
+                self._call("index_entity", [wid, "note", note_id, content, index_emb])
+                self._call("index_terms", [wid, "note", note_id, content])
+                self._tantivy_index(wid, note_id, content, "note")
+            except RuntimeError:
+                pass  # Best-effort re-indexing
+        return result
 
     def delete_note(self, note_id: str) -> dict[str, Any]:
-        """Delete a note and its backlinks."""
-        return self._call("delete_note", [note_id])
+        """Delete a note and its backlinks, and remove from search index."""
+        result = self._call("delete_note", [note_id])
+        # Clean up search index entries
+        if result.get("status") == "ok":
+            try:
+                self._call("remove_from_index", ["note", note_id])
+            except RuntimeError:
+                pass  # Best-effort cleanup
+        return result
 
     def list_notes(
         self, workspace_id: str = "default", include_inactive: bool = False

@@ -1321,6 +1321,137 @@ class TestNoteCrudStubs:
             "title": "My Note", "is_active": "true"})
 
 
+class TestNoteSearchIndexing:
+    """Note search indexing: create_note, update_note, delete_note index
+    into search_index so hybrid search returns notes alongside memories."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock(return_value={"status": "ok"})
+        c._query = Mock()
+        c._embed = Mock(return_value=[0.1, 0.2, 0.3])
+        c._tantivy_index = Mock(return_value=True)
+        return c
+
+    def test_create_note_calls_index_entity(self, client):
+        """create_note with content must call index_entity + index_terms."""
+        client._query.side_effect = [
+            # First call: resolve note ID by content match
+            [{"id": "note-abc", "content": "My test content", "title": "Test"}],
+        ]
+        client.create_note(
+            workspace_id="ws-1",
+            title="Test Note",
+            content="My test content",
+            embed=True,
+        )
+        # Should call create_note reducer (embedding is [0.1,0.2,0.3] from mock)
+        client._call.assert_any_call("create_note", [
+            "ws-1", "Test Note", "My test content", "", "[0.1, 0.2, 0.3]",
+        ])
+        # Should call index_entity for search index
+        client._call.assert_any_call("index_entity", [
+            "ws-1", "note", "note-abc", "My test content", "[0.1, 0.2, 0.3]",
+        ])
+        # Should call index_terms for BM25
+        client._call.assert_any_call("index_terms", [
+            "ws-1", "note", "note-abc", "My test content",
+        ])
+        # Should index into Tantivy
+        client._tantivy_index.assert_called_with(
+            "ws-1", "note-abc", "My test content", "note",
+        )
+
+    def test_create_note_no_index_when_status_not_ok(self, client):
+        """create_note must NOT call index_entity when reducer fails."""
+        client._call = Mock(return_value={"error": "failed"})
+        client._query = Mock(return_value=[])
+        client.create_note(
+            workspace_id="ws-1",
+            title="Fail",
+            content="any content",
+            embed=True,
+        )
+        # Should only have called create_note
+        calls = [c[0][0] for c in client._call.call_args_list]
+        for cname in ("index_entity", "index_terms"):
+            assert cname not in calls, f"{cname} should not be called on failure"
+
+    def test_update_note_reindexes(self, client):
+        """update_note must call remove_from_index + index_entity."""
+        client._query.side_effect = [
+            [{"id": "note-abc", "workspace_id": "ws-1", "content": "Updated content"}],
+        ]
+        client.update_note("note-abc", title="Updated", content="Updated content", embed=True)
+        # Should remove old index entries
+        client._call.assert_any_call("remove_from_index", ["note", "note-abc"])
+        # Should re-index with new content
+        client._call.assert_any_call("index_entity", [
+            "ws-1", "note", "note-abc", "Updated content", "[0.1, 0.2, 0.3]",
+        ])
+        client._call.assert_any_call("index_terms", [
+            "ws-1", "note", "note-abc", "Updated content",
+        ])
+
+    def test_update_note_resolves_workspace_id(self, client):
+        """update_note queries the note to resolve workspace_id."""
+        client._query.side_effect = [
+            [{"id": "n1", "workspace_id": "ws-42", "content": "x"}],
+        ]
+        client.update_note("n1", content="x", embed=False)
+        client._call.assert_any_call("index_entity", [
+            "ws-42", "note", "n1", "x", "[]",
+        ])
+
+    def test_delete_note_removes_from_index(self, client):
+        """delete_note must call remove_from_index."""
+        client.delete_note("note-abc")
+        client._call.assert_any_call("delete_note", ["note-abc"])
+        client._call.assert_any_call("remove_from_index", ["note", "note-abc"])
+
+    def test_delete_note_no_cleanup_on_failure(self, client):
+        """delete_note must NOT call remove_from_index when deletion fails."""
+        client._call = Mock(return_value={"error": "not found"})
+        client.delete_note("note-missing")
+        calls = [c[0][0] for c in client._call.call_args_list]
+        assert "remove_from_index" not in calls
+
+    def test_enrich_content_handles_note_entity_type(self):
+        """_enrich_content must look up note content for entity_type='note'."""
+        c = Client(host="h", port="1", database="d")
+        c._query = Mock(return_value=[
+            {"id": "n1", "title": "My Note", "content": "Hello world"},
+        ])
+        rows = [
+            {"entity_id": "n1", "entity_type": "note", "fused_score": 0.9},
+        ]
+        result = c._enrich_content(rows, "ws-1")
+        assert result[0]["memory_content"] == "My Note\n\nHello world"
+        c._query.assert_called_with(
+            "note", filter_dict={"id": "n1"},
+            columns=["id", "title", "content"],
+        )
+
+    def test_keyword_fallback_includes_notes(self):
+        """_keyword_fallback must merge notes with memories."""
+        c = Client(host="h", port="1", database="d")
+        c._query = Mock(side_effect=[
+            # First call: memory query
+            [{"id": "m1", "content": "alpha memory", "created_at": 100}],
+            # Second call: note query
+            [{"id": "n1", "content": "beta note", "title": "Beta", "created_at": 200}],
+        ])
+        c._emit_event = Mock()
+        results = c._keyword_fallback("ws-1", "beta", "", "", 10)
+        # Must include the note
+        ids = [r["id"] for r in results]
+        assert "n1" in ids
+        assert results[0]["entity_type"] == "note"
+        # Note (200) sorted before memory (100) due to created_at desc
+        assert results[0]["id"] == "n1"
+
+
 # ── Multi-region / Failover ────────────────────────────────────────────
 
 

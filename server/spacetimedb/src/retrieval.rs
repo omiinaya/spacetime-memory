@@ -45,10 +45,10 @@ pub fn index_entity(
 
     // Validate entity_type
     match entity_type.as_str() {
-        "memory" | "node" | "chunk" | "peer" => {}
+        "memory" | "node" | "chunk" | "peer" | "note" => {}
         _ => {
             return Err(format!(
-                "Invalid entity_type '{}': must be 'memory', 'node', 'chunk', or 'peer'",
+                "Invalid entity_type '{}': must be 'memory', 'node', 'chunk', 'peer', or 'note'",
                 entity_type
             ));
         }

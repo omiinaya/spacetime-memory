@@ -133,7 +133,8 @@ class TestMemorySearch:
         assert isinstance(result, list)
 
     def test_search_keyword(self, mock_http_client):
-        """search() with semantic=False does a keyword SQL query."""
+        """search() with semantic=False does a keyword SQL query, now
+        including notes alongside memories."""
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([
@@ -147,8 +148,11 @@ class TestMemorySearch:
             semantic=False,
         )
 
-        assert len(result) == 1
-        assert "pizza" in result[0]["content"]
+        # Both memories and notes appear in keyword results
+        assert len(result) >= 1
+        assert any("pizza" in r.get("content", "") for r in result)
+        # At least one entry should be a memory
+        assert any(r.get("entity_type") == "memory" for r in result)
 
     def test_search_with_filters(self, mock_http_client, monkeypatch):
         """search_with_filters applies metadata and location filters."""
