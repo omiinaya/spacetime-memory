@@ -152,6 +152,67 @@ class TestCompounderStoreAnswer:
         assert "First" in title
 
 
+class TestCompounderStoreAnswers:
+    """Tests for Compounder.store_answers()."""
+
+    def test_empty_pairs_returns_empty(self):
+        from spacetime_memory.compounder import Compounder
+        cp = Compounder(MagicMock())
+        results = cp.store_answers([])
+        assert results == []
+
+    def test_stores_multiple_answers(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client.create_note.return_value = {"id": "note_1"}
+        client._query.return_value = []  # no existing index
+        mock_llm = MagicMock()
+        mock_llm.available = False
+        mock_llm.extract_entities_llm.return_value = None
+
+        cp = Compounder(client, llm=mock_llm)
+        results = cp.store_answers([
+            ("What is RLHF?", "RLHF stands for Reinforcement Learning from Human Feedback."),
+            ("What is GPT?", "GPT is a generative pre-trained transformer."),
+        ], workspace_id="ws1")
+
+        assert len(results) == 2
+        assert results[0]["note"] == {"id": "note_1"}
+        assert results[1]["note"] == {"id": "note_1"}
+
+    def test_handles_single_error_gracefully(self):
+        from spacetime_memory.compounder import Compounder
+        cp = Compounder(MagicMock())
+        # Mock store_answer on the instance to raise on second call
+        original = cp.store_answer
+        call_count = 0
+
+        def mock_store(query, answer, workspace_id="default",
+                       source_memory_ids=None, title=None, embed=True):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise RuntimeError("Simulated failure")
+            return {"note": {"id": f"note_{call_count}"},
+                    "entities": [], "links": []}
+
+        cp.store_answer = mock_store
+
+        results = cp.store_answers([
+            ("Q1", "A1"),
+            ("Q2", "A2"),
+            ("Q3", "A3"),
+        ], workspace_id="ws1")
+
+        assert len(results) == 3
+        # First should have succeeded
+        assert results[0]["note"]["id"] == "note_1"
+        # Second should be empty dict (error caught)
+        assert results[1] == {"note": {}, "entities": [], "links": []}
+        # Third should have succeeded
+        assert results[2]["note"]["id"] == "note_3"
+
+
 class TestCompounderCrossLink:
     """Tests for Compounder.cross_link()."""
 

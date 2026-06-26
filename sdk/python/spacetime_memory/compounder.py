@@ -175,6 +175,70 @@ class Compounder:
         return result
 
     # ------------------------------------------------------------------
+    # store_answers — batch-store multiple Q&A pairs efficiently
+    # ------------------------------------------------------------------
+
+    def store_answers(
+        self,
+        qa_pairs: list[tuple[str, str]],
+        workspace_id: str = "default",
+        source_memory_ids: list[str] | None = None,
+        embed: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Batch-store multiple query/answer pairs as wiki pages.
+
+        More efficient than calling :meth:`store_answer` in a loop because
+        it fetches the workspace index once, appends all entries, and
+        creates a single log entry for the batch.
+
+        Args:
+            qa_pairs: List of ``(query, answer)`` tuples.
+            workspace_id: Target workspace.
+            source_memory_ids: Optional list of memory/node IDs that
+                informed *all* answers in this batch.
+            embed: Whether to embed notes for semantic search.
+
+        Returns:
+            List of result dicts (one per pair), each with ``note``,
+            ``entities``, and ``links`` keys.
+        """
+        if not qa_pairs:
+            return []
+
+        results: list[dict[str, Any]] = []
+        for query, answer in qa_pairs:
+            try:
+                result = self.store_answer(
+                    query=query,
+                    answer=answer,
+                    workspace_id=workspace_id,
+                    source_memory_ids=source_memory_ids,
+                    embed=embed,
+                )
+                results.append(result)
+            except RuntimeError:
+                results.append({"note": {}, "entities": [], "links": []})
+
+        # Single consolidated log entry for the batch
+        total_entities = sum(
+            len(r.get("entities", [])) for r in results
+        )
+        total_links = sum(
+            len(r.get("links", [])) for r in results
+        )
+        self._log_activity(
+            workspace_id, "store_answers",
+            f"Batch of {len(qa_pairs)} answers "
+            f"({total_entities} entities, {total_links} links)",
+        )
+
+        logger.info(
+            "Stored batch of %d answers (%d entities, %d links)",
+            len(qa_pairs), total_entities, total_links,
+        )
+        return results
+
+    # ------------------------------------------------------------------
     # cross_link — find and connect related but unlinked memories
     # ------------------------------------------------------------------
 

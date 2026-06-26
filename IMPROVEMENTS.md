@@ -28,9 +28,37 @@ Difficulty: Easy (tracking)
 Est: 0.5h
 Status: Research complete — no action needed
 
+### Add compounder.search_entities() convenience method
+Currently users must use `client._query("kg_node", ...)` directly to search
+KG entities. A high-level `search_entities(label=None, node_type=None,
+semantic_query=None)` method would make entity discovery much simpler for
+LLM Wiki pattern users.
+Difficulty: Easy
+Est: 1h
+
+### Add compounder.update_entity_page() method
+`create_entity_page()` exists but there's no public compounder method to
+update both a KG node and its associated wiki note in one call. Currently
+users must update the node and note separately via the client.
+Difficulty: Easy
+Est: 1h
+
+### Add MCP tool for batch store-answers
+The `store_answers()` batch method exists now but has no corresponding MCP
+tool. Add an MCP tool wrapping it so agents can batch-persist multiple
+Q&A pairs in one call.
+Difficulty: Medium
+Est: 1h
+
 ---
 
 ## Recently Completed
+
+### ✅ Batch store_answers() added to compounder (Jun 25)
+New `store_answers()` batch method processes multiple query/answer pairs
+efficiently: single index traversal, consolidated logging, graceful error
+handling (one failure doesn't stop the batch). 3 new unit tests.
+Files: sdk/python/spacetime_memory/compounder.py, tests/test_compounder.py
 
 ### ✅ format_uuid_v4() now outputs standard 32-hex-char UUID (Jun 25)
 Previously `format_uuid_v4()` produced a non-standard 28-hex-char format
@@ -91,12 +119,6 @@ Commit: 202e47f
 All 27 no-longer-raw `uuid_v4()` call sites migrated in consolidation.rs,
 auth.rs, insight.rs, profile.rs, replication.rs. Zero compiler warnings.
 Commit: 6cdb64d
-
-### ✅ Unit test coverage for Rust helper functions (Jun 24)
-Extracted pure computation helpers (`format_uuid_v4`, `micros_from_timestamp`,
-`compute_expires_at`) from context-dependent functions and added 21 tests.
-All 156 unit tests pass. WASM build check passes.
-Commits: 7bb4ff3
 
 ---
 
