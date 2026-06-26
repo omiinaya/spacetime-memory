@@ -1441,6 +1441,10 @@ class TestNoteSearchIndexing:
             [{"id": "m1", "content": "alpha memory", "created_at": 100}],
             # Second call: note query
             [{"id": "n1", "content": "beta note", "title": "Beta", "created_at": 200}],
+            # _boost_with_entity_signal: kg_node query
+            [],
+            # _boost_with_entity_signal: entity_link query
+            [],
         ])
         c._emit_event = Mock()
         results = c._keyword_fallback("ws-1", "beta", "", "", 10)
@@ -1450,6 +1454,58 @@ class TestNoteSearchIndexing:
         assert results[0]["entity_type"] == "note"
         # Note (200) sorted before memory (100) due to created_at desc
         assert results[0]["id"] == "n1"
+
+    def test_keyword_fallback_applies_entity_boost(self):
+        """_keyword_fallback calls _boost_with_entity_signal when query is set."""
+        c = Client(host="h", port="1", database="d")
+        c._query = Mock(side_effect=[
+            # First call: memory query
+            [{"id": "m1", "content": "RLHF is a technique", "created_at": 100}],
+            # Second call: note query
+            [],
+            # _boost_with_entity_signal: kg_node query
+            [],
+            # _boost_with_entity_signal: entity_link query
+            [],
+        ])
+        c._emit_event = Mock()
+        # Mock the boost method to track that it was called
+        c._boost_with_entity_signal = Mock(wraps=c._boost_with_entity_signal)
+        results = c._keyword_fallback("ws-1", "RLHF", "", "", 10)
+        c._boost_with_entity_signal.assert_called_once()
+        args, _ = c._boost_with_entity_signal.call_args
+        assert args[0] == "RLHF"  # query
+        assert len(args[1]) == 1  # rows
+        assert args[2] == "ws-1"  # workspace_id
+
+    def test_keyword_fallback_boost_no_crash_empty_query(self):
+        """_keyword_fallback with empty query still works (no boost applied)."""
+        c = Client(host="h", port="1", database="d")
+        c._query = Mock(side_effect=[
+            [{"id": "m1", "content": "test", "created_at": 100}],
+            [],
+        ])
+        c._emit_event = Mock()
+        c._boost_with_entity_signal = Mock()
+        results = c._keyword_fallback("ws-1", "", "", "", 10)
+        c._boost_with_entity_signal.assert_not_called()
+        assert len(results) == 1
+
+    def test_keyword_fallback_boost_no_crash_no_entities(self):
+        """_keyword_fallback with query but no KG entities doesn't crash."""
+        c = Client(host="h", port="1", database="d")
+        c._query = Mock(side_effect=[
+            [{"id": "m1", "content": "hello world content", "created_at": 100}],
+            [],
+        ])
+        c._emit_event = Mock()
+        c._boost_with_entity_signal = Mock(
+            wraps=lambda q, rows, ws: rows  # passthrough
+        )
+        results = c._keyword_fallback("ws-1", "hello", "", "", 10)
+        assert len(results) == 1
+        # Should have fused_score from baseline assignment
+        assert "fused_score" in results[0]
 
 
 # ── Multi-region / Failover ────────────────────────────────────────────
@@ -2038,7 +2094,11 @@ class TestSearchEntityTypes:
         mock_notes = [
             {"id": "n1", "content": "world of notes", "entity_type": "note", "created_at": 90},
         ]
-        with patch.object(mock_client, "_query", side_effect=[mock_memories, mock_notes]):
+        with patch.object(mock_client, "_query", side_effect=[
+            mock_memories, mock_notes,
+            [],  # _boost_with_entity_signal: kg_node
+            [],  # _boost_with_entity_signal: entity_link
+        ]):
             result = mock_client.search(
                 "ws1", "world", semantic=False,
                 limit=20, entity_types=["memory"],

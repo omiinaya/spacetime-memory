@@ -1300,6 +1300,13 @@ class Client:
         all_rows = list(seen.values())
         all_rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         results = all_rows[:limit]
+        # Assign baseline fused_score for entity-aware boosting
+        max_idx = max(len(results) - 1, 1)
+        for idx, r in enumerate(results):
+            r["fused_score"] = 1.0 - (idx / max_idx)
+        # Apply entity-aware boosting with entity_link alias support
+        if query:
+            results = self._boost_with_entity_signal(query, results, workspace_id)
         self._emit_event("search.performed", {
             "query": query,
             "result_count": len(results),
