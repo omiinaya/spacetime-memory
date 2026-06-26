@@ -530,11 +530,13 @@ def memory_store(
 @click.option("--mmr-lambda", type=float, default=0.0,
               help="MMR diversity reranking (0.7 default: 70% relevance, 30% diversity)")
 @click.option("--watch", "-w", is_flag=True, help="Watch for changes (poll every 5s)")
+@click.option("--snippet", "-s", is_flag=True,
+              help="Show snippet preview (first ~200 chars) instead of full content in table output")
 @click.pass_context
 def memory_search(ctx: click.Context, workspace_id: str, query: str,
                   memory_type: str | None, tier: str | None, limit: int,
                   semantic: bool, polyphonic: bool, watch: bool,
-                  mmr_lambda: float) -> None:
+                  mmr_lambda: float, snippet: bool) -> None:
     """Search memories in a workspace."""
     client = _sdk_client()
 
@@ -552,6 +554,11 @@ def memory_search(ctx: click.Context, workspace_id: str, query: str,
             )
 
     def _display(rows: list[dict[str, Any]]) -> None:
+        if snippet:
+            # Replace verbose content fields with snippet preview
+            for r in rows:
+                r["memory_content"] = r.get("snippet", "")
+                r.pop("content", None)
         print_table(rows, title=f"Search results (workspace: {workspace_id})",
                     output=ctx.obj.get("output", "table"))
 

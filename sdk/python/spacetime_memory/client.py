@@ -1212,6 +1212,9 @@ class Client:
                 r["memory_content"] = note_map.get(eid, "")
             else:
                 r["memory_content"] = ""
+            # Add content snippet for callers that only need a preview
+            content_text = r.get("memory_content", "") or r.get("content", "")
+            r["snippet"] = _make_snippet(content_text)
             r["score"] = r.get("fused_score", r.get("score", 0.0))
             if eid in mem_confidences:
                 from .veracity import confidence_multiplier
@@ -1304,6 +1307,10 @@ class Client:
         max_idx = max(len(results) - 1, 1)
         for idx, r in enumerate(results):
             r["fused_score"] = 1.0 - (idx / max_idx)
+        # Add content snippets for callers that only need a preview
+        for r in results:
+            content_text = r.get("content", "") or r.get("memory_content", "") or r.get("summary", "")
+            r["snippet"] = _make_snippet(content_text)
         # Apply entity-aware boosting with entity_link alias support
         if query:
             results = self._boost_with_entity_signal(query, results, workspace_id)
@@ -3368,6 +3375,29 @@ def _parse_sql_response(raw: str) -> list[dict[str, Any]]:
             results.append(row_dict)
     return results
 
+
+def _make_snippet(text: str, max_chars: int = 200) -> str:
+    """Truncate text at word boundary, appending '...' if truncated.
+
+    Args:
+        text: The full text to truncate.
+        max_chars: Maximum character length before truncation (default 200).
+
+    Returns:
+        Truncated text ending at a word boundary, with ``...`` appended
+        if the original exceeded *max_chars*.  Returns ``\"\"`` for
+        falsy input.
+    """
+    if not text:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    truncated = text[:max_chars]
+    # Break at last space within the truncated portion
+    last_space = truncated.rfind(" ")
+    if last_space > max_chars // 2:  # Only use word boundary if non-trivial
+        truncated = truncated[:last_space]
+    return truncated.rstrip() + "..."
 
 # ---------------------------------------------------------------------------
 # LLM Reranking (QMD parity)
