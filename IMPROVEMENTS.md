@@ -6,27 +6,41 @@ and works the top pending item each tick.
 
 ---
 
-## Status: PENDING
+| Status: PENDING
 
-### Add note content preview to search results (snippet extraction)
-When `search()` returns results, include a short content snippet (first 200 chars)
-in the result dict so callers (especially CLI/MCP tools) can display previews
-without fetching full notes. Currently results return content in full but the
-JSON output is verbose. Add a `snippet` key with truncation at word boundary.
-Files: sdk/python/spacetime_memory/client.py (search pipeline)
-Difficulty: Easy
-Est: 15min
-
-### Add `--snippet` flag to `stmem search` CLI output
-Complement the above: add a `--snippet`/`-s` flag to the search CLI command
-that shows a 1-line preview instead of the full content in table output.
-Files: cli/stmem.py
+### Add unit tests for `_make_snippet()`
+The `_make_snippet()` function (word-boundary text truncation) is currently
+untested as a pure function. Add unit tests covering: short text (no truncation),
+exact boundary, truncation at word boundary, empty/None input, very long text,
+single-word content (no space to break on).
+Files: sdk/python/tests/test_client.py
 Difficulty: Easy
 Est: 10min
 
 ---
 
 ## Recently Completed
+
+### ✅ Add `--snippet` flag to `stmem search` CLI output (Jun 27)
+Added `--snippet`/`-s` flag to the `stmem search` command. When set, replaces
+verbose `memory_content` and `content` columns with the `snippet` preview
+(~200 chars, word-boundary truncated) in table output. Works with both
+semantic and keyword-fallback search paths.
+Commit: e0ff612
+Files: cli/stmem.py
+Difficulty: Easy
+Est: 10min
+
+### ✅ Add note content preview to search results (snippet extraction) (Jun 27)
+When `search()` returns results, each result dict now includes a `snippet`
+key with word-boundary truncated preview (first ~200 chars) of the content.
+Callers (CLI, MCP tools) can use this for compact previews without dealing
+with verbose full content. Added in both `_enrich_content` (semantic path)
+and `_keyword_fallback` (non-semantic path).
+Commit: e0ff612
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 15min
 
 ### ✅ OTel tracer graceful degradation when collector is unreachable (Jun 26)
 The `Tracer.setup()` method now checks OTLP collector connectivity before
@@ -131,11 +145,32 @@ Difficulty: Hard (needs live STDB)
 
 ---
 
-| *(cron manages this section — moves items here when marked ✅, purged old ones)*
+| *(cron manages this section — moves items here when marked ✅, purged old ones)*|
 
 ---
 
 ## Research Log
+
+### Jun 27 — Snippet preview in search results + --snippet CLI flag
+- **Snippet extraction**: Added `_make_snippet()` — word-boundary truncation at
+  ~200 chars with `...` suffix. Integrated into both `_enrich_content` (semantic)
+  and `_keyword_fallback` (non-semantic) search paths. Each result dict now
+  carries a `snippet` key.
+- **CLI `--snippet` flag**: Added `-s`/`--snippet` to `stmem search`. When set,
+  replaces verbose `memory_content`/`content` columns with the compact snippet
+  preview in table output.
+- **Commit**: e0ff612 — 2 files changed, 38 insertions (+), 1 deletion(-).
+- **Research**: 
+  - STDB crate v2.6.0 (unchanged), spacetimedb-sdk v0.7.0 (unchanged).
+  - mem0ai v2.0.8 (latest, was 2.0.7 last check) — no new features relevant.
+  - langgraph v1.2.6 (unchanged).
+  - opentelemetry-sdk: installed 1.37.0, latest available is 1.43.0 — minor
+    version bumps, no game-changing new observability patterns to adopt.
+  - No new competitor features detected (mem0, langgraph, zep).
+- **New PENDING item**: Unit tests for `_make_snippet()` — pure function with
+  multiple edge cases (empty, exact boundary, word boundary, single-word).
+- **Tests**: 92 search tests + 123 CLI tests all passing. Pre-existing
+  `test_get_memory_history` failure unrelated (STDB table visibility).
 
 ### Jun 26 — OTel graceful degradation + Tantivy mock fix + backlog refresh
 - **OTel tracer**: Added connectivity check to OTLP collector before wiring up
