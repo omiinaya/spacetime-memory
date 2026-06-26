@@ -502,3 +502,212 @@ class TestGenerateOverview:
         mock_compounder.generate_overview_page.return_value = {"note": {}}
         result = generate_overview(workspace_id="ws1")
         assert "Workspace is empty" in result
+
+
+# ── Graph query tools (get_node, get_neighbors, get_community, query_graph) ──
+
+
+class TestGetNode:
+    """Tests for the get_node MCP tool."""
+
+    def test_get_node_found(self, mock_mcp_client):
+        from server.mcp.main import get_node
+        mock_mcp_client.get_node.return_value = [
+            {"id": "n1", "label": "RLHF", "node_type": "concept"},
+        ]
+        result = get_node(id="n1")
+        assert isinstance(result, list)
+        assert result[0]["label"] == "RLHF"
+        mock_mcp_client.get_node.assert_called_once_with("n1")
+
+    def test_get_node_not_found(self, mock_mcp_client):
+        from server.mcp.main import get_node
+        mock_mcp_client.get_node.return_value = []
+        result = get_node(id="nonexistent")
+        assert result == []
+
+
+class TestGetNeighbors:
+    """Tests for the get_neighbors MCP tool."""
+
+    def test_get_neighbors_with_edges(self, mock_mcp_client):
+        from server.mcp.main import get_neighbors
+        mock_mcp_client.get_neighbors.return_value = [
+            {"edge_id": "e1", "source_node_id": "n1", "target_node_id": "n2", "relationship": "related_to"},
+            {"edge_id": "e2", "source_node_id": "n1", "target_node_id": "n3", "relationship": "informed_by"},
+        ]
+        result = get_neighbors(node_id="n1")
+        assert len(result) == 2
+        assert result[0]["relationship"] == "related_to"
+        mock_mcp_client.get_neighbors.assert_called_once_with("n1")
+
+    def test_get_neighbors_empty(self, mock_mcp_client):
+        from server.mcp.main import get_neighbors
+        mock_mcp_client.get_neighbors.return_value = []
+        result = get_neighbors(node_id="lonely")
+        assert result == []
+
+
+class TestGetCommunity:
+    """Tests for the get_community MCP tool."""
+
+    def test_get_community_with_nodes(self, mock_mcp_client):
+        from server.mcp.main import get_community
+        mock_mcp_client.get_community.return_value = {
+            "community_id": 1,
+            "nodes": [{"id": "n1", "label": "A"}, {"id": "n2", "label": "B"}],
+        }
+        result = get_community(community_id=1)
+        assert result["community_id"] == 1
+        assert len(result["nodes"]) == 2
+        mock_mcp_client.get_community.assert_called_once_with(1)
+
+    def test_get_community_empty(self, mock_mcp_client):
+        from server.mcp.main import get_community
+        mock_mcp_client.get_community.return_value = {"community_id": 99, "nodes": []}
+        result = get_community(community_id=99)
+        assert result["nodes"] == []
+
+
+class TestQueryGraph:
+    """Tests for the query_graph MCP tool."""
+
+    def test_query_graph_with_results(self, mock_mcp_client):
+        from server.mcp.main import query_graph
+        mock_mcp_client.query_graph.return_value = [
+            {"id": "n1", "label": "Python", "node_type": "concept"},
+            {"id": "n2", "label": "Rust", "node_type": "concept"},
+        ]
+        result = query_graph(workspace_id="ws1", query="language")
+        assert len(result) == 2
+        assert result[0]["label"] == "Python"
+        mock_mcp_client.query_graph.assert_called_once_with("ws1", "language")
+
+    def test_query_graph_empty(self, mock_mcp_client):
+        from server.mcp.main import query_graph
+        mock_mcp_client.query_graph.return_value = []
+        result = query_graph(workspace_id="ws1", query="nonexistent")
+        assert result == []
+
+    def test_query_graph_default_query(self, mock_mcp_client):
+        from server.mcp.main import query_graph
+        mock_mcp_client.query_graph.return_value = []
+        result = query_graph(workspace_id="ws1")
+        assert result == []
+        mock_mcp_client.query_graph.assert_called_once_with("ws1", "")
+
+
+# ── Graph computation tools (shortest_path, graph_bfs, pagerank, community_hierarchy) ──
+
+
+class TestShortestPath:
+    """Tests for the shortest_path MCP tool."""
+
+    def test_shortest_path_calls_client(self, mock_mcp_client):
+        from server.mcp.main import shortest_path
+        result = shortest_path(
+            workspace_id="ws1",
+            source_id="n1",
+            target_id="n5",
+            max_hops=6,
+        )
+        assert "Shortest path computed" in result
+        mock_mcp_client.shortest_path.assert_called_once_with("ws1", "n1", "n5", 6)
+
+    def test_shortest_path_custom_hops(self, mock_mcp_client):
+        from server.mcp.main import shortest_path
+        result = shortest_path(
+            workspace_id="ws1",
+            source_id="a",
+            target_id="b",
+            max_hops=3,
+        )
+        assert "Shortest path computed" in result
+        mock_mcp_client.shortest_path.assert_called_once_with("ws1", "a", "b", 3)
+
+
+class TestGraphBFS:
+    """Tests for the graph_bfs MCP tool."""
+
+    def test_bfs_calls_client(self, mock_mcp_client):
+        from server.mcp.main import graph_bfs
+        result = graph_bfs(workspace_id="ws1", start_node_id="n1", max_depth=3)
+        assert "BFS from n1" in result
+        assert "depth 3" in result
+        mock_mcp_client.graph_bfs.assert_called_once_with("ws1", "n1", 3)
+
+    def test_bfs_custom_depth(self, mock_mcp_client):
+        from server.mcp.main import graph_bfs
+        result = graph_bfs(workspace_id="ws1", start_node_id="root", max_depth=5)
+        assert "BFS from root" in result
+        mock_mcp_client.graph_bfs.assert_called_once_with("ws1", "root", 5)
+
+
+class TestComputePagerank:
+    """Tests for the compute_pagerank MCP tool."""
+
+    def test_pagerank_with_results(self, mock_mcp_client):
+        from server.mcp.main import compute_pagerank
+        mock_mcp_client._sql.return_value = [
+            {"node_id": "n1", "rank": 0.95},
+            {"node_id": "n2", "rank": 0.80},
+        ]
+        result = compute_pagerank(workspace_id="ws1", damping=0.85, max_iterations=100)
+        import json as _json
+        parsed = _json.loads(result)
+        assert len(parsed) == 2
+        assert parsed[0]["rank"] == 0.95
+        mock_mcp_client.compute_pagerank.assert_called_once_with("ws1", 0.85, 100)
+
+    def test_pagerank_empty(self, mock_mcp_client):
+        from server.mcp.main import compute_pagerank
+        mock_mcp_client._sql.return_value = []
+        result = compute_pagerank(workspace_id="ws1")
+        import json as _json
+        parsed = _json.loads(result)
+        assert parsed == []
+
+    def test_pagerank_default_params(self, mock_mcp_client):
+        from server.mcp.main import compute_pagerank
+        mock_mcp_client._sql.return_value = []
+        compute_pagerank(workspace_id="ws1")
+        mock_mcp_client.compute_pagerank.assert_called_once_with("ws1", 0.85, 100)
+
+
+class TestComputeCommunityHierarchy:
+    """Tests for the compute_community_hierarchy MCP tool."""
+
+    def test_hierarchy_with_results(self, mock_mcp_client):
+        from server.mcp.main import compute_community_hierarchy
+        mock_mcp_client._sql.side_effect = [
+            [  # edges
+                {"edge_id": "e1", "depth": 0},
+                {"edge_id": "e2", "depth": 1},
+            ],
+            [  # clusters
+                {"cluster_id": "c1", "depth": 0},
+            ],
+        ]
+        result = compute_community_hierarchy(workspace_id="ws1")
+        import json as _json
+        parsed = _json.loads(result)
+        assert "edges" in parsed
+        assert "clusters" in parsed
+        assert len(parsed["edges"]) == 2
+        assert len(parsed["clusters"]) == 1
+        mock_mcp_client.compute_community_hierarchy.assert_called_once_with("ws1")
+
+    def test_hierarchy_empty(self, mock_mcp_client):
+        from server.mcp.main import compute_community_hierarchy
+        mock_mcp_client._sql.return_value = []
+        result = compute_community_hierarchy(workspace_id="ws1")
+        import json as _json
+        parsed = _json.loads(result)
+        assert parsed["edges"] == []
+        assert parsed["clusters"] == []
+
+    def test_hierarchy_calls_sql_twice(self, mock_mcp_client):
+        from server.mcp.main import compute_community_hierarchy
+        mock_mcp_client._sql.return_value = []
+        compute_community_hierarchy(workspace_id="ws1")
+        assert mock_mcp_client._sql.call_count == 2

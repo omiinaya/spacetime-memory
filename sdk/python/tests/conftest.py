@@ -356,6 +356,21 @@ def mock_compounder():
 
 
 @pytest.fixture
+def mock_mcp_client():
+    """Mock ``get_client()`` in MCP tools for testing graph/pagerank tools.
+
+    Patches ``server.mcp.main.get_client`` so MCP tools that call
+    ``get_client().<method>()`` get a MagicMock.  Tests can set return
+    values and assert calls on ``get_client().<method>`` via the yielded
+    instance.
+    """
+    with patch("server.mcp.main.get_client") as mock_fn:
+        instance = MagicMock()
+        mock_fn.return_value = instance
+        yield instance
+
+
+@pytest.fixture
 def cli_mock_client():
     """Return a real Client with mocked HTTP for CLI testing.
 
