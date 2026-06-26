@@ -10,94 +10,123 @@ and works the top pending item each tick.
 
 ---
 
-## Pending
-
-### Fix stale WASM binary causing test_get_memory_history failure
-The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
-is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
-whitelist. `test_get_memory_history` fails against the real STDB server.
-Fix: rebuild WASM module (requires cargo build, currently blocked by OOM).
-Files: server/spacetimedb/src/query.rs
-Difficulty: Medium (needs cargo build)
-Est: N/A (blocked)
-
----
-
-## Recently Completed
-
-### ✅ Add document CRUD MCP tools (Jul 2)
-Added 5 MCP tools for document management: create_document, get_document,
-list_documents, get_document_chunks, delete_document. Covers the full
-document lifecycle for the LLM Wiki workflow (Supermemory parity).
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 8min
-Test: 2173/2173 unit tests passing
-
-### ✅ Add note CRUD MCP tools (Jun 26)
-Added 9 MCP tools for note management: create_note, get_note, update_note,
-delete_note, list_notes, get_note_by_title, get_note_history, get_backlinks,
-get_outgoing_links. Covers the full LLM Wiki note workflow (AGENTS.md).
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 12min
-Test: 155/155 unit tests passing
-
-### ✅ Add `get_memory_history` MCP tool (Jun 26)
-Added `get_memory_history` MCP tool wrapping `Client.get_memory_history()`.
-Returns revision history ordered by version ascending, with current state
-appended as final entry.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-
-### ✅ Add `update_memory` MCP tool (Jun 26)
-Added `update_memory` MCP tool wrapping `Client.update_memory()`.
-Accepts memory_id, content, summary, confidence. Non-empty/non-zero fields
-are updated; empty strings leave fields unchanged.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-
-### ✅ Add `delete_memory` MCP tool (Jun 26)
-Added `delete_memory` MCP tool wrapping `Client.delete_memory()`.
-Hard-deletes a memory by its ID.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-
-### ✅ Add `entity_types`/`before`/`after` params to MCP search tools (Jun 26)
-Added `entity_types` (list[str]), `before` (float), and `after` (float) parameters
-to both `search_memories` and `hybrid_search` MCP tools, matching the SDK
-`Client.search()` signature.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-
-### ✅ Add `find_near_duplicates` MCP tool (Jun 26)
-Added `find_near_duplicates` MCP tool wrapping the Compounder method. Accepts
-`content`, `workspace_id`, `threshold` (default 0.92), `limit` (default 5).
-Returns formatted list of near-duplicate candidates with entity type, ID, score,
-and content snippet.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 8min
-
-### ✅ Add `cross_link` and `suggest_connections` MCP tools (Jun 26)
-Both tools already existed in `server/mcp/main.py` but had field-name mismatches
-with the Compounder return types:
-- `cross_link` read `result["edges_created"]` but compounder returns `links_created`.
-- `suggest_connections` did `result.get("suggestions", [])` on a list (AttributeError),
-  and used wrong field names (`source`/`target`/`score` instead of
-  `source_label`/`target_label`/`common_count`).
-- Both fixed to use correct compounder return field names.
-- Files: server/mcp/main.py
-- Difficulty: Easy
-- Est: 10min
-
----
-
-## Deferred / Blocked
+|## Pending
+|
+|### Fix stale WASM binary causing test_get_memory_history failure
+|The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
+|is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
+|whitelist. `test_get_memory_history` fails against the real STDB server.
+|Fix: rebuild WASM module (requires cargo build, currently blocked by OOM).
+|Files: server/spacetimedb/src/query.rs
+|Difficulty: Medium (needs cargo build)
+|Est: N/A (blocked)
+|
+|### Add `export_workspace` MCP tool
+|`export_workspace` is documented in AGENTS.md as available via CLI but has no
+|MCP tool wrapper. Add MCP tool wrapping `Compounder.export_workspace()` to
+|export wiki as markdown files for Obsidian/git.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 5min
+|
+|### Add `delete_workspace` MCP tool
+|`Client.delete_workspace()` has no MCP wrapper. Add simple MCP tool for
+|workspace deletion.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 3min
+|
+|### Add `store_batch` MCP tool
+|`Client.store_batch()` has no MCP wrapper. Add tool for batch memory storage
+|with JSON items input.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 5min
+|
+|### Add `fuzzy_get` MCP tool
+|`Client.fuzzy_get()` has no MCP wrapper. Add tool for fuzzy matching by field
+|content with difflib SequenceMatcher.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 5min
+|
+|### Add `detect_patterns` MCP tool
+|`Client.detect_patterns()` has no MCP wrapper. Add tool for temporal clustering,
+|term extraction, and co-occurrence detection.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 5min
+|
+|### Add `get_note_by_date` MCP tool
+|`Client.get_note_by_date()` has no MCP wrapper. Add tool to look up notes by
+|ISO-8601 date string.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 3min
+|
+|---
+|
+|## Recently Completed
+|
+|### ✅ Add `export_workspace` MCP tool (Jun 26)
+|Added `export_workspace` MCP tool wrapping `Compounder.export_workspace()`.
+|Exports wiki notes as markdown files with YAML frontmatter for Obsidian/git.
+|Supports include_kg and include_system_notes flags.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 5min
+|Test: 58/58 MCP tests passing
+|
+|### ✅ Add document CRUD MCP tools (Jul 2)
+|Added 5 MCP tools for document management: create_document, get_document,
+|list_documents, get_document_chunks, delete_document. Covers the full
+|document lifecycle for the LLM Wiki workflow (Supermemory parity).
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 8min
+|Test: 2173/2173 unit tests passing
+|
+|### ✅ Add note CRUD MCP tools (Jun 26)
+|Added 9 MCP tools for note management: create_note, get_note, update_note,
+|delete_note, list_notes, get_note_by_title, get_note_history, get_backlinks,
+|get_outgoing_links. Covers the full LLM Wiki note workflow (AGENTS.md).
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 12min
+|Test: 155/155 unit tests passing
+|
+|### ✅ Add `entity_types`/`before`/`after` params to MCP search tools (Jun 26)
+|Added `entity_types` (list[str]), `before` (float), and `after` (float) parameters
+|to both `search_memories` and `hybrid_search` MCP tools, matching the SDK
+|`Client.search()` signature.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 10min
+|
+|### ✅ Add `find_near_duplicates` MCP tool (Jun 26)
+|Added `find_near_duplicates` MCP tool wrapping the Compounder method. Accepts
+|`content`, `workspace_id`, `threshold` (default 0.92), `limit` (default 5).
+|Returns formatted list of near-duplicate candidates with entity type, ID, score,
+|and content snippet.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 8min
+|
+|### ✅ Add `cross_link` and `suggest_connections` MCP tools (Jun 26)
+|Both tools already existed in `server/mcp/main.py` but had field-name mismatches
+|with the Compounder return types:
+|- `cross_link` read `result["edges_created"]` but compounder returns `links_created`.
+|- `suggest_connections` did `result.get("suggestions", [])` on a list (AttributeError),
+|  and used wrong field names (`source`/`target`/`score` instead of
+|  `source_label`/`target_label`/`common_count`).
+|- Both fixed to use correct compounder return field names.
+|- Files: server/mcp/main.py
+|- Difficulty: Easy
+|- Est: 10min
+|
+|---|
+|
+|## Deferred / Blocked
 
 ### STDB 2% fatal error under heavy concurrent load
 **uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use

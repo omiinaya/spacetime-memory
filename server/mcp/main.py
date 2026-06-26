@@ -1840,6 +1840,48 @@ def store_answers_batch(
     )
 
 
+@mcp.tool()
+@require_api_key
+def export_workspace(
+    output_dir: str,
+    workspace_id: str = "default",
+    include_kg: bool = False,
+    include_system_notes: bool = False,
+) -> str:
+    """Export all notes in a workspace as markdown files with YAML frontmatter.
+
+    Generates one ``.md`` file per note, using the note title as the filename.
+    Output is ready for Obsidian or git-based wiki browsing.
+
+    Args:
+        output_dir: Directory to write markdown files into.
+        workspace_id: Target workspace (default: "default").
+        include_kg: Also export KG node summaries as markdown.
+        include_system_notes: Include ``_index`` and ``_log`` notes.
+
+    Returns:
+        Summary string with files written and output directory.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    result = cp.export_workspace(
+        output_dir=output_dir,
+        workspace_id=workspace_id,
+        include_kg=include_kg,
+        include_system_notes=include_system_notes,
+    )
+    files_written = result.get("files_written", 0)
+    out_dir = result.get("output_dir", output_dir)
+    errors = result.get("errors", [])
+    summary = f"Exported {files_written} file(s) to {out_dir}"
+    if errors:
+        summary += f"\n  Errors: {len(errors)}"
+        for e in errors[:5]:
+            summary += f"\n    - {e}"
+    return summary
+
+
 # ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
