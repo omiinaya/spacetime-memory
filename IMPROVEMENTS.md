@@ -21,21 +21,6 @@ and works the top pending item each tick.
 |Difficulty: Medium (needs cargo build)
 |Est: N/A (blocked)
 |
-|### Add `export_workspace` MCP tool
-|`export_workspace` is documented in AGENTS.md as available via CLI but has no
-|MCP tool wrapper. Add MCP tool wrapping `Compounder.export_workspace()` to
-|export wiki as markdown files for Obsidian/git.
-|Files: server/mcp/main.py
-|Difficulty: Easy
-|Est: 5min
-|
-|### Add `delete_workspace` MCP tool
-|`Client.delete_workspace()` has no MCP wrapper. Add simple MCP tool for
-|workspace deletion.
-|Files: server/mcp/main.py
-|Difficulty: Easy
-|Est: 3min
-|
 |### Add `store_batch` MCP tool
 |`Client.store_batch()` has no MCP wrapper. Add tool for batch memory storage
 |with JSON items input.
@@ -64,9 +49,16 @@ and works the top pending item each tick.
 |Difficulty: Easy
 |Est: 3min
 |
-|---
-|
+|---|
+
 |## Recently Completed
+
+|### ✅ Add `delete_workspace` MCP tool (Jul 6)
+|Added `delete_workspace` MCP tool wrapping `Client.delete_workspace()`.
+|Simple workspace deletion via MCP.
+|Files: server/mcp/main.py
+|Difficulty: Easy
+|Est: 3min
 |
 |### ✅ Add `export_workspace` MCP tool (Jun 26)
 |Added `export_workspace` MCP tool wrapping `Compounder.export_workspace()`.
@@ -281,6 +273,18 @@ Difficulty: Hard (needs live STDB)
 
 ### Jun 26 — entity_types filter implemented; 2 PENDING items remain
 
-### Jun 26 — Doc-tests added to compilation-critical Rust modules
+|### Jun 26 — Doc-tests added to compilation-critical Rust modules
+|
+|### Jun 26 — Entity-link alias boosting done; keyword-fallback boosting gap found
 
-### Jun 26 — Entity-link alias boosting done; keyword-fallback boosting gap found
+### Jul 6 — `delete_workspace` MCP tool added; 4 remaining MCP gaps
+- **MCP tools audit**: `delete_workspace` (Client) now has an MCP tool wrapper.
+- **Research**:
+  - spacetimedb-sdk v0.7.0 (unchanged).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps remaining**: 4 `Client` methods still missing MCP wrappers:
+  - `store_batch`, `fuzzy_get`, `detect_patterns`, `get_note_by_date`.
+- **Backlog**: 5 PENDING items (1 stale WASM blocked + 4 MCP gaps).

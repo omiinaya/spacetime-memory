@@ -222,6 +222,20 @@ def list_workspaces() -> list[dict[str, Any]]:
     return get_client().list_workspaces()
 
 
+@mcp.tool()
+@require_api_key
+def delete_workspace(workspace_id: str) -> dict[str, Any]:
+    """Delete a workspace and all its data.
+
+    Args:
+        workspace_id: The ID of the workspace to delete.
+
+    Returns:
+        Dict with status and workspace ID.
+    """
+    return get_client().delete_workspace(workspace_id)
+
+
 # ---------------------------------------------------------------------------
 # Memory tools
 # ---------------------------------------------------------------------------
