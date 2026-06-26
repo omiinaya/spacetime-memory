@@ -8,26 +8,34 @@ and works the top pending item each tick.
 
 | Status: PENDING
 
-### Add unit tests for `_make_snippet()`
-The `_make_snippet()` function (word-boundary text truncation) is currently
-untested as a pure function. Add unit tests covering: short text (no truncation),
-exact boundary, truncation at word boundary, empty/None input, very long text,
-single-word content (no space to break on).
-Files: sdk/python/tests/test_client.py
+### Add CLI flag for JSON output format in search results
+The `stmem search` command currently only outputs a human-readable table format.
+Add `--output json` (or `-o json`) flag to emit JSON-formatted search results,
+making it easier for programmatic consumers (scripts, pipes) to consume search
+output without parsing the table format.
+Files: cli/stmem.py
 Difficulty: Easy
-Est: 10min
+Est: 15min
+
+### Add `--from`/`--to` date range filter to CLI search
+The SDK `search()` supports `before`/`after` timestamp parameters, but the CLI
+`stmem search` command doesn't expose them. Add `--from` and `--to` CLI flags to
+pass `before`/`after` through to the SDK.
+Files: cli/stmem.py
+Difficulty: Easy
+Est: 15min
 
 ---
 
 ## Recently Completed
 
-### ✅ Add `--snippet` flag to `stmem search` CLI output (Jun 27)
-Added `--snippet`/`-s` flag to the `stmem search` command. When set, replaces
-verbose `memory_content` and `content` columns with the `snippet` preview
-(~200 chars, word-boundary truncated) in table output. Works with both
-semantic and keyword-fallback search paths.
-Commit: e0ff612
-Files: cli/stmem.py
+### ✅ Add unit tests for `_make_snippet()` (Jun 27)
+Added 10 unit tests for the word-boundary text truncation function covering:
+short text (no truncation), exact boundary, word-boundary truncation, hard cut
+on single-word content, empty/None falsy input, custom max_chars, very long
+text, and trailing whitespace stripping.
+Commit: 137ca81
+Files: sdk/python/tests/test_client.py
 Difficulty: Easy
 Est: 10min
 
@@ -150,6 +158,24 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jun 27 — Unit tests for _make_snippet() completed; 2 new PENDING items added
+- **_make_snippet unit tests**: 10 tests added covering all edge cases (short
+  text, exact boundary, word-boundary truncation, hard cut for single-word,
+  empty/None, custom max_chars, very long text, trailing whitespace stripping).
+- **Commit**: 137ca81 — 1 file (+83 lines), all 155 client tests passing.
+- **Research**:
+  - STDB crate v2.6.0 (unchanged), spacetimedb-sdk v0.7.0 (unchanged).
+  - mem0ai v2.0.8 (installed 2.0.7) — no new features relevant to our module.
+  - langgraph v1.2.6 (unchanged).
+  - opentelemetry-sdk: installed 1.37.0, latest 1.43.0 (+6 minor versions).
+    No breaking changes or new patterns to adopt in the 1.37→1.43 range;
+    the current graceful-degradation pattern is solid. No upgrade urgency.
+  - No new competitor features detected (mem0, langgraph, zep).
+- **New PENDING items**: 
+  - `--output json` flag for `stmem search` (programmatic consumption)
+  - `--from`/`--to` date range filter for `stmem search` (CLI parity with SDK)
+- **Tests**: 155 client tests all passing.
 
 ### Jun 27 — Snippet preview in search results + --snippet CLI flag
 - **Snippet extraction**: Added `_make_snippet()` — word-boundary truncation at
