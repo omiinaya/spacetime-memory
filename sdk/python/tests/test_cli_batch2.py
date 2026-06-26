@@ -1127,6 +1127,106 @@ class TestStoreAnswerCLI:
         assert result.exit_code != 0
 
 
+class TestStoreAnswersBatchCLI:
+    """stmem store-answers-batch"""
+
+    def test_store_answers_batch_help(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["store-answers-batch", "--help"])
+        assert result.exit_code == 0
+        assert "Batch" in result.output or "pairs" in result.output
+
+    def test_store_answers_batch_valid_pairs(self, mocked_cli_runner, monkeypatch):
+        runner, mock_client = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch", "-w", "test",
+            "-p", '[["What is X?", "X is Y."], ["What is Z?", "Z is W."]]',
+        ])
+        assert result.exit_code == 0
+
+    def test_store_answers_batch_empty_list(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-p", "[]",
+        ])
+        assert result.exit_code == 0
+
+    def test_store_answers_batch_single_pair(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-p", '[["Q1", "A1"]]',
+        ])
+        assert result.exit_code == 0
+
+    def test_store_answers_batch_invalid_json(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-p", "not valid json",
+        ])
+        assert result.exit_code == 1
+        assert "Invalid JSON" in result.output
+
+    def test_store_answers_batch_not_a_list(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-p", '"just a string"',
+        ])
+        assert result.exit_code == 1
+        assert "Pairs must be" in result.output
+
+    def test_store_answers_batch_wrong_structure(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-p", "[1, 2, 3]",
+        ])
+        assert result.exit_code == 1
+        assert "Pairs must be" in result.output
+
+    def test_store_answers_batch_with_workspace(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-w", "custom_ws",
+            "-p", '[["Q", "A"]]',
+        ])
+        assert result.exit_code == 0
+
+    def test_store_answers_batch_with_source_ids(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-p", '[["Q", "A"]]',
+            "-s", "mem1,mem2,mem3",
+        ])
+        assert result.exit_code == 0
+
+    def test_store_answers_batch_file_input(self, mocked_cli_runner, tmp_path):
+        runner, _ = mocked_cli_runner
+        pairs_file = tmp_path / "pairs.json"
+        pairs_file.write_text('[["Q1", "A1"], ["Q2", "A2"]]')
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-p", "[[ignored]]",  # --pairs is required, value overwritten by --file
+            "-f", str(pairs_file),
+        ])
+        assert result.exit_code == 0
+
+    def test_store_answers_batch_file_not_found(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, [
+            "store-answers-batch",
+            "-p", "[[ignored]]",
+            "-f", "/nonexistent/pairs.json",
+        ])
+        assert result.exit_code == 1
+        assert "File not found" in result.output
+
+
 class TestEntityPageCLI:
     """stmem entity-page"""
 
