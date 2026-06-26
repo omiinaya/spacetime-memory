@@ -15,14 +15,41 @@ suggest-connections → export). Add a test that runs the full pipeline.
 Difficulty: Medium
 Est: 1h
 
-### Add memory versioning/history tracking (inspired by mem0 v2.0.4 `history`)
-mem0 v2.0.4 supports per-memory change history tracking. The current
+### Add memory versioning/history tracking (inspired by mem0 v3 `history`)
+mem0 v2.0.8 (v3) supports per-memory change history tracking. The current
 spacetime-memory system only has `_log_activity` for workspace-wide
 audit tracking. Adding per-memory revision history (via an STDB
 `memory_revision` table + reducer) would enable undo, diff, and
 audit at the individual memory level.
 Difficulty: Medium
 Est: 1-2h
+
+### Add scheduled workspace maintenance via STDB `#[procedure]`
+STDB v2.5+ stabilized `#[spacetimedb::procedure]` for scheduled,
+transaction-capable server-side functions. The module currently has
+no `init` function or scheduled tasks. Adding a procedure for
+periodic cross-linking, decay, or lint would reduce reliance on
+external cron and improve consistency.
+Difficulty: Medium
+Est: 2h
+
+### Add near-duplicate memory detection on store
+When similar content is stored multiple times (e.g., same fact
+re-phrased), the system creates duplicate memory entries. Adding
+a lightweight similarity check before insert (using the existing
+hybrid search) with a configurable threshold would prevent
+duplication at write time.
+Difficulty: Easy
+Est: 30min
+
+### Add entity-aware search result boosting (inspired by mem0 v3)
+mem0 v3's multi-signal retrieval fuses semantic, BM25, and entity
+signals. The current search pipeline does hybrid search (semantic +
+BM25) but has no entity-aware boosting at query time. Add a step
+that detects entities in the query and boosts results matching
+those entities (KG node labels/summaries).
+Difficulty: Easy
+Est: 30min
 
 ---
 

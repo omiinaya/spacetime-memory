@@ -204,12 +204,13 @@ class Compounder:
         content = self._format_answer_page(query, answer, source_memory_ids)
 
         # 1. Create the note
-        note = self._client.create_note(
+        raw = self._client.create_note(
             workspace_id=workspace_id,
             title=generated_title,
             content=content,
             embed=embed,
         )
+        note = self._resolve_created_note(workspace_id, generated_title, raw)
 
         result: dict[str, Any] = {"note": note, "entities": [], "links": []}
 
@@ -518,6 +519,38 @@ class Compounder:
         # Otherwise use first line of answer
         first_line = answer.strip().split("\n")[0]
         return first_line[:80].rstrip("?.")
+
+    def _resolve_created_note(
+        self,
+        workspace_id: str,
+        title: str,
+        create_result: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Resolve the full note record after creation.
+
+        The ``create_note`` reducer returns ``{"status": "ok"}``, not the
+        note data.  This helper queries the note back by title so callers
+        get the real note dict with ``id``, ``created_at``, etc.
+
+        Falls back to returning the original result if the query fails.
+        """
+        if create_result.get("status") == "ok" and title:
+            try:
+                matches = self._client.get_note_by_title(title)
+                if matches:
+                    return matches[0]
+                # Fallback: scan recent notes
+                all_notes = self._client._query(
+                    "note", workspace_id=workspace_id, filter_dict={},
+                )
+                for n in sorted(
+                    all_notes, key=lambda r: r.get("created_at", 0), reverse=True
+                ):
+                    if n.get("title", "") == title:
+                        return n
+            except RuntimeError:
+                pass
+        return create_result
 
     def _format_answer_page(
         self,
@@ -1098,6 +1131,14 @@ class Compounder:
             embed=embed,
         )
         result["note"] = note
+
+        # If create_note only returned status, resolve the full record
+        if not note.get("id"):
+            resolved = self._resolve_created_note(
+                workspace_id, f"Source: {source_title}", note,
+            )
+            note = resolved
+            result["note"] = resolved
 
         # 2. Extract entities and create KG nodes
         if self._llm.available:
