@@ -46,6 +46,19 @@ mentions no known entities and have no KG connections.
 Difficulty: Medium
 Est: 30min
 
+### ✅ Use entity_link aliases in entity-aware boosting (Jun 26)
+The `_boost_with_entity_signal` method now also fetches entity_link records
+alongside KG nodes. When the query matches an entity_link alias (e.g.
+"reinforcement learning from human feedback" → canonical "RLHF"), the
+canonical name AND all aliases are checked against result content for
+proportional boosting. Both KG node labels and entity_link aliases contribute
+to the entity-hit count. Graceful degradation if entity_link table is
+unavailable.
+Commit: c907187
+Files: sdk/python/spacetime_memory/client.py, sdk/python/tests/test_client.py
+Difficulty: Easy
+Est: 20min
+
 ---
 
 ## Recently Completed
