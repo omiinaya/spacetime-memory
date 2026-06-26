@@ -1157,6 +1157,41 @@ def create_concept_page(
 
 @mcp.tool()
 @require_api_key
+def create_comparison_page(
+    title: str,
+    items: str,
+    workspace_id: str = "default",
+    criteria: str = "features,performance,ecosystem",
+) -> str:
+    """Create a comparison wiki page with markdown table.
+
+    Creates a note with YAML frontmatter (type: comparison) and a
+    markdown comparison table of the given items across specified
+    criteria.
+
+    Args:
+        title: Page title (e.g. \"LangGraph vs CrewAI vs AutoGen\").
+        items: Comma-separated list of items to compare.
+        workspace_id: Target workspace.
+        criteria: Comma-separated comparison criteria.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    item_list = [i.strip() for i in items.split(",") if i.strip()]
+    crit_list = [c.strip() for c in criteria.split(",") if c.strip()]
+    cp = Compounder(get_client())
+    result = cp.create_comparison_page(
+        title=title,
+        items=item_list,
+        workspace_id=workspace_id,
+        criteria=crit_list,
+    )
+    note_id = result.get("note", {}).get("id", "")[:16]
+    return f"Comparison page '{title}' created with {len(item_list)} items (note: {note_id}...)"
+
+
+@mcp.tool()
+@require_api_key
 def lint_workspace(
     workspace_id: str = "default",
     check_contradictions: bool = False,

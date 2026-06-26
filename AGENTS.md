@@ -160,6 +160,7 @@ automatically available without importing the SDK:
 | `ingest_source` | Full LLM Wiki ingest: summarize, extract entities, create KG nodes, link, ripple, check contradictions |
 | `create_entity_page` | Create entity wiki page + KG node with YAML frontmatter |
 | `create_concept_page` | Create concept definition page with [[wiki-links]] |
+| `create_comparison_page` | Create comparison page with markdown table |
 | `lint_workspace` | Health-check: orphans, missing crossrefs, contradictions |
 | `generate_overview` | Generate workspace overview/synthesis page |
 | `store_answer` | Persist an LLM answer as a wiki page |
