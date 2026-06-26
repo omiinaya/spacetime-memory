@@ -8,30 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Track STDB UniqueColumn::update() deprecation
-**RESOLVED: UniqueColumn::update() is NOT deprecated in STDB v2.6.0.**  
-Source code review of STDB 2.6.0 confirms that `update()` on `UniqueColumn` is
-still the standard upsert mechanism. No deprecation warning or removal
-notice exists. Item kept for periodic re-check but moved to low priority.
-Files: server/spacetimedb/src/*.rs (50+ call sites)
-Difficulty: Easy (tracking)
-Est: 0.5h
-Status: Research complete — no action needed
-
-### Fix non-standard UUID format (8-4-4-4-8 → standard 8-4-4-4-12)
-Discovered during unit test work: `format_uuid_v4()` produces a legacy
-28-hex-char UUID (8-4-4-4-8, 112 bits) instead of the standard 32-hex-char
-format (8-4-4-4-12, 128 bits). The upper 4 hex digits from `high` are
-unused. The new `uuid_v7()` function in lib.rs outputs standard format
-via `ctx.new_uuid_v7().to_string()`. The legacy `format_uuid_v4()` still
-has this quirk but is now only used by the original `uuid_v4()` path.
-
-Status: Addressed for UUID v7 path. Legacy v4 path still non-standard.
-Requires data migration to fix existing stored UUIDs.
-Files: server/spacetimedb/src/lib.rs
-Difficulty: Medium
-Est: 1h (plus migration planning)
-
 ### STDB 2% fatal error under heavy concurrent load (deferred for live STDB)
 **uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use
 collision-retry. The remaining ~2% fatal errors appear to be a STDB-level
@@ -42,9 +18,25 @@ Files: server/spacetimedb/src/lib.rs, tests/concurrent/
 Difficulty: Hard (needs live STDB)
 Est: N/A (blocked)
 
+### Track STDB UniqueColumn::update() deprecation
+**RESOLVED: UniqueColumn::update() is NOT deprecated in STDB v2.6.0.**  
+Source code review of STDB 2.6.0 confirms that `update()` on `UniqueColumn` is
+still the standard upsert mechanism. No deprecation warning or removal
+notice exists. Item kept for periodic re-check but moved to low priority.
+Files: server/spacetimedb/src/*.rs (50+ call sites)
+Difficulty: Easy (tracking)
+Est: 0.5h
+Status: Research complete — no action needed
+
 ---
 
 ## Recently Completed
+
+### ✅ format_uuid_v4() now outputs standard 32-hex-char UUID (Jun 25)
+Previously `format_uuid_v4()` produced a non-standard 28-hex-char format
+(8-4-4-4-8, 112 bits) where the upper 4 hex digits from the `high` u64
+were discarded. Now produces standard RFC 4122 v4 UUIDs (8-4-4-4-12, 128 bits).
+Commit: 5c98d30
 
 ### ✅ Knowledge Compounder — all 7 patterns implemented (Jun 25)
 Compounder operations now use real reducers (``create_edge``, ``update_node``).
@@ -105,22 +97,6 @@ Extracted pure computation helpers (`format_uuid_v4`, `micros_from_timestamp`,
 `compute_expires_at`) from context-dependent functions and added 21 tests.
 All 156 unit tests pass. WASM build check passes.
 Commits: 7bb4ff3
-
-### ✅ STDB dependency upgrade 2.4 → 2.6 (Jun 24)
-Commit: d1d147f
-
-### ✅ OpenTelemetry / observability integration (Jun 24)
-P0: Python SDK + P1: Rust server module.
-Commits: 5398f8f, 54fe3ab
-
-### ✅ Observability test fix — OTel cache pollution (Jun 24)
-Commit: 91f1861
-
-### ✅ .env stale config cleanup (Jun 24)
-Commit: ec81a0b
-
-### ✅ PyPI publish pipeline (Jun 24)
-Commit: e1ba6fe
 
 ---
 
