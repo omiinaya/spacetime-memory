@@ -26,15 +26,6 @@ external cron and improve consistency.
 Difficulty: Medium
 Est: 2h
 
-### Add near-duplicate memory detection on store
-When similar content is stored multiple times (e.g., same fact
-re-phrased), the system creates duplicate memory entries. Adding
-a lightweight similarity check before insert (using the existing
-hybrid search) with a configurable threshold would prevent
-duplication at write time.
-Difficulty: Easy
-Est: 30min
-
 ### Add entity-aware search result boosting (inspired by mem0 v3)
 mem0 v3's multi-signal retrieval fuses semantic, BM25, and entity
 signals. The current search pipeline does hybrid search (semantic +
@@ -47,6 +38,18 @@ Est: 30min
 ---
 
 ## Recently Completed
+
+### ✅ Add near-duplicate memory detection on store (Jun 26)
+Added `find_near_duplicates()` method to Compounder that uses the
+existing hybrid search pipeline with a configurable threshold (default
+0.92) to detect semantically similar content before creating new notes.
+Integrated into `store_answer()` and `store_answers()` via new
+`skip_duplicates=True` and `duplicate_threshold=0.92` parameters.
+When a near-duplicate is found, the method returns early with a
+`duplicate_of` key instead of creating a new note. 10 new tests added.
+Files: sdk/python/spacetime_memory/compounder.py,
+       sdk/python/tests/test_compounder.py
+Commit: 18c994c
 
 ### ✅ Add integration tests for full compounder pipeline (Jun 26)
 Added 17 integration tests covering the full LLM Wiki pipeline tested
@@ -89,12 +92,6 @@ Added 10 unit tests for the `store_answers_batch` MCP tool covering:
 valid batches, empty list, single pair, invalid JSON, wrong structure,
 workspace ID passthrough, source_memory_ids parsing, and no-entities.
 Files: sdk/python/tests/test_mcp.py
-Commit: 37817bc
-
-### ✅ Add cross-link/suggest-connections CLI edge-case tests (Jun 26)
-Added 3 new tests for `cross-link --dry-run`, `suggest-connections --limit 5`,
-and `suggest-connections --json --limit 10` to fill coverage gaps.
-Files: sdk/python/tests/test_cli_batch2.py
 Commit: 37817bc
 
 ---
