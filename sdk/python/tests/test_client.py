@@ -2135,3 +2135,86 @@ class TestSearchEntityTypes:
                 limit=20, entity_types=[],
             )
         assert result == []
+
+
+class TestMakeSnippet:
+    """Tests for the _make_snippet() pure function (word-boundary text truncation)."""
+
+    def test_short_text_no_truncation(self):
+        """Text shorter than max_chars is returned unchanged."""
+        from spacetime_memory.client import _make_snippet
+        text = "Hello world"
+        result = _make_snippet(text, max_chars=200)
+        assert result == "Hello world"
+
+    def test_exact_boundary_no_truncation(self):
+        """Text exactly at max_chars is returned without '...'."""
+        from spacetime_memory.client import _make_snippet
+        text = "A" * 200
+        result = _make_snippet(text, max_chars=200)
+        assert result == "A" * 200
+        assert len(result) == 200
+
+    def test_truncate_at_word_boundary(self):
+        """Long text is truncated at the last space within the first max_chars."""
+        from spacetime_memory.client import _make_snippet
+        # "quick brown fox..." — first 20 chars: "quick brown fox jump"
+        # last space within those 20 is after "fox" (pos 15)
+        text = "quick brown fox jumped over the lazy dog"
+        result = _make_snippet(text, max_chars=20)
+        assert result == "quick brown fox..."
+
+    def test_truncate_no_good_boundary_uses_hard_cut(self):
+        """When no suitable word boundary (space before max_chars//2), use hard cut at max_chars."""
+        from spacetime_memory.client import _make_snippet
+        # "abcdefghijklmnopqrstuvwxyz" — 26 chars, max_chars=10, no space at all
+        text = "abcdefghijklmnopqrstuvwxyz"
+        result = _make_snippet(text, max_chars=10)
+        assert result == "abcdefghij..."
+
+    def test_empty_string_returns_empty(self):
+        """Empty string returns empty string."""
+        from spacetime_memory.client import _make_snippet
+        assert _make_snippet("") == ""
+
+    def test_none_falsy_returns_empty(self):
+        """Falsy input (None, empty) returns empty string."""
+        from spacetime_memory.client import _make_snippet
+        assert _make_snippet(None) == ""  # type: ignore[arg-type]
+        assert _make_snippet("") == ""
+        assert _make_snippet("   ".strip()[:0]) == ""
+
+    def test_custom_max_chars(self):
+        """max_chars parameter controls truncation length."""
+        from spacetime_memory.client import _make_snippet
+        text = "this is a test of the emergency broadcast system"
+        result = _make_snippet(text, max_chars=10)
+        # First 10 chars: "this is a " — last space at pos 9 ("this is a")
+        assert result == "this is a..."
+
+    def test_very_long_text(self):
+        """Very long text (multi-KB) truncates correctly."""
+        from spacetime_memory.client import _make_snippet
+        text = "hello world " * 500  # ~6000 chars
+        result = _make_snippet(text, max_chars=200)
+        assert result.endswith("...")
+        assert len(result) <= 200 + 3  # 200 max + "..." suffix
+        assert " " not in result[:-3].lstrip("...") or result[:-3].endswith(" ") is False
+        # Ensure word-boundary was respected
+        assert result.rstrip(".")  # non-empty
+
+    def test_single_word_no_space(self):
+        """A single unbroken word longer than max_chars uses hard cut."""
+        from spacetime_memory.client import _make_snippet
+        text = "Supercalifragilisticexpialidocious"
+        result = _make_snippet(text, max_chars=10)
+        assert result == "Supercalif..."  # Hard cut at 10 + "..."
+
+    def test_rstrip_trailing_spaces(self):
+        """Trailing whitespace before '...' is stripped."""
+        from spacetime_memory.client import _make_snippet
+        # First 20 chars: "hello world      a" with lots of trailing spaces
+        text = "hello world" + " " * 20 + "this part is after the boundary"
+        result = _make_snippet(text, max_chars=20)
+        # The space at pos 10 is the last space within first 20 chars
+        assert result == "hello world..."
