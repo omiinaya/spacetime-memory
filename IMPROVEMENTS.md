@@ -31,7 +31,7 @@ New `store_answers_batch` MCP tool accepts a JSON string of
 `[[query, answer], ...]` pairs and delegates to `Compounder.store_answers()`.
 Includes input validation with clear error messages.
 Files: server/mcp/main.py
-Commit: (pending)
+Commit: 3a8951d
 
 ### ✅ Add compounder.update_entity_page() method (Jun 25)
 Implemented `Compounder.update_entity_page()` that updates both the KG
