@@ -6,24 +6,9 @@ and works the top pending item each tick.
 
 ---
 
-| Status: PENDING
+|| Status: PENDING
 
-### Add CLI flag for JSON output format in search results
-The `stmem search` command currently only outputs a human-readable table format.
-Add `--output json` (or `-o json`) flag to emit JSON-formatted search results,
-making it easier for programmatic consumers (scripts, pipes) to consume search
-output without parsing the table format.
-Files: cli/stmem.py
-Difficulty: Easy
-Est: 15min
-
-### Add `--from`/`--to` date range filter to CLI search
-The SDK `search()` supports `before`/`after` timestamp parameters, but the CLI
-`stmem search` command doesn't expose them. Add `--from` and `--to` CLI flags to
-pass `before`/`after` through to the SDK.
-Files: cli/stmem.py
-Difficulty: Easy
-Est: 15min
+*(none — all actionable items are complete. Next cron tick will research new opportunities.)*
 
 ---
 
@@ -114,29 +99,18 @@ suitable for doc-tests.
 Commit: a16c187
 Files: server/spacetimedb/src/change_event.rs, server/spacetimedb/src/consolidation.rs
 
-### ✅ Use entity_link aliases in entity-aware boosting (Jun 26)
-The `_boost_with_entity_signal` method now also fetches entity_link records
-alongside KG nodes. When the query matches an entity_link alias (e.g.
-"reinforcement learning from human feedback" → canonical "RLHF"), the
-canonical name AND all aliases are checked against result content for
-proportional boosting. Both KG node labels and entity_link aliases contribute
-to the entity-hit count. Graceful degradation if entity_link table is
-unavailable.
-Commit: c907187
-Files: sdk/python/spacetime_memory/client.py, sdk/python/tests/test_client.py
+### ✅ Add `--from`/`--to` date range filter to CLI search (Jun 28)
+Added `--from` and `--to` flags to `stmem memory search` for filtering results
+by creation date. Accepts ISO-8601 dates (e.g. `2026-06-01`, `2026-06-01T12:00:00Z`)
+or Unix epoch timestamps. SDK `search()` gained `before`/`after` parameters
+that filter results by `created_at` in both semantic hybrid and keyword-fallback
+paths. Also discovered: `--output json` was already available via the global CLI
+`--output` flag (root group, inherited by all subcommands), so the earlier
+PENDING item for JSON output was pre-existing functionality.
+Commit: c13a447
+Files: cli/stmem.py, sdk/python/spacetime_memory/client.py
 Difficulty: Easy
-Est: 20min
-
-### ✅ Add search for wiki notes via the hybrid search pipeline (Jun 26)
-Notes created via `create_note`/`update_note` are now indexed into `search_index`,
-`term_index`, and Tantivy BM25, making them discoverable via `search()` (both
-semantic hybrid and keyword fallback). Added `"note"` to valid entity_types in
-Rust `index_entity` reducer. Python `_enrich_content` resolves note title+content
-for entity_type="note". `_keyword_fallback` merges notes with memory results.
-8 new unit tests.
-Commit: 21ca33c
-Files: server/spacetimedb/src/retrieval.rs, sdk/python/spacetime_memory/client.py,
-       sdk/python/tests/test_client.py, sdk/python/tests/test_memory.py
+Est: 15min
 
 ---
 
@@ -158,6 +132,30 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jun 28 — Date range filter implemented; backlog fully cleared
+- **`--from`/`--to` date range filter**: Added to both SDK (`before`/`after` params
+  on `Client.search()`) and CLI (`--from`/`--to` flags on `stmem memory search`).
+  Accepts ISO-8601 dates or Unix epoch timestamps. Filters by `created_at` in
+  both semantic hybrid and keyword-fallback paths.
+- **`--output json` discovery**: The global `--output`/`-o` flag on the root CLI
+  group already provides JSON output for all subcommands including search.
+  The PENDING item was pre-existing functionality, now documented.
+- **Commit**: c13a447 — 2 files changed, 81 insertions (+), 4 deletions(-).
+- **Research**:
+  - STDB v2.6.0 (unchanged), spacetimedb-sdk v0.7.0 (unchanged).
+  - mem0ai upgraded to v2.0.8 (was 2.0.5). New features: `embed_batch` for 5
+    embedders, `attributed_to` returned from `get()`/`search()` (provenance
+    tracking — we already return similar provenance in enriched results).
+    No new patterns to adopt.
+  - opentelemetry-sdk upgraded to v1.43.0 (was 1.37.0). No breaking changes;
+    graceful-degradation pattern from Jun 26 remains solid.
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features that warrant implementation (mem0, langgraph, zep).
+- **Backlog**: 0 PENDING items remaining. All actionable improvements complete.
+  Next tick will research fresh opportunities.
+- **Tests**: 651 passed, 5 skipped, 1 pre-existing failure
+  (`test_get_memory_history` — STDB table visibility, unrelated).
 
 ### Jun 27 — Unit tests for _make_snippet() completed; 2 new PENDING items added
 - **_make_snippet unit tests**: 10 tests added covering all edge cases (short
