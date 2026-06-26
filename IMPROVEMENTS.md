@@ -8,13 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add compounder.update_entity_page() method
-`create_entity_page()` exists but there's no public compounder method to
-update both a KG node and its associated wiki note in one call. Currently
-users must update the node and note separately via the client.
-Difficulty: Easy
-Est: 1h
-
 ### Add MCP tool for batch store-answers
 The `store_answers()` batch method exists now but has no corresponding MCP
 tool. Add an MCP tool wrapping it so agents can batch-persist multiple
@@ -22,9 +15,33 @@ Q&A pairs in one call.
 Difficulty: Medium
 Est: 1h
 
+### Add zep adapter missing features — get/session/message APIs
+The Zep adapter (`sdks/zep.py`) explicitly documents missing features:
+`get_session_message()`, `get_session_messages()`, `update_message_metadata()`.
+Implement these to reach full Zep API parity.
+Difficulty: Medium
+Est: 1-2h
+
+### Add LangChain memory integration tests
+The `sdks/langchain.py` adapter exists but has no dedicated test file.
+Add `test_langchain_adapter.py` with unit tests for all public methods
+to match the coverage level of the mem0/zep adapters.
+Difficulty: Easy
+Est: 30min
+
 ---
 
 ## Recently Completed
+
+### ✅ Add compounder.update_entity_page() method (Jun 25)
+Implemented `Compounder.update_entity_page()` that updates both the KG
+node (label, type, summary) and the associated wiki note (title, content)
+in a single call. Partial updates supported (None = keep existing).
+Includes MCP tool `update_entity_page`, CLI command `stmem update-entity-page`,
+5 unit tests. Documentation added to AGENTS.md.
+Files: sdk/python/spacetime_memory/compounder.py, server/mcp/main.py,
+       cli/stmem.py, tests/test_compounder.py, AGENTS.md
+Commit: 3d18628
 
 ### ✅ Batch store_answers() added to compounder (Jun 25)
 New `store_answers()` batch method processes multiple query/answer pairs
