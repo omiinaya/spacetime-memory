@@ -8,15 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add memory versioning/history tracking (inspired by mem0 v3 `history`)
-mem0 v2.0.8 (v3) supports per-memory change history tracking. The current
-spacetime-memory system only has `_log_activity` for workspace-wide
-audit tracking. Adding per-memory revision history (via an STDB
-`memory_revision` table + reducer) would enable undo, diff, and
-audit at the individual memory level.
-Difficulty: Medium
-Est: 1-2h
-
 ### Add scheduled workspace maintenance via STDB `#[procedure]`
 STDB v2.5+ stabilized `#[spacetimedb::procedure]` for scheduled,
 transaction-capable server-side functions. The module currently has
@@ -35,9 +26,28 @@ those entities (KG node labels/summaries).
 Difficulty: Easy
 Est: 30min
 
+### Add note versioning/history tracking (note_revision table)
+Following the memory_revision pattern, add a `note_revision` table
+and modify `update_note` to record revisions and increment version.
+This gives full undo/diff/audit for wiki pages too.
+Difficulty: Easy
+Est: 30min
+
 ---
 
 ## Recently Completed
+
+### ✅ Add memory versioning/history tracking via memory_revision table (Jun 26)
+Added `memory_revision` STDB table with `record_revision` helper function.
+Modified `update_memory` reducer to save revision snapshots before updates
+and increment the `version` field (previously defined but never incremented).
+Updated Python `get_memory_history()` to query real revision history from
+the `memory_revision` table (instead of returning just the current state).
+Added `memory_revision` to `ALLOWED_TABLES` whitelist and added
+`query_memory_revision` handler. 4 new unit tests.
+Files: server/spacetimedb/src/memory.rs, server/spacetimedb/src/query.rs,
+       sdk/python/spacetime_memory/client.py,
+       sdk/python/tests/test_client.py
 
 ### ✅ Add near-duplicate memory detection on store (Jun 26)
 Added `find_near_duplicates()` method to Compounder that uses the

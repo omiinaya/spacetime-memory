@@ -62,6 +62,7 @@ const ALLOWED_TABLES: &[&str] = &[
     "hierarchy_cluster", "community_hierarchy",
     "proxy_metrics_snapshot",
     "bridge_result", "kg_stats_result", "memory_recommendation",
+    "memory_revision",
 ];
 
 /// Query a private table with auth + workspace enforcement.
@@ -128,6 +129,7 @@ pub fn query_table(
         "directory" => query_generic_scan(ctx, &query_id, "context_directory", workspace_id, filter_obj, &columns, now),
         "context_delta" => query_generic_scan(ctx, &query_id, "delta_pack", workspace_id, filter_obj, &columns, now),
         "peer_reputation" => query_generic_scan(ctx, &query_id, "peer_reputation", workspace_id, filter_obj, &columns, now),
+        "memory_revision" => query_memory_revision(ctx, query_id, filter_obj, &columns, now),
         _ => query_generic(ctx, &query_id, &table_name, workspace_id, filter_obj, &columns, now),
     }
 }
@@ -496,6 +498,28 @@ fn query_connector_config(
         });
         if filter_matches(&row, filter) {
             insert_row(ctx, &query_id, "connector_config", row_to_json(&row, columns), now);
+        }
+    }
+    Ok(())
+}
+
+/// Query memory revision history by memory_id.
+fn query_memory_revision(
+    ctx: &ReducerContext, query_id: String,
+    filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
+) -> Result<(), String> {
+    for rev in ctx.db.memory_revision().iter().take(crate::MAX_RESULTS) {
+        let row = serde_json::json!({
+            "id": rev.id, "memory_id": rev.memory_id, "workspace_id": rev.workspace_id,
+            "version": rev.version,
+            "previous_content": rev.previous_content, "previous_summary": rev.previous_summary,
+            "previous_confidence": rev.previous_confidence,
+            "new_content": rev.new_content, "new_summary": rev.new_summary,
+            "new_confidence": rev.new_confidence,
+            "changed_at": rev.changed_at, "changed_by": rev.changed_by,
+        });
+        if filter_matches(&row, filter) {
+            insert_row(ctx, &query_id, "memory_revision", row_to_json(&row, columns), now);
         }
     }
     Ok(())

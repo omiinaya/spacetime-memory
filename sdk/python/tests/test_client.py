@@ -3,7 +3,7 @@
 import json
 import pytest
 import httpx
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 from spacetime_memory import Client
 from tests.conftest import make_sql_response
 
@@ -1417,3 +1417,133 @@ class TestMultiRegionFailover:
         assert c.host == "alive"
         assert c.port == "4000"
         assert c._current_host_index == 1
+
+
+class TestGetMemoryHistory:
+    """get_memory_history() — returns revision history from memory_revision table."""
+
+    def test_get_memory_history_with_revisions(self, mock_http_client):
+        """Returns revision history from memory_revision table, sorted by version."""
+        client = mock_http_client
+        memory_id = "mem_001"
+
+        # Mock _query to return revision records for memory_revision
+        client._query = MagicMock(return_value=[
+            {
+                "version": 1,
+                "previous_content": "",
+                "previous_summary": "",
+                "previous_confidence": 0.0,
+                "new_content": "original content",
+                "new_summary": "original summary",
+                "new_confidence": 0.8,
+                "changed_at": 1000,
+                "changed_by": "user1",
+            },
+            {
+                "version": 2,
+                "previous_content": "original content",
+                "previous_summary": "original summary",
+                "previous_confidence": 0.8,
+                "new_content": "updated content",
+                "new_summary": "updated summary",
+                "new_confidence": 0.9,
+                "changed_at": 2000,
+                "changed_by": "user2",
+            },
+        ])
+
+        # The second _query call (for current memory state) should return the latest
+        from unittest.mock import call
+        client._query.side_effect = None  # Reset
+        # Make repeated calls return different values based on the table name
+        orig_query = client._query
+
+        def side_effect(table, **kw):
+            if table == "memory_revision":
+                return [
+                    {"version": 1, "previous_content": "", "previous_summary": "",
+                     "previous_confidence": 0.0, "new_content": "original content",
+                     "new_summary": "original summary", "new_confidence": 0.8,
+                     "changed_at": 1000, "changed_by": "user1"},
+                    {"version": 2, "previous_content": "original content", "previous_summary": "original summary",
+                     "previous_confidence": 0.8, "new_content": "updated content",
+                     "new_summary": "updated summary", "new_confidence": 0.9,
+                     "changed_at": 2000, "changed_by": "user2"},
+                ]
+            if table == "memory":
+                return [{"content": "updated content", "summary": "updated summary",
+                         "version": 2, "updated_at": 2000, "confidence": 0.9}]
+            return []
+
+        client._query = MagicMock(side_effect=side_effect)
+
+        history = client.get_memory_history(memory_id)
+
+        # Should have 2 revision entries (no duplicate current state since version 2 matches)
+        assert len(history) == 2
+        assert history[0]["version"] == 1
+        assert history[0]["content"] == "original content"
+        assert history[0]["previous_content"] == ""
+        assert history[1]["version"] == 2
+        assert history[1]["content"] == "updated content"
+        assert history[1]["previous_content"] == "original content"
+
+    def test_get_memory_history_no_revisions(self, mock_http_client):
+        """Returns empty list when memory has no revisions and doesn't exist."""
+        client = mock_http_client
+
+        # Both queries return empty
+        client._query = MagicMock(return_value=[])
+
+        history = client.get_memory_history("nonexistent")
+        assert history == []
+
+    def test_get_memory_history_current_only(self, mock_http_client):
+        """Returns current state when memory exists but has no revision history."""
+        client = mock_http_client
+
+        def side_effect(table, **kw):
+            if table == "memory_revision":
+                return []
+            if table == "memory":
+                return [{"content": "current content", "summary": "current summary",
+                         "version": 1, "updated_at": 3000, "confidence": 0.7}]
+            return []
+
+        client._query = MagicMock(side_effect=side_effect)
+
+        history = client.get_memory_history("mem_002")
+
+        assert len(history) == 1
+        assert history[0]["version"] == 1
+        assert history[0]["content"] == "current content"
+        assert history[0]["previous_content"] == ""
+
+    def test_get_memory_history_newer_current_state(self, mock_http_client):
+        """When current state has a higher version than last revision, append it."""
+        client = mock_http_client
+
+        def side_effect(table, **kw):
+            if table == "memory_revision":
+                return [
+                    {"version": 1, "previous_content": "", "previous_summary": "",
+                     "previous_confidence": 0.0, "new_content": "v1 content",
+                     "new_summary": "v1 summary", "new_confidence": 0.8,
+                     "changed_at": 1000, "changed_by": "user1"},
+                ]
+            if table == "memory":
+                return [{"content": "v2 content", "summary": "v2 summary",
+                         "version": 2, "updated_at": 2000, "confidence": 0.9}]
+            return []
+
+        client._query = MagicMock(side_effect=side_effect)
+
+        history = client.get_memory_history("mem_003")
+
+        assert len(history) == 2
+        assert history[0]["version"] == 1
+        assert history[0]["content"] == "v1 content"
+        assert history[1]["version"] == 2
+        assert history[1]["content"] == "v2 content"
+        assert history[1]["previous_content"] == ""

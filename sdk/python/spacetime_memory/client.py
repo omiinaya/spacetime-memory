@@ -1885,21 +1885,58 @@ class Client:
     def get_memory_history(self, memory_id: str) -> list[dict[str, Any]]:
         """Get version history for a memory. Mem0 parity.
 
-        Returns the current state as a single-version history entry
-        (SpacetimeDB doesn't store version snapshots).
+        Returns revision history from the ``memory_revision`` table,
+        ordered by version ascending.  Each entry shows what changed
+        in that revision (previous vs new content/summary/confidence).
+
+        The current (latest) state is appended as the final entry
+        with no ``previous_*`` fields.
         """
-        rows = self._query("memory", filter_dict={"id": memory_id},
-                          columns=["id", "content", "summary", "version", "updated_at", "confidence"])
+        # Fetch revision history from the memory_revision table
+        revisions = self._query(
+            "memory_revision",
+            filter_dict={"memory_id": memory_id},
+        )
+        # Sort by version ascending
+        revisions.sort(key=lambda r: r.get("version", 0))
+
+        result: list[dict[str, Any]] = []
+        for rev in revisions:
+            result.append({
+                "version": rev.get("version", 0),
+                "previous_content": rev.get("previous_content", ""),
+                "previous_summary": rev.get("previous_summary", ""),
+                "previous_confidence": rev.get("previous_confidence", 1.0),
+                "content": rev.get("new_content", ""),
+                "summary": rev.get("new_summary", ""),
+                "confidence": rev.get("new_confidence", 1.0),
+                "changed_at": rev.get("changed_at", 0),
+                "changed_by": rev.get("changed_by", ""),
+            })
+
+        # Append the current state as the latest version
+        rows = self._query(
+            "memory", filter_dict={"id": memory_id},
+            columns=["content", "summary", "version", "updated_at", "confidence"],
+        )
         if rows:
             r = rows[0]
-            return [{
-                "version": r.get("version", 1),
-                "content": r.get("content", ""),
-                "summary": r.get("summary", ""),
-                "confidence": r.get("confidence", 1.0),
-                "updated_at": r.get("updated_at", 0),
-            }]
-        return []
+            current_version = r.get("version", 1)
+            # Only append if we don't already have this version
+            if not result or result[-1].get("version") != current_version:
+                result.append({
+                    "version": current_version,
+                    "previous_content": "",
+                    "previous_summary": "",
+                    "previous_confidence": 0.0,
+                    "content": r.get("content", ""),
+                    "summary": r.get("summary", ""),
+                    "confidence": r.get("confidence", 1.0),
+                    "changed_at": r.get("updated_at", 0),
+                    "changed_by": "",
+                })
+
+        return result
 
     # -----------------------------------------------------------------------
     # Reputation decay configuration (Weibull / Linear)

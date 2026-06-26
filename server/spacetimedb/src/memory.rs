@@ -68,6 +68,55 @@ pub struct Memory {
     pub user_scope: String,
 }
 
+/// A snapshot of a memory's state before an update.
+/// Used for version history tracking (mem0 `history` parity).
+#[table(accessor = memory_revision)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MemoryRevision {
+    #[primary_key]
+    pub id: String,
+    /// The memory this revision belongs to
+    pub memory_id: String,
+    pub workspace_id: String,
+    /// Which version this was before the update
+    pub version: u32,
+    pub previous_content: String,
+    pub previous_summary: String,
+    pub previous_confidence: f64,
+    pub new_content: String,
+    pub new_summary: String,
+    pub new_confidence: f64,
+    pub changed_at: i64,
+    pub changed_by: String,
+}
+
+/// Save a revision snapshot before a memory is updated.
+/// Should be called *before* modifying the memory in-place.
+pub fn record_revision(
+    ctx: &ReducerContext,
+    mem: &Memory,
+    new_content: &str,
+    new_summary: &str,
+    new_confidence: f64,
+) {
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.memory_revision().id().find(id).is_none(), 3);
+    let revision = MemoryRevision {
+        id,
+        memory_id: mem.id.clone(),
+        workspace_id: mem.workspace_id.clone(),
+        version: mem.version,
+        previous_content: mem.content.clone(),
+        previous_summary: mem.summary.clone(),
+        previous_confidence: mem.confidence,
+        new_content: new_content.to_string(),
+        new_summary: new_summary.to_string(),
+        new_confidence,
+        changed_at: now_micros(ctx),
+        changed_by: ctx.sender().to_hex(),
+    };
+    ctx.db.memory_revision().insert(revision);
+}
+
 /// Input struct for store_memory_batch
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StoreMemoryItem {
@@ -210,9 +259,13 @@ pub fn update_memory(
         let caller = ctx.sender().to_hex();
         check_space_access(ctx, &mem.workspace_id, &caller, "editor")?;
 
+        // Save revision snapshot before modifying
+        record_revision(ctx, &mem, &content, &summary, confidence);
+
         mem.content = content;
         mem.summary = summary;
         mem.confidence = confidence;
+        mem.version += 1; // Increment version on each update
         mem.updated_at = now_micros(ctx);
 
         let ws_id = mem.workspace_id.clone();
