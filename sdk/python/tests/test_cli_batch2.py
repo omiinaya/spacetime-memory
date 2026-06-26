@@ -1050,8 +1050,13 @@ class TestCrossLinkCLI:
         assert result.exit_code == 0
 
     def test_cross_link_basic(self, mocked_cli_runner):
-        runner, _ = mocked_cli_runner
+        runner, mock_client = mocked_cli_runner
         result = runner.invoke(cli, ["cross-link", "-w", "test"])
+        assert result.exit_code == 0
+
+    def test_cross_link_dry_run(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["cross-link", "-w", "test", "--dry-run"])
         assert result.exit_code == 0
 
     def test_cross_link_json(self, mocked_cli_runner):
@@ -1073,9 +1078,19 @@ class TestSuggestConnectionsCLI:
         result = runner.invoke(cli, ["suggest-connections", "-w", "test"])
         assert result.exit_code == 0
 
+    def test_suggest_connections_with_limit(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["suggest-connections", "-w", "test", "-n", "5"])
+        assert result.exit_code == 0
+
     def test_suggest_connections_json(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
         result = runner.invoke(cli, ["--output", "json", "suggest-connections", "-w", "test"])
+        assert result.exit_code == 0
+
+    def test_suggest_connections_json_with_limit(self, mocked_cli_runner):
+        runner, _ = mocked_cli_runner
+        result = runner.invoke(cli, ["--output", "json", "suggest-connections", "-w", "test", "-n", "10"])
         assert result.exit_code == 0
 
 

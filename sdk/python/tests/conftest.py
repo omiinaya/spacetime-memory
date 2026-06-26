@@ -342,6 +342,20 @@ def _generate_test_token() -> str:
 
 
 @pytest.fixture
+def mock_compounder():
+    """Mock the ``Compounder`` class used inside MCP tools.
+
+    Patches ``spacetime_memory.compounder.Compounder`` so that
+    ``Compounder(get_client())`` returns a MagicMock in MCP tool bodies.
+    Tests can set return values and assert calls on the yielded instance.
+    """
+    with patch("spacetime_memory.compounder.Compounder") as mock_cls:
+        instance = MagicMock()
+        mock_cls.return_value = instance
+        yield instance
+
+
+@pytest.fixture
 def cli_mock_client():
     """Return a real Client with mocked HTTP for CLI testing.
 
