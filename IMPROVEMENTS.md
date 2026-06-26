@@ -97,35 +97,6 @@ and `suggest-connections --json --limit 10` to fill coverage gaps.
 Files: sdk/python/tests/test_cli_batch2.py
 Commit: 37817bc
 
-### ✅ Add unit tests for MCP tools (server/mcp/main.py) (Jun 25)
-The MCP server has 40+ tools but zero test coverage. Start by adding
-unit tests for `store_answers_batch`, `search_entities`, and the
-compounder-related LLM Wiki tools (`ingest_source`, `lint_workspace`).
-Use mocked client similar to test_compounder.py patterns.
-Difficulty: Medium
-Est: 1-2h
-
-### ✅ Add `search_entities` MCP tool tests (Jun 25)
-The MCP `search_entities` tool exists (line 1275) but has no dedicated
-unit tests. Add tests for label/type/semantic search modes and empty
-results edge case.
-Difficulty: Easy
-Est: 20min
-
-### ✅ Add cross-link and suggest-connections coverage in CLI tests (Jun 25)
-CLI commands `cross-link` and `suggest-connections` exist but
-`test_cli_batch2.py` may not cover all error/edge-case paths.
-Audit and fill gaps.
-Difficulty: Easy
-Est: 30min
-
-### ✅ Add `store-answers-batch` CLI command (Jun 25)
-Added `stmem store-answers-batch --pairs '[[...]]'` CLI command with
-JSON validation, file input support (--file), and --json output.
-Previously only existed as MCP tool.
-Files: cli/stmem.py
-Commit: ebff101
-
 ---
 
 ## Deferred / Blocked
