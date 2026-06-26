@@ -183,15 +183,40 @@ class Tracer:
                 OTLPSpanExporter,
             )
 
-            otlp_exporter = OTLPSpanExporter(
-                endpoint=f"{self._otlp_endpoint}/v1/traces",
-            )
-            span_processor = BatchSpanProcessor(otlp_exporter)
-            self._provider.add_span_processor(span_processor)
-            logger.info(
-                "OpenTelemetry tracing: OTLP exporter -> %s",
-                self._otlp_endpoint,
-            )
+            # ── Connectivity check ──────────────────────────────────────
+            # Test if the OTLP collector is reachable before wiring up the
+            # BatchSpanProcessor.  A background thread that retries forever
+            # on ConnectionError pollutes logs and confuses users.
+            _collector_reachable = False
+            try:
+                import httpx as _httpx
+                _probe = _httpx.get(
+                    self._otlp_endpoint.rstrip("/v1") + "/",
+                    timeout=2.0,
+                )
+                _collector_reachable = _probe.status_code < 500
+            except Exception:
+                # Any error (connection refused, DNS fail, timeout) means
+                # the collector is not available — fall through gracefully.
+                pass
+
+            if not _collector_reachable:
+                logger.warning(
+                    "OTLP collector at %s is not reachable — "
+                    "skipping OTLP trace exporter. "
+                    "Set OTEL_ENABLED=false to silence this warning.",
+                    self._otlp_endpoint,
+                )
+            else:
+                otlp_exporter = OTLPSpanExporter(
+                    endpoint=f"{self._otlp_endpoint}/v1/traces",
+                )
+                span_processor = BatchSpanProcessor(otlp_exporter)
+                self._provider.add_span_processor(span_processor)
+                logger.info(
+                    "OpenTelemetry tracing: OTLP exporter -> %s",
+                    self._otlp_endpoint,
+                )
         except ImportError:
             logger.info(
                 "OpenTelemetry OTLP exporter not installed. "

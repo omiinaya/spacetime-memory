@@ -8,11 +8,47 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-*No pending items — all backlog has been implemented.*
+### Add note content preview to search results (snippet extraction)
+When `search()` returns results, include a short content snippet (first 200 chars)
+in the result dict so callers (especially CLI/MCP tools) can display previews
+without fetching full notes. Currently results return content in full but the
+JSON output is verbose. Add a `snippet` key with truncation at word boundary.
+Files: sdk/python/spacetime_memory/client.py (search pipeline)
+Difficulty: Easy
+Est: 15min
+
+### Add `--snippet` flag to `stmem search` CLI output
+Complement the above: add a `--snippet`/`-s` flag to the search CLI command
+that shows a 1-line preview instead of the full content in table output.
+Files: cli/stmem.py
+Difficulty: Easy
+Est: 10min
 
 ---
 
 ## Recently Completed
+
+### ✅ OTel tracer graceful degradation when collector is unreachable (Jun 26)
+The `Tracer.setup()` method now checks OTLP collector connectivity before
+creating the `OTLPSpanExporter`. When the collector is unreachable (common
+in development/test environments), it logs a single warning and skips OTLP
+exporter setup instead of letting the `BatchSpanProcessor` background thread
+retry forever and pollute logs with `ConnectionError` tracebacks.
+File: sdk/python/spacetime_memory/tracer.py
+Difficulty: Medium
+Est: 20min
+
+### ✅ Fix cli_mock_client Tantivy endpoint type mismatch (Jun 26)
+The `cli_mock_client` test fixture used a single `Mock(json=lambda: ...)` for
+ALL POST requests, returning `{"data": [{"embedding": [0.0]}]}` even for the
+Tantivy BM25 search endpoint (which expects a JSON list). This caused
+`_tantivy_search` to return a dict instead of a list, leading to
+`AttributeError("'str' object has no attribute 'get'")` in the search pipeline.
+Fix: URL-aware `side_effect` on `mock_http.post` returns appropriate JSON shape.
+Also fixed `test_store_answer_basic` which was blocked by this bug.
+Files: sdk/python/tests/conftest.py, sdk/python/tests/test_cli_batch2.py
+Difficulty: Medium
+Est: 15min
 
 ### ✅ Apply entity-aware boosting in keyword fallback path (Jun 26)
 `_boost_with_entity_signal` is now called at the end of `_keyword_fallback`,
@@ -80,17 +116,6 @@ Commit: 21ca33c
 Files: server/spacetimedb/src/retrieval.rs, sdk/python/spacetime_memory/client.py,
        sdk/python/tests/test_client.py, sdk/python/tests/test_memory.py
 
-### ✅ Add entity-aware search result boosting (mem0 v3 multi-signal parity) (Jun 26)
-Added `_boost_with_entity_signal()` method to the `Client` class that detects
-knowledge-graph entities mentioned in the query and boosts the `fused_score` of
-search results whose content references those entities. Uses three matching
-strategies: (1) exact entity label in query, (2) word-level overlap, (3) query
-substring in entity summary. Proportional boost scales with the fraction of
-matched entities present in each result's content. Integrated into the
-`search()` pipeline after `_enrich_content` and before cross-encoder reranking.
-9 new unit tests covering all matching strategies and graceful degradation.
-Files: sdk/python/spacetime_memory/client.py, sdk/python/tests/test_client.py
-
 ---
 
 ## Deferred / Blocked
@@ -106,10 +131,25 @@ Difficulty: Hard (needs live STDB)
 
 ---
 
-|| *(cron manages this section — moves items here when marked ✅, purged old ones)*
-|
+| *(cron manages this section — moves items here when marked ✅, purged old ones)*
+
+---
 
 ## Research Log
+
+### Jun 26 — OTel graceful degradation + Tantivy mock fix + backlog refresh
+- **OTel tracer**: Added connectivity check to OTLP collector before wiring up
+  `BatchSpanProcessor`. When collector is unreachable (common in dev/test),
+  logs a single warning and skips OTLP exporter. Fixes noisy `ConnectionError`
+  tracebacks from background export thread.
+- **Tantivy mock fix**: `cli_mock_client` fixture now uses URL-aware `side_effect`
+  on `mock_http.post`. Tantivy endpoint gets `json=lambda: []` while all other
+  endpoints get `{"data": [{"embedding": [0.0]}]}`. Fixes `test_store_answer_basic`.
+- **Research**: STDB crate v2.6.0 (latest, unchanged), mem0ai v2.0.8, langgraph v1.2.6.
+  No game-changing new competitor features detected. No new STDB features that
+  would benefit the module. Deferred STDB item still blocked.
+- **New PENDING items**: Note snippet extraction for search results, `--snippet` CLI flag.
+- **456+ tests passing** (test_cli_batch2.py now at 123 passed, up from 122).
 
 ### Jun 26 — Full backlog cleared; both PENDING items implemented
 - **Note orphan detection** (Item 1): `_find_note_orphans()` — notes with no

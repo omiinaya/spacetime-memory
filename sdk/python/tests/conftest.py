@@ -383,13 +383,28 @@ def cli_mock_client():
         embedder_url="http://localhost:9090",
     )
     mock_http = MagicMock(spec=httpx.Client)
-    mock_http.post.return_value = Mock(
-        status_code=200,
-        text=json.dumps([]),
-        # Return a valid OpenAI embedding structure so _embed_openai
-        # doesn't choke on resp.json()["data"][0]["embedding"].
-        json=lambda: {"data": [{"embedding": [0.0]}]},
-    )
+
+    def _post_side_effect(url, *args, **kwargs):
+        """Return different mock responses depending on the URL."""
+        url_str = str(url)
+        # Tantivy search expects a JSON list
+        if ":9091" in url_str or "tantivy" in url_str.lower():
+            return Mock(
+                status_code=200,
+                text=json.dumps([]),
+                json=lambda: [],
+            )
+        # All other POST (STDB reducers, embedder) — return the
+        # embedding response that _embed_openai expects
+        return Mock(
+            status_code=200,
+            text=json.dumps([]),
+            # Return a valid OpenAI embedding structure so _embed_openai
+            # doesn't choke on resp.json()["data"][0]["embedding"].
+            json=lambda: {"data": [{"embedding": [0.0]}]},
+        )
+
+    mock_http.post.side_effect = _post_side_effect
     mock_http.get.return_value = Mock(
         status_code=200,
         json=lambda: {"model": "mock"},
