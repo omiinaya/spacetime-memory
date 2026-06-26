@@ -3,7 +3,7 @@
 import json
 import pytest
 import httpx
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 from spacetime_memory import Client
 from tests.conftest import make_sql_response
 
@@ -1987,3 +1987,91 @@ class TestEntityAwareBoost:
         result = mock_http_client._boost_with_entity_signal("RLHF", rows, "default")
         assert result[0]["entity_id"] == "m1"
         assert result[0]["fused_score"] > 0.8  # Still boosted via entity_name
+
+
+# ── Entity types filter in search() ─────────────────────────────────────
+
+
+class TestSearchEntityTypes:
+    """Tests for the entity_types filter parameter in search()."""
+
+    @pytest.fixture
+    def mock_client(self):
+        c = Client(host="localhost", port="3000", database="test")
+        c._identity_established = True
+        c._query_cache = None
+        c.event_bus = None
+        return c
+
+    def test_entity_types_hybrid_filter(self, mock_client):
+        """entity_types filter in hybrid path keeps only matching types."""
+        mock_rows = [
+            {"entity_id": "m1", "entity_type": "memory", "score": 0.9, "strategy": "semantic"},
+            {"entity_id": "n1", "entity_type": "note", "score": 0.8, "strategy": "semantic"},
+            {"entity_id": "k1", "entity_type": "node", "score": 0.7, "strategy": "semantic"},
+        ]
+        with patch.object(mock_client, "_embed", return_value=[0.1, 0.2]):
+            with patch.object(mock_client, "_call", return_value={"status": "ok"}):
+                with patch.object(mock_client, "_sql", return_value=mock_rows):
+                    with patch.object(mock_client, "_tantivy_search", return_value=[]):
+                        with patch.object(mock_client, "_fuse_and_deduplicate", return_value=mock_rows):
+                            with patch.object(mock_client, "_enrich_content", return_value=mock_rows):
+                                result = mock_client.search(
+                                    "ws1", "test query", semantic=True,
+                                    limit=20, entity_types=["memory", "note"],
+                                )
+        # Should only contain memories and notes
+        assert all(r["entity_type"] in ("memory", "note") for r in result)
+        assert any(r["entity_type"] == "memory" for r in result)
+        assert any(r["entity_type"] == "note" for r in result)
+        assert not any(r["entity_type"] == "node" for r in result)
+
+    def test_entity_types_keyword_filter(self, mock_client):
+        """entity_types filter in keyword fallback path keeps only matching types."""
+        from unittest.mock import patch
+
+        # _keyword_fallback calls _query twice: first for "memory" table,
+        # then for "note" table.  Use side_effect to return distinct data.
+        mock_memories = [
+            {"id": "m1", "content": "hello world", "entity_type": "memory", "created_at": 100},
+        ]
+        mock_notes = [
+            {"id": "n1", "content": "world of notes", "entity_type": "note", "created_at": 90},
+        ]
+        with patch.object(mock_client, "_query", side_effect=[mock_memories, mock_notes]):
+            result = mock_client.search(
+                "ws1", "world", semantic=False,
+                limit=20, entity_types=["memory"],
+            )
+        # Only memories survive (notes are filtered out)
+        assert all(r.get("entity_type") == "memory" for r in result)
+
+    def test_entity_types_none_returns_all(self, mock_client):
+        """entity_types=None (default) returns all entity types unchanged."""
+        mock_rows = [
+            {"entity_id": "m1", "entity_type": "memory", "score": 0.9, "strategy": "semantic"},
+            {"entity_id": "n1", "entity_type": "note", "score": 0.8, "strategy": "semantic"},
+            {"entity_id": "k1", "entity_type": "node", "score": 0.7, "strategy": "semantic"},
+        ]
+        with patch.object(mock_client, "_embed", return_value=[0.1, 0.2]):
+            with patch.object(mock_client, "_call", return_value={"status": "ok"}):
+                with patch.object(mock_client, "_sql", return_value=mock_rows):
+                    with patch.object(mock_client, "_tantivy_search", return_value=[]):
+                        with patch.object(mock_client, "_fuse_and_deduplicate", return_value=mock_rows):
+                            with patch.object(mock_client, "_enrich_content", return_value=mock_rows):
+                                result = mock_client.search(
+                                    "ws1", "test query", semantic=True, limit=20,
+                                )
+        # All types present (no filtering)
+        assert len(result) == 3
+        types = {r["entity_type"] for r in result}
+        assert types == {"memory", "note", "node"}
+
+    def test_entity_types_empty_list_returns_none(self, mock_client):
+        """entity_types=[] returns empty results."""
+        with patch.object(mock_client, "_query", return_value=[]):
+            result = mock_client.search(
+                "ws1", "test", semantic=False,
+                limit=20, entity_types=[],
+            )
+        assert result == []

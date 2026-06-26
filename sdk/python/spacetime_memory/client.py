@@ -1498,6 +1498,7 @@ class Client:
         polyphonic: bool = False,
         mmr_lambda: float = 0.0,
         fusion_weights: dict[str, float] | None = None,
+        entity_types: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Search memories.  When *semantic* is True uses hybrid search.
 
@@ -1523,6 +1524,10 @@ class Client:
             fusion_weights: Optional dict of strategy weights for min-max fusion.
                     Keys: ``"semantic"``, ``"keyword"``, ``"binary"``, ``"graph"``, ``"temporal"``.
                     Values should sum to ~1.0. Omit or pass None to use defaults.
+            entity_types: Optional list of entity_type values to filter results by.
+                    e.g. ``["memory", "note"]`` to return only memories and notes,
+                    or ``["node"]`` for KG nodes only. Applied after fusion and
+                    enrichment, in both hybrid and keyword-fallback paths.
         """
         if semantic:
             # ── Query cache check ──
@@ -1696,6 +1701,10 @@ class Client:
             # ── Entity-aware search result boosting (mem0 v3 parity) ──
             rows = self._boost_with_entity_signal(query, rows, workspace_id)
 
+            # ── Entity_types filter (after fusion, before reranking) ──
+            if entity_types is not None and entity_types:
+                rows = [r for r in rows if r.get("entity_type") in entity_types]
+
             if cross_encoder:
                 try:
                     from .cross_encoder import cross_encoder_rerank
@@ -1736,7 +1745,10 @@ class Client:
             return results
 
         # Non-semantic (keyword) fallback
-        return self._keyword_fallback(workspace_id, query, memory_type, tier, limit)
+        rows = self._keyword_fallback(workspace_id, query, memory_type, tier, limit)
+        if entity_types is not None and entity_types:
+            rows = [r for r in rows if r.get("entity_type") in entity_types]
+        return rows
 
     def detect_patterns(
         self,
