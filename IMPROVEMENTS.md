@@ -8,13 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add integration test that exercises the full ingest→search→cross-link pipeline
-Current integration tests cover individual components but not the full
-LLM Wiki workflow end-to-end (ingest source → search → cross-link →
-suggest-connections → export). Add a test that runs the full pipeline.
-Difficulty: Medium
-Est: 1h
-
 ### Add memory versioning/history tracking (inspired by mem0 v3 `history`)
 mem0 v2.0.8 (v3) supports per-memory change history tracking. The current
 spacetime-memory system only has `_log_activity` for workspace-wide
@@ -54,6 +47,18 @@ Est: 30min
 ---
 
 ## Recently Completed
+
+### ✅ Add integration tests for full compounder pipeline (Jun 26)
+Added 17 integration tests covering the full LLM Wiki pipeline tested
+against real STDB: store_answer, store_answers batch, manual KG
+creation, suggest_connections (2-link graph analysis), lint (orphans +
+missing crossrefs), export (system note filtering, empty workspace),
+and search_entities (label, type, no-match). Also fixed a latent bug
+where store_answer/ingest_source silently dropped note IDs because
+create_note returns {'status': 'ok'} not the note data.
+Files: sdk/python/tests/test_compounder_integration.py,
+       sdk/python/spacetime_memory/compounder.py
+Commit: b45e62f
 
 ### ✅ Add MCP tool tests for core graph/pagerank/community tools (Jun 26)
 Added `mock_mcp_client` fixture and 19 tests for 8 graph/community MCP
