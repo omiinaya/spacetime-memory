@@ -117,7 +117,7 @@
 | Context trees | ✓ | `set_workspace_context()`, context badges in UI |
 | LLM reranking | ✓ | Two-tier: cross-encoder + LLM rerank |
 | MCP server (47 tools) | ✓ | `server/mcp/main.py`, HTTP + SSE transport |
-| CLI (32 subcommands) | ✓ | `cli/stmem.py` |
+| CLI (35 subcommands) | ✓ | `cli/stmem.py` |
 | 6 competitor drop-in adapters | ✓ | All tests pass, signature-matched |
 | CDC / delta sync | ✓ | ChangeEvent table + DeltaSync polling |
 | BM25 via Tantivy | ✓ | Sidecar on :9091 |

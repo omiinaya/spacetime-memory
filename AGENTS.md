@@ -144,9 +144,9 @@ All compounder SDK methods have terminal equivalents via `stmem`:
 | `compounder.export_workspace()` | `stmem export markdown ./path/ --workspace <id>` |
 | `compounder.generate_overview_page()` | `stmem overview --workspace <id>` |
 | `compounder.ingest_source()` | `stmem ingest file --path article.txt` |
-| `compounder.create_entity_page()` | Use SDK or MCP (no standalone CLI yet) |
-| `compounder.create_concept_page()` | Use SDK or MCP (no standalone CLI yet) |
-| `compounder.create_comparison_page()` | Use SDK or MCP (no standalone CLI yet) |
+| `compounder.create_entity_page()` | `stmem entity-page --name "..." --description "..."` |
+| `compounder.create_concept_page()` | `stmem concept-page --concept "..." --definition "..."` |
+| `compounder.create_comparison_page()` | `stmem comparison-page --title "..." --items "a,b"` |
 
 All CLI commands support `--output json` for machine-readable output.
 

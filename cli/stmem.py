@@ -1799,6 +1799,144 @@ def store_answer_cmd(workspace: str, query: str, answer: str,
         print_json(result)
 
 
+# ── Entity Page ───────────────────────────────────────────────────────────────
+
+@cli.command(name="entity-page")
+@click.option("--name", "-n", required=True, help="Entity name (page title + node label)")
+@click.option("--description", "-d", required=True, help="2-3 sentence description")
+@click.option("--type", "-t", "entity_type", default="concept",
+              type=click.Choice(["person", "org", "concept", "product", "location", "event", "topic"]),
+              help="Entity type")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--tags", help="Comma-separated tags")
+@click.option("--related", help="Related entity names (comma-separated)")
+def entity_page_cmd(name: str, description: str, entity_type: str,
+                    workspace: str, tags: str | None,
+                    related: str | None) -> None:
+    """Create a structured entity wiki page + KG node.
+
+    Creates both a markdown note with YAML frontmatter and a typed
+    knowledge graph node. Use for any named entity: person, org,
+    concept, product, location, event, or topic.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    rel_list = (
+        [{"target": r.strip(), "relation": "related_to"}
+         for r in related.split(",") if r.strip()]
+        if related else None
+    )
+
+    cp = Compounder(_sdk_client())
+    with console.status(f"Creating entity page '{name}'..."):
+        result = cp.create_entity_page(
+            name=name,
+            description=description,
+            entity_type=entity_type,
+            workspace_id=workspace,
+            tags=tag_list,
+            relations=rel_list,
+        )
+
+    note = result.get("note", {})
+    node = result.get("node", {})
+    if note.get("id"):
+        _quiet_print(f"[green]Entity page created:[/green] [cyan]{name}[/cyan] ({entity_type})")
+        if node.get("id"):
+            _quiet_print(f"  KG node: [yellow]{node['id'][:16]}...[/yellow]")
+    else:
+        console.print("[red]Failed to create entity page.[/red]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
+# ── Concept Page ──────────────────────────────────────────────────────────────
+
+@cli.command(name="concept-page")
+@click.option("--concept", "-c", required=True, help="Concept name")
+@click.option("--definition", "-d", required=True, help="Concept definition")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--related", help="Related concept names (comma-separated)")
+def concept_page_cmd(concept: str, definition: str, workspace: str,
+                     related: str | None) -> None:
+    """Create a concept definition page with [[wiki-links]].
+
+    Creates a note with YAML frontmatter (type: concept) and a
+    structured definition. Related concepts are linked as wiki-links.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    rel_list = (
+        [r.strip() for r in related.split(",") if r.strip()]
+        if related else None
+    )
+
+    cp = Compounder(_sdk_client())
+    with console.status(f"Creating concept page '{concept}'..."):
+        result = cp.create_concept_page(
+            concept=concept,
+            definition=definition,
+            workspace_id=workspace,
+            related_concepts=rel_list,
+        )
+
+    note = result.get("note", {})
+    if note.get("id"):
+        _quiet_print(f"[green]Concept page created:[/green] [cyan]{concept}[/cyan]")
+        if rel_list:
+            _quiet_print(f"  Related: {', '.join(rel_list)}")
+    else:
+        console.print("[red]Failed to create concept page.[/red]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
+# ── Comparison Page ───────────────────────────────────────────────────────────
+
+@cli.command(name="comparison-page")
+@click.option("--title", "-t", required=True, help="Page title (e.g. 'LangGraph vs CrewAI')")
+@click.option("--items", "-i", required=True, help="Comma-separated items to compare")
+@click.option("--criteria", "-c", default="features,performance,ecosystem",
+              help="Comma-separated comparison criteria")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+def comparison_page_cmd(title: str, items: str, criteria: str,
+                        workspace: str) -> None:
+    """Create a comparison table wiki page.
+
+    Creates a note with YAML frontmatter (type: comparison) and a
+    markdown comparison table of the given items across specified
+    criteria.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    item_list = [i.strip() for i in items.split(",") if i.strip()]
+    crit_list = [c.strip() for c in criteria.split(",") if c.strip()]
+
+    cp = Compounder(_sdk_client())
+    with console.status(f"Creating comparison page '{title}'..."):
+        result = cp.create_comparison_page(
+            title=title,
+            items=item_list,
+            workspace_id=workspace,
+            criteria=crit_list,
+        )
+
+    note = result.get("note", {})
+    if note.get("id"):
+        _quiet_print(
+            f"[green]Comparison page created:[/green] [cyan]{title}[/cyan] "
+            f"({len(item_list)} items)"
+        )
+    else:
+        console.print("[red]Failed to create comparison page.[/red]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
 # ===================================================================
 # connector — external data sources
 # ===================================================================
