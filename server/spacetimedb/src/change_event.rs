@@ -82,6 +82,23 @@ pub fn log_change(
 }
 
 /// Serialise any STDB record to JSON string for the data_json field.
+///
+/// # Example
+///
+/// ```
+/// use serde::Serialize;
+/// use spacetime_memory::change_event::record_to_json;
+///
+/// #[derive(Serialize)]
+/// struct Metric {
+///     name: String,
+///     value: f64,
+/// }
+///
+/// let m = Metric { name: "cpu".into(), value: 0.85 };
+/// let json = record_to_json(&m);
+/// assert_eq!(json, r#"{"name":"cpu","value":0.85}"#);
+/// ```
 pub fn record_to_json<T: serde::Serialize>(record: &T) -> String {
     serde_json::to_string(record).unwrap_or_else(|_| "{}".to_string())
 }

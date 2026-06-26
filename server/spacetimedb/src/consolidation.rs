@@ -364,6 +364,15 @@ pub fn reject_merge(ctx: &ReducerContext, suggestion_id: String) -> Result<(), S
 // ── Auto-Dedup ─────────────────────────────────────────────────────
 
 /// Levenshtein edit distance between two strings (character-level).
+///
+/// Used internally by `dedup_memories` and `suggest_merges` to compute
+/// normalised edit distance for near-duplicate detection.
+///
+/// ```ignore
+/// // edit_distance is crate-internal; callable via:
+/// let d = crate::consolidation::edit_distance("kitten", "sitting");
+/// assert_eq!(d, 3);
+/// ```
 fn edit_distance(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
