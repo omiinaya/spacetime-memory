@@ -8,23 +8,56 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add zep adapter missing features — get/session/message APIs
-The Zep adapter (`sdks/zep.py`) explicitly documents missing features:
-`get_session_message()`, `get_session_messages()`, `update_message_metadata()`.
-Implement these to reach full Zep API parity.
+### Add unit tests for MCP tools (server/mcp/main.py)
+The MCP server has 40+ tools but zero test coverage. Start by adding
+unit tests for `store_answers_batch`, `search_entities`, and the
+compounder-related LLM Wiki tools (`ingest_source`, `lint_workspace`).
+Use mocked client similar to test_compounder.py patterns.
 Difficulty: Medium
 Est: 1-2h
 
-### Add LangChain memory integration tests
-The `sdks/langchain.py` adapter exists but has no dedicated test file.
-Add `test_langchain_adapter.py` with unit tests for all public methods
-to match the coverage level of the mem0/zep adapters.
+### Add `search_entities` MCP tool tests
+The MCP `search_entities` tool exists (line 1275) but has no dedicated
+unit tests. Add tests for label/type/semantic search modes and empty
+results edge case.
+Difficulty: Easy
+Est: 20min
+
+### Add cross-link and suggest-connections coverage in CLI tests
+CLI commands `cross-link` and `suggest-connections` exist but
+`test_cli_batch2.py` may not cover all error/edge-case paths.
+Audit and fill gaps.
 Difficulty: Easy
 Est: 30min
 
 ---
 
 ## Recently Completed
+
+### ✅ Add `store-answers-batch` CLI command (Jun 25)
+Added `stmem store-answers-batch --pairs '[[...]]'` CLI command with
+JSON validation, file input support (--file), and --json output.
+Previously only existed as MCP tool.
+Files: cli/stmem.py
+
+### ✅ Fix stale docstring in zep.py (Jun 25)
+The module docstring claimed get_session_message/get_session_messages/
+update_message_metadata were missing — they're fully implemented and
+tested. Updated docstring to "Full API parity with zep-python v2.0.2".
+Files: sdk/python/spacetime_memory/sdks/zep.py
+
+### ✅ Add zep adapter missing features — get/session/message APIs (Jun 25)
+All three methods (`get_session_message`, `get_session_messages`,
+`update_message_metadata`) are fully implemented in `sdks/zep.py`
+and covered by 12+ tests in `test_zep_adapter.py`.
+(Already done when research re-checked the codebase.)
+Files: sdk/python/spacetime_memory/sdks/zep.py, sdk/python/tests/test_zep_adapter.py
+
+### ✅ Add LangChain memory integration tests (Jun 25)
+`test_langchain_adapter.py` exists with 753 lines covering all public
+methods of StmemStore, StmemMemoryStore, and StmemChatMessageHistory.
+(Already done when research re-checked the codebase.)
+Files: sdk/python/tests/test_langchain_adapter.py
 
 ### ✅ Add MCP tool for batch store-answers (Jun 25)
 New `store_answers_batch` MCP tool accepts a JSON string of

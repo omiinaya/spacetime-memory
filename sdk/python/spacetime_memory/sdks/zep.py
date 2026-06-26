@@ -17,8 +17,9 @@ when the real library is installed, with graceful fallback to
 - Fallback: when ``zep_python`` is not installed, the same exception
   names are defined as ``RuntimeError`` subclasses in this module.
 
-NOTE: Missing some advanced features — ``get_session_message()``,
-``get_session_messages()``, ``update_message_metadata()``.
+Full API parity with zep-python v2.0.2 including:
+``get_session_message()``, ``get_session_messages()``,
+``update_message_metadata()``.
 
 Maps::
 

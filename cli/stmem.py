@@ -1799,7 +1799,90 @@ def store_answer_cmd(workspace: str, query: str, answer: str,
         print_json(result)
 
 
-# ── Entity Page ───────────────────────────────────────────────────────────────
+# ── Store Answers Batch ──────────────────────────────────────────────────────
+
+@cli.command(name="store-answers-batch")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--pairs", "-p", required=True,
+              help='JSON string of [[query, answer], ...] pairs. '
+                   'Example: --pairs \'[["Q1","A1"],["Q2","A2"]]\'')
+@click.option("--source-ids", "-s", help="Comma-separated source memory IDs")
+@click.option("--file", "-f", "pairs_file",
+              help="Read JSON pairs from a file instead of --pairs argument")
+def store_answers_batch_cmd(workspace: str, pairs: str,
+                             source_ids: str | None,
+                             pairs_file: str | None) -> None:
+    """Batch-persist multiple LLM-synthesized answers as wiki pages.
+
+    More efficient than calling store-answer repeatedly — fetches the
+    workspace index once and creates a single consolidated log entry.
+
+    Provide pairs as a JSON string via --pairs, or read from a file
+    via --file. Each pair is [query, answer].
+    """
+    import json as _json
+
+    from spacetime_memory.compounder import Compounder
+
+    # Resolve pairs source
+    if pairs_file:
+        try:
+            with open(pairs_file, "r") as f:
+                raw = f.read()
+        except FileNotFoundError:
+            console.print(f"[red]File not found: {pairs_file}[/red]")
+            sys.exit(1)
+        except OSError as e:
+            console.print(f"[red]Error reading {pairs_file}: {e}[/red]")
+            sys.exit(1)
+    else:
+        raw = pairs
+
+    try:
+        qa_pairs = _json.loads(raw)
+    except _json.JSONDecodeError as e:
+        console.print(f"[red]Invalid JSON in pairs: {e}[/red]")
+        sys.exit(1)
+
+    if not isinstance(qa_pairs, list) or not all(
+        isinstance(p, list) and len(p) == 2 and all(isinstance(s, str) for s in p)
+        for p in qa_pairs
+    ):
+        console.print(
+            "[red]Pairs must be a JSON list of [query, answer] string pairs, "
+            "e.g. '[['Q1','A1'],['Q2','A2']]'[/red]"
+        )
+        sys.exit(1)
+
+    mem_ids = (
+        [s.strip() for s in source_ids.split(",") if s.strip()]
+        if source_ids else None
+    )
+
+    client = _sdk_client()
+    cp = Compounder(client)
+
+    with console.status(
+        f"Storing {len(qa_pairs)} answers in batch..."
+    ):
+        results = cp.store_answers(
+            qa_pairs=qa_pairs,
+            workspace_id=workspace,
+            source_memory_ids=mem_ids,
+        )
+
+    n_stored = len(results)
+    n_entities = sum(len(r.get("entities", [])) for r in results)
+    _quiet_print(
+        f"[green]Batch stored {n_stored} answers[/green] "
+        f"([yellow]{n_entities}[/yellow] total entities)"
+    )
+
+    if _current_output_format == "json":
+        print_json(results)
+
+
+# ── Entity Page ────────────────────────────────────────────────────────���──────
 
 @cli.command(name="entity-page")
 @click.option("--name", "-n", required=True, help="Entity name (page title + node label)")
