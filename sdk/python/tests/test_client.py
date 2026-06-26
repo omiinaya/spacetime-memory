@@ -1547,3 +1547,165 @@ class TestGetMemoryHistory:
         assert history[1]["version"] == 2
         assert history[1]["content"] == "v2 content"
         assert history[1]["previous_content"] == ""
+
+
+class TestEntityAwareBoost:
+    """Tests for _boost_with_entity_signal — entity-aware search boosting."""
+
+    def test_boost_no_entities_in_query(self, mock_http_client):
+        """No boost when query doesn't match any KG node labels."""
+        mock_http_client._query = MagicMock(return_value=[
+            {"id": "n1", "label": "RLHF", "summary": "Reinforcement learning from human feedback", "node_type": "concept"},
+        ])
+
+        rows = [
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is a training method"},
+            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "Supervised fine-tuning"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal("some unrelated query", rows, "default")
+        assert result[0]["fused_score"] == 0.8  # Unchanged
+        assert result[1]["fused_score"] == 0.6  # Unchanged
+
+    def test_boost_entity_exact_match(self, mock_http_client):
+        """Boost when query exactly matches an entity label."""
+        mock_http_client._query = MagicMock(return_value=[
+            {"id": "n1", "label": "RLHF", "summary": "Reinforcement learning from human feedback", "node_type": "concept"},
+            {"id": "n2", "label": "LoRA", "summary": "Low-rank adaptation", "node_type": "concept"},
+        ])
+
+        rows = [
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is a training method for LLMs"},
+            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "Supervised fine-tuning of base models"},
+            {"entity_id": "m3", "fused_score": 0.4, "memory_content": "LoRA is a parameter-efficient technique"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal(
+            "tell me about RLHF", rows, "default", boost_factor=0.15
+        )
+
+        # m1 mentions RLHF → gets boosted (because RLHF appears in query + content)
+        assert result[0]["entity_id"] == "m1"
+        assert result[0]["fused_score"] > 0.8
+        assert result[0].get("entity_boost", 0) > 0
+
+        # m3 mentions LoRA but query is about RLHF → not boosted
+        assert result[2]["entity_id"] == "m3"
+        assert result[2]["fused_score"] == 0.4
+
+        # m2 has no entity match → unchanged
+        assert result[1]["entity_id"] == "m2"
+        assert result[1]["fused_score"] == 0.6
+
+    def test_boost_multiple_entity_hits(self, mock_http_client):
+        """Boost scales with proportion of matched entities in content."""
+        mock_http_client._query = MagicMock(return_value=[
+            {"id": "n1", "label": "RLHF", "summary": "", "node_type": "concept"},
+            {"id": "n2", "label": "LoRA", "summary": "", "node_type": "concept"},
+        ])
+
+        rows = [
+            # Mentions both RLHF and LoRA when both entities match query
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF and LoRA combined"},
+            # Mentions only one
+            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "Only RLHF here"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal(
+            "RLHF LoRA comparison", rows, "default", boost_factor=0.15
+        )
+
+        # m1 has both entities → proportion = 2/2 = 1.0 → max boost
+        # m2 has one entity → proportion = 1/2 = 0.5 → half boost
+        assert result[0]["entity_id"] == "m1"
+        assert result[1]["entity_id"] == "m2"
+        boost_m1 = result[0].get("entity_boost", 0)
+        boost_m2 = result[1].get("entity_boost", 0)
+        assert boost_m1 > boost_m2
+        assert abs(boost_m1 - 0.15) < 0.001  # max boost
+        assert abs(boost_m2 - 0.075) < 0.001  # half boost
+
+    def test_boost_word_level_overlap(self, mock_http_client):
+        """Boost fires when a word from entity label overlaps query words."""
+        mock_http_client._query = MagicMock(return_value=[
+            {"id": "n1", "label": "Neural Networks", "summary": "", "node_type": "concept"},
+        ])
+
+        rows = [
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "neural networks are powerful"},
+            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "just some text"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal(
+            "neural networks in ML", rows, "default", boost_factor=0.15
+        )
+
+        assert result[0]["entity_id"] == "m1"
+        assert result[0]["fused_score"] > 0.8
+        # m2 unchanged
+        assert result[1]["entity_id"] == "m2"
+        assert result[1]["fused_score"] == 0.6
+
+    def test_boost_summary_match(self, mock_http_client):
+        """Boost fires when the query substring appears in entity summary, and result content mentions the entity label."""
+        mock_http_client._query = MagicMock(return_value=[
+            {"id": "n1", "label": "PEFT", "summary": "Parameter-efficient fine-tuning for large models", "node_type": "concept"},
+        ])
+
+        rows = [
+            # Content mentions the entity label "PEFT"
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "PEFT (parameter efficient fine tuning) is useful"},
+            # Content doesn't mention the entity label — no boost
+            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "just some unrelated text"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal(
+            "parameter-efficient fine-tuning", rows, "default", boost_factor=0.15
+        )
+
+        # m1 mentions PEFT → boosted (entity matched via summary, content mentions label)
+        assert result[0]["entity_id"] == "m1"
+        assert result[0]["fused_score"] > 0.8
+        assert result[0].get("entity_boost", 0) > 0
+
+        # m2 doesn't mention PEFT → unchanged
+        assert result[1]["entity_id"] == "m2"
+        assert result[1]["fused_score"] == 0.6
+
+    def test_boost_no_nodes_found(self, mock_http_client):
+        """No boost when KG has no nodes (graceful degradation)."""
+        mock_http_client._query = MagicMock(return_value=[])
+
+        rows = [{"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF content"}]
+        result = mock_http_client._boost_with_entity_signal("RLHF", rows, "default")
+        assert result[0]["fused_score"] == 0.8
+
+    def test_boost_query_lookup_fails(self, mock_http_client):
+        """No boost when KG query raises RuntimeError (graceful degradation)."""
+        mock_http_client._query = MagicMock(side_effect=RuntimeError("db error"))
+
+        rows = [{"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF content"}]
+        result = mock_http_client._boost_with_entity_signal("RLHF", rows, "default")
+        assert result[0]["fused_score"] == 0.8
+
+    def test_boost_empty_rows(self, mock_http_client):
+        """No boost when rows list is empty."""
+        result = mock_http_client._boost_with_entity_signal("RLHF", [], "default")
+        assert result == []
+
+    def test_boost_integrated_in_search_called(self, mock_http_client):
+        """Verify _boost_with_entity_signal is called during search()."""
+        from unittest.mock import patch
+        # Mock _embed to return valid embedding
+        mock_http_client._embed = MagicMock(return_value=[0.1, 0.2, 0.3])
+        # Mock _call for hybrid_search and query_table
+        mock_http_client._call = MagicMock(return_value={"status": "ok"})
+        # Mock _sql to return empty results
+        mock_http_client._sql = MagicMock(return_value=[])
+        # Mock _tantivy_search
+        mock_http_client._tantivy_search = MagicMock(return_value=[])
+        # Spy on _boost_with_entity_signal
+        with patch.object(mock_http_client, '_boost_with_entity_signal',
+                          wraps=mock_http_client._boost_with_entity_signal) as spy:
+            mock_http_client.search("default", "RLHF", semantic=True, limit=5)
+            spy.assert_called_once()

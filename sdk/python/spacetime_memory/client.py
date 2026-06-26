@@ -1266,6 +1266,121 @@ class Client:
         }, workspace_id=workspace_id)
         return results
 
+    # ------------------------------------------------------------------
+    # Entity-aware search result boosting (mem0 v3 multi-signal parity)
+    # ------------------------------------------------------------------
+
+    def _boost_with_entity_signal(
+        self,
+        query: str,
+        rows: list[dict[str, Any]],
+        workspace_id: str,
+        *,
+        boost_factor: float = 0.15,
+    ) -> list[dict[str, Any]]:
+        """Boost search results that mention entities found in the query.
+
+        Inspired by mem0 v3's multi-signal retrieval: if the query mentions
+        a known knowledge-graph entity (label or summary match), results
+        whose content references that entity get a fused_score boost.
+
+        Operates in-place on the ``fused_score`` of each row and re-sorts.
+
+        Args:
+            query: The search query.
+            rows: Search results after ``_enrich_content`` (must have
+                  ``memory_content`` or ``content`` key).
+            workspace_id: Target workspace for entity lookup.
+            boost_factor: Maximum fractional boost applied to entity-matching
+                          results (default 0.15 = +15%).
+
+        Returns:
+            Rows with adjusted ``fused_score`` values, re-sorted
+            highest-first.  If no entities are found in the query or
+            the KG lookup fails, returns rows unchanged.
+        """
+        if not rows or not query:
+            return rows
+
+        # Fetch KG nodes from this workspace
+        try:
+            nodes = self._query(
+                "kg_node",
+                workspace_id=workspace_id,
+                columns=["id", "label", "summary", "node_type"],
+            )
+        except RuntimeError:
+            return rows  # Graceful degradation
+
+        if not nodes:
+            return rows
+
+        query_lower = query.lower()
+        query_words = set(query_lower.split())
+
+        # Find entity labels that match the query
+        matching_labels: list[str] = []
+        for node in nodes:
+            label = (node.get("label") or "").lower().strip()
+            summary = (node.get("summary") or "").lower().strip()
+
+            if not label:
+                continue
+
+            # 1) Exact match: query contains the full entity label
+            if label in query_lower:
+                matching_labels.append(label)
+                continue
+
+            # 2) Word-level overlap: a word from the label appears in the query
+            label_words = set(label.split())
+            if label_words and query_words & label_words:
+                matching_labels.append(label)
+                continue
+
+            # 3) Query substring appears in entity summary
+            if summary and query_lower in summary:
+                matching_labels.append(label)
+                continue
+
+        if not matching_labels:
+            return rows
+
+        unique_labels = list(set(matching_labels))
+        logger.debug(
+            "Entity-aware boost: detected %d entities in query: %s",
+            len(unique_labels),
+            unique_labels[:5],
+        )
+
+        # Boost each result that references any of the matched entities
+        for row in rows:
+            content = (
+                row.get("memory_content")
+                or row.get("content")
+                or ""
+            ).lower()
+            if not content:
+                continue
+
+            # Count how many of the matched entity labels appear in the content
+            hit_count = sum(
+                1 for lbl in unique_labels if lbl and lbl in content
+            )
+            if hit_count == 0:
+                continue
+
+            # Proportional boost: more entity hits → higher boost,
+            # capped by boost_factor
+            proportion = min(hit_count / max(len(unique_labels), 1), 1.0)
+            entity_boost = proportion * boost_factor
+            current = row.get("fused_score", 0.0)
+            row["fused_score"] = current * (1.0 + entity_boost)
+            row["entity_boost"] = entity_boost
+
+        # Re-sort by boosted fused_score
+        rows.sort(key=lambda r: r.get("fused_score", 0.0), reverse=True)
+        return rows
 
     def search(
         self,
@@ -1478,6 +1593,9 @@ class Client:
 
             # ── Look up content and apply veracity weighting ──
             rows = self._enrich_content(rows, workspace_id)
+
+            # ── Entity-aware search result boosting (mem0 v3 parity) ──
+            rows = self._boost_with_entity_signal(query, rows, workspace_id)
 
             if cross_encoder:
                 try:
