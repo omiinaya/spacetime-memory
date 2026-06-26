@@ -72,5 +72,6 @@ markers = [
     "unit: tests that mock HTTP — no SpacetimeDB required",
     "integration: tests that need a running SpacetimeDB standalone",
     "embedder: tests that also need the ONNX embedder sidecar on :9090",
+    "asyncio: async test — requires pytest-asyncio plugin",
 ]
 testpaths = ["tests"]

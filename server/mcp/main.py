@@ -1318,6 +1318,59 @@ def search_entities(
 
 @mcp.tool()
 @require_api_key
+def cross_link(workspace_id: str = "default") -> str:
+    """Auto-link related but unconnected memories in a workspace.
+
+    Finds memories that reference similar concepts or share entities
+    but aren't directly linked, and creates edges between them.
+
+    Args:
+        workspace_id: Target workspace (default: "default").
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    result = cp.cross_link(workspace_id=workspace_id)
+    links_created = result.get("links_created", 0)
+    pairs_checked = result.get("pairs_checked", 0)
+    return (
+        f"Cross-link complete for workspace {workspace_id[:16]}...\n"
+        f"  Pairs checked: {pairs_checked}\n"
+        f"  Links created: {links_created}"
+    )
+
+
+@mcp.tool()
+@require_api_key
+def suggest_connections(workspace_id: str = "default") -> str:
+    """Find knowledge-graph node pairs that should be linked.
+
+    Identifies node pairs that share neighbours but aren't directly
+    connected, and returns ranked suggestions for new edges.
+
+    Args:
+        workspace_id: Target workspace (default: "default").
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    suggestions = cp.suggest_connections(workspace_id=workspace_id)
+    if not suggestions:
+        return "No connection suggestions found."
+    lines = [
+        f"Found {len(suggestions)} connection suggestion(s) "
+        f"for workspace {workspace_id[:16]}...:"
+    ]
+    for s in suggestions[:20]:
+        src = s.get("source_label", "?")
+        tgt = s.get("target_label", "?")
+        common = s.get("common_count", 0)
+        lines.append(f"  - {src[:40]} → {tgt[:40]} ({common} common neighbour(s))")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@require_api_key
 def store_answer(
     query: str,
     answer: str,

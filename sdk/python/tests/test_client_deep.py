@@ -5048,13 +5048,15 @@ class TestNoteEmbedOps:
     def test_create_note_with_embed(self):
         from unittest.mock import Mock
         c = Client(host="localhost", port=3001)
-        c._call = Mock(return_value={"status": "ok"})
+        c._call = Mock(side_effect=lambda name, *a: {"status": "ok"}  if name == "create_note" else [])
         c._embed = Mock(return_value=[0.1, 0.2, 0.3])
         result = c.create_note("ws", "Title", "Content here", embed=True)
         c._embed.assert_called_once()
-        c._call.assert_called_once()
-        args = c._call.call_args[0][1]
-        assert "Content here" in args
+        # First _call must be create_note; query_table/index calls are internal
+        first_call_name = c._call.call_args_list[0][0][0]
+        first_call_args = c._call.call_args_list[0][0][1]
+        assert first_call_name == "create_note"
+        assert "Content here" in first_call_args
 
     def test_create_note_embed_empty_content(self):
         """Embed empty content — _embed not called, embedding_json stays '[]'."""
