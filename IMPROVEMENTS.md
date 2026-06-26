@@ -42,9 +42,18 @@ The `lint_workspace()` method currently checks for KG nodes with no edges
 check for notes that are entirely disconnected from the KG — notes that
 exist as wiki pages but have no corresponding KG nodes or edges.  Add a
 `note_orphans` section to the lint result that lists notes whose content
-mentions no known entities and have no KG connections.
+mention no known entities and have no KG connections.
 Difficulty: Medium
 Est: 30min
+
+### Apply entity-aware boosting in keyword fallback path
+When the embedder is unavailable (or semantic search is disabled), `search()`
+falls back to `_keyword_fallback()`. That path does NOT call
+`_boost_with_entity_signal`, so entity-aware boosting is completely absent
+when there are no embeddings. Add boosting (with entity_link alias support)
+at the end of `_keyword_fallback`, before the limit+return.
+Difficulty: Easy
+Est: 15min
 
 ### ✅ Use entity_link aliases in entity-aware boosting (Jun 26)
 The `_boost_with_entity_signal` method now also fetches entity_link records
@@ -128,4 +137,12 @@ Difficulty: Hard (needs live STDB)
 
 ---
 
-*(cron manages this section — moves items here when marked ✅, purges old ones)*
+| *(cron manages this section — moves items here when marked ✅, purges old ones)*
+|
+
+## Research Log
+
+### Jun 26 — Entity-link alias boosting done; keyword-fallback boosting gap found
+- Implemented: entity_link alias matching in `_boost_with_entity_signal`
+- Found gap: `_keyword_fallback` (called when embedder is down) doesn't apply entity-aware boosting at all. Only the semantic search path calls `_boost_with_entity_signal`. Added PENDING item below.
+- The remaining 3 PENDING items in the queue are the next targets.
