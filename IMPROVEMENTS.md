@@ -6,12 +6,21 @@ and works the top pending item each tick.
 
 ---
 
-| Status | Item |
-|--------|------|
-| ✅ | Add `find_near_duplicates` MCP tool |
-| PENDING | Add `entity_types` and `before`/`after` params to MCP search tools |
+*(cron manages this section — moves items here when marked ✅, purged old ones)*
 
-### ✅ Add `find_near_duplicates` MCP tool
+---
+
+## Recently Completed
+
+### ✅ Add `entity_types`/`before`/`after` params to MCP search tools (Jul 1)
+Added `entity_types` (list[str]), `before` (float), and `after` (float) parameters
+to both `search_memories` and `hybrid_search` MCP tools, matching the SDK
+`Client.search()` signature.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+
+### ✅ Add `find_near_duplicates` MCP tool (Jul 1)
 Added `find_near_duplicates` MCP tool wrapping the Compounder method. Accepts
 `content`, `workspace_id`, `threshold` (default 0.92), `limit` (default 5).
 Returns formatted list of near-duplicate candidates with entity type, ID, score,
@@ -19,18 +28,6 @@ and content snippet.
 Files: server/mcp/main.py
 Difficulty: Easy
 Est: 8min
-
-### Add `entity_types` and `before`/`after` params to MCP search tools
-The SDK `Client.search()` supports `entity_types` (list[str]), `before` (float),
-and `after` (float) parameters for filtering by entity type and creation date.
-The MCP `search_memories` and `hybrid_search` tools don't expose these yet.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-
----
-
-## Recently Completed
 
 ### ✅ Add `cross_link` and `suggest_connections` MCP tools (Jun 30)
 Both tools already existed in `server/mcp/main.py` but had field-name mismatches
@@ -88,11 +85,21 @@ Difficulty: Hard (needs live STDB)
 
 ---
 
-*(cron manages this section — moves items here when marked ✅, purged old ones)*
-
----
-
 ## Research Log
+
+### Jul 1 — entity_types/before/after params added to MCP search tools
+- **MCP search tools upgrade**: Added `entity_types` (list[str]), `before` (float),
+  and `after` (float) parameters to both `search_memories` and `hybrid_search`
+  MCP tools, matching the existing SDK `Client.search()` signature.
+- **Research**:
+  - STDB crate v2.6.0 (unchanged), spacetimedb-sdk v0.7.0 (unchanged).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+  - No new features in STDB v2.6 changelog that would benefit the module.
+- **Backlog**: 0 PENDING items remaining. All actionable improvements complete.
+- **Commits**: (pending commit — entity_types/before/after MCP params).
 
 ### Jun 30 — cross_link/suggest_connections fixed; find_near_duplicates MCP tool added
 - **MCP tools audit**: Fixed `cross_link` (reads `links_created` not `edges_created`)

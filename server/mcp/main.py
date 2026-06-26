@@ -267,10 +267,20 @@ def search_memories(
     tier: str = "",
     limit: int = 50,
     rerank: bool = False,
+    entity_types: list[str] | None = None,
+    before: float | None = None,
+    after: float | None = None,
 ) -> list[dict[str, Any]]:
     """Search memories via keyword with optional filters.
 
-    Set rerank=True to enable LLM reranking for improved precision."""
+    Set rerank=True to enable LLM reranking for improved precision.
+
+    Args:
+        entity_types: Optional list of entity_type values to filter by
+            (e.g. ["memory", "note"], or ["node"] for KG nodes only).
+        before: Optional Unix timestamp — only return results created before this time.
+        after: Optional Unix timestamp — only return results created after this time.
+    """
     return get_client().search(
         workspace_id=workspace_id,
         query=query_text,
@@ -279,6 +289,9 @@ def search_memories(
         limit=limit,
         semantic=True,
         rerank=rerank,
+        entity_types=entity_types,
+        before=before,
+        after=after,
     )
 
 
@@ -292,10 +305,20 @@ def hybrid_search(
     limit: int = 20,
     strategies: str = "semantic,keyword,graph,temporal",
     rerank: bool = True,
+    entity_types: list[str] | None = None,
+    before: float | None = None,
+    after: float | None = None,
 ) -> list[dict[str, Any]]:
     """Multi-strategy hybrid search across memories, KG nodes, and temporal data.
 
-    Uses LLM reranking by default for improved precision (P@5=29% vs 23% baseline)."""
+    Uses LLM reranking by default for improved precision (P@5=29% vs 23% baseline).
+
+    Args:
+        entity_types: Optional list of entity_type values to filter by
+            (e.g. ["memory", "note"], or ["node"] for KG nodes only).
+        before: Optional Unix timestamp — only return results created before this time.
+        after: Optional Unix timestamp — only return results created after this time.
+    """
     return get_client().search(
         workspace_id=workspace_id,
         query=query_text,
@@ -304,6 +327,9 @@ def hybrid_search(
         limit=limit,
         semantic=True,
         rerank=rerank,
+        entity_types=entity_types,
+        before=before,
+        after=after,
     )
 
 
