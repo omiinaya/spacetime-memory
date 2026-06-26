@@ -1230,11 +1230,19 @@ class Client:
         memory_type: str,
         tier: str,
         limit: int,
+        before: float | int | None = None,
+        after: float | int | None = None,
     ) -> list[dict[str, Any]]:
         """Non-semantic keyword-only search fallback using client-side filtering.
 
         Searches both the ``memory`` table and the ``note`` table, merging
         results sorted by ``created_at`` descending.
+
+        Args:
+            before: Optional Unix timestamp — only return results with
+                    ``created_at < before``.
+            after: Optional Unix timestamp — only return results with
+                    ``created_at > after``.
         """
         clauses = [f"workspace_id = '{_esc(workspace_id)}'"]
         if memory_type:
@@ -1318,12 +1326,23 @@ class Client:
             "query": query,
             "result_count": len(results),
         }, workspace_id=workspace_id)
+        # ── Date range filter (before/after) ──
+        if before is not None or after is not None:
+            filtered = []
+            for r in results:
+                ts = r.get("created_at")
+                if ts is None:
+                    continue
+                if before is not None and not (ts < before):
+                    continue
+                if after is not None and not (ts > after):
+                    continue
+                filtered.append(r)
+            results = filtered
         return results
 
     # ------------------------------------------------------------------
     # Entity-aware search result boosting (mem0 v3 multi-signal parity)
-    # ------------------------------------------------------------------
-
     def _boost_with_entity_signal(
         self,
         query: str,
@@ -1513,6 +1532,8 @@ class Client:
         mmr_lambda: float = 0.0,
         fusion_weights: dict[str, float] | None = None,
         entity_types: list[str] | None = None,
+        before: float | int | None = None,
+        after: float | int | None = None,
     ) -> list[dict[str, Any]]:
         """Search memories.  When *semantic* is True uses hybrid search.
 
@@ -1542,6 +1563,10 @@ class Client:
                     e.g. ``["memory", "note"]`` to return only memories and notes,
                     or ``["node"]`` for KG nodes only. Applied after fusion and
                     enrichment, in both hybrid and keyword-fallback paths.
+            before: Optional Unix timestamp — only return results with
+                    ``created_at < before``.
+            after: Optional Unix timestamp — only return results with
+                    ``created_at > after``.
         """
         if semantic:
             # ── Query cache check ──
@@ -1719,6 +1744,20 @@ class Client:
             if entity_types is not None and entity_types:
                 rows = [r for r in rows if r.get("entity_type") in entity_types]
 
+            # ── Date range filter (before/after) ──
+            if before is not None or after is not None:
+                filtered = []
+                for r in rows:
+                    ts = r.get("created_at")
+                    if ts is None:
+                        continue
+                    if before is not None and not (ts < before):
+                        continue
+                    if after is not None and not (ts > after):
+                        continue
+                    filtered.append(r)
+                rows = filtered
+
             if cross_encoder:
                 try:
                     from .cross_encoder import cross_encoder_rerank
@@ -1759,7 +1798,8 @@ class Client:
             return results
 
         # Non-semantic (keyword) fallback
-        rows = self._keyword_fallback(workspace_id, query, memory_type, tier, limit)
+        rows = self._keyword_fallback(workspace_id, query, memory_type, tier, limit,
+                                      before=before, after=after)
         if entity_types is not None and entity_types:
             rows = [r for r in rows if r.get("entity_type") in entity_types]
         return rows

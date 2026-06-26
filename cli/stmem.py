@@ -22,6 +22,7 @@ import time
 from typing import Any
 
 import click
+import datetime
 import httpx
 from rich.console import Console
 from rich.table import Table
@@ -532,12 +533,46 @@ def memory_store(
 @click.option("--watch", "-w", is_flag=True, help="Watch for changes (poll every 5s)")
 @click.option("--snippet", "-s", is_flag=True,
               help="Show snippet preview (first ~200 chars) instead of full content in table output")
+@click.option("--from", "from_ts", default=None,
+              help="Show only results created after this timestamp. Accepts ISO-8601 "
+                   "(e.g. '2026-06-01' or '2026-06-01T12:00:00Z') or a Unix epoch timestamp.")
+@click.option("--to", "to_ts", default=None,
+              help="Show only results created before this timestamp. Accepts ISO-8601 "
+                   "(e.g. '2026-06-30' or '2026-06-30T12:00:00Z') or a Unix epoch timestamp.")
 @click.pass_context
 def memory_search(ctx: click.Context, workspace_id: str, query: str,
                   memory_type: str | None, tier: str | None, limit: int,
                   semantic: bool, polyphonic: bool, watch: bool,
-                  mmr_lambda: float, snippet: bool) -> None:
+                  mmr_lambda: float, snippet: bool,
+                  from_ts: str | None, to_ts: str | None) -> None:
     """Search memories in a workspace."""
+
+    def _parse_timestamp(val: str | None) -> float | None:
+        """Parse ISO-8601 string or Unix timestamp. Returns Unix timestamp (float) or None."""
+        if val is None:
+            return None
+        val = val.strip()
+        # Try numeric (Unix timestamp)
+        try:
+            return float(val)
+        except ValueError:
+            pass
+        # Try ISO-8601 datetime
+        for fmt in [
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S%z",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d",
+        ]:
+            try:
+                dt = datetime.datetime.strptime(val, fmt)
+                return dt.timestamp()
+            except ValueError:
+                continue
+        raise click.BadParameter(
+            f"Cannot parse '{val}' as a timestamp. Use ISO-8601 or a Unix epoch number."
+        )
+
     client = _sdk_client()
 
     def _run_search() -> list[dict[str, Any]]:
@@ -551,6 +586,8 @@ def memory_search(ctx: click.Context, workspace_id: str, query: str,
                 semantic=semantic,
                 polyphonic=polyphonic,
                 mmr_lambda=mmr_lambda,
+                before=_parse_timestamp(to_ts),
+                after=_parse_timestamp(from_ts),
             )
 
     def _display(rows: list[dict[str, Any]]) -> None:
