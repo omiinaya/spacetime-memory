@@ -26,6 +26,26 @@ Add `/// ````````````` doc-test blocks on pure helper functions in these files.
 Difficulty: Easy
 Est: 30min
 
+### Add entity_types filter parameter to search()
+The `search()` method has `memory_type` and `tier` filters but no way to
+select which content types to return (memory, note, node).  Add an
+`entity_types` parameter (e.g. `entity_types=["memory", "note"]`) that
+filters after fusion so users can scope searches to notes only or exclude
+noisy memory results.  The filter should apply in both semantic and
+keyword-fallback paths.
+Difficulty: Easy
+Est: 15min
+
+### Add note orphan detection to lint_workspace()
+The `lint_workspace()` method currently checks for KG nodes with no edges
+(orphans) and missing cross-refs between notes and entities.  It does not
+check for notes that are entirely disconnected from the KG — notes that
+exist as wiki pages but have no corresponding KG nodes or edges.  Add a
+`note_orphans` section to the lint result that lists notes whose content
+mentions no known entities and have no KG connections.
+Difficulty: Medium
+Est: 30min
+
 ---
 
 ## Recently Completed
