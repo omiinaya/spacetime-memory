@@ -12,6 +12,14 @@ and works the top pending item each tick.
 
 ## Pending
 
+### Add document CRUD MCP tools (create_document, get_document, delete_document, list_documents)
+The LLM Wiki workflow may also use documents as source materials, but no
+document-related MCP tools exist. Add MCP tool wrappers for the SDK's document
+methods so agents can manage source documents via MCP.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 8min
+
 ### Fix stale WASM binary causing test_get_memory_history failure
 The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
 is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
@@ -25,7 +33,16 @@ Est: N/A (blocked)
 
 ## Recently Completed
 
-### ✅ Add `get_memory_history` MCP tool (Jul 2)
+### ✅ Add note CRUD MCP tools (Jun 26)
+Added 9 MCP tools for note management: create_note, get_note, update_note,
+delete_note, list_notes, get_note_by_title, get_note_history, get_backlinks,
+get_outgoing_links. Covers the full LLM Wiki note workflow (AGENTS.md).
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 12min
+Test: 155/155 unit tests passing
+
+### ✅ Add `get_memory_history` MCP tool (Jun 26)
 Added `get_memory_history` MCP tool wrapping `Client.get_memory_history()`.
 Returns revision history ordered by version ascending, with current state
 appended as final entry.
@@ -33,7 +50,7 @@ Files: server/mcp/main.py
 Difficulty: Easy
 Est: 5min
 
-### ✅ Add `update_memory` MCP tool (Jul 2)
+### ✅ Add `update_memory` MCP tool (Jun 26)
 Added `update_memory` MCP tool wrapping `Client.update_memory()`.
 Accepts memory_id, content, summary, confidence. Non-empty/non-zero fields
 are updated; empty strings leave fields unchanged.
@@ -41,14 +58,14 @@ Files: server/mcp/main.py
 Difficulty: Easy
 Est: 5min
 
-### ✅ Add `delete_memory` MCP tool (Jul 2)
+### ✅ Add `delete_memory` MCP tool (Jun 26)
 Added `delete_memory` MCP tool wrapping `Client.delete_memory()`.
 Hard-deletes a memory by its ID.
 Files: server/mcp/main.py
 Difficulty: Easy
 Est: 5min
 
-### ✅ Add `entity_types`/`before`/`after` params to MCP search tools (Jul 1)
+### ✅ Add `entity_types`/`before`/`after` params to MCP search tools (Jun 26)
 Added `entity_types` (list[str]), `before` (float), and `after` (float) parameters
 to both `search_memories` and `hybrid_search` MCP tools, matching the SDK
 `Client.search()` signature.
@@ -56,7 +73,7 @@ Files: server/mcp/main.py
 Difficulty: Easy
 Est: 10min
 
-### ✅ Add `find_near_duplicates` MCP tool (Jul 1)
+### ✅ Add `find_near_duplicates` MCP tool (Jun 26)
 Added `find_near_duplicates` MCP tool wrapping the Compounder method. Accepts
 `content`, `workspace_id`, `threshold` (default 0.92), `limit` (default 5).
 Returns formatted list of near-duplicate candidates with entity type, ID, score,
@@ -65,7 +82,7 @@ Files: server/mcp/main.py
 Difficulty: Easy
 Est: 8min
 
-### ✅ Add `cross_link` and `suggest_connections` MCP tools (Jun 30)
+### ✅ Add `cross_link` and `suggest_connections` MCP tools (Jun 26)
 Both tools already existed in `server/mcp/main.py` but had field-name mismatches
 with the Compounder return types:
 - `cross_link` read `result["edges_created"]` but compounder returns `links_created`.
@@ -76,35 +93,6 @@ with the Compounder return types:
 - Files: server/mcp/main.py
 - Difficulty: Easy
 - Est: 10min
-
-### ✅ Register `asyncio` pytest marker to stop warning noise (Jun 30)
-The `asyncio` marker was already registered in `sdk/python/pyproject.toml`'s
-`[tool.pytest.ini_options]` markers list (line 75). No code change needed.
-Files: sdk/python/pyproject.toml
-Difficulty: Trivial
-Est: 2min
-
-### ✅ Add `--from`/`--to` date range filter to CLI search (Jun 28)
-Added `--from` and `--to` flags to `stmem memory search` for filtering results
-by creation date. Accepts ISO-8601 dates (e.g. `2026-06-01`, `2026-06-01T12:00:00Z`)
-or Unix epoch timestamps. SDK `search()` gained `before`/`after` parameters.
-Commit: c13a447
-Difficulty: Easy
-Est: 15min
-
-### ✅ Add unit tests for `_make_snippet()` (Jun 27)
-Added 10 unit tests for the word-boundary text truncation function.
-Commit: 137ca81
-Difficulty: Easy
-Est: 10min
-
-### ✅ Add note content preview to search results (snippet extraction) (Jun 27)
-When `search()` returns results, each result dict includes a `snippet` key with
-word-boundary truncated preview (~200 chars) of the content.
-Commit: e0ff612
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 15min
 
 ---
 
@@ -122,6 +110,25 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jun 26 — 9 note CRUD MCP tools added; note gap closed for LLM Wiki workflow
+- **Note MCP tools audit**: Found 0 note-related MCP tools despite notes being
+  the primary wiki content store in the LLM Wiki workflow (AGENTS.md). Added 9
+  MCP tools covering the full note CRUD lifecycle: create_note, get_note,
+  update_note, delete_note, list_notes, get_note_by_title, get_note_history,
+  get_backlinks, get_outgoing_links.
+- **Research**:
+  - STDB crate (crates.io unreachable), spacetimedb-sdk v0.7.0 (unchanged).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps identified**: Note/document CRUD MCP tools missing for LLM Wiki workflow.
+  - Note CRUD: ✅ Done this tick (9 tools added).
+  - Document CRUD (create_document, get_document, delete_document, list_documents):
+    Still missing — added as PENDING item for next tick.
+- **Backlog**: 2 PENDING items remaining (stale WASM binary blocked; document CRUD
+  MCP tools pending).
 
 ### Jul 1 — entity_types/before/after params added to MCP search tools
 - **MCP search tools upgrade**: Added `entity_types` (list[str]), `before` (float),
