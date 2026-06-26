@@ -38,20 +38,20 @@ defined, causing all test_mcp.py tests to fail with fixture-not-found.
 Added fixture to conftest.py that patches `spacetime_memory.compounder.Compounder`
 so all 39 MCP tests now pass.
 Files: sdk/python/tests/conftest.py
-Commit: (current)
+Commit: 37817bc
 
 ### ✅ Add `store_answers_batch` MCP tool tests (Jun 26)
 Added 10 unit tests for the `store_answers_batch` MCP tool covering:
 valid batches, empty list, single pair, invalid JSON, wrong structure,
 workspace ID passthrough, source_memory_ids parsing, and no-entities.
 Files: sdk/python/tests/test_mcp.py
-Commit: (current)
+Commit: 37817bc
 
 ### ✅ Add cross-link/suggest-connections CLI edge-case tests (Jun 26)
 Added 3 new tests for `cross-link --dry-run`, `suggest-connections --limit 5`,
 and `suggest-connections --json --limit 10` to fill coverage gaps.
 Files: sdk/python/tests/test_cli_batch2.py
-Commit: (current)
+Commit: 37817bc
 
 ### ✅ Add unit tests for MCP tools (server/mcp/main.py) (Jun 25)
 The MCP server has 40+ tools but zero test coverage. Start by adding
