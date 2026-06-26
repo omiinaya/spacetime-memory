@@ -1127,6 +1127,39 @@ def create_entity_page(
 
 @mcp.tool()
 @require_api_key
+def update_entity_page(
+    name: str,
+    description: str | None = None,
+    entity_type: str | None = None,
+    workspace_id: str = "default",
+) -> str:
+    """Update an existing entity wiki page and its KG node.
+
+    Finds the entity by name and updates the provided fields. Fields not
+    provided are left unchanged.
+
+    Args:
+        name: Entity name (used to find the existing entity).
+        description: New 2-3 sentence description (optional).
+        entity_type: New entity type (e.g. person, org, concept).
+        workspace_id: Target workspace.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    result = cp.update_entity_page(
+        name=name,
+        description=description,
+        entity_type=entity_type,
+        workspace_id=workspace_id,
+    )
+    if not result:
+        return f"Entity page '{name}' not found."
+    return f"Entity page '{name}' updated."
+
+
+@mcp.tool()
+@require_api_key
 def create_concept_page(
     concept: str,
     definition: str,

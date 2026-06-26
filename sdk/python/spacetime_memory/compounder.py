@@ -1414,6 +1414,149 @@ class Compounder:
 
         return {"node": node, "note": note}
 
+    # ------------------------------------------------------------------
+    # update_entity_page — update an existing entity wiki page + KG node
+    # ------------------------------------------------------------------
+
+    def update_entity_page(
+        self,
+        name: str,
+        workspace_id: str = "default",
+        description: str | None = None,
+        entity_type: str | None = None,
+        tags: list[str] | None = None,
+        relations: list[dict[str, str]] | None = None,
+        embed: bool = True,
+    ) -> dict[str, Any]:
+        """Update an existing entity wiki page and its KG node in one call.
+
+        Finds the entity by its label (``name``), then updates the KG node
+        and the associated wiki note with the provided fields. Fields set to
+        ``None`` are left unchanged on the existing entity.
+
+        Args:
+            name: Entity name (used to find the existing entity by label).
+            workspace_id: Target workspace.
+            description: New 2-3 sentence description (updates both node
+                summary and note content). ``None`` = keep existing.
+            entity_type: New entity type (e.g. ``"person"``, ``"concept"``).
+                ``None`` = keep existing.
+            tags: Updated YAML frontmatter tags. ``None`` = keep existing.
+            relations: Updated relations list. ``None`` = keep existing.
+            embed: Whether to re-embed the note for semantic search.
+
+        Returns:
+            Dict with ``node`` and ``note`` keys, or empty dict if the
+            entity was not found.
+        """
+        # 1. Find the existing KG node by label
+        existing = self._client._query(
+            "kg_node", workspace_id=workspace_id,
+            filter_dict={"label": name},
+        )
+        if not existing:
+            logger.warning("update_entity_page: entity '%s' not found", name)
+            return {}
+        node = existing[0]
+
+        # 2. Find the associated wiki note (entity pages use name as title)
+        notes = self._client._query(
+            "note", workspace_id=workspace_id,
+            filter_dict={"title": name, "is_active": "true"},
+        )
+        note = notes[0] if notes else {}
+
+        # 3. Update the KG node with any provided values
+        new_label = name  # label stays the same (it's the lookup key)
+        new_type = entity_type if entity_type is not None else node.get("node_type", "concept")
+        new_summary = description if description is not None else node.get("summary", "")
+
+        try:
+            self._client.update_node(
+                node_id=node["id"],
+                label=new_label,
+                node_type=new_type,
+                summary=new_summary,
+                metadata_json=node.get("metadata_json", "{}"),
+                source_memory_id=node.get("source_memory_id", ""),
+            )
+        except RuntimeError:
+            logger.warning("update_entity_page: failed to update KG node '%s'", name)
+
+        # 4. Rebuild the note content with updated fields
+        if note.get("id"):
+            # Preserve original content and parse frontmatter if it exists
+            old_content = note.get("content", "")
+
+            # Build updated frontmatter tags
+            if tags is not None:
+                tag_line = ""
+                if tags:
+                    tag_line = "tags: [" + ", ".join(tags) + "]\n"
+            else:
+                # Try to extract existing tags from frontmatter
+                tag_line = ""
+                if old_content.startswith("---"):
+                    end_idx = old_content.find("---", 3)
+                    if end_idx != -1:
+                        fm = old_content[3:end_idx].strip()
+                        for line in fm.split("\n"):
+                            if line.startswith("tags:"):
+                                tag_line = line + "\n"
+
+            # Build relations section
+            if relations is not None:
+                rel_lines = ""
+                if relations:
+                    rel_lines = "\n## Relations\n\n"
+                    for r in relations:
+                        rel_lines += f"- **{r.get('relation', 'related_to')}**: {r.get('name', '')}\n"
+            else:
+                # Extract existing relations section
+                rel_lines = ""
+                if old_content and "## Relations" in old_content:
+                    parts = old_content.split("## Relations", 1)
+                    rest = parts[1] if len(parts) > 1 else ""
+                    if "---" in rest:
+                        rel_lines = "## Relations" + rest.split("---", 1)[0]
+
+            # Build new content
+            new_content = (
+                f"---\n"
+                f"type: {new_type}\n"
+                f"{tag_line}"
+                f"sources: []\n"
+                f"created: {datetime.datetime.utcnow().strftime('%Y-%m-%d')}\n"
+                f"---\n\n"
+                f"## Overview\n\n{new_summary}\n\n"
+                f"{rel_lines}"
+                f"---\n*Entity page: {name}*"
+            )
+
+            try:
+                note = self._client.update_note(
+                    note_id=note["id"],
+                    title=name,
+                    content=new_content,
+                    embed=embed,
+                )
+            except RuntimeError:
+                logger.warning("update_entity_page: failed to update note for '%s'", name)
+
+        # 5. Update the index entry
+        self._update_index(
+            workspace_id, name, note,
+            summary=(description or node.get("summary", ""))[:100],
+        )
+
+        # 6. Log
+        self._log_activity(
+            workspace_id, "update_entity_page",
+            f"'{name}' ({new_type})",
+        )
+
+        return {"node": node, "note": note}
+
     def create_concept_page(
         self,
         concept: str,

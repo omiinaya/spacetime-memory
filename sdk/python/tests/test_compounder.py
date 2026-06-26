@@ -1190,3 +1190,144 @@ class TestCompounderSearchEntities:
         # Semantic results come first
         assert ids[0] == "node_2" or ids[1] == "node_2"
 
+
+class TestCompounderEntityPageUpdate:
+    """Tests for Compounder.update_entity_page()."""
+
+    def _make_client(self, node_data: dict, note_data: list[dict] | None = None,
+                     index_data: list[dict] | None = None):
+        """Helper to build a mock client with predictable _query side effects."""
+        client = MagicMock()
+        # _query is called: 1) find node, 2) find note, 3) find _index, 4+) log
+        effects = [node_data]
+        effects.append(note_data if note_data is not None else [])
+        effects.append(index_data if index_data is not None else [])
+        # _log_activity calls _query to find the _log note
+        effects.append([])  # find _log note
+        client._query.side_effect = effects
+        return client
+
+    def test_updates_node_and_note(self):
+        from spacetime_memory.compounder import Compounder
+        client = self._make_client(
+            node_data=[{"id": "node_1", "label": "RLHF", "node_type": "concept",
+                        "summary": "Old description", "metadata_json": "{}",
+                        "source_memory_id": ""}],
+            note_data=[{"id": "note_1", "title": "RLHF",
+                        "content": "---\ntype: concept\n---\n\n## Overview\n\nOld description\n\n---\n*Entity page: RLHF*"}],
+        )
+        client.update_node.return_value = {"id": "node_1"}
+        client.update_note.return_value = {"id": "note_1", "title": "RLHF"}
+
+        cp = Compounder(client)
+        result = cp.update_entity_page(
+            name="RLHF",
+            workspace_id="ws1",
+            description="Reinforcement Learning from Human Feedback is a technique.",
+            entity_type="concept",
+        )
+
+        assert result["node"]["id"] == "node_1"
+        assert result["note"]["id"] == "note_1"
+        client.update_node.assert_called_once_with(
+            node_id="node_1",
+            label="RLHF",
+            node_type="concept",
+            summary="Reinforcement Learning from Human Feedback is a technique.",
+            metadata_json="{}",
+            source_memory_id="",
+        )
+        client.update_note.assert_called_once()
+        call_kw = client.update_note.call_args[1]
+        assert call_kw["title"] == "RLHF"
+        assert "Reinforcement Learning from Human Feedback is a technique." in call_kw["content"]
+
+    def test_not_found_returns_empty(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = []  # No nodes found
+
+        cp = Compounder(client)
+        result = cp.update_entity_page(
+            name="NonExistentEntity",
+            workspace_id="ws1",
+            description="New description",
+        )
+
+        assert result == {}
+        client.update_node.assert_not_called()
+        client.update_note.assert_not_called()
+
+    def test_no_note_skips_note_update(self):
+        from spacetime_memory.compounder import Compounder
+        client = self._make_client(
+            node_data=[{"id": "node_1", "label": "RLHF", "node_type": "concept",
+                        "summary": "Old", "metadata_json": "{}", "source_memory_id": ""}],
+            note_data=None,  # No note found
+        )
+
+        cp = Compounder(client)
+        result = cp.update_entity_page(
+            name="RLHF",
+            workspace_id="ws1",
+            description="New description",
+        )
+
+        assert result["node"]["id"] == "node_1"
+        # Node should still be updated
+        client.update_node.assert_called_once()
+        # Note should not be updated
+        client.update_note.assert_not_called()
+
+    def test_partial_update_keeps_unchanged_fields(self):
+        from spacetime_memory.compounder import Compounder
+        client = self._make_client(
+            node_data=[{"id": "node_1", "label": "Alice", "node_type": "person",
+                        "summary": "A researcher.", "metadata_json": '{"age": 30}',
+                        "source_memory_id": "mem_123"}],
+            note_data=[{"id": "note_1", "title": "Alice",
+                        "content": "---\ntype: person\n---\n\n## Overview\n\nA researcher.\n\n---\n*Entity page: Alice*"}],
+        )
+
+        cp = Compounder(client)
+        # Only update description, keep type and others
+        result = cp.update_entity_page(
+            name="Alice",
+            workspace_id="ws1",
+            description="A senior researcher specializing in AI safety.",
+            entity_type=None,
+        )
+
+        assert result["node"]["id"] == "node_1"
+        # Type should remain as "person" (unchanged)
+        client.update_node.assert_called_once_with(
+            node_id="node_1",
+            label="Alice",
+            node_type="person",  # unchanged
+            summary="A senior researcher specializing in AI safety.",
+            metadata_json='{"age": 30}',
+            source_memory_id="mem_123",
+        )
+
+    def test_preserves_existing_tags_from_frontmatter(self):
+        from spacetime_memory.compounder import Compounder
+        client = self._make_client(
+            node_data=[{"id": "node_1", "label": "RLHF", "node_type": "concept",
+                        "summary": "Old", "metadata_json": "{}", "source_memory_id": ""}],
+            note_data=[{"id": "note_1", "title": "RLHF",
+                        "content": "---\ntype: concept\ntags: [ml, reinforcement, alignment]\nsources: []\n---\n\n## Overview\n\nOld\n\n---\n*Entity page: RLHF*"}],
+        )
+
+        cp = Compounder(client)
+        # Don't pass tags — should preserve existing ones
+        result = cp.update_entity_page(
+            name="RLHF",
+            workspace_id="ws1",
+            description="Updated description.",
+        )
+
+        client.update_note.assert_called_once()
+        content = client.update_note.call_args[1]["content"]
+        assert "tags: [ml, reinforcement, alignment]" in content
+        assert "Updated description." in content
+

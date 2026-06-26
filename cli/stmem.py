@@ -1852,6 +1852,44 @@ def entity_page_cmd(name: str, description: str, entity_type: str,
         print_json(result)
 
 
+# ── Update Entity Page ─────────────────────────────────────────────────────────
+
+@cli.command(name="update-entity-page")
+@click.option("--name", "-n", required=True, help="Entity name to update")
+@click.option("--description", "-d", default=None, help="New 2-3 sentence description")
+@click.option("--type", "-t", "entity_type", default=None,
+              type=click.Choice(["person", "org", "concept", "product", "location", "event", "topic"]),
+              help="New entity type")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+def update_entity_page_cmd(name: str, description: str | None,
+                           entity_type: str | None, workspace: str) -> None:
+    """Update an existing entity wiki page + KG node.
+
+    Finds the entity by name and updates the provided fields.
+    Unset fields are left unchanged.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(_sdk_client())
+    with console.status(f"Updating entity page '{name}'..."):
+        result = cp.update_entity_page(
+            name=name,
+            description=description,
+            entity_type=entity_type,
+            workspace_id=workspace,
+        )
+
+    if result.get("note", {}).get("id"):
+        _quiet_print(f"[green]Entity page updated:[/green] [cyan]{name}[/cyan]")
+        if result.get("node", {}).get("id"):
+            _quiet_print(f"  KG node: [yellow]{result['node']['id'][:16]}...[/yellow]")
+    else:
+        console.print(f"[red]Entity page '{name}' not found.[/red]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
 # ── Concept Page ──────────────────────────────────────────────────────────────
 
 @cli.command(name="concept-page")

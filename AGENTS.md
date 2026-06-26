@@ -128,6 +128,7 @@ Run `compounder.lint_workspace()` periodically (weekly or after every ~10 ingest
 | Create node | `client.create_node(workspace_id, label, node_type, ...)` | Add a KG entity |
 | Create edge | `client._call("create_edge", [workspace_id, src, tgt, ...])` | Link two nodes |
 | Entity page | `compounder.create_entity_page(name, description, ...)` | Structured entity wiki page + KG node |
+| Update entity page | `compounder.update_entity_page(name, ...)` | Update existing entity wiki page + KG node |
 | Concept page | `compounder.create_concept_page(concept, definition, ...)` | Concept definition with [[wiki-links]] |
 | Comparison page | `compounder.create_comparison_page(title, items, ...)` | Markdown comparison table |
 
@@ -145,6 +146,7 @@ All compounder SDK methods have terminal equivalents via `stmem`:
 | `compounder.generate_overview_page()` | `stmem overview --workspace <id>` |
 | `compounder.ingest_source()` | `stmem ingest file --path article.txt` |
 | `compounder.create_entity_page()` | `stmem entity-page --name "..." --description "..."` |
+| `compounder.update_entity_page()` | `stmem update-entity-page --name "..." --description "..."` |
 | `compounder.create_concept_page()` | `stmem concept-page --concept "..." --definition "..."` |
 | `compounder.create_comparison_page()` | `stmem comparison-page --title "..." --items "a,b"` |
 | `compounder.search_entities()` | `stmem search-entities --label "..." --type concept --query "..."` |
@@ -160,6 +162,7 @@ automatically available without importing the SDK:
 |------|-------------|
 | `ingest_source` | Full LLM Wiki ingest: summarize, extract entities, create KG nodes, link, ripple, check contradictions |
 | `create_entity_page` | Create entity wiki page + KG node with YAML frontmatter |
+| `update_entity_page` | Update existing entity wiki page + KG node |
 | `create_concept_page` | Create concept definition page with [[wiki-links]] |
 | `create_comparison_page` | Create comparison page with markdown table |
 | `lint_workspace` | Health-check: orphans, missing crossrefs, contradictions |
