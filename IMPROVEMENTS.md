@@ -8,28 +8,35 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add note orphan detection to lint_workspace()
-The `lint_workspace()` method currently checks for KG nodes with no edges
-(orphans) and missing cross-refs between notes and entities.  It does not
-check for notes that are entirely disconnected from the KG — notes that
-exist as wiki pages but have no corresponding KG nodes or edges.  Add a
-`note_orphans` section to the lint result that lists notes whose content
-mention no known entities and have no KG connections.
-Difficulty: Medium
-Est: 30min
-
-### Apply entity-aware boosting in keyword fallback path
-When the embedder is unavailable (or semantic search is disabled), `search()`
-falls back to `_keyword_fallback()`. That path does NOT call
-`_boost_with_entity_signal`, so entity-aware boosting is completely absent
-when there are no embeddings. Add boosting (with entity_link alias support)
-at the end of `_keyword_fallback`, before the limit+return.
-Difficulty: Easy
-Est: 15min
+*No pending items — all backlog has been implemented.*
 
 ---
 
 ## Recently Completed
+
+### ✅ Apply entity-aware boosting in keyword fallback path (Jun 26)
+`_boost_with_entity_signal` is now called at the end of `_keyword_fallback`,
+applying entity-aware signal boosting (with entity_link alias support) that was
+previously only available in the semantic search path. Results get a baseline
+`fused_score` based on recency position before boosting, then are re-sorted by
+boosted score. Empty query skips boost. 3 new unit tests.
+Commit: 2b91198
+Files: sdk/python/spacetime_memory/client.py, sdk/python/tests/test_client.py
+Difficulty: Easy
+Est: 15min
+
+### ✅ Add note orphan detection to lint_workspace() (Jun 26)
+Added `_find_note_orphans()` method to Compounder that detects notes
+entirely disconnected from the knowledge graph. Notes are flagged when
+their content/title mentions no KG node labels AND their ID does not
+appear in any KG edge. New `check_note_orphans=True` parameter on
+`lint_workspace()`. Included in summary counts, log messages, and MCP output.
+5 new unit tests.
+Commit: a9d7106
+Files: sdk/python/spacetime_memory/compounder.py, sdk/python/tests/test_compounder.py,
+       server/mcp/main.py
+Difficulty: Medium
+Est: 30min
 
 ### ✅ Add entity_types filter parameter to search() (Jun 26)
 Added `entity_types` parameter to `search()` — filters results by
@@ -84,34 +91,6 @@ matched entities present in each result's content. Integrated into the
 9 new unit tests covering all matching strategies and graceful degradation.
 Files: sdk/python/spacetime_memory/client.py, sdk/python/tests/test_client.py
 
-### ✅ Add note versioning/history tracking (note_revision table) (Jun 26)
-Following the `memory_revision` pattern, added a `NoteRevision` STDB table with
-`record_note_revision` helper function. Modified `update_note` reducer to save
-revision snapshots before updates and increment the `version` field.
-Added `version: 1` to `create_note`. Updated Python `get_note_history()` to
-query real revision history from the `note_revision` table. Added `note_revision`
-to `ALLOWED_TABLES` whitelist and `query_note_revision` handler.
-Files: server/spacetimedb/src/note.rs, server/spacetimedb/src/query.rs,
-       sdk/python/spacetime_memory/client.py
-
-### ✅ Add scheduled workspace maintenance via STDB `#[table(scheduled(...))]` (Jun 26)
-Scheduled maintenance was already implemented via `maintenance_schedule` table
-with `scheduled(run_maintenance)` + `#[reducer(init)]` in consolidation.rs.
-The system runs expiry every 5 min and decay every 60 min. Marking as done.
-Files: server/spacetimedb/src/consolidation.rs
-
-### ✅ Add memory versioning/history tracking via memory_revision table (Jun 26)
-Added `memory_revision` STDB table with `record_revision` helper function.
-Modified `update_memory` reducer to save revision snapshots before updates
-and increment the `version` field (previously defined but never incremented).
-Updated Python `get_memory_history()` to query real revision history from
-the `memory_revision` table (instead of returning just the current state).
-Added `memory_revision` to `ALLOWED_TABLES` whitelist and added
-`query_memory_revision` handler. 4 new unit tests.
-Files: server/spacetimedb/src/memory.rs, server/spacetimedb/src/query.rs,
-       sdk/python/spacetime_memory/client.py,
-       sdk/python/tests/test_client.py
-
 ---
 
 ## Deferred / Blocked
@@ -127,19 +106,24 @@ Difficulty: Hard (needs live STDB)
 
 ---
 
-| *(cron manages this section — moves items here when marked ✅, purges old ones)*
+|| *(cron manages this section — moves items here when marked ✅, purged old ones)*
 |
 
 ## Research Log
 
+### Jun 26 — Full backlog cleared; both PENDING items implemented
+- **Note orphan detection** (Item 1): `_find_note_orphans()` — notes with no
+  KG label mentions and no edges flagged in lint output. 5 tests. Done.
+- **Keyword-fallback boosting** (Item 2): `_boost_with_entity_signal` now
+  called at the end of `_keyword_fallback`. 3 tests. Done.
+- **Backlog is now empty** — all actionable improvement items are complete.
+- STDB 2.6 is latest; spacetimedb-sdk 0.7.0. No new competitor features
+  identified (mem0, langgraph, zep). Deferred item still needs live STDB.
+
 ### Jun 26 — entity_types filter implemented; 2 PENDING items remain
 - Implemented: `entity_types` filter parameter for `search()` in both
   hybrid and keyword-fallback paths. 4 unit tests, all passing.
-- Next items in queue:
-  1. Note orphan detection in lint_workspace()
-  2. Entity-aware boosting in keyword fallback path
-- STDB 2.6 is latest; no major SDK changes. pip shows spacetimedb-sdk
-  0.7.0 as latest. No new competitor features identified this tick.
+- Next items in queue: Note orphan detection, keyword-fallback boosting.
 
 ### Jun 26 — Doc-tests added to compilation-critical Rust modules; entity_types filter next
 - Added doc-test to `record_to_json` (change_event.rs) + enhanced `edit_distance` doc
