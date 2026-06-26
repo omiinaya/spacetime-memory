@@ -1353,6 +1353,68 @@ def store_answer(
     )
 
 
+@mcp.tool()
+@require_api_key
+def store_answers_batch(
+    qa_pairs_json: str,
+    workspace_id: str = "default",
+    source_memory_ids: str = "",
+) -> str:
+    """Batch-persist multiple LLM-synthesized answers as wiki pages.
+
+    More efficient than calling store_answer repeatedly — fetches the
+    workspace index once and creates a single consolidated log entry.
+
+    Args:
+        qa_pairs_json: JSON string of [[query, answer], ...] pairs.
+            Example: '[["What is RLHF?", "RLHF is..."], ["What is
+            PPO?", "PPO is a..."]]'
+        workspace_id: Target workspace (default: "default").
+        source_memory_ids: Comma-separated list of source memory/node
+            IDs that informed *all* answers in this batch (optional).
+
+    Returns:
+        Summary string with count of stored answers and extracted
+        entities.
+    """
+    import json as _json
+
+    from spacetime_memory.compounder import Compounder
+
+    try:
+        qa_pairs = _json.loads(qa_pairs_json)
+    except _json.JSONDecodeError as e:
+        return f"Error: invalid JSON in qa_pairs_json — {e}"
+
+    if not isinstance(qa_pairs, list) or not all(
+        isinstance(p, list) and len(p) == 2 and all(isinstance(s, str) for s in p)
+        for p in qa_pairs
+    ):
+        return (
+            "Error: qa_pairs_json must be a JSON list of [query, answer] "
+            "string pairs, e.g. '[[\"Q1\", \"A1\"], [\"Q2\", \"A2\"]]'"
+        )
+
+    ids = (
+        [s.strip() for s in source_memory_ids.split(",") if s.strip()]
+        if source_memory_ids
+        else None
+    )
+    cp = Compounder(get_client())
+    results = cp.store_answers(
+        qa_pairs=qa_pairs,
+        workspace_id=workspace_id,
+        source_memory_ids=ids,
+    )
+
+    n_stored = len(results)
+    n_entities = sum(len(r.get("entities", [])) for r in results)
+    return (
+        f"Batch stored {n_stored} answers (note: {n_stored} notes)\n"
+        f"  Total entities extracted: {n_entities}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
