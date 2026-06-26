@@ -141,6 +141,23 @@ Difficulty: Hard (needs live STDB)
 
 ## Research Log
 
+### Jun 26 — `export_workspace` MCP tool added; 5 new PENDING items for remaining MCP gaps
+- **MCP tools audit**: Found 6 `Client`/`Compounder` methods missing MCP wrappers:
+  - `export_workspace` (Compounder) — ✅ Done this tick.
+  - `delete_workspace` — added as PENDING.
+  - `store_batch` — added as PENDING.
+  - `fuzzy_get` — added as PENDING.
+  - `detect_patterns` — added as PENDING.
+  - `get_note_by_date` — added as PENDING.
+- **Research**:
+  - STDB crate (crates.io unreachable), spacetimedb-sdk v0.7.0 (unchanged).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps identified**: 5 remaining `Client`/`Compounder` methods without MCP tool wrappers.
+- **Backlog**: 6 PENDING items (1 stale WASM blocked + 5 new MCP gaps).
+
 ### Jul 2 — 5 document CRUD MCP tools added; document gap closed for LLM Wiki workflow
 - **Document MCP tools audit**: Found 0 document-related MCP tools despite the SDK
   having full document CRUD support (create_document, get_document, list_documents,
