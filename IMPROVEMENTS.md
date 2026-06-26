@@ -30,10 +30,6 @@ Est: 10min
 
 ---
 
-*(No PENDING items — all actionable improvements are complete.)*
-
----
-
 ## Recently Completed
 
 ### ✅ Add `cross_link` and `suggest_connections` MCP tools (Jun 30)
@@ -114,7 +110,7 @@ Difficulty: Hard (needs live STDB)
   the `entity_types`, `before`, and `after` parameters that the SDK supports.
   Added as new PENDING item.
 - **Backlog**: 1 PENDING item remaining (entity_types/before/after search params).
-- **Commits**: 893e6f1 (cross_link/suggest_connections fixes) pushed.
+- **Commits**: 893e6f1 (cross_link/suggest_connections fixes), bc3c7ea (find_near_duplicates).
 
 ### Jun 28 — Date range filter implemented; backlog fully cleared
 - **`--from`/`--to` date range filter**: Added to both SDK (`before`/`after` params
