@@ -131,6 +131,25 @@ Run `compounder.lint_workspace()` periodically (weekly or after every ~10 ingest
 | Concept page | `compounder.create_concept_page(concept, definition, ...)` | Concept definition with [[wiki-links]] |
 | Comparison page | `compounder.create_comparison_page(title, items, ...)` | Markdown comparison table |
 
+### Available via CLI
+
+All compounder SDK methods have terminal equivalents via `stmem`:
+
+| SDK Method | CLI Command |
+|-----------|-------------|
+| `compounder.store_answer()` | `stmem store-answer --query "..." --answer "..."` |
+| `compounder.cross_link()` | `stmem cross-link --workspace <id>` |
+| `compounder.suggest_connections()` | `stmem suggest-connections --workspace <id>` |
+| `compounder.lint_workspace()` | `stmem lint --workspace <id>` |
+| `compounder.export_workspace()` | `stmem export markdown ./path/ --workspace <id>` |
+| `compounder.generate_overview_page()` | `stmem overview --workspace <id>` |
+| `compounder.ingest_source()` | `stmem ingest file --path article.txt` |
+| `compounder.create_entity_page()` | Use SDK or MCP (no standalone CLI yet) |
+| `compounder.create_concept_page()` | Use SDK or MCP (no standalone CLI yet) |
+| `compounder.create_comparison_page()` | Use SDK or MCP (no standalone CLI yet) |
+
+All CLI commands support `--output json` for machine-readable output.
+
 ### Available via MCP tools
 
 When the agent is connected via MCP (``stmem serve``), these tools are
