@@ -1593,6 +1593,212 @@ def overview_cmd(workspace: str, no_embed: bool) -> None:
         print_json(result)
 
 
+# ── Lint ──────────────────────────────────────────────────────────────────────
+
+@cli.command(name="lint")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--no-contradictions", is_flag=True,
+              help="Skip contradiction detection (LLM-intensive)")
+@click.option("--no-crossrefs", is_flag=True,
+              help="Skip missing-crossref detection")
+def lint_cmd(workspace: str, no_contradictions: bool, no_crossrefs: bool) -> None:
+    """Run a workspace health-check.
+
+    Finds orphan KG nodes (no edges), missing cross-references,
+    and (optionally) contradictory memory pairs via LLM analysis.
+
+    Contradiction detection requires an available LLM and can be
+    slow on large workspaces — use --no-contradictions to skip it.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    client = _sdk_client()
+    cp = Compounder(client)
+
+    with console.status(
+        f"Linting workspace '{workspace}'..."
+    ):
+        result = cp.lint_workspace(
+            workspace_id=workspace,
+            check_contradictions=not no_contradictions,
+            check_crossrefs=not no_crossrefs,
+        )
+
+    orphans = result.get("orphans", [])
+    crossrefs = result.get("missing_crossrefs", [])
+    contradictions = result.get("contradictions", [])
+
+    if orphans:
+        console.print(f"\n[bold]Orphan nodes ({len(orphans)}):[/bold]")
+        for o in orphans[:20]:
+            console.print(f"  • {o.get('label', o.get('id', '?'))[:12]} — {o.get('node_type', '?')}")
+        if len(orphans) > 20:
+            console.print(f"  ... and {len(orphans) - 20} more")
+    else:
+        console.print("[green]No orphan nodes.[/green]")
+
+    if crossrefs:
+        console.print(f"\n[bold]Missing cross-references ({len(crossrefs)}):[/bold]")
+        for cr in crossrefs[:10]:
+            console.print(f"  • Note [cyan]{cr.get('note_title', cr.get('note_id', '?'))[:30]}[/cyan] mentions entity [yellow]{cr.get('entity', '?')}[/yellow] with no KG edge")
+        if len(crossrefs) > 10:
+            console.print(f"  ... and {len(crossrefs) - 10} more")
+    elif not no_crossrefs:
+        console.print("[green]Cross-references are clean.[/green]")
+
+    if contradictions:
+        console.print(f"\n[bold yellow]Contradictions found ({len(contradictions)}):[/bold yellow]")
+        for c in contradictions[:5]:
+            console.print(f"  • {c.get('note_id', '?')[:12]} vs {c.get('contradicts_note_id', '?')[:12]}")
+            note_id = c.get("contradiction_note_id", "")
+            if note_id:
+                console.print(f"    → contradiction note: [cyan]{note_id[:16]}...[/cyan]")
+        if len(contradictions) > 5:
+            console.print(f"  ... and {len(contradictions) - 5} more")
+    elif not no_contradictions:
+        console.print("[green]No contradictions detected.[/green]")
+
+    if not orphans and not crossrefs and not contradictions:
+        console.print("[green]Workspace is clean![/green]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
+# ── Cross-link ────────────────────────────────────────────────────────────────
+
+@cli.command(name="cross-link")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--dry-run", is_flag=True, help="Preview links without creating them")
+def cross_link_cmd(workspace: str, dry_run: bool) -> None:
+    """Auto-link related but unconnected memories.
+
+    Finds semantically similar memories that aren't linked in the
+    knowledge graph and creates edges between them.  Uses keyword +
+    embedding similarity when available.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    client = _sdk_client()
+    cp = Compounder(client)
+
+    with console.status(
+        f"Cross-linking workspace '{workspace}'..."
+    ):
+        result = cp.cross_link(workspace_id=workspace)
+
+    links = result.get("links_created", [])
+    if dry_run and links:
+        console.print(
+            f"[yellow]DRY RUN:[/yellow] Would create {len(links)} edges"
+        )
+    elif links:
+        console.print(
+            f"[green]Created {len(links)} new cross-links.[/green]"
+        )
+    else:
+        console.print("[green]No new cross-links found.[/green]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
+# ── Suggest Connections ───────────────────────────────────────────────────────
+
+@cli.command(name="suggest-connections")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--limit", "-n", default=20, type=int,
+              help="Max suggestions to return")
+def suggest_connections_cmd(workspace: str, limit: int) -> None:
+    """Suggest node pairs that should be connected.
+
+    Identifies entity/node pairs that share many neighbors but aren't
+    directly linked — candidates for manual review or auto-linking.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    client = _sdk_client()
+    cp = Compounder(client)
+
+    with console.status(
+        f"Finding connection suggestions for '{workspace}'..."
+    ):
+        result = cp.suggest_connections(
+            workspace_id=workspace,
+            limit=limit,
+        )
+
+    suggestions = result.get("suggestions", [])
+    if suggestions:
+        console.print(
+            f"\n[bold]Suggested connections ({len(suggestions)}):[/bold]"
+        )
+        for s in suggestions[:20]:
+            src = s.get("source_label", s.get("source", "?"))[:25]
+            tgt = s.get("target_label", s.get("target", "?"))[:25]
+            score = s.get("score", s.get("shared_neighbors", 0))
+            console.print(f"  • [cyan]{src}[/cyan] ↔ [yellow]{tgt}[/yellow]  (score: {score})")
+    else:
+        console.print("[green]No connection suggestions found.[/green]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
+# ── Store Answer ──────────────────────────────────────────────────────────────
+
+@cli.command(name="store-answer")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--query", "-q", required=True, help="The question that was answered")
+@click.option("--answer", "-a", required=True, help="The answer text")
+@click.option("--source-ids", "-s", help="Comma-separated source memory IDs")
+@click.option("--no-embed", is_flag=True, help="Skip semantic embedding")
+def store_answer_cmd(workspace: str, query: str, answer: str,
+                     source_ids: str | None, no_embed: bool) -> None:
+    """Persist an LLM answer as a wiki page.
+
+    Creates a note + KG nodes + index entry from an answer synthesis.
+    Implements the 'answers get filed back into the wiki' pattern
+    from Karpathy's LLM Wiki.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    client = _sdk_client()
+    cp = Compounder(client)
+
+    mem_ids = (
+        [s.strip() for s in source_ids.split(",") if s.strip()]
+        if source_ids else None
+    )
+
+    with console.status(
+        f"Storing answer for '{query[:40]}...'"
+    ):
+        result = cp.store_answer(
+            query=query,
+            answer=answer,
+            workspace_id=workspace,
+            source_memory_ids=mem_ids,
+            embed=not no_embed,
+        )
+
+    note = result.get("note", {})
+    entities = result.get("entities_created", [])
+    if note.get("id"):
+        _quiet_print(
+            f"[green]Answer stored:[/green] [cyan]{note.get('title', note['id'][:16])}[/cyan]"
+        )
+        if entities:
+            _quiet_print(
+                f"  Entities created: [yellow]{', '.join(e.get('label', '?') for e in entities)}[/yellow]"
+            )
+    else:
+        console.print("[yellow]Failed to store answer.[/yellow]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
 # ===================================================================
 # connector — external data sources
 # ===================================================================
