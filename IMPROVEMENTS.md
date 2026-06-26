@@ -39,12 +39,14 @@ Added `stmem store-answers-batch --pairs '[[...]]'` CLI command with
 JSON validation, file input support (--file), and --json output.
 Previously only existed as MCP tool.
 Files: cli/stmem.py
+Commit: ebff101
 
 ### ✅ Fix stale docstring in zep.py (Jun 25)
 The module docstring claimed get_session_message/get_session_messages/
 update_message_metadata were missing — they're fully implemented and
 tested. Updated docstring to "Full API parity with zep-python v2.0.2".
 Files: sdk/python/spacetime_memory/sdks/zep.py
+Commit: ebff101
 
 ### ✅ Add zep adapter missing features — get/session/message APIs (Jun 25)
 All three methods (`get_session_message`, `get_session_messages`,
