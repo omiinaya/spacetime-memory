@@ -8,34 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### STDB 2% fatal error under heavy concurrent load (deferred for live STDB)
-**uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use
-collision-retry. The remaining ~2% fatal errors appear to be a STDB-level
-WASM limitation (not UUID-related). Root cause analysis requires a live
-STDB instance with replicator stress testing. Deferred until live STDB
-infrastructure is available for investigation.
-Files: server/spacetimedb/src/lib.rs, tests/concurrent/
-Difficulty: Hard (needs live STDB)
-Est: N/A (blocked)
-
-### Track STDB UniqueColumn::update() deprecation
-**RESOLVED: UniqueColumn::update() is NOT deprecated in STDB v2.6.0.**  
-Source code review of STDB 2.6.0 confirms that `update()` on `UniqueColumn` is
-still the standard upsert mechanism. No deprecation warning or removal
-notice exists. Item kept for periodic re-check but moved to low priority.
-Files: server/spacetimedb/src/*.rs (50+ call sites)
-Difficulty: Easy (tracking)
-Est: 0.5h
-Status: Research complete — no action needed
-
-### Add compounder.search_entities() convenience method
-Currently users must use `client._query("kg_node", ...)` directly to search
-KG entities. A high-level `search_entities(label=None, node_type=None,
-semantic_query=None)` method would make entity discovery much simpler for
-LLM Wiki pattern users.
-Difficulty: Easy
-Est: 1h
-
 ### Add compounder.update_entity_page() method
 `create_entity_page()` exists but there's no public compounder method to
 update both a KG node and its associated wiki note in one call. Currently
@@ -86,39 +58,34 @@ into chat history. Methods: ``store_answer()``, ``cross_link()``,
 ``suggest_connections()``. 20 unit tests. All 1700 unit tests pass.
 Commits: 62834b3, 53f2f86
 
-### ✅ tracer.py 51% → 100% coverage (Jun 24)
-35 new unit tests covering _NoOpSpan, _check_otel_available(), Tracer
-init/setup/is_enabled/start_span/instrument_method, get_tracer(), and
-module-level start_span(). Needed: mock OTel SDK hierarchy for the
-full setup() path, auto-mock-module pattern for sub-imports.
-Commit: 62834b3
+### ✅ STDB UniqueColumn::update() deprecation tracking — resolved (Jun 25)
+**RESOLVED: UniqueColumn::update() is NOT deprecated in STDB v2.6.0.**  
+Source code review confirms `update()` on `UniqueColumn` is still the
+standard upsert mechanism. No deprecation warning or removal notice exists.
+Kept for periodic re-check.
 
-### ✅ Migrate all uuid_v4() call sites to uuid_v7() for sortable UUIDs (Jun 24)
-Replaced `uuid_v4(ctx)` with `uuid_v7(ctx)` at all 57 non-retry call sites
-across 21 source files. Uses `ctx.new_uuid_v7().to_string()` which produces
-standard 8-4-4-4-12 format UUIDs with time-ordered prefixes for better
-B-tree index locality. Remaining `uuid_v4(ctx)` calls in lib.rs are inside
-`uuid_v4_uniq()` (the v4 retry wrapper) and are intentionally preserved.
-Commit: cc3f49a
+### ✅ Compounder.search_entities() — label/type/semantic entity search (Jun 25)
+New `search_entities(workspace_id, label, node_type, semantic_query, limit)`
+method on Compounder. Three search modes — label exact match, node_type filter,
+semantic search via hybrid engine (filters entity_type=="node"). Merges and
+deduplicates results. 6 new unit tests. MCP tool `search_entities` added.
+CLI command `stmem search-entities` added. AGENTS.md updated.
+Files: sdk/python/spacetime_memory/compounder.py,
+       sdk/python/tests/test_compounder.py,
+       server/mcp/main.py, cli/stmem.py, AGENTS.md
 
-### ✅ Multi-region / failover support (Jun 24)
-Added `SPACETIMEDB_HOSTS` env var for comma-separated host:port pairs.
-`_try_failover()` cycles to next host on connection failure.
-`_request_with_retry` fails over after all retries exhausted.
-`_ensure_identity` probes all hosts, pins to first responsive one.
-6 new tests. Backward compatible.
-Commit: b595739
+---
 
-### ✅ uuid_v7() + uuid_v7_uniq() build-block functions (Jun 24)
-Added `uuid_v7()` (returns `ctx.new_uuid_v7().to_string()`) and
-`uuid_v7_uniq()` (with collision retry) to lib.rs. Runs alongside
-existing v4 functions. Standard 8-4-4-4-12 UUID format.
-Commit: 202e47f
+## Deferred / Blocked
 
-### ✅ Extend uuid_v4_uniq() to remaining tables (Jun 24)
-All 27 no-longer-raw `uuid_v4()` call sites migrated in consolidation.rs,
-auth.rs, insight.rs, profile.rs, replication.rs. Zero compiler warnings.
-Commit: 6cdb64d
+### STDB 2% fatal error under heavy concurrent load
+**uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use
+collision-retry. The remaining ~2% fatal errors appear to be a STDB-level
+WASM limitation (not UUID-related). Root cause analysis requires a live
+STDB instance with replicator stress testing. Deferred until live STDB
+infrastructure is available for investigation.
+Files: server/spacetimedb/src/lib.rs, tests/concurrent/
+Difficulty: Hard (needs live STDB)
 
 ---
 

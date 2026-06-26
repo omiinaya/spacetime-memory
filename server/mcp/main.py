@@ -1239,6 +1239,51 @@ def generate_overview(workspace_id: str = "default") -> str:
 
 @mcp.tool()
 @require_api_key
+def search_entities(
+    workspace_id: str = "default",
+    label: str = "",
+    node_type: str = "",
+    semantic_query: str = "",
+    limit: int = 20,
+) -> str:
+    """Search knowledge-graph entities with flexible filters.
+
+    Supports label search, type filtering, and semantic search.
+    Combine filters to narrow results.
+
+    Args:
+        workspace_id: Target workspace.
+        label: Exact entity label to search for (optional).
+        node_type: Entity type filter (person, org, concept, product,
+            location, event, topic). Optional.
+        semantic_query: Natural-language query for semantic entity
+            search (optional).
+        limit: Max results (default: 20).
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    results = cp.search_entities(
+        workspace_id=workspace_id,
+        label=label or None,
+        node_type=node_type or None,
+        semantic_query=semantic_query or None,
+        limit=limit,
+    )
+    if not results:
+        return "No entities found."
+    lines = [f"Found {len(results)} entities:"]
+    for n in results:
+        nid = n.get("id", "")[:12]
+        label_text = n.get("label", "?")
+        ntype = n.get("node_type", "?")
+        summary = (n.get("summary", "") or "")[:80]
+        lines.append(f"- [{label_text}]({nid}) [{ntype}] {summary}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@require_api_key
 def store_answer(
     query: str,
     answer: str,

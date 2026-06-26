@@ -147,6 +147,7 @@ All compounder SDK methods have terminal equivalents via `stmem`:
 | `compounder.create_entity_page()` | `stmem entity-page --name "..." --description "..."` |
 | `compounder.create_concept_page()` | `stmem concept-page --concept "..." --definition "..."` |
 | `compounder.create_comparison_page()` | `stmem comparison-page --title "..." --items "a,b"` |
+| `compounder.search_entities()` | `stmem search-entities --label "..." --type concept --query "..."` |
 
 All CLI commands support `--output json` for machine-readable output.
 
@@ -164,6 +165,7 @@ automatically available without importing the SDK:
 | `lint_workspace` | Health-check: orphans, missing crossrefs, contradictions |
 | `generate_overview` | Generate workspace overview/synthesis page |
 | `store_answer` | Persist an LLM answer as a wiki page |
+| `search_entities` | Search KG entities by label, type, or semantic query |
 
 ---
 

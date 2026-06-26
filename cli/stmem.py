@@ -1937,6 +1937,68 @@ def comparison_page_cmd(title: str, items: str, criteria: str,
         print_json(result)
 
 
+# ── Search Entities ───────────────────────────────────────────────────────────
+
+@cli.command(name="search-entities")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--label", "-l", help="Exact entity label to search for")
+@click.option("--type", "-t", "node_type",
+              help="Entity type (person, org, concept, product, location, event, topic)")
+@click.option("--query", "-q", "semantic_query", help="Natural-language semantic query")
+@click.option("--limit", type=int, default=20, help="Max results (default: 20)")
+def search_entities_cmd(workspace: str, label: str | None, node_type: str | None,
+                        semantic_query: str | None, limit: int) -> None:
+    """Search knowledge-graph entities with flexible filters.
+
+    Supports label search, type filtering, and semantic search.
+    Combine filters to narrow results.
+
+    Examples:
+
+      stmem search-entities --type person
+
+      stmem search-entities --label "RLHF"
+
+      stmem search-entities --type concept --query "machine learning"
+
+      stmem search-entities --query "reinforcement learning" --limit 5
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(_sdk_client())
+    with console.status("Searching entities..."):
+        results = cp.search_entities(
+            workspace_id=workspace,
+            label=label,
+            node_type=node_type,
+            semantic_query=semantic_query,
+            limit=limit,
+        )
+
+    if not results:
+        console.print("[yellow]No entities found.[/yellow]")
+        if _current_output_format == "json":
+            print_json([])
+        return
+
+    if _current_output_format == "json":
+        print_json(results)
+        return
+
+    table = Table(title=f"Entities ({len(results)} found)", box=box.ROUNDED)
+    table.add_column("ID", style="dim")
+    table.add_column("Label", style="cyan")
+    table.add_column("Type", style="yellow")
+    table.add_column("Summary")
+    for n in results:
+        nid = n.get("id", "")[:12]
+        label_text = n.get("label", "?")
+        ntype = n.get("node_type", "?")
+        summary = (n.get("summary", "") or "")[:80]
+        table.add_row(nid, label_text, ntype, summary)
+    console.print(table)
+
+
 # ===================================================================
 # connector — external data sources
 # ===================================================================

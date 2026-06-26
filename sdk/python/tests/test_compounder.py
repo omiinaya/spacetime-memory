@@ -1072,3 +1072,121 @@ class TestGenerateOverview:
         content = client.create_note.call_args_list[0][1]["content"]
         assert "orphan" in content.lower()
 
+
+class TestCompounderSearchEntities:
+    """Tests for Compounder.search_entities()."""
+
+    def test_search_by_label(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = [
+            {"id": "n1", "label": "RLHF", "node_type": "concept",
+             "summary": "Reinforcement learning from human feedback."},
+        ]
+        cp = Compounder(client)
+        results = cp.search_entities(workspace_id="ws1", label="RLHF")
+        assert len(results) == 1
+        assert results[0]["label"] == "RLHF"
+        client._query.assert_called_once_with(
+            "kg_node", workspace_id="ws1",
+            filter_dict={"label": "RLHF"},
+        )
+
+    def test_search_by_node_type(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = [
+            {"id": "n1", "label": "Alice", "node_type": "person"},
+            {"id": "n2", "label": "Bob", "node_type": "person"},
+        ]
+        cp = Compounder(client)
+        results = cp.search_entities(workspace_id="ws1", node_type="person")
+        assert len(results) == 2
+        assert results[0]["node_type"] == "person"
+
+    def test_search_no_filters_returns_empty(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        cp = Compounder(client)
+        results = cp.search_entities(workspace_id="ws1")
+        # No label, node_type, or semantic_query → no query executed
+        assert results == []
+
+    def test_search_label_and_type(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        client._query.return_value = [
+            {"id": "n1", "label": "RLHF", "node_type": "concept"},
+        ]
+        cp = Compounder(client)
+        results = cp.search_entities(
+            workspace_id="ws1", label="RLHF", node_type="concept",
+        )
+        assert len(results) == 1
+        # Both filters should be in the filter_dict
+        call_filter = client._query.call_args[1]["filter_dict"]
+        assert call_filter["label"] == "RLHF"
+        assert call_filter["node_type"] == "concept"
+
+    def test_search_semantic_filters_node_results(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        # Mock search to return mixed results
+        client.search.return_value = [
+            {"entity_id": "node_1", "entity_type": "node", "score": 0.85},
+            {"entity_id": "mem_1", "entity_type": "memory", "score": 0.72},
+            {"entity_id": "node_2", "entity_type": "node", "score": 0.65},
+        ]
+        # Mock _query to return kg_node records
+        def _query_side_effect(table, **kwargs):
+            if table == "kg_node" and kwargs.get("workspace_id") == "ws1":
+                return [
+                    {"id": "node_1", "label": "Transformer", "node_type": "concept"},
+                    {"id": "node_2", "label": "Attention", "node_type": "concept"},
+                    {"id": "node_3", "label": "CNN", "node_type": "concept"},
+                ]
+            return []
+        client._query.side_effect = _query_side_effect
+
+        cp = Compounder(client)
+        results = cp.search_entities(
+            workspace_id="ws1", semantic_query="neural networks",
+        )
+        # Should only return node entities, not memory entities
+        assert len(results) == 2
+        ids = {r["id"] for r in results}
+        assert "node_1" in ids
+        assert "node_2" in ids
+        assert "node_3" not in ids  # Not in semantic results
+
+    def test_search_combined_filters_and_semantic(self):
+        from spacetime_memory.compounder import Compounder
+        client = MagicMock()
+        # _query for filter_dict
+        client._query.side_effect = [
+            # First call: filter by node_type
+            [{"id": "node_1", "label": "RLHF", "node_type": "concept"}],
+            # Second call: get all nodes for semantic lookup
+            [
+                {"id": "node_1", "label": "RLHF", "node_type": "concept"},
+                {"id": "node_2", "label": "DPO", "node_type": "concept"},
+                {"id": "node_3", "label": "PPO", "node_type": "concept"},
+            ],
+        ]
+        client.search.return_value = [
+            {"entity_id": "node_2", "entity_type": "node", "score": 0.9},
+            {"entity_id": "node_3", "entity_type": "node", "score": 0.8},
+        ]
+
+        cp = Compounder(client)
+        results = cp.search_entities(
+            workspace_id="ws1",
+            node_type="concept",
+            semantic_query="preference optimization",
+        )
+        # Should merge: node_2, node_3 from semantic, then node_1 from filter
+        assert len(results) <= 3
+        ids = [r["id"] for r in results]
+        # Semantic results come first
+        assert ids[0] == "node_2" or ids[1] == "node_2"
+
