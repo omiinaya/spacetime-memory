@@ -1321,8 +1321,10 @@ class Client:
         """Boost search results that mention entities found in the query.
 
         Inspired by mem0 v3's multi-signal retrieval: if the query mentions
-        a known knowledge-graph entity (label or summary match), results
-        whose content references that entity get a fused_score boost.
+        a known knowledge-graph entity (label or summary match) OR an
+        entity_link alias (e.g. "reinforcement learning from human feedback"
+        matching the canonical "RLHF" entity), results whose content
+        references that entity get a fused_score boost.
 
         Operates in-place on the ``fused_score`` of each row and re-sorts.
 
@@ -1352,14 +1354,27 @@ class Client:
         except RuntimeError:
             return rows  # Graceful degradation
 
-        if not nodes:
+        # Fetch entity_link records for alias matching
+        try:
+            links = self._query(
+                "entity_link",
+                workspace_id=workspace_id,
+                columns=["id", "entity_name", "aliases_json", "entity_type"],
+            )
+        except RuntimeError:
+            links = []  # entity_link table may not exist — graceful degradation
+
+        if not nodes and not links:
             return rows
 
         query_lower = query.lower()
         query_words = set(query_lower.split())
 
-        # Find entity labels that match the query
-        matching_labels: list[str] = []
+        # Build a list of matched entities, each with canonical name + aliases
+        # Structure: list[dict] — {"canonical": str, "aliases": list[str]}
+        matching_entities: list[dict[str, Any]] = []
+
+        # --- Match against KG node labels & summaries ---
         for node in nodes:
             label = (node.get("label") or "").lower().strip()
             summary = (node.get("summary") or "").lower().strip()
@@ -1369,28 +1384,63 @@ class Client:
 
             # 1) Exact match: query contains the full entity label
             if label in query_lower:
-                matching_labels.append(label)
+                matching_entities.append({"canonical": label, "aliases": []})
                 continue
 
             # 2) Word-level overlap: a word from the label appears in the query
             label_words = set(label.split())
             if label_words and query_words & label_words:
-                matching_labels.append(label)
+                matching_entities.append({"canonical": label, "aliases": []})
                 continue
 
             # 3) Query substring appears in entity summary
             if summary and query_lower in summary:
-                matching_labels.append(label)
+                matching_entities.append({"canonical": label, "aliases": []})
                 continue
 
-        if not matching_labels:
+        # --- Match against entity_link aliases ---
+        import json as _json
+
+        for link in links:
+            entity_name = (link.get("entity_name") or "").lower().strip()
+            if not entity_name:
+                continue
+
+            # Parse aliases JSON
+            raw_aliases = link.get("aliases_json") or "[]"
+            try:
+                alias_list: list[str] = _json.loads(raw_aliases)
+            except (ValueError, TypeError):
+                alias_list = []
+
+            # Build the set of names to check against the query:
+            # canonical entity_name + all aliases
+            all_names = [entity_name] + [a.lower().strip() for a in alias_list if a]
+
+            matched = False
+            for name in all_names:
+                if name in query_lower:
+                    matched = True
+                    break
+                name_words = set(name.split())
+                if name_words and query_words & name_words:
+                    matched = True
+                    break
+
+            if matched:
+                matching_entities.append({
+                    "canonical": entity_name,
+                    "aliases": [a.lower().strip() for a in alias_list if a],
+                })
+
+        if not matching_entities:
             return rows
 
-        unique_labels = list(set(matching_labels))
+        canonical_labels = [e["canonical"] for e in matching_entities]
         logger.debug(
             "Entity-aware boost: detected %d entities in query: %s",
-            len(unique_labels),
-            unique_labels[:5],
+            len(canonical_labels),
+            canonical_labels[:5],
         )
 
         # Boost each result that references any of the matched entities
@@ -1403,16 +1453,25 @@ class Client:
             if not content:
                 continue
 
-            # Count how many of the matched entity labels appear in the content
-            hit_count = sum(
-                1 for lbl in unique_labels if lbl and lbl in content
-            )
+            # Count how many matched entities appear in the content.
+            # For each entity: check canonical name first, then any alias.
+            hit_count = 0
+            for entity in matching_entities:
+                canonical = entity["canonical"]
+                if canonical and canonical in content:
+                    hit_count += 1
+                    continue
+                for alias in entity["aliases"]:
+                    if alias and alias in content:
+                        hit_count += 1
+                        break
+
             if hit_count == 0:
                 continue
 
             # Proportional boost: more entity hits → higher boost,
             # capped by boost_factor
-            proportion = min(hit_count / max(len(unique_labels), 1), 1.0)
+            proportion = min(hit_count / max(len(matching_entities), 1), 1.0)
             entity_boost = proportion * boost_factor
             current = row.get("fused_score", 0.0)
             row["fused_score"] = current * (1.0 + entity_boost)

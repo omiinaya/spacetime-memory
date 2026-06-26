@@ -1840,3 +1840,150 @@ class TestEntityAwareBoost:
                           wraps=mock_http_client._boost_with_entity_signal) as spy:
             mock_http_client.search("default", "RLHF", semantic=True, limit=5)
             spy.assert_called_once()
+
+    # --- Alias-based entity boosting via entity_link ---
+
+    def test_boost_entity_link_alias_in_query(self, mock_http_client):
+        """Boost fires when query contains an entity_link alias."""
+        # First _query call returns kg_node (empty), second returns entity_link
+        mock_http_client._query = MagicMock(side_effect=[
+            [],  # kg_node: no nodes
+            [   # entity_link: one record with aliases
+                {
+                    "id": "el1",
+                    "entity_name": "RLHF",
+                    "aliases_json": '["reinforcement learning from human feedback", "RL from human feedback"]',
+                    "entity_type": "concept",
+                }
+            ],
+        ])
+
+        rows = [
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is a training method"},
+            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "Supervised fine-tuning"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal(
+            "reinforcement learning from human feedback", rows, "default"
+        )
+
+        # m1 has the canonical name "RLHF" in content → boosted
+        assert result[0]["entity_id"] == "m1"
+        assert result[0]["fused_score"] > 0.8
+        assert result[0].get("entity_boost", 0) > 0
+
+        # m2 doesn't mention RLHF → unchanged
+        assert result[1]["entity_id"] == "m2"
+        assert result[1]["fused_score"] == 0.6
+
+    def test_boost_entity_link_alias_in_content(self, mock_http_client):
+        """Boost fires when result content contains an alias, not just canonical name."""
+        mock_http_client._query = MagicMock(side_effect=[
+            [],  # kg_node: empty
+            [
+                {
+                    "id": "el1",
+                    "entity_name": "PEFT",
+                    "aliases_json": '["parameter-efficient fine-tuning", "lightweight fine-tuning"]',
+                    "entity_type": "concept",
+                }
+            ],
+        ])
+
+        rows = [
+            # Content doesn't mention "PEFT" but mentions the alias
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "parameter-efficient fine-tuning is useful for LLMs"},
+            # No alias mention
+            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "some unrelated content"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal(
+            "PEFT methods", rows, "default"
+        )
+
+        # m1 mentions the alias "parameter-efficient fine-tuning" → boosted
+        assert result[0]["entity_id"] == "m1"
+        assert result[0]["fused_score"] > 0.8
+
+        # m2 unchanged
+        assert result[1]["entity_id"] == "m2"
+        assert result[1]["fused_score"] == 0.6
+
+    def test_boost_entity_link_and_kg_node_combined(self, mock_http_client):
+        """Both KG nodes and entity_link aliases contribute to matching."""
+        mock_http_client._query = MagicMock(side_effect=[
+            [  # kg_node
+                {"id": "n1", "label": "RLHF", "summary": "Reinforcement learning from human feedback", "node_type": "concept"},
+            ],
+            [  # entity_link
+                {
+                    "id": "el1",
+                    "entity_name": "LoRA",
+                    "aliases_json": '["low-rank adaptation"]',
+                    "entity_type": "concept",
+                }
+            ],
+        ])
+
+        rows = [
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF and LoRA combined"},
+            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "only RLHF here"},
+            {"entity_id": "m3", "fused_score": 0.4, "memory_content": "low-rank adaptation is efficient"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal(
+            "RLHF and low-rank adaptation", rows, "default", boost_factor=0.15
+        )
+
+        # m1 has both RLHF (KG node via label match) and LoRA (entity_link via alias match in content)
+        # → proportion = 2/2 = 1.0 → max boost
+        assert result[0]["entity_id"] == "m1"
+        assert abs(result[0].get("entity_boost", 0) - 0.15) < 0.001
+
+        # m2 only has RLHF → proportion = 1/2 = 0.5 → half boost
+        assert result[1]["entity_id"] == "m2"
+        assert abs(result[1].get("entity_boost", 0) - 0.075) < 0.001
+
+        # m3 has "low-rank adaptation" (alias of LoRA) in content → matched via entity_link
+        assert result[2]["entity_id"] == "m3"
+        assert result[2]["fused_score"] > 0.4
+
+    def test_boost_entity_link_table_unavailable(self, mock_http_client):
+        """Graceful degradation when entity_link query raises RuntimeError."""
+        mock_http_client._query = MagicMock(side_effect=[
+            [  # kg_node succeeds
+                {"id": "n1", "label": "RLHF", "summary": "", "node_type": "concept"},
+            ],
+            RuntimeError("no entity_link table"),  # entity_link fails
+        ])
+
+        rows = [
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is great"},
+        ]
+
+        # Should not crash — falls back to KG-node-only matching
+        result = mock_http_client._boost_with_entity_signal("RLHF", rows, "default")
+        assert result[0]["entity_id"] == "m1"
+        assert result[0]["fused_score"] > 0.8
+
+    def test_boost_entity_link_empty_aliases_json(self, mock_http_client):
+        """entity_link with empty or invalid aliases_json is handled gracefully."""
+        mock_http_client._query = MagicMock(side_effect=[
+            [],
+            [
+                {
+                    "id": "el1",
+                    "entity_name": "RLHF",
+                    "aliases_json": "",  # empty aliases field
+                    "entity_type": "concept",
+                }
+            ],
+        ])
+
+        rows = [
+            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is awesome"},
+        ]
+
+        result = mock_http_client._boost_with_entity_signal("RLHF", rows, "default")
+        assert result[0]["entity_id"] == "m1"
+        assert result[0]["fused_score"] > 0.8  # Still boosted via entity_name
