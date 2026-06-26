@@ -12,14 +12,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add document CRUD MCP tools (create_document, get_document, delete_document, list_documents)
-The LLM Wiki workflow may also use documents as source materials, but no
-document-related MCP tools exist. Add MCP tool wrappers for the SDK's document
-methods so agents can manage source documents via MCP.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 8min
-
 ### Fix stale WASM binary causing test_get_memory_history failure
 The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
 is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
@@ -32,6 +24,15 @@ Est: N/A (blocked)
 ---
 
 ## Recently Completed
+
+### ✅ Add document CRUD MCP tools (Jul 2)
+Added 5 MCP tools for document management: create_document, get_document,
+list_documents, get_document_chunks, delete_document. Covers the full
+document lifecycle for the LLM Wiki workflow (Supermemory parity).
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 8min
+Test: 2173/2173 unit tests passing
 
 ### ✅ Add note CRUD MCP tools (Jun 26)
 Added 9 MCP tools for note management: create_note, get_note, update_note,
@@ -110,6 +111,20 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jul 2 — 5 document CRUD MCP tools added; document gap closed for LLM Wiki workflow
+- **Document MCP tools audit**: Found 0 document-related MCP tools despite the SDK
+  having full document CRUD support (create_document, get_document, list_documents,
+  get_document_chunks, delete_document). Added all 5 as MCP tools.
+- **Research**:
+  - STDB crate (crates.io unreachable), spacetimedb-sdk v0.7.0 (unchanged).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps identified**: Document CRUD MCP tools missing for LLM Wiki workflow.
+  - Document CRUD: ✅ Done this tick (5 tools added).
+- **Backlog**: 1 PENDING item remaining (stale WASM binary blocked).
 
 ### Jun 26 — 9 note CRUD MCP tools added; note gap closed for LLM Wiki workflow
 - **Note MCP tools audit**: Found 0 note-related MCP tools despite notes being
