@@ -8,24 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Use entity_link aliases in entity-aware boosting
-The new `_boost_with_entity_signal` matches entities by KG node labels, label
-word-overlap, and summary substring.  The `entity_link` table stores canonical
-entity names with aliases (e.g. "RLHF" → ["RLHF", "reinforcement learning from
-human feedback"]).  Extend the boosting to also match against entity_link
-aliases, so a query mentioning "reinforcement learning from human feedback"
-boosts results mentioning the "RLHF" KG node and vice versa.
-Difficulty: Easy
-Est: 20min
-
-### Add coverage for compilation-critical Rust modules with doc-tests
-Several Rust reducer modules (consolidation.rs, change_event.rs, graph_traversal.rs)
-have no Rust-level tests.  While full integration tests exist, doc-tests on
-pure helper functions would provide fast compilation-free verification.
-Add `/// ````````````` doc-test blocks on pure helper functions in these files.
-Difficulty: Easy
-Est: 30min
-
 ### Add entity_types filter parameter to search()
 The `search()` method has `memory_type` and `tier` filters but no way to
 select which content types to return (memory, note, node).  Add an
@@ -55,6 +37,19 @@ at the end of `_keyword_fallback`, before the limit+return.
 Difficulty: Easy
 Est: 15min
 
+---
+
+## Recently Completed
+
+### ✅ Add coverage for compilation-critical Rust modules with doc-tests (Jun 26)
+Added a runnable doc-test to `record_to_json` in change_event.rs (the only pure
+`pub fn` amongst the three modules). Enhanced doc comment for `edit_distance`
+in consolidation.rs with a usage example (function already has 8 unit tests
+in a `#[cfg(test)]` block). graph_traversal.rs has no pure helper functions
+suitable for doc-tests.
+Commit: a16c187
+Files: server/spacetimedb/src/change_event.rs, server/spacetimedb/src/consolidation.rs
+
 ### ✅ Use entity_link aliases in entity-aware boosting (Jun 26)
 The `_boost_with_entity_signal` method now also fetches entity_link records
 alongside KG nodes. When the query matches an entity_link alias (e.g.
@@ -67,10 +62,6 @@ Commit: c907187
 Files: sdk/python/spacetime_memory/client.py, sdk/python/tests/test_client.py
 Difficulty: Easy
 Est: 20min
-
----
-
-## Recently Completed
 
 ### ✅ Add search for wiki notes via the hybrid search pipeline (Jun 26)
 Notes created via `create_note`/`update_note` are now indexed into `search_index`,
@@ -141,6 +132,11 @@ Difficulty: Hard (needs live STDB)
 |
 
 ## Research Log
+
+### Jun 26 — Doc-tests added to compilation-critical Rust modules; entity_types filter next
+- Added doc-test to `record_to_json` (change_event.rs) + enhanced `edit_distance` doc
+- Found: consolidation.rs already has 8 unit tests; graph_traversal.rs has no pure helpers
+- Next item in queue: `entity_types` filter parameter for `search()`
 
 ### Jun 26 — Entity-link alias boosting done; keyword-fallback boosting gap found
 - Implemented: entity_link alias matching in `_boost_with_entity_signal`
