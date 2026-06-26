@@ -63,6 +63,7 @@ const ALLOWED_TABLES: &[&str] = &[
     "proxy_metrics_snapshot",
     "bridge_result", "kg_stats_result", "memory_recommendation",
     "memory_revision",
+    "note_revision",
 ];
 
 /// Query a private table with auth + workspace enforcement.
@@ -130,6 +131,7 @@ pub fn query_table(
         "context_delta" => query_generic_scan(ctx, &query_id, "delta_pack", workspace_id, filter_obj, &columns, now),
         "peer_reputation" => query_generic_scan(ctx, &query_id, "peer_reputation", workspace_id, filter_obj, &columns, now),
         "memory_revision" => query_memory_revision(ctx, query_id, filter_obj, &columns, now),
+        "note_revision" => query_note_revision(ctx, query_id, filter_obj, &columns, now),
         _ => query_generic(ctx, &query_id, &table_name, workspace_id, filter_obj, &columns, now),
     }
 }
@@ -520,6 +522,25 @@ fn query_memory_revision(
         });
         if filter_matches(&row, filter) {
             insert_row(ctx, &query_id, "memory_revision", row_to_json(&row, columns), now);
+        }
+    }
+    Ok(())
+}
+
+fn query_note_revision(
+    ctx: &ReducerContext, query_id: String,
+    filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
+) -> Result<(), String> {
+    for rev in ctx.db.note_revision().iter().take(crate::MAX_RESULTS) {
+        let row = serde_json::json!({
+            "id": rev.id, "note_id": rev.note_id, "workspace_id": rev.workspace_id,
+            "version": rev.version,
+            "previous_title": rev.previous_title, "previous_content": rev.previous_content,
+            "new_title": rev.new_title, "new_content": rev.new_content,
+            "changed_at": rev.changed_at, "changed_by": rev.changed_by,
+        });
+        if filter_matches(&row, filter) {
+            insert_row(ctx, &query_id, "note_revision", row_to_json(&row, columns), now);
         }
     }
     Ok(())

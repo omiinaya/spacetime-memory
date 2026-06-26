@@ -26,6 +26,52 @@ pub struct Note {
     pub created_at: i64,
     pub updated_at: i64,
     pub is_active: bool,
+    /// Version number (incremented on updates for history tracking)
+    pub version: u32,
+}
+
+/// A snapshot of a note's state before an update.
+/// Used for version history / audit / undo-diff tracking.
+#[table(accessor = note_revision)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NoteRevision {
+    #[primary_key]
+    pub id: String,
+    /// The note this revision belongs to
+    pub note_id: String,
+    pub workspace_id: String,
+    /// Which version this was before the update
+    pub version: u32,
+    pub previous_title: String,
+    pub previous_content: String,
+    pub new_title: String,
+    pub new_content: String,
+    pub changed_at: i64,
+    pub changed_by: String,
+}
+
+/// Save a revision snapshot before a note is updated.
+/// Should be called *before* modifying the note in-place.
+pub fn record_note_revision(
+    ctx: &ReducerContext,
+    note: &Note,
+    new_title: &str,
+    new_content: &str,
+) {
+    let id = uuid_v4_uniq(ctx, |id| ctx.db.note_revision().id().find(id).is_none(), 3);
+    let revision = NoteRevision {
+        id,
+        note_id: note.id.clone(),
+        workspace_id: note.workspace_id.clone(),
+        version: note.version,
+        previous_title: note.title.clone(),
+        previous_content: note.content.clone(),
+        new_title: new_title.to_string(),
+        new_content: new_content.to_string(),
+        changed_at: now_micros(ctx),
+        changed_by: ctx.sender().to_hex(),
+    };
+    ctx.db.note_revision().insert(revision);
 }
 
 /// A backlink — forward edge from note A → note B ([[wikilink]]).
@@ -134,6 +180,7 @@ pub fn create_note(
         created_at: now,
         updated_at: now,
         is_active: true,
+        version: 1,
     };
 
     ctx.db.note().insert(note);
@@ -171,9 +218,13 @@ pub fn update_note(
         title
     };
 
+    // Save revision snapshot before modifying
+    record_note_revision(ctx, &note, &final_title, &content);
+
     note.title = final_title;
     note.content = content.clone();
     note.updated_at = now;
+    note.version += 1; // Increment version on each update
     if !embedding_json.is_empty() {
         note.embedding_json = embedding_json;
     }

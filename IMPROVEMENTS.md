@@ -8,15 +8,6 @@ and works the top pending item each tick.
 
 ## Status: PENDING
 
-### Add scheduled workspace maintenance via STDB `#[procedure]`
-STDB v2.5+ stabilized `#[spacetimedb::procedure]` for scheduled,
-transaction-capable server-side functions. The module currently has
-no `init` function or scheduled tasks. Adding a procedure for
-periodic cross-linking, decay, or lint would reduce reliance on
-external cron and improve consistency.
-Difficulty: Medium
-Est: 2h
-
 ### Add entity-aware search result boosting (inspired by mem0 v3)
 mem0 v3's multi-signal retrieval fuses semantic, BM25, and entity
 signals. The current search pipeline does hybrid search (semantic +
@@ -26,16 +17,25 @@ those entities (KG node labels/summaries).
 Difficulty: Easy
 Est: 30min
 
-### Add note versioning/history tracking (note_revision table)
-Following the memory_revision pattern, add a `note_revision` table
-and modify `update_note` to record revisions and increment version.
-This gives full undo/diff/audit for wiki pages too.
-Difficulty: Easy
-Est: 30min
-
 ---
 
 ## Recently Completed
+
+### ✅ Add note versioning/history tracking (note_revision table) (Jun 26)
+Following the memory_revision pattern, added a `NoteRevision` STDB table with
+`record_note_revision` helper function. Modified `update_note` reducer to save
+revision snapshots before updates and increment the `version` field.
+Added `version: 1` to `create_note`. Updated Python `get_note_history()` to
+query real revision history from the `note_revision` table. Added `note_revision`
+to `ALLOWED_TABLES` whitelist and `query_note_revision` handler.
+Files: server/spacetimedb/src/note.rs, server/spacetimedb/src/query.rs,
+       sdk/python/spacetime_memory/client.py
+
+### ✅ Add scheduled workspace maintenance via STDB `#[table(scheduled(...))]` (Jun 26)
+Scheduled maintenance was already implemented via `maintenance_schedule` table
+with `scheduled(run_maintenance)` + `#[reducer(init)]` in consolidation.rs.
+The system runs expiry every 5 min and decay every 60 min. Marking as done.
+Files: server/spacetimedb/src/consolidation.rs
 
 ### ✅ Add memory versioning/history tracking via memory_revision table (Jun 26)
 Added `memory_revision` STDB table with `record_revision` helper function.
