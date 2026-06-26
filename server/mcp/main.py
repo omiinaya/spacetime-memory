@@ -1318,6 +1318,49 @@ def search_entities(
 
 @mcp.tool()
 @require_api_key
+def find_near_duplicates(
+    content: str,
+    workspace_id: str = "default",
+    threshold: float = 0.92,
+    limit: int = 5,
+) -> str:
+    """Find memories with semantically similar content to the given text.
+
+    Uses the hybrid search pipeline to catch rephrasings of the same fact.
+    Default threshold of 0.92 works well for BGE-M3 embeddings.
+
+    Args:
+        content: The text to check for near-duplicates.
+        workspace_id: Target workspace (default: "default").
+        threshold: Minimum similarity score (0.0-1.0, default: 0.92).
+        limit: Max results to return (default: 5).
+
+    Returns:
+        Formatted string listing near-duplicate candidates with scores.
+    """
+    from spacetime_memory.compounder import Compounder
+
+    cp = Compounder(get_client())
+    results = cp.find_near_duplicates(
+        content=content,
+        workspace_id=workspace_id,
+        threshold=threshold,
+        limit=limit,
+    )
+    if not results:
+        return "No near-duplicates found."
+    lines = [f"Found {len(results)} near-duplicate candidate(s):"]
+    for r in results[:limit]:
+        eid = r.get("entity_id", "")[:16]
+        etype = r.get("entity_type", "?")
+        score = r.get("score", 0.0)
+        snippet = (r.get("content", "") or "")[:120].replace("\n", " ")
+        lines.append(f"  - [{etype}] {eid} (score: {score:.4f}) {snippet}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@require_api_key
 def cross_link(workspace_id: str = "default") -> str:
     """Auto-link related but unconnected memories in a workspace.
 

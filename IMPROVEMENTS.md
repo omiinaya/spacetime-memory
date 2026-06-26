@@ -6,6 +6,30 @@ and works the top pending item each tick.
 
 ---
 
+| Status | Item |
+|--------|------|
+| ✅ | Add `find_near_duplicates` MCP tool |
+| PENDING | Add `entity_types` and `before`/`after` params to MCP search tools |
+
+### ✅ Add `find_near_duplicates` MCP tool
+Added `find_near_duplicates` MCP tool wrapping the Compounder method. Accepts
+`content`, `workspace_id`, `threshold` (default 0.92), `limit` (default 5).
+Returns formatted list of near-duplicate candidates with entity type, ID, score,
+and content snippet.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 8min
+
+### Add `entity_types` and `before`/`after` params to MCP search tools
+The SDK `Client.search()` supports `entity_types` (list[str]), `before` (float),
+and `after` (float) parameters for filtering by entity type and creation date.
+The MCP `search_memories` and `hybrid_search` tools don't expose these yet.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+
+---
+
 *(No PENDING items — all actionable improvements are complete.)*
 
 ---
@@ -74,22 +98,23 @@ Difficulty: Hard (needs live STDB)
 
 ## Research Log
 
-### Jun 30 — cross_link/suggest_connections MCP tools fixed; backlog cleared
-- **MCP tools audit**: Found that `cross_link` and `suggest_connections` MCP tools
-  already existed but had field-name mismatches with the Compounder return types.
-  Both fixed: `cross_link` now reads `links_created`/`pairs_checked`;
-  `suggest_connections` now correctly handles the list return type and uses
-  `source_label`/`target_label`/`common_count` field names.
+### Jun 30 — cross_link/suggest_connections fixed; find_near_duplicates MCP tool added
+- **MCP tools audit**: Fixed `cross_link` (reads `links_created` not `edges_created`)
+  and `suggest_connections` (handles list return, uses correct field names).
 - **asyncio marker**: Already registered in pyproject.toml. No action needed.
+- **find_near_duplicates MCP tool**: Added new MCP tool wrapping the Compounder
+  method for checking semantic near-duplicates before storing.
 - **Research**:
   - STDB crate v2.6.0 (unchanged), spacetimedb-sdk v0.7.0 (unchanged).
   - mem0ai v2.0.8 (unchanged since last check).
   - opentelemetry-sdk v1.43.0 (unchanged since last check).
   - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
   - No new competitor features to adopt.
-- **Backlog**: 0 PENDING items. All known actionable improvements are complete.
-  Next tick will research fresh opportunities.
-- **Commits**: MCP tool fixes committed and pushed.
+- **Gaps found**: MCP `search_memories` and `hybrid_search` tools are missing
+  the `entity_types`, `before`, and `after` parameters that the SDK supports.
+  Added as new PENDING item.
+- **Backlog**: 1 PENDING item remaining (entity_types/before/after search params).
+- **Commits**: 893e6f1 (cross_link/suggest_connections fixes) pushed.
 
 ### Jun 28 — Date range filter implemented; backlog fully cleared
 - **`--from`/`--to` date range filter**: Added to both SDK (`before`/`after` params
