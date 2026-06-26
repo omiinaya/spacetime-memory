@@ -539,6 +539,109 @@ def get_outgoing_links(note_id: str) -> list[dict[str, Any]]:
     return get_client().get_outgoing_links(note_id)
 
 
+# ---------------------------------------------------------------------------
+# Document tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def create_document(
+    workspace_id: str = "default",
+    title: str = "",
+    content: str = "",
+    content_type: str = "text",
+    file_path: str = "",
+    source_url: str = "",
+    metadata_json: str = "",
+) -> dict[str, Any]:
+    """Create a document with auto-chunking.
+
+    Documents with content ≥ 100 chars are automatically split into
+    overlapping ~500-char chunks (sentence-boundary-aware).
+
+    Args:
+        workspace_id: Target workspace (default: "default").
+        title: Document title.
+        content: Document body text. Auto-chunked if ≥ 100 chars.
+        content_type: ``"text"``, ``"pdf"``, ``"image"``, ``"video"``, ``"code"``, or ``"url"``.
+        file_path: Optional file path reference.
+        source_url: Optional source URL.
+        metadata_json: Optional JSON string of metadata.
+
+    Returns:
+        Dictionary with creation status and document details.
+    """
+    import json as _json
+
+    metadata = _json.loads(metadata_json) if metadata_json else None
+    return get_client().create_document(
+        workspace_id=workspace_id,
+        title=title,
+        content=content,
+        content_type=content_type,
+        file_path=file_path,
+        source_url=source_url,
+        metadata=metadata,
+    )
+
+
+@mcp.tool()
+@require_api_key
+def get_document(doc_id: str) -> dict[str, Any] | None:
+    """Get a document by its ID.
+
+    Args:
+        doc_id: The document's unique identifier.
+
+    Returns:
+        Document record if found, None otherwise.
+    """
+    return get_client().get_document(doc_id)
+
+
+@mcp.tool()
+@require_api_key
+def list_documents(workspace_id: str = "default") -> list[dict[str, Any]]:
+    """List all documents in a workspace.
+
+    Args:
+        workspace_id: Target workspace (default: "default").
+
+    Returns:
+        List of document records in the workspace.
+    """
+    return get_client().list_documents(workspace_id)
+
+
+@mcp.tool()
+@require_api_key
+def get_document_chunks(doc_id: str) -> list[dict[str, Any]]:
+    """Get all chunks for a document, ordered by chunk_index.
+
+    Args:
+        doc_id: The document's unique identifier.
+
+    Returns:
+        List of chunk records ordered by chunk index.
+    """
+    return get_client().get_document_chunks(doc_id)
+
+
+@mcp.tool()
+@require_api_key
+def delete_document(doc_id: str) -> dict[str, Any]:
+    """Delete a document and all its chunks (cascading).
+
+    Args:
+        doc_id: The document's unique identifier.
+
+    Returns:
+        Dictionary with deletion status.
+    """
+    return get_client().delete_document(doc_id)
+
+
 @mcp.tool()
 @require_api_key
 def reinforce_memory(memory_id: str) -> dict[str, Any]:
