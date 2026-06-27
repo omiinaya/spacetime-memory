@@ -12,11 +12,32 @@ and works the top pending item each tick.
 
 ## Pending
 
-*No pending items. All known Client SDK methods now have MCP tool wrappers.*
+### Update MCP README with full tool catalog
+`server/mcp/README.md` only documents ~15 of ~120 MCP tools. The table needs
+expansion to cover all tool categories (memory, notes, graph, sessions,
+profiles, tours, compounder, etc.) for agent discoverability.
+Files: server/mcp/README.md
+Difficulty: Medium
+Est: 20min
+
+### Add pre-commit config for automated linting
+The project is mature (~37K LOC) but lacks a `.pre-commit-config.yaml`.
+Add config for ruff (Python), rustfmt (Rust), and markdownlint.
+Files: .pre-commit-config.yaml
+Difficulty: Easy
+Est: 10min
 
 ---
 
 ## Recently Completed
+
+### ✅ Fix stale SpacetimeDB version badge in README.md (Jul 28)
+The README badge at the top still said `SpacetimeDB v2.4` but the dependency
+was upgraded to v2.6 in commit `d1d147f`. Updated the badge URL and alt text
+in both `README.md` and `server/mcp/README.md`.
+Files: README.md, server/mcp/README.md
+Difficulty: Trivial
+Est: 2min
 
 ### ✅ Add `list_context_deltas` MCP tool for context pack diffing (Jul 27)
 Added `list_context_deltas` MCP tool wrapping `Client.list_context_deltas()`.
@@ -58,51 +79,6 @@ Difficulty: Easy
 Est: 5min
 Test: 2/2 new tests passing (190/190 total MCP tests)
 
-### ✅ Add `detect_bridge_nodes` MCP tool for KG analysis (Jul 27)
-Added `detect_bridge_nodes` MCP tool wrapping `Client.detect_bridge_nodes()`.
-Detects bridge nodes that connect multiple communities in the knowledge graph.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 3/3 new tests passing (190/190 total MCP tests)
-
-### ✅ Add `detect_communities` MCP tool for KG community detection (Jul 27)
-Added `detect_communities` MCP tool wrapping `Client.detect_communities()`.
-Runs label-propagation community detection on the KG. Returns status,
-nodes_processed, and communities_found counts.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 3/3 new tests passing (177/177 total MCP tests)
-
-### ✅ Add `add_dynamic_context` MCP tool for peer profile context (Jul 27)
-Added `add_dynamic_context` MCP tool wrapping `Client.add_dynamic_context()`.
-Allows agents to append dynamic context to their profile mid-session without
-replacing the whole profile. Also added `add_profile_fact` and
-`get_profile_context` MCP tools for complete profile coverage.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 7/7 new tests passing (174/174 total MCP tests)
-
-### ✅ Add `check_embedder_health` MCP tool for embedder diagnostics (Jul 27)
-Added `check_embedder_health` MCP tool wrapping `Client.check_embedder_health()`.
-Standalone embedder health check (previously only embedded in health_check).
-Returns reachability status, model, dimension, and uptime.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 3/3 new tests passing (167/167 total MCP tests)
-
-### ✅ Add `run_maintenance` MCP tool for system health (Jul 27)
-Added `run_maintenance` MCP tool wrapping `Client.run_maintenance()`. Triggers
-periodic maintenance routines (expire stale memories, decay, dedup). Useful
-for scheduled system upkeep.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 2/2 new tests passing (167/167 total MCP tests)
-
 ---
 
 ## Deferred / Blocked
@@ -128,6 +104,24 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Research Log
+
+### Jul 28 — Fixed stale STDB badge, added 2 new PENDING items for README/doc gaps
+- **Fixed**: Stale SpacetimeDB version badge in `README.md` (v2.4 → v2.6) and
+  `server/mcp/README.md` (v2.4 → v2.6). The badge had not been updated since
+  the dependency was upgraded in commit `d1d147f`.
+- **Cleanup**: Purged 5 oldest Recently Completed entries (detect_bridge_nodes,
+  detect_communities, add_dynamic_context, check_embedder_health,
+  run_maintenance). Kept 5 most recent entries.
+- **Research**:
+  - Git log (7 days): 30 commits, latest: cbddf22.
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
+  - opentelemetry-sdk v1.43.0 (unchanged).
+  - No new competitor features to adopt from mem0, langgraph, zep.
+  - Deeper scan found doc gaps: stale badge (#1), incomplete MCP README (#2),
+    missing pre-commit config (#3).
+- **Backlog**: 2 PENDING items remaining.
+- **Commit**: TBD — 3 files changed.
 
 ### Jul 27 — Added 6 MCP tools; cleared all remaining PENDING items; backlog now empty
 - **MCP tools**: Added `seed_communities`, `detect_bridge_nodes`,

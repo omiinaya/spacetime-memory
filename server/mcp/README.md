@@ -9,7 +9,7 @@ for any MCP-compatible agent (Claude Code, Codex, Cline, etc.).
 ```
 ┌──────────────┐    stdio     ┌──────────────┐    HTTP     ┌────────────────┐
 │  MCP Client  │ ──────────►  │  MCP Server  │ ──────────► │  SpacetimeDB   │
-│  (Agent)     │ ◄──────────  │  (this tool) │ ◄────────── │  (v2.4, WASM)  │
+│  (Agent)     │ ◄──────────  │  (this tool) │ ◄────────── │  (v2.6, WASM)  │
 └──────────────┘              └──────────────┘              └────────────────┘
 ```
 

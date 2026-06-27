@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License: MIT"></a>
-  <a href="server/spacetimedb"><img src="https://img.shields.io/badge/SpacetimeDB-v2.4-blue" alt="SpacetimeDB v2.4"></a>
+  <a href="server/spacetimedb"><img src="https://img.shields.io/badge/SpacetimeDB-v2.6-blue" alt="SpacetimeDB v2.6"></a>
   <a href="client"><img src="https://img.shields.io/badge/Frontend-React%20%2B%20shadcn-61DAFB" alt="Frontend"></a>
 </p>
 
