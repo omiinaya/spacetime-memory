@@ -12,14 +12,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `list_profiles` MCP tool for profile listing
-Add `list_profiles` MCP tool wrapping `Client.list_profiles()`. Lists all
-profiles in a workspace. Complements existing `search_profiles` and
-`get_profile` tools for admin browsing.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-
 ### Add `get_peer_reputation` MCP tool for trust monitoring
 Add `get_peer_reputation` MCP tool wrapping `Client.get_peer_reputation()`.
 Returns reputation stats (trust score, feedback count) for a peer. Useful
@@ -47,6 +39,15 @@ Est: 5min
 ---
 
 ## Recently Completed
+
+### ✅ Add `list_profiles` MCP tool for profile listing (Jul 27)
+Added `list_profiles` MCP tool wrapping `Client.list_profiles()`. Lists all
+profiles in a workspace. Complements existing `search_profiles` and
+`get_profile` tools for admin browsing.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 3/3 new tests passing (159/159 total MCP tests)
 
 ### ✅ Add `list_peers` MCP tool for peer discovery (Jul 27)
 Added `list_peers` MCP tool wrapping `Client.list_peers()`. Lets agents
@@ -172,6 +173,22 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Research Log
+
+### Jul 27 — `list_profiles` MCP tool added; 3 PENDING items remain
+- **MCP tools audit**: Added `list_profiles` MCP tool wrapping
+  `Client.list_profiles()`. Workspace profile listing is now available via
+  MCP for admin browsing and workspace member discovery.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick: 9f84193 (docs
+    update, Jul 27). This tick: df99692 (list_profiles MCP tool).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged since last check).
+  - zep-python v2.0.2 (unchanged since last check).
+  - No new competitor features to adopt.
+- **Backlog**: 3 PENDING items (2 blocked items remain).
+- **Commit**: df99692 — 2 files changed, +58 lines, 159/159 MCP tests passing.
 
 ### Jul 27 — `list_peers` MCP tool added; 4 new PENDING items for remaining Client methods without MCP wrappers
 - **MCP tools audit**: Added `list_peers` MCP tool wrapping
