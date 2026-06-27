@@ -133,7 +133,7 @@ Difficulty: Hard (needs live STDB)
   get_directory, link_memory_to_directory/unlink_memory_from_directory,
   backup/restore. All are directory and admin/infrastructure methods.
 - **Backlog**: 3 PENDING items (2 blocked items remain).
-- **Commit**: (pending — resolve_entity MCP tool).
+- **Commit**: 6d21a3c — 3 files changed, +71/-25 lines, 107/107 MCP tests passing.
 
 ### Jul 27 — delete_tour MCP tool added; 4 new PENDING items for remaining gaps
 - **MCP tools audit**: Added `delete_tour` MCP tool wrapping `Client.delete_tour()`.
