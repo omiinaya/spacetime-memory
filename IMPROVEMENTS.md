@@ -181,7 +181,7 @@ Difficulty: Hard (needs live STDB)
   - Deeper scan: no new gaps found. All Client SDK methods have MCP wrappers
     (135+ tools). 3315 tests collected. No code-level TODO/FIXME markers.
 - **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: TBD — 4 files changed (memory.rs, client.py, main.py, test_client_deep.py).
+- **Commit**: 2ef708cd — 5 files changed, +85/-5 lines (memory.rs, client.py, main.py, test_client_deep.py).
 
 ### Aug 2 — Fixed 9 stale STDB v2.4 doc references; backlog remains empty
 - **Completed**: Updated 9 stale SpacetimeDB v2.4/v2.4.1 references across 7
