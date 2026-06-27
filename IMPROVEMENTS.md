@@ -12,36 +12,31 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Fix stale WASM binary causing test_get_memory_history failure
-The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
-is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
-whitelist. `test_get_memory_history` fails against the real STDB server.
-Fix: rebuild WASM module (requires cargo build, currently blocked by OOM).
-Files: server/spacetimedb/src/query.rs
-Difficulty: Medium (needs cargo build)
-Est: N/A (blocked)
-
-### Add `fuzzy_get` MCP tool ✅
-`Client.fuzzy_get()` has no MCP wrapper. Add tool for fuzzy matching by field
-content with difflib SequenceMatcher.
+### Add `update_node` MCP tool
+`Client.update_node()` has no MCP wrapper. Need tool to update existing KG
+nodes — needed for ripple update workflow.
 Files: server/mcp/main.py
 Difficulty: Easy
 
-### Add `detect_patterns` MCP tool ✅
-`Client.detect_patterns()` has no MCP wrapper. Add tool for temporal clustering,
-term extraction, and co-occurrence detection.
-Files: server/mcp/main.py
-Difficulty: Easy
-
-### Add `get_note_by_date` MCP tool ✅
-`Client.get_note_by_date()` has no MCP wrapper. Add tool to look up notes by
-ISO-8601 date string.
+### Add `list_memories` MCP tool
+`Client.list_memories()` has no MCP wrapper. Need tool to list active memories
+in a workspace with optional memory_type filter.
 Files: server/mcp/main.py
 Difficulty: Easy
 
 ---
 
 ## Recently Completed
+
+### ✅ Add `create_edge` MCP tool (Jun 26)
+Added `create_edge` MCP tool wrapping `Client.create_edge()`. Creates directed,
+typed edges between KG nodes with all parameters (weight, confidence,
+metadata_json, source_memory_id). Fills a real gap — `create_node` existed
+but edges could not be created via MCP, blocking the LLM Wiki workflow.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 8min
+Test: 68/68 MCP tests passing
 
 ### ✅ Add `fuzzy_get` MCP tool (Jul 6)
 Added `fuzzy_get` MCP tool wrapping `Client.fuzzy_get()`. Returns JSON with
@@ -127,6 +122,15 @@ with the Compounder return types:
 ---
 
 ## Deferred / Blocked
+
+### Fix stale WASM binary causing test_get_memory_history failure
+The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
+is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
+whitelist. `test_get_memory_history` fails against the real STDB server.
+Fix: rebuild WASM module (requires cargo build, currently blocked by OOM).
+Files: server/spacetimedb/src/query.rs
+Difficulty: Medium (needs cargo build)
+Est: N/A (blocked)
 
 ### STDB 2% fatal error under heavy concurrent load
 **uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use
@@ -334,3 +338,25 @@ Difficulty: Hard (needs live STDB)
 - **Gaps remaining**: 4 `Client` methods still missing MCP wrappers:
   - `store_batch`, `fuzzy_get`, `detect_patterns`, `get_note_by_date`.
 - **Backlog**: 5 PENDING items (1 stale WASM blocked + 4 MCP gaps).
+
+### Jun 26 — `create_edge` MCP tool added; deep MCP audit reveals remaining gaps
+- **MCP tools audit**: Deep audit of all `Client` public methods vs. MCP tool
+  coverage. Found `Client.create_edge()` had no MCP wrapper despite `create_node`
+  existing. Also missing: `update_node`, `list_memories`, and many others.
+- **`create_edge` MCP tool**: Added wrapping `Client.create_edge()` with all
+  8 parameters (workspace_id, source_node_id, target_node_id, relation, weight,
+  confidence, metadata_json, source_memory_id). Fills real gap in LLM Wiki
+  workflow where edges power `informed_by`/`related_to`/`contradicts` relations
+  between KG nodes.
+- **Cleanup**: Moved 3 stale ✅ items from Pending section (duplicates already in
+  Recently Completed). Moved stale WASM binary item to Deferred/Blocked.
+- **Research**:
+  - Git log (7 days): Most recent commit e96a744 (MCP tool tests). 76 MCP tools now.
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged), opentelemetry-sdk v1.43.0 (unchanged).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps remaining**: `update_node`, `list_memories`, and ~30 other `Client`
+  methods still without MCP wrappers (low-priority admin/utility methods).
+- **Backlog**: 2 PENDING items (update_node MCP tool, list_memories MCP tool).
+- **Commit**: (pending push)

@@ -527,6 +527,43 @@ class TestGetNode:
         assert result == []
 
 
+class TestCreateEdge:
+    """Tests for the create_edge MCP tool."""
+
+    def test_creates_edge_with_minimal_args(self, mock_mcp_client):
+        from server.mcp.main import create_edge
+        mock_mcp_client.create_edge.return_value = {"status": "ok", "edge_id": "e1"}
+        result = create_edge(
+            workspace_id="ws1",
+            source_node_id="n1",
+            target_node_id="n2",
+            relation="informed_by",
+        )
+        assert result["edge_id"] == "e1"
+        mock_mcp_client.create_edge.assert_called_once_with(
+            "ws1", "n1", "n2", "informed_by", 1.0, "EXTRACTED", "{}", "",
+        )
+
+    def test_creates_edge_with_all_args(self, mock_mcp_client):
+        from server.mcp.main import create_edge
+        mock_mcp_client.create_edge.return_value = {"status": "ok", "edge_id": "e2"}
+        result = create_edge(
+            workspace_id="ws1",
+            source_node_id="n1",
+            target_node_id="n3",
+            relation="contradicts",
+            weight=0.8,
+            confidence="INFERRED",
+            metadata_json='{"source": "paper"}',
+            source_memory_id="mem1",
+        )
+        assert result["edge_id"] == "e2"
+        mock_mcp_client.create_edge.assert_called_once_with(
+            "ws1", "n1", "n3", "contradicts", 0.8, "INFERRED",
+            '{"source": "paper"}', "mem1",
+        )
+
+
 class TestGetNeighbors:
     """Tests for the get_neighbors MCP tool."""
 

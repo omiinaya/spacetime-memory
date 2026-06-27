@@ -943,6 +943,37 @@ def create_node(
 
 @mcp.tool()
 @require_api_key
+def create_edge(
+    workspace_id: str,
+    source_node_id: str,
+    target_node_id: str,
+    relation: str,
+    weight: float = 1.0,
+    confidence: str = "EXTRACTED",
+    metadata_json: str = "{}",
+    source_memory_id: str = "",
+) -> dict[str, Any]:
+    """Create a directed, typed edge between two knowledge graph nodes.
+
+    Args:
+        workspace_id: Target workspace.
+        source_node_id: Source node ID.
+        target_node_id: Target node ID.
+        relation: Relationship type label (e.g. "informed_by", "related_to", "part_of").
+        weight: Edge weight (default: 1.0).
+        confidence: Confidence level (default: "EXTRACTED").
+        metadata_json: Optional JSON metadata string.
+        source_memory_id: Optional memory record ID that supports this edge.
+    """
+    return get_client().create_edge(
+        workspace_id, source_node_id, target_node_id,
+        relation, weight, confidence, metadata_json,
+        source_memory_id,
+    )
+
+
+@mcp.tool()
+@require_api_key
 def query_graph(workspace_id: str, query: str = "") -> list[dict[str, Any]]:
     """Search knowledge graph nodes by label within a workspace."""
     return get_client().query_graph(workspace_id, query)
