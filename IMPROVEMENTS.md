@@ -165,7 +165,7 @@ Difficulty: Hard (needs live STDB)
   All `Client` public methods now have MCP wrappers. No remaining gaps.
 - **Research**:
   - Git log (7 days): Most recent commit before this tick: c76ca42 (docs update,
-    Jul 27). This tick: (pending commit).
+    Jul 27). This tick: 16f1880 (5 MCP tools).
   - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
   - mem0ai v2.0.8 (unchanged since last check).
   - opentelemetry-sdk v1.43.0 (unchanged since last check).
@@ -179,8 +179,7 @@ Difficulty: Hard (needs live STDB)
   `set_decay_model`/`get_decay_config`, `batch_update_memories`.
   These are all admin/utility/infrastructure methods.
 - **Backlog**: 4 new PENDING items added (2 blocked items remain).
-- **Commit**: (pending commit signature) — 3 files changed, 12 new tests,
-  119/119 MCP tests passing.
+- **Commit**: 16f1880 — 3 files changed, +332/-11 lines, 119/119 MCP tests passing.
 
 ### Jul 27 — resolve_entity MCP tool added; 3 PENDING items remain
 - **MCP tools audit**: Added `resolve_entity` MCP tool wrapping `Client.resolve_entity()`.
