@@ -21,47 +21,52 @@ Files: server/spacetimedb/src/query.rs
 Difficulty: Medium (needs cargo build)
 Est: N/A (blocked)
 
-### Add `fuzzy_get` MCP tool
+### Add `fuzzy_get` MCP tool ✅
 `Client.fuzzy_get()` has no MCP wrapper. Add tool for fuzzy matching by field
 content with difflib SequenceMatcher.
 Files: server/mcp/main.py
 Difficulty: Easy
-Est: 5min
 
-### Add `detect_patterns` MCP tool
+### Add `detect_patterns` MCP tool ✅
 `Client.detect_patterns()` has no MCP wrapper. Add tool for temporal clustering,
 term extraction, and co-occurrence detection.
 Files: server/mcp/main.py
 Difficulty: Easy
-Est: 5min
 
-### Add `get_note_by_date` MCP tool
+### Add `get_note_by_date` MCP tool ✅
 `Client.get_note_by_date()` has no MCP wrapper. Add tool to look up notes by
 ISO-8601 date string.
 Files: server/mcp/main.py
 Difficulty: Easy
-Est: 3min
 
 ---
 
 ## Recently Completed
 
-### ✅ Add `store_batch` MCP tool (Jun 27)
-Added `store_batch` MCP tool wrapping `Client.store_batch()`. Accepts
-`items_json` (JSON string of item dicts) and `workspace_id`. Embeds all items
-in one batch call and sends a single reducer. Uses same JSON-input pattern as
-`store_answers_batch`.
+### ✅ Add `fuzzy_get` MCP tool (Jul 6)
+Added `fuzzy_get` MCP tool wrapping `Client.fuzzy_get()`. Returns JSON with
+best fuzzy-match or no-match message. Uses difflib SequenceMatcher.
 Files: server/mcp/main.py
 Difficulty: Easy
 Est: 5min
-Test: 155/155 client tests passing
+Test: 59/59 MCP tests passing
 
-### ✅ Add `delete_workspace` MCP tool (Jul 6)
-Added `delete_workspace` MCP tool wrapping `Client.delete_workspace()`.
-Simple workspace deletion via MCP.
+### ✅ Add `detect_patterns` MCP tool (Jul 6)
+Added `detect_patterns` MCP tool wrapping `Client.detect_patterns()`. Accepts
+include_clusters, include_terms, include_co_occur flags. Returns JSON with
+temporal clusters, frequent terms, co-occurrences.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 5min
+Test: 59/59 MCP tests passing
+
+### ✅ Add `get_note_by_date` MCP tool (Jul 6)
+Added `get_note_by_date` MCP tool wrapping `Client.get_note_by_date()`. Looks
+up notes by ISO-8601 date string.
 Files: server/mcp/main.py
 Difficulty: Easy
 Est: 3min
+Test: 59/59 MCP tests passing
 
 ### ✅ Add `export_workspace` MCP tool (Jun 26)
 Added `export_workspace` MCP tool wrapping `Compounder.export_workspace()`.
@@ -135,6 +140,24 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jul 6 — All 3 remaining MCP gaps closed; backlog cleared
+- **MCP tools audit**: Added `fuzzy_get`, `detect_patterns`, `get_note_by_date`
+  MCP tools. All `Client` methods now have MCP tool wrappers.
+- **Research**:
+  - Git log (7 days): Most recent commits are store_batch, delete_workspace,
+    export_workspace, document CRUD. No unreviewed changes. An additional
+    3 tools added this tick: fuzzy_get, detect_patterns, get_note_by_date.
+    Commit: 74273c7.
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps remaining**: 0 `Client` methods without MCP wrappers. All actionable
+  improvement items are complete.
+- **Backlog**: 1 PENDING item remaining (stale WASM binary blocked).
+- **Commit**: 74273c7 — 1 file (+91 lines), 59/59 MCP tests passing.
 
 ### Jun 27 — `store_batch` MCP tool added; 3 remaining MCP gaps
 - **MCP tools audit**: `store_batch` (Client) now has an MCP tool wrapper.
