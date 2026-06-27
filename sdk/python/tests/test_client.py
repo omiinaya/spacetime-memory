@@ -995,7 +995,7 @@ class TestBatchUpdateMemoriesSuccess:
         c.update_memory = Mock(return_value={"status": "ok"})
 
         result = c.batch_update_memories("ws1", ["m1"], {"content": "new"})
-        c.update_memory.assert_called_once_with("m1", "new", "s", 0.5)
+        c.update_memory.assert_called_once_with("m1", "new", "s", 0.5, None)
         assert result["status"] == "ok"
 
     def test_batch_update_missing_memory(self):

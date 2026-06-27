@@ -2158,12 +2158,24 @@ class Client:
             - ``None`` (default): preserve the current expiration.
             - ``0``: clear expiration (memory never expires).
             - ``>0``: set to the given absolute timestamp.
-        """
-        # Translate Python None → Rust sentinel -1 ("preserve")
-        rust_expires_at: int = -1 if expires_at is None else expires_at
+
+        Note
+        ----
+        This method sends 5 arguments when ``expires_at`` is explicitly set,
+        or 4 arguments when ``expires_at`` is ``None`` (default).  The 4-arg
+        form is backward-compatible with pre-``expires_at`` WASM binaries.
+        The 5-arg form requires the ``expires_at`` reducer (rebuilt WASM).
+        """  # noqa: E501
+        if expires_at is None:
+            # Backward-compatible 4-arg call (works with old WASM)
+            return self._call(
+                "update_memory",
+                [memory_id, content, summary, confidence],
+            )
+        # Forward-looking 5-arg call (requires rebuilt WASM with expires_at support)
         return self._call(
             "update_memory",
-            [memory_id, content, summary, confidence, rust_expires_at],
+            [memory_id, content, summary, confidence, expires_at],
         )
 
     def delete_memory(self, memory_id: str) -> dict[str, Any]:
@@ -2331,7 +2343,8 @@ class Client:
         self, workspace_id: str, memory_ids: list[str], updates: dict[str, Any]
     ) -> dict[str, Any]:
         """Batch update multiple memories. Mem0 parity.
-        updates can contain: content, summary, confidence, tier, is_active
+        updates can contain: content, summary, confidence, tier, is_active,
+        expires_at
 
         Performs client-side batching: loops over each memory_id and
         calls the existing ``update_memory`` reducer individually.
@@ -2352,7 +2365,8 @@ class Client:
                 content = updates.get("content", current.get("content", ""))
                 summary = updates.get("summary", current.get("summary", ""))
                 confidence = updates.get("confidence", current.get("confidence", 0.8))
-                self.update_memory(mem_id, content, summary, confidence)
+                expires_at = updates.get("expires_at", None)
+                self.update_memory(mem_id, content, summary, confidence, expires_at)
                 updated += 1
             except Exception as e:
                 errors.append(f"Memory '{mem_id}': {e}")
