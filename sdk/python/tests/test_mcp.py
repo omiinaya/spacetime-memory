@@ -1664,3 +1664,84 @@ class TestListApiKeys:
         list_api_keys(workspace_id="ws-abc")
         mock_mcp_client.list_api_keys.assert_called_once_with("ws-abc")
 
+
+# ── set_workspace_context / set_memory_context / get_context_chain ──────
+
+
+class TestSetWorkspaceContext:
+    """Tests for the set_workspace_context MCP tool."""
+
+    def test_sets_context(self, mock_mcp_client):
+        from server.mcp.main import set_workspace_context
+        mock_mcp_client.set_workspace_context.return_value = {
+            "status": "ok",
+        }
+        result = set_workspace_context(
+            workspace_id="ws1", context="Agent session context data"
+        )
+        assert "ok" in result.get("status", "")
+        mock_mcp_client.set_workspace_context.assert_called_once_with(
+            "ws1", "Agent session context data"
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import set_workspace_context
+        set_workspace_context(workspace_id="ws-abc", context="test context")
+        mock_mcp_client.set_workspace_context.assert_called_once_with(
+            "ws-abc", "test context"
+        )
+
+
+class TestSetMemoryContext:
+    """Tests for the set_memory_context MCP tool."""
+
+    def test_sets_context(self, mock_mcp_client):
+        from server.mcp.main import set_memory_context
+        mock_mcp_client.set_memory_context.return_value = {
+            "status": "ok",
+        }
+        result = set_memory_context(
+            memory_id="mem-123", context="Memory-specific context"
+        )
+        assert "ok" in result.get("status", "")
+        mock_mcp_client.set_memory_context.assert_called_once_with(
+            "mem-123", "Memory-specific context"
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import set_memory_context
+        set_memory_context(memory_id="mem-xyz", context="ctx")
+        mock_mcp_client.set_memory_context.assert_called_once_with(
+            "mem-xyz", "ctx"
+        )
+
+
+class TestGetContextChain:
+    """Tests for the get_context_chain MCP tool."""
+
+    def test_gets_context_chain(self, mock_mcp_client):
+        from server.mcp.main import get_context_chain
+        mock_mcp_client.get_context_chain.return_value = {
+            "workspace_context": "WS context",
+            "memory_context": "Memory context",
+        }
+        result = get_context_chain(memory_id="mem-123")
+        assert result["workspace_context"] == "WS context"
+        assert result["memory_context"] == "Memory context"
+        mock_mcp_client.get_context_chain.assert_called_once_with("mem-123")
+
+    def test_empty_chain(self, mock_mcp_client):
+        from server.mcp.main import get_context_chain
+        mock_mcp_client.get_context_chain.return_value = {
+            "workspace_context": "",
+            "memory_context": "",
+        }
+        result = get_context_chain(memory_id="mem-nonexistent")
+        assert result["workspace_context"] == ""
+        assert result["memory_context"] == ""
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import get_context_chain
+        get_context_chain(memory_id="mem-xyz")
+        mock_mcp_client.get_context_chain.assert_called_once_with("mem-xyz")
+

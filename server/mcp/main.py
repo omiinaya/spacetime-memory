@@ -497,6 +497,55 @@ def store_batch(
     return f"Stored {len(results)} memories in batch (workspace: {workspace_id})"
 
 
+# ---------------------------------------------------------------------------
+# Context tools  (QMD-style context chains)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def set_workspace_context(workspace_id: str, context: str) -> dict[str, Any]:
+    """Attach a context string to a workspace for QMD-style context trees.
+
+    Args:
+        workspace_id: The workspace to set context on.
+        context: The context string to attach.
+
+    Returns:
+        Dict with reducer response status.
+    """
+    return get_client().set_workspace_context(workspace_id, context)
+
+
+@mcp.tool()
+@require_api_key
+def set_memory_context(memory_id: str, context: str) -> dict[str, Any]:
+    """Attach a context string to a memory for QMD-style context trees.
+
+    Args:
+        memory_id: The memory to set context on.
+        context: The context string to attach.
+
+    Returns:
+        Dict with reducer response status.
+    """
+    return get_client().set_memory_context(memory_id, context)
+
+
+@mcp.tool()
+@require_api_key
+def get_context_chain(memory_id: str) -> dict[str, Any]:
+    """Return the context chain for a memory: workspace context + memory context.
+
+    Args:
+        memory_id: The memory ID to retrieve context chain for.
+
+    Returns:
+        Dict with ``workspace_context`` and ``memory_context`` keys.
+    """
+    return get_client().get_context_chain(memory_id)
+
+
 @mcp.tool()
 @require_api_key
 def fuzzy_get(

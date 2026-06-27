@@ -95,37 +95,7 @@ Difficulty: Easy
 Est: 5min
 Test: 2/2 new tests passing (105/105 total MCP tests)
 
-### ✅ Add `search_profiles` MCP tool (Jul 6)
-Added MCP tool wrapping `Client.search_profiles()`. Searches peer profiles by
-static_facts or dynamic_context (client-side filter).
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 11/11 new tests passing (103/103 total MCP tests)
 
-### ✅ Add `get_user_memories` MCP tool (Jul 6)
-Added MCP tool wrapping `Client.get_user_memories()`. Gets user-scoped memories
-for multi-user scenarios.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 11/11 new tests passing (103/103 total MCP tests)
-
-### ✅ Add `search_sessions_semantic` MCP tool (Jul 6)
-Added MCP tool wrapping `Client.search_sessions_semantic()`. Semantic search
-across past sessions for agent context retrieval.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 11/11 new tests passing (103/103 total MCP tests)
-
-### ✅ Add `recommend_memories` MCP tool (Jul 6)
-Added MCP tool wrapping `Client.recommend_memories()`. Recommends memories that
-need attention (urgent, decaying, low-trust) for maintenance workflow.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 11/11 new tests passing (103/103 total MCP tests)
 
 ---
 
