@@ -12,6 +12,22 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add `expires_at` support to `update_memory` — SDK + MCP + Rust reducer (Aug 2)
+Added optional `expires_at` parameter to the Rust `update_memory` reducer,
+Python SDK `Client.update_memory()`, and MCP `update_memory` tool. This
+matches mem0 v2.0.10's new `expiration_date` on update feature.
+
+Convention: `-1` = preserve existing expiration, `0` = never expires (clear),
+`>0` = set specific timestamp in microseconds. Python SDK maps `None` → `-1`.
+
+This was the last Client SDK method that couldn't modify `expires_at` despite
+the `Memory` table already having the field.
+Files: server/spacetimedb/src/memory.rs, sdk/python/spacetime_memory/client.py,
+  server/mcp/main.py
+Difficulty: Easy
+Est: 15min
+Notes: Rust reducer change requires WASM rebuild (blocked by OOM — see Deferred).
+
 ### ✅ Add `delete_tour_stop` SDK method + MCP tool (Aug 2)
 The Rust `remove_tour_stop` reducer was not exposed in the Python SDK or MCP
 server. Added `Client.delete_tour_stop(stop_id)` method, `delete_tour_stop` MCP
@@ -148,6 +164,24 @@ Difficulty: Hard (needs live STDB)
 ||---
 
 ## Research Log
+
+### Aug 2 — Added `expires_at` support to `update_memory`; backlog stays clear
+- **Completed**: Added optional `expires_at` parameter to Rust `update_memory`
+  reducer, Python SDK `Client.update_memory()`, and MCP `update_memory` tool.
+  The `Memory` table already had `expires_at` but no way to modify it after
+  creation. Now matches mem0 v2.0.10's `expiration_date` on update feature.
+- **Cleanup**: Added new completed item to Recently Completed (10 total, at
+  max limit, no purge needed).
+- **Research**:
+  - Git log (7 days): 243+ commits, latest: eebefeee (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged — latest on PyPI has `expiration_date` on
+    update; that feature is now matched in SpacetimeMemory).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
+  - Deeper scan: no new gaps found. All Client SDK methods have MCP wrappers
+    (135+ tools). 3315 tests collected. No code-level TODO/FIXME markers.
+- **Backlog**: 0 PENDING items — backlog remains empty.
+- **Commit**: TBD — 4 files changed (memory.rs, client.py, main.py, test_client_deep.py).
 
 ### Aug 2 — Fixed 9 stale STDB v2.4 doc references; backlog remains empty
 - **Completed**: Updated 9 stale SpacetimeDB v2.4/v2.4.1 references across 7

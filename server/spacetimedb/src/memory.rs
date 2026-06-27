@@ -247,6 +247,7 @@ pub fn update_memory(
     content: String,
     summary: String,
     confidence: f64,
+    expires_at: i64,
 ) -> Result<(), String> {
     trace_span!(ctx, "update_memory", TracingSpanKind::Write, "", {
         let _account = require_auth(ctx)?;
@@ -267,6 +268,12 @@ pub fn update_memory(
         mem.confidence = confidence;
         mem.version += 1; // Increment version on each update
         mem.updated_at = now_micros(ctx);
+
+        // Update expires_at if caller specified a change.
+        // -1 = preserve existing value;  0 = never expires;  >0 = set specific timestamp.
+        if expires_at >= 0 {
+            mem.expires_at = expires_at;
+        }
 
         let ws_id = mem.workspace_id.clone();
         let mem_id = mem.id.clone();

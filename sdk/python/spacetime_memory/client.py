@@ -2133,10 +2133,38 @@ class Client:
         return matches
 
     def update_memory(
-        self, memory_id: str, content: str, summary: str = "", confidence: float = 0.8
+        self,
+        memory_id: str,
+        content: str,
+        summary: str = "",
+        confidence: float = 0.8,
+        expires_at: int | None = None,
     ) -> dict[str, Any]:
-        """Update a memory's content/summary/confidence."""
-        return self._call("update_memory", [memory_id, content, summary, confidence])
+        """Update a memory's content/summary/confidence.
+
+        Parameters
+        ----------
+        memory_id:
+            Target memory ID.
+        content:
+            New body text.
+        summary:
+            New short summary (default ``""`` = no summary).
+        confidence:
+            New confidence score 0.0–1.0 (default ``0.8``).
+        expires_at:
+            Expiration timestamp in microseconds (epoch).
+            Special values:
+            - ``None`` (default): preserve the current expiration.
+            - ``0``: clear expiration (memory never expires).
+            - ``>0``: set to the given absolute timestamp.
+        """
+        # Translate Python None → Rust sentinel -1 ("preserve")
+        rust_expires_at: int = -1 if expires_at is None else expires_at
+        return self._call(
+            "update_memory",
+            [memory_id, content, summary, confidence, rust_expires_at],
+        )
 
     def delete_memory(self, memory_id: str) -> dict[str, Any]:
         """Deactivate a memory. Idempotent — succeeds if already deleted."""

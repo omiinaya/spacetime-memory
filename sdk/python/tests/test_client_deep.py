@@ -3822,7 +3822,9 @@ class TestClientUnitCoverage:
         client = Client(host="localhost", port="3000", database="test")
         with patch.object(client, "_call", return_value={"status": "ok"}) as mock_call:
             result = client.update_memory("m1", "new content", summary="sum", confidence=0.9)
-            mock_call.assert_called_once_with("update_memory", ["m1", "new content", "sum", 0.9])
+            mock_call.assert_called_once_with(
+                "update_memory", ["m1", "new content", "sum", 0.9, -1]
+            )
             assert result == {"status": "ok"}
 
     # ── delete_memory query_cache path (lines 1583-1587, 1593) ──

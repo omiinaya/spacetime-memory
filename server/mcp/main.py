@@ -437,6 +437,7 @@ def update_memory(
     content: str = "",
     summary: str = "",
     confidence: float = 0.0,
+    expires_at: int = -1,
 ) -> dict[str, Any]:
     """Update a memory's content, summary, and/or confidence.
 
@@ -444,8 +445,16 @@ def update_memory(
     empty strings for fields you want to leave unchanged.
 
     Creates a revision snapshot before updating (version history).
+
+    Parameters
+    ----------
+    expires_at:
+        Expiration timestamp in microseconds (epoch).
+        ``-1`` (default): preserve the current expiration.
+        ``0``: clear expiration (memory never expires).
+        ``>0``: set to the given absolute timestamp.
     """
-    return get_client().update_memory(memory_id, content, summary, confidence)
+    return get_client().update_memory(memory_id, content, summary, confidence, expires_at)
 
 
 @mcp.tool()
