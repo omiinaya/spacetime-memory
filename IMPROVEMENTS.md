@@ -12,7 +12,41 @@ and works the top pending item each tick.
 
 ## Pending
 
-*(All actionable improvements complete. Next backlog item: stale WASM binary blocked by OOM.)*
+### Add `compute_kg_stats` MCP tool
+Add MCP tool wrapping `Client.compute_kg_stats()`. Returns KG stats: node_count,
+edge_count, community_count, orphan_nodes, avg_degree. Provides workspace health
+monitoring for the LLM Wiki workflow.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+
+### Add `recommend_memories` MCP tool
+Add MCP tool wrapping `Client.recommend_memories()`. Recommends memories that
+need attention (urgent, decaying, low-trust) for maintenance workflow.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+
+### Add `search_sessions_semantic` MCP tool
+Add MCP tool wrapping `Client.search_sessions_semantic()`. Semantic search
+across past sessions for agent context retrieval.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+
+### Add `get_user_memories` MCP tool
+Add MCP tool wrapping `Client.get_user_memories()`. Get user-scoped memories
+for multi-user scenarios.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+
+### Add `search_profiles` MCP tool
+Add MCP tool wrapping `Client.search_profiles()`. Search peer profiles by
+static facts or dynamic context.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
 
 ---
 

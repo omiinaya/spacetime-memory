@@ -1253,6 +1253,26 @@ def compute_community_hierarchy(workspace_id: str) -> str:
     return json.dumps({"edges": edges, "clusters": clusters}, default=str)
 
 
+@mcp.tool()
+@require_api_key
+def compute_kg_stats(workspace_id: str) -> str:
+    """Compute knowledge graph statistics for a workspace.
+
+    Returns node_count, edge_count, community_count, orphan_nodes,
+    avg_degree, and other KG metrics for health monitoring.
+
+    Args:
+        workspace_id: The workspace to compute stats for.
+
+    Returns:
+        JSON string with KG statistics.
+    """
+    result = get_client().compute_kg_stats(workspace_id)
+    if result is None:
+        return json.dumps({"workspace_id": workspace_id, "error": "No stats found"})
+    return json.dumps(result, default=str)
+
+
 # ---------------------------------------------------------------------------
 # Session tools
 # ---------------------------------------------------------------------------

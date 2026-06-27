@@ -795,6 +795,39 @@ class TestComputeCommunityHierarchy:
         assert mock_mcp_client._sql.call_count == 2
 
 
+class TestComputeKgStats:
+    """Tests for the compute_kg_stats MCP tool."""
+
+    def test_returns_stats(self, mock_mcp_client):
+        from server.mcp.main import compute_kg_stats
+        mock_mcp_client.compute_kg_stats.return_value = {
+            "workspace_id": "ws1",
+            "node_count": 42,
+            "edge_count": 156,
+            "community_count": 5,
+            "orphan_nodes": 3,
+            "avg_degree": 3.7,
+        }
+        result = compute_kg_stats(workspace_id="ws1")
+        import json as _json
+        parsed = _json.loads(result)
+        assert parsed["node_count"] == 42
+        assert parsed["edge_count"] == 156
+        assert parsed["community_count"] == 5
+        assert parsed["orphan_nodes"] == 3
+        assert parsed["avg_degree"] == 3.7
+        mock_mcp_client.compute_kg_stats.assert_called_once_with("ws1")
+
+    def test_no_stats_returns_error(self, mock_mcp_client):
+        from server.mcp.main import compute_kg_stats
+        mock_mcp_client.compute_kg_stats.return_value = None
+        result = compute_kg_stats(workspace_id="empty_ws")
+        import json as _json
+        parsed = _json.loads(result)
+        assert "error" in parsed
+        assert parsed["workspace_id"] == "empty_ws"
+
+
 # ── Workspace tools ─────────────────────────────────────────────────────
 
 
