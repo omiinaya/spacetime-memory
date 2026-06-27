@@ -1443,6 +1443,28 @@ def search_profiles(workspace_id: str, query: str, limit: int = 20) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Peer tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def list_peers(workspace_id: str | None = None) -> list[dict[str, Any]]:
+    """List all peers, optionally filtered by workspace.
+
+    Returns peer IDs, workspace membership, and profile metadata for
+    peer discovery and multi-agent coordination.
+
+    Args:
+        workspace_id: Optional workspace ID to filter peers by.
+
+    Returns:
+        List of peer records with ID, profile, and metadata.
+    """
+    return get_client().list_peers(workspace_id)
+
+
+# ---------------------------------------------------------------------------
 # Session tools
 # ---------------------------------------------------------------------------
 

@@ -2013,3 +2013,51 @@ class TestAddAlias:
             "el-xyz-987", "Alice"
         )
 
+
+# ── list_peers ─────────────────────────────────────────────────────────────
+
+
+class TestListPeers:
+    """Tests for the list_peers MCP tool."""
+
+    def test_lists_all_peers(self, mock_mcp_client):
+        from server.mcp.main import list_peers
+        mock_mcp_client.list_peers.return_value = [
+            {"peer_id": "peer-001", "workspace_id": "ws1"},
+            {"peer_id": "peer-002", "workspace_id": "ws1"},
+        ]
+        result = list_peers()
+        assert len(result) == 2
+        assert result[0]["peer_id"] == "peer-001"
+        assert result[1]["peer_id"] == "peer-002"
+        mock_mcp_client.list_peers.assert_called_once_with(None)
+
+    def test_filters_by_workspace(self, mock_mcp_client):
+        from server.mcp.main import list_peers
+        mock_mcp_client.list_peers.return_value = [
+            {"peer_id": "peer-001", "workspace_id": "ws1"},
+        ]
+        result = list_peers(workspace_id="ws1")
+        assert len(result) == 1
+        mock_mcp_client.list_peers.assert_called_once_with("ws1")
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import list_peers
+        mock_mcp_client.list_peers.return_value = []
+        result = list_peers(workspace_id="empty-ws")
+        assert result == []
+        mock_mcp_client.list_peers.assert_called_once_with("empty-ws")
+
+    def test_returns_profile_metadata(self, mock_mcp_client):
+        from server.mcp.main import list_peers
+        mock_mcp_client.list_peers.return_value = [
+            {
+                "peer_id": "peer-003",
+                "workspace_id": "ws2",
+                "profile": {"name": "Alice", "tags": ["researcher"]},
+            },
+        ]
+        result = list_peers()
+        assert result[0]["profile"]["name"] == "Alice"
+        assert "researcher" in result[0]["profile"]["tags"]
+
