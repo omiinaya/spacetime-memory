@@ -2102,3 +2102,129 @@ class TestListProfiles:
         assert "active" in result[0]["dynamic_context_json"]
         assert mock_mcp_client.list_profiles.call_count == 1
 
+
+# ── get_peer_reputation ──────────────────────────────────────────────────────
+
+
+class TestGetPeerReputation:
+    """Tests for the get_peer_reputation MCP tool."""
+
+    def test_returns_reputation_for_peer(self, mock_mcp_client):
+        from server.mcp.main import get_peer_reputation
+        mock_mcp_client.get_peer_reputation.return_value = {
+            "id": "peer-001",
+            "trust_score": 0.92,
+            "feedback_count": 15,
+            "positive_feedback": 14,
+            "negative_feedback": 1,
+        }
+        result = get_peer_reputation(peer_id="peer-001")
+        assert result["id"] == "peer-001"
+        assert result["trust_score"] == 0.92
+        assert result["feedback_count"] == 15
+        mock_mcp_client.get_peer_reputation.assert_called_once_with("peer-001")
+
+    def test_returns_none_for_unknown_peer(self, mock_mcp_client):
+        from server.mcp.main import get_peer_reputation
+        mock_mcp_client.get_peer_reputation.return_value = None
+        result = get_peer_reputation(peer_id="unknown-peer")
+        assert result is None
+        mock_mcp_client.get_peer_reputation.assert_called_once_with("unknown-peer")
+
+    def test_includes_all_reputation_fields(self, mock_mcp_client):
+        from server.mcp.main import get_peer_reputation
+        mock_mcp_client.get_peer_reputation.return_value = {
+            "id": "peer-002",
+            "trust_score": 0.75,
+            "feedback_count": 8,
+            "positive_feedback": 6,
+            "negative_feedback": 2,
+            "last_updated": "2026-06-27T12:00:00Z",
+        }
+        result = get_peer_reputation(peer_id="peer-002")
+        assert result["trust_score"] == 0.75
+        assert result["feedback_count"] == 8
+        assert result["positive_feedback"] == 6
+        assert result["negative_feedback"] == 2
+        assert result["last_updated"] == "2026-06-27T12:00:00Z"
+
+
+# ── run_maintenance ──────────────────────────────────────────────────────────
+
+
+class TestRunMaintenance:
+    """Tests for the run_maintenance MCP tool."""
+
+    def test_triggers_maintenance(self, mock_mcp_client):
+        from server.mcp.main import run_maintenance
+        mock_mcp_client.run_maintenance.return_value = {
+            "status": "ok",
+            "expired": 5,
+            "decayed": 12,
+            "deduped": 3,
+        }
+        result = run_maintenance()
+        assert result["status"] == "ok"
+        assert result["expired"] == 5
+        assert result["decayed"] == 12
+        assert result["deduped"] == 3
+        mock_mcp_client.run_maintenance.assert_called_once_with()
+
+    def test_returns_clean_state(self, mock_mcp_client):
+        from server.mcp.main import run_maintenance
+        mock_mcp_client.run_maintenance.return_value = {
+            "status": "ok",
+            "expired": 0,
+            "decayed": 0,
+            "deduped": 0,
+        }
+        result = run_maintenance()
+        assert result["expired"] == 0
+        assert result["decayed"] == 0
+        assert result["deduped"] == 0
+
+
+# ── check_embedder_health ────────────────────────────────────────────────────
+
+
+class TestCheckEmbedderHealth:
+    """Tests for the check_embedder_health MCP tool."""
+
+    def test_returns_healthy(self, mock_mcp_client):
+        from server.mcp.main import check_embedder_health
+        mock_mcp_client.check_embedder_health.return_value = {
+            "status": "ok",
+            "reachable": True,
+            "model": "nomic-embed-text-v1.5",
+        }
+        result = check_embedder_health()
+        assert result["status"] == "ok"
+        assert result["reachable"] is True
+        mock_mcp_client.check_embedder_health.assert_called_once_with()
+
+    def test_returns_unreachable(self, mock_mcp_client):
+        from server.mcp.main import check_embedder_health
+        mock_mcp_client.check_embedder_health.return_value = {
+            "status": "error",
+            "reachable": False,
+            "message": "Connection refused",
+        }
+        result = check_embedder_health()
+        assert result["status"] == "error"
+        assert result["reachable"] is False
+        assert "Connection refused" in result["message"]
+
+    def test_returns_embedder_details(self, mock_mcp_client):
+        from server.mcp.main import check_embedder_health
+        mock_mcp_client.check_embedder_health.return_value = {
+            "status": "ok",
+            "reachable": True,
+            "model": "nomic-embed-text-v1.5",
+            "dimension": 768,
+            "uptime_seconds": 3600,
+        }
+        result = check_embedder_health()
+        assert result["model"] == "nomic-embed-text-v1.5"
+        assert result["dimension"] == 768
+        assert result["uptime_seconds"] == 3600
+
