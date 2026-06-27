@@ -1,7 +1,5 @@
 """Tests for memory CRUD operations via Client."""
 
-import json
-import pytest
 from unittest.mock import Mock
 from tests.conftest import make_sql_response
 
@@ -34,6 +32,7 @@ class TestMemoryStore:
     def test_store_with_auto_index(self, mock_http_client, monkeypatch):
         """store() auto-indexes when embedder returns a vector."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
         # Mock for the embedder call specifically
         def post_side_effect(*args, **kwargs):
             if "/embeddings" in args[0]:
@@ -48,7 +47,6 @@ class TestMemoryStore:
         mock_http_client._http.post.side_effect = post_side_effect
 
         # Override _sql to return a memory that was "just inserted"
-        import spacetime_memory.client as client_mod
         original_sql = mock_http_client._sql
         call_count = [0]
 
@@ -73,6 +71,7 @@ class TestMemoryStore:
     def test_store_with_tier(self, mock_http_client, monkeypatch):
         """store() updates tier when tier is L0/L1/L2."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
         def post_side_effect(*args, **kwargs):
             if "/embeddings" in args[0]:
                 emb_resp = Mock(status_code=200)
@@ -109,6 +108,7 @@ class TestMemorySearch:
     def test_search_semantic(self, mock_http_client, monkeypatch):
         """search() with semantic=True calls hybrid_search reducer."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
         # Mock the embedder to return a proper vector
         def post_side_effect(*args, **kwargs):
             if "/embeddings" in args[0]:
@@ -137,9 +137,11 @@ class TestMemorySearch:
         including notes alongside memories."""
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
-            text=make_sql_response([
-                {"id": "1", "content": "pizza is great", "created_at": 100},
-            ]),
+            text=make_sql_response(
+                [
+                    {"id": "1", "content": "pizza is great", "created_at": 100},
+                ]
+            ),
         )
 
         result = mock_http_client.search(
@@ -157,6 +159,7 @@ class TestMemorySearch:
     def test_search_with_filters(self, mock_http_client, monkeypatch):
         """search_with_filters applies metadata and location filters."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
         # We need hybrid_search + SQL results for the search + filter path
         def post_side_effect(*args, **kwargs):
             if "/embeddings" in args[0]:
@@ -186,10 +189,12 @@ class TestMemoryCrud:
         """list_memories() builds correct SQL query and parses results."""
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
-            text=make_sql_response([
-                {"id": "1", "content": "hello", "is_active": True, "created_at": 200},
-                {"id": "2", "content": "world", "is_active": True, "created_at": 100},
-            ]),
+            text=make_sql_response(
+                [
+                    {"id": "1", "content": "hello", "is_active": True, "created_at": 200},
+                    {"id": "2", "content": "world", "is_active": True, "created_at": 100},
+                ]
+            ),
         )
 
         results = mock_http_client.list_memories(workspace_id="ws1")
@@ -204,9 +209,11 @@ class TestMemoryCrud:
         def post_side_effect(*args, **kwargs):
             call_log.append(args[0])
             resp = Mock(status_code=200)
-            resp.text = make_sql_response([
-                {"id": "mem-1", "content": "found it"},
-            ])
+            resp.text = make_sql_response(
+                [
+                    {"id": "mem-1", "content": "found it"},
+                ]
+            )
             return resp
 
         mock_http_client._http.post.side_effect = post_side_effect
@@ -223,9 +230,7 @@ class TestMemoryCrud:
             text="{}",
         )
 
-        result = mock_http_client.update_memory(
-            "mem-1", "new content", "new summary", 0.9
-        )
+        result = mock_http_client.update_memory("mem-1", "new content", "new summary", 0.9)
 
         assert result["status"] == "ok"
 

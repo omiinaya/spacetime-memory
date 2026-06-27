@@ -1,10 +1,10 @@
 """Pytest tests for spacetime_memory.mmr — MMR reranking and Jaccard similarity."""
 
-import pytest
 from spacetime_memory.mmr import _jaccard_similarity, mmr_rerank
 
 
 # ── _jaccard_similarity tests ────────────────────────────────────────────────
+
 
 class TestJaccardSimilarity:
     """Token-level Jaccard similarity between two strings."""
@@ -74,6 +74,7 @@ class TestJaccardSimilarity:
 
 
 # ── mmr_rerank tests ─────────────────────────────────────────────────────────
+
 
 class TestMMRRerank:
     """MMR reranking: balances relevance and diversity."""
@@ -292,10 +293,7 @@ class TestMMRRerank:
 
     def test_many_results(self):
         """MMR should handle a larger result set."""
-        results = [
-            {"memory_content": f"topic {i}", "score": 1.0 - i * 0.01}
-            for i in range(20)
-        ]
+        results = [{"memory_content": f"topic {i}", "score": 1.0 - i * 0.01} for i in range(20)]
         output = mmr_rerank(results)
         assert len(output) == 20
         # All original items present

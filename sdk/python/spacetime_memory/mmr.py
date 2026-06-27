@@ -9,8 +9,6 @@ A λ of 0.7 means 70% relevance, 30% diversity penalty.
 Integrated into Client.search() via mmr_lambda parameter.
 """
 
-import math
-from collections.abc import Sequence
 from typing import Any
 
 

@@ -15,15 +15,18 @@ from cli.stmem import cli
 # Directory tree — traverse_directory
 # ====================================================================
 
+
 class TestDirectoryTree:
     """directory tree command."""
 
     def test_directory_tree_with_results(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
-        mock_client.traverse_directory = Mock(return_value=[
-            {"id": "d1", "name": "subdir", "path": "/root/subdir", "type": "directory"},
-            {"id": "m1", "name": "memory_1", "memory_id": "mem1", "type": "memory"},
-        ])
+        mock_client.traverse_directory = Mock(
+            return_value=[
+                {"id": "d1", "name": "subdir", "path": "/root/subdir", "type": "directory"},
+                {"id": "m1", "name": "memory_1", "memory_id": "mem1", "type": "memory"},
+            ]
+        )
         result = runner.invoke(cli, ["directory", "tree", "ws1", "root1"])
         assert result.exit_code == 0
 
@@ -45,12 +48,14 @@ class TestDirectoryTree:
 # Plugin load / unload / reload — PluginManager branches
 # ====================================================================
 
+
 class TestPluginLifecycle:
     """Plugin load, unload, reload, discover."""
 
     def test_plugin_load_success(self, monkeypatch, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         from unittest.mock import MagicMock
+
         mock_mgr = MagicMock()
         mock_mgr.discover = Mock()
         mock_mgr.load = Mock(return_value=True)
@@ -102,15 +107,23 @@ class TestPluginLifecycle:
 # Mental model creation — result branch
 # ====================================================================
 
+
 class TestMentalCreate:
     """mental create command with result."""
 
     def test_mental_create_with_result(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[{"id": "mm1"}])
-        result = runner.invoke(cli, [
-            "mental", "create", "ws1", "--memory-ids", "m1,m2,m3",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "mental",
+                "create",
+                "ws1",
+                "--memory-ids",
+                "m1,m2,m3",
+            ],
+        )
         assert result.exit_code == 0
         assert "Mental model created" in result.output
 
@@ -118,6 +131,7 @@ class TestMentalCreate:
 # ====================================================================
 # Mental synthesize — subprocess branching
 # ====================================================================
+
 
 class TestMentalSynthesize:
     """mental synthesize command with all/dry-run flags."""
@@ -159,24 +173,38 @@ class TestMentalSynthesize:
 # Connector run — RSS import error and success branches
 # ====================================================================
 
+
 class TestConnectorRun:
     """connector run command."""
 
     def test_connector_run_no_rss(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "connector", "run", "--workspace-id", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "connector",
+                "run",
+                "--workspace-id",
+                "ws1",
+            ],
+        )
         # prints warning (not exit code 1) but it's safe
         assert "No connector specified" in result.output
 
     def test_connector_run_rss_import_error(self, monkeypatch, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         monkeypatch.setitem(sys.modules, "spacetime_memory.connectors", None)
-        result = runner.invoke(cli, [
-            "connector", "run", "--rss", "https://example.com/feed",
-            "--workspace-id", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "connector",
+                "run",
+                "--rss",
+                "https://example.com/feed",
+                "--workspace-id",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 1
         assert "Missing dep" in result.output
 
@@ -185,23 +213,35 @@ class TestConnectorRun:
 # Connector register — result branch
 # ====================================================================
 
+
 class TestConnectorRegister:
     """connector register command."""
 
     def test_connector_register_with_result(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value={"id": "c1"})
-        result = runner.invoke(cli, [
-            "connector", "register", "--name", "rss1",
-            "--type", "rss", "--config", '{"url":"https://ex.com/feed"}',
-            "--workspace-id", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "connector",
+                "register",
+                "--name",
+                "rss1",
+                "--type",
+                "rss",
+                "--config",
+                '{"url":"https://ex.com/feed"}',
+                "--workspace-id",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 0
 
 
 # ====================================================================
 # Ingest — import error path
 # ====================================================================
+
 
 class TestIngestImportError:
     """ingest codebase command — import error branch."""
@@ -210,30 +250,52 @@ class TestIngestImportError:
         runner, mock_client = mocked_cli_runner
         monkeypatch.setitem(sys.modules, "spacetime_memory.ingest", None)
         # Use an existing path since Click validates Path(exists=True)
-        result = runner.invoke(cli, [
-            "ingest", "codebase", "/tmp", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "ingest",
+                "codebase",
+                "/tmp",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 1
         assert "pip install spacetime-memory" in result.output
 
     def test_ingest_success(self, monkeypatch, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_ingester = Mock()
-        mock_ingester.ingest = Mock(return_value={
-            "files": 10, "defs": 50, "edges": 30, "errors": 2,
-        })
+        mock_ingester.ingest = Mock(
+            return_value={
+                "files": 10,
+                "defs": 50,
+                "edges": 30,
+                "errors": 2,
+            }
+        )
         # Avoid tree_sitter_language_pack dependency by faking the whole import
         import types
+
         fake_ingest = types.ModuleType("spacetime_memory.ingest")
         fake_ingest.CodebaseIngester = Mock(return_value=mock_ingester)
         monkeypatch.setitem(sys.modules, "spacetime_memory.ingest", fake_ingest)
         # Also register it on the parent package so the import works
         import spacetime_memory
+
         monkeypatch.setattr(spacetime_memory, "ingest", fake_ingest, raising=False)
-        result = runner.invoke(cli, [
-            "ingest", "codebase", "/tmp", "ws1",
-            "--max-files", "100", "--skip-dirs", ".git,node_modules",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "ingest",
+                "codebase",
+                "/tmp",
+                "ws1",
+                "--max-files",
+                "100",
+                "--skip-dirs",
+                ".git,node_modules",
+            ],
+        )
         assert result.exit_code == 0
         assert "Ingestion complete" in result.output
 
@@ -242,22 +304,34 @@ class TestIngestImportError:
 # KG edge create and neighbors — result branches
 # ====================================================================
 
+
 class TestKgEdgeCreate:
     """kg edge create command with result."""
 
     def test_kg_edge_create_with_result(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[{"id": "e1"}])
-        result = runner.invoke(cli, [
-            "kg", "edge", "create", "ws1", "node1", "node2", "calls",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "kg",
+                "edge",
+                "create",
+                "ws1",
+                "node1",
+                "node2",
+                "calls",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_kg_neighbors_with_result(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
-        mock_client.get_neighbors = Mock(return_value=[
-            {"node_id": "n2", "relation": "calls", "weight": 1.0},
-        ])
+        mock_client.get_neighbors = Mock(
+            return_value=[
+                {"node_id": "n2", "relation": "calls", "weight": 1.0},
+            ]
+        )
         result = runner.invoke(cli, ["kg", "neighbors", "node1"])
         assert result.exit_code == 0
 
@@ -273,6 +347,7 @@ class TestKgEdgeCreate:
 # Profile get — empty result
 # ====================================================================
 
+
 class TestProfileGetEmpty:
     """profile get with empty results."""
 
@@ -287,6 +362,7 @@ class TestProfileGetEmpty:
 # ====================================================================
 # Context pack — empty result
 # ====================================================================
+
 
 class TestContextPackEmpty:
     """context pack with no results."""
@@ -304,6 +380,7 @@ class TestContextPackEmpty:
 # Replication — add with auto workspace selection
 # ====================================================================
 
+
 class TestReplicationAddAutoWs:
     """replication add — auto workspace selection."""
 
@@ -311,26 +388,40 @@ class TestReplicationAddAutoWs:
         runner, mock_client = mocked_cli_runner
         mock_client.list_workspaces = Mock(return_value=[{"id": "ws-auto"}])
         mock_client._call = Mock(return_value=[{"status": "ok"}])
-        result = runner.invoke(cli, [
-            "replication", "add", "peer1",
-            "http://127.0.0.10:3001", "remote-db",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "replication",
+                "add",
+                "peer1",
+                "http://127.0.0.10:3001",
+                "remote-db",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_replication_add_with_workspace_id(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[{"status": "ok"}])
-        result = runner.invoke(cli, [
-            "replication", "add", "peer1",
-            "http://127.0.0.10:3001", "remote-db",
-            "--workspace-id", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "replication",
+                "add",
+                "peer1",
+                "http://127.0.0.10:3001",
+                "remote-db",
+                "--workspace-id",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 0
 
 
 # ====================================================================
 # Replication peers — empty result
 # ====================================================================
+
 
 class TestReplicationPeersEmpty:
     """replication peers with empty results."""
@@ -354,12 +445,16 @@ class TestReplicationPeersEmpty:
     def test_replication_peers_with_data(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[])
-        mock_client._sql = Mock(return_value=[{
-            "json_data": json.dumps([
-                {"id": "p1", "name": "remote", "url": "http://r:3001"}
-            ]),
-            "query_type": "peers",
-        }])
+        mock_client._sql = Mock(
+            return_value=[
+                {
+                    "json_data": json.dumps(
+                        [{"id": "p1", "name": "remote", "url": "http://r:3001"}]
+                    ),
+                    "query_type": "peers",
+                }
+            ]
+        )
         result = runner.invoke(cli, ["replication", "peers"])
         assert result.exit_code == 0
 
@@ -368,6 +463,7 @@ class TestReplicationPeersEmpty:
 # Replication status — output format branches
 # ====================================================================
 
+
 class TestReplicationStatusFormats:
     """replication status output format branching."""
 
@@ -375,28 +471,48 @@ class TestReplicationStatusFormats:
         runner, mock_client = mocked_cli_runner
         mock_client.list_workspaces = Mock(return_value=[{"id": "ws1"}])
         mock_client._call = Mock(return_value=[])
-        mock_client._sql = Mock(return_value=[{
-            "json_data": json.dumps({"status": "synced", "peers": 2}),
-            "query_type": "status",
-            "workspace_id": "ws1",
-        }])
-        result = runner.invoke(cli, [
-            "--output", "json", "replication", "status",
-        ])
+        mock_client._sql = Mock(
+            return_value=[
+                {
+                    "json_data": json.dumps({"status": "synced", "peers": 2}),
+                    "query_type": "status",
+                    "workspace_id": "ws1",
+                }
+            ]
+        )
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "json",
+                "replication",
+                "status",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_replication_status_csv(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client.list_workspaces = Mock(return_value=[{"id": "ws1"}])
         mock_client._call = Mock(return_value=[])
-        mock_client._sql = Mock(return_value=[{
-            "json_data": json.dumps({"status": "synced", "peers": 2}),
-            "query_type": "status",
-            "workspace_id": "ws1",
-        }])
-        result = runner.invoke(cli, [
-            "--output", "csv", "replication", "status",
-        ])
+        mock_client._sql = Mock(
+            return_value=[
+                {
+                    "json_data": json.dumps({"status": "synced", "peers": 2}),
+                    "query_type": "status",
+                    "workspace_id": "ws1",
+                }
+            ]
+        )
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "csv",
+                "replication",
+                "status",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_replication_status_empty(self, mocked_cli_runner):
@@ -413,14 +529,21 @@ class TestReplicationStatusFormats:
 # Replication sync — import error
 # ====================================================================
 
+
 class TestReplicationSync:
     """replication sync command — import error path."""
 
     def test_replication_sync_import_error(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "replication", "sync", "--workspace-id", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "replication",
+                "sync",
+                "--workspace-id",
+                "ws1",
+            ],
+        )
         if result.exit_code != 0:
             assert "replication_daemon.py not found" in result.output
 
@@ -429,39 +552,60 @@ class TestReplicationSync:
 # Agent step — import + call path
 # ====================================================================
 
+
 class TestAgentStep:
     """agent step command."""
 
     def test_agent_step_basic(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[])
-        mock_client._sql = Mock(return_value=[
-            {"id": "step-1", "workspace_id": "ws1"},
-        ])
-        result = runner.invoke(cli, [
-            "agent", "step", "sess1", "thought",
-            "I should check the cache first",
-            "--summary", "summary text",
-            "--workspace-id", "ws1",
-        ])
+        mock_client._sql = Mock(
+            return_value=[
+                {"id": "step-1", "workspace_id": "ws1"},
+            ]
+        )
+        result = runner.invoke(
+            cli,
+            [
+                "agent",
+                "step",
+                "sess1",
+                "thought",
+                "I should check the cache first",
+                "--summary",
+                "summary text",
+                "--workspace-id",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_agent_step_no_workspace_infer(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[])
-        mock_client._sql = Mock(side_effect=[
-            [{"workspace_id": "ws-inferred"}],
-            [{"id": "step-2"}],
-        ])
-        result = runner.invoke(cli, [
-            "agent", "step", "sess1", "observation", "Tool returned 42",
-        ])
+        mock_client._sql = Mock(
+            side_effect=[
+                [{"workspace_id": "ws-inferred"}],
+                [{"id": "step-2"}],
+            ]
+        )
+        result = runner.invoke(
+            cli,
+            [
+                "agent",
+                "step",
+                "sess1",
+                "observation",
+                "Tool returned 42",
+            ],
+        )
         assert result.exit_code == 0
 
 
 # ====================================================================
 # Agent steps — list with SQL results
 # ====================================================================
+
 
 class TestAgentSteps:
     """agent steps command — SQL result branches."""
@@ -477,10 +621,22 @@ class TestAgentSteps:
     def test_agent_steps_with_data(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[])
-        mock_client._sql = Mock(return_value=[
-            {"id": "step1", "step_type": "thought", "content": "thinking...", "created_at": 1700000000},
-            {"id": "step2", "step_type": "action", "content": "call tool", "created_at": 1700000001},
-        ])
+        mock_client._sql = Mock(
+            return_value=[
+                {
+                    "id": "step1",
+                    "step_type": "thought",
+                    "content": "thinking...",
+                    "created_at": 1700000000,
+                },
+                {
+                    "id": "step2",
+                    "step_type": "action",
+                    "content": "call tool",
+                    "created_at": 1700000001,
+                },
+            ]
+        )
         result = runner.invoke(cli, ["agent", "steps", "sess1"])
         assert result.exit_code == 0
 
@@ -488,6 +644,7 @@ class TestAgentSteps:
 # ====================================================================
 # Metrics show — exception handlers
 # ====================================================================
+
 
 class TestMetricsExceptions:
     """metrics show command — exception handling branches."""
@@ -521,6 +678,7 @@ class TestMetricsExceptions:
 # Metrics reset — token path
 # ====================================================================
 
+
 class TestMetricsReset:
     """metrics reset command."""
 
@@ -540,15 +698,23 @@ class TestMetricsReset:
 # Admin init — with token
 # ====================================================================
 
+
 class TestAdminInit:
     """admin init command with token."""
 
     def test_admin_init_with_token(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[])
-        result = runner.invoke(cli, [
-            "admin", "init", "abcdef1234567890", "-t", "jwt-token",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "admin",
+                "init",
+                "abcdef1234567890",
+                "-t",
+                "jwt-token",
+            ],
+        )
         assert result.exit_code == 0
         assert "Initial admin set" in result.output
 
@@ -557,18 +723,23 @@ class TestAdminInit:
 # Replication list — alias for peers
 # ====================================================================
 
+
 class TestReplicationListAlias:
     """replication list (alias for peers)."""
 
     def test_replication_list(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[])
-        mock_client._sql = Mock(return_value=[{
-            "json_data": json.dumps([
-                {"id": "p1", "name": "remote", "url": "http://r:3001"}
-            ]),
-            "query_type": "peers",
-        }])
+        mock_client._sql = Mock(
+            return_value=[
+                {
+                    "json_data": json.dumps(
+                        [{"id": "p1", "name": "remote", "url": "http://r:3001"}]
+                    ),
+                    "query_type": "peers",
+                }
+            ]
+        )
         result = runner.invoke(cli, ["replication", "list"])
         assert result.exit_code == 0
 
@@ -576,6 +747,7 @@ class TestReplicationListAlias:
 # ====================================================================
 # Replication remove — result
 # ====================================================================
+
 
 class TestReplicationRemove:
     """replication remove with result."""
@@ -591,6 +763,7 @@ class TestReplicationRemove:
 # Replication daemon — import error
 # ====================================================================
 
+
 class TestReplicationDaemon:
     """replication daemon command — import error path."""
 
@@ -598,6 +771,7 @@ class TestReplicationDaemon:
         runner, mock_client = mocked_cli_runner
         # Block the replication_daemon import so we hit the error path
         import builtins
+
         real_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
@@ -615,6 +789,7 @@ class TestReplicationDaemon:
 # MCP serve — ImportError path
 # ====================================================================
 
+
 class TestMcpServe:
     """mcp serve command — not yet implemented in CLI."""
 
@@ -629,6 +804,7 @@ class TestMcpServe:
 # ====================================================================
 # AAAK — pipe and file input modes
 # ====================================================================
+
 
 class TestAaakCompressInput:
     """aaak compress command — pipe and file input modes."""
@@ -712,6 +888,7 @@ class TestAaakRatio:
 # Veracity — list and calc error paths
 # ====================================================================
 
+
 class TestVeracityList:
     """veracity list command."""
 
@@ -747,6 +924,7 @@ class TestVeracityCalc:
 # Veracity compound — compound output
 # ====================================================================
 
+
 class TestVeracityCompound:
     """veracity compound command."""
 
@@ -763,6 +941,7 @@ class TestVeracityCompound:
 # SHMR resonate — full path
 # ====================================================================
 
+
 class TestShmrResonate:
     """shmr resonate command."""
 
@@ -771,9 +950,16 @@ class TestShmrResonate:
         mock_client.search = Mock(return_value=[])
         mock_client._embed = Mock(return_value=[])
         mock_client._call = Mock(return_value=[{"count": 5}])
-        result = runner.invoke(cli, [
-            "shmr", "resonate", "ws1", "--days", "30",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "shmr",
+                "resonate",
+                "ws1",
+                "--days",
+                "30",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_shmr_resonate_with_iterations(self, mocked_cli_runner):
@@ -781,9 +967,18 @@ class TestShmrResonate:
         mock_client.search = Mock(return_value=[])
         mock_client._embed = Mock(return_value=[])
         mock_client._call = Mock(return_value=[{"count": 10}])
-        result = runner.invoke(cli, [
-            "shmr", "resonate", "ws1", "--days", "7", "--iterations", "3",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "shmr",
+                "resonate",
+                "ws1",
+                "--days",
+                "7",
+                "--iterations",
+                "3",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_shmr_resonate_json_output(self, mocked_cli_runner):
@@ -791,9 +986,16 @@ class TestShmrResonate:
         mock_client.search = Mock(return_value=[])
         mock_client._embed = Mock(return_value=[])
         mock_client._call = Mock(return_value=[{"count": 5}])
-        result = runner.invoke(cli, [
-            "--output", "json", "shmr", "resonate", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "json",
+                "shmr",
+                "resonate",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 0
 
 
@@ -801,15 +1003,18 @@ class TestShmrResonate:
 # Memory history — result branch
 # ====================================================================
 
+
 class TestMemoryHistory:
     """memory history command."""
 
     def test_memory_history(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
-        mock_client.get_memory_history = Mock(return_value=[
-            {"id": "v1", "content": "old content", "created_at": 1700000000},
-            {"id": "v2", "content": "newer content", "created_at": 1700000001},
-        ])
+        mock_client.get_memory_history = Mock(
+            return_value=[
+                {"id": "v1", "content": "old content", "created_at": 1700000000},
+                {"id": "v2", "content": "newer content", "created_at": 1700000001},
+            ]
+        )
         result = runner.invoke(cli, ["memory", "history", "mem-id-12345"])
         assert result.exit_code == 0
 
@@ -825,22 +1030,31 @@ class TestMemoryHistory:
 # Session create — result branch
 # ====================================================================
 
+
 class TestSessionCreate:
     """session create command with result."""
 
     def test_session_create_with_result(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[{"id": "sess-new"}])
-        result = runner.invoke(cli, [
-            "session", "create", "ws1", "my-session",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "session",
+                "create",
+                "ws1",
+                "my-session",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_session_messages(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
-        mock_client.get_session_messages = Mock(return_value=[
-            {"id": "msg1", "role": "user", "content": "hello"},
-        ])
+        mock_client.get_session_messages = Mock(
+            return_value=[
+                {"id": "msg1", "role": "user", "content": "hello"},
+            ]
+        )
         result = runner.invoke(cli, ["session", "messages", "sess1"])
         assert result.exit_code == 0
 
@@ -856,31 +1070,50 @@ class TestSessionCreate:
 # Recommend and peer-reputation — output format / result paths
 # ====================================================================
 
+
 class TestRecommendOutput:
     """recommend and peer-reputation with different outputs."""
 
     def test_recommend_json(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client.recommend_memories = Mock(return_value=[{"id": "r1"}])
-        result = runner.invoke(cli, [
-            "--output", "json", "recommend", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "json",
+                "recommend",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_recommend_csv(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client.recommend_memories = Mock(return_value=[{"id": "r1"}])
-        result = runner.invoke(cli, [
-            "--output", "csv", "recommend", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "csv",
+                "recommend",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_peer_reputation_json(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client._call = Mock(return_value=[{"peer_id": "p1", "score": 0.8}])
-        result = runner.invoke(cli, [
-            "--output", "json", "peer-reputation", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "json",
+                "peer-reputation",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 0
 
 
@@ -888,31 +1121,52 @@ class TestRecommendOutput:
 # Directory link / unlink — result branches
 # ====================================================================
 
+
 class TestDirectoryLink:
     """directory link and unlink with results."""
 
     def test_directory_link_with_result(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client.link_memory_to_directory = Mock(return_value={"status": "ok"})
-        result = runner.invoke(cli, [
-            "directory", "link", "dir1", "mem1", "ws1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "directory",
+                "link",
+                "dir1",
+                "mem1",
+                "ws1",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_directory_unlink_with_result(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client.unlink_memory_from_directory = Mock(return_value={"status": "ok"})
-        result = runner.invoke(cli, [
-            "directory", "unlink", "dir1", "mem1",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "directory",
+                "unlink",
+                "dir1",
+                "mem1",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_directory_create_with_result(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client.create_directory = Mock(return_value={"id": "dir-new"})
-        result = runner.invoke(cli, [
-            "directory", "create", "ws1", "mydir", "/path/mydir",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "directory",
+                "create",
+                "ws1",
+                "mydir",
+                "/path/mydir",
+            ],
+        )
         assert result.exit_code == 0
 
 
@@ -920,29 +1174,34 @@ class TestDirectoryLink:
 # Health — model_path line coverage
 # ====================================================================
 
+
 class TestHealthModelPath:
     """health command covering embedder model_path branch."""
 
     def test_health_with_model_path(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
-        mock_client.health = Mock(return_value={
-            "status": "ok",
-            "database": {"status": "ok", "latency_ms": 5},
-            "embedder": {"reachable": True, "model_path": "/models/bge-m3"},
-            "token_configured": True,
-        })
+        mock_client.health = Mock(
+            return_value={
+                "status": "ok",
+                "database": {"status": "ok", "latency_ms": 5},
+                "embedder": {"reachable": True, "model_path": "/models/bge-m3"},
+                "token_configured": True,
+            }
+        )
         result = runner.invoke(cli, ["health"])
         assert result.exit_code == 0
         assert "Model:" in result.output
 
     def test_health_degraded(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
-        mock_client.health = Mock(return_value={
-            "status": "degraded",
-            "database": {"status": "ok", "latency_ms": 5},
-            "embedder": {"reachable": False},
-            "token_configured": False,
-        })
+        mock_client.health = Mock(
+            return_value={
+                "status": "degraded",
+                "database": {"status": "ok", "latency_ms": 5},
+                "embedder": {"reachable": False},
+                "token_configured": False,
+            }
+        )
         result = runner.invoke(cli, ["health"])
         assert result.exit_code == 0
         assert "System degraded" in result.output
@@ -952,20 +1211,25 @@ class TestHealthModelPath:
 # Diagnostics — JSON and exception paths
 # ====================================================================
 
+
 class TestDiagnosticsFull:
     """diagnostics command — JSON output and full paths."""
 
     def test_diagnostics_json(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client.ping = Mock(return_value={"status": "ok", "latency_ms": 3})
-        mock_client.health = Mock(return_value={
-            "status": "ok",
-            "embedder": {"reachable": True, "model_path": "bge-m3"},
-            "token_configured": True,
-        })
-        mock_client._sql = Mock(return_value=[
-            {"memory_type": "experience", "c": 10},
-        ])
+        mock_client.health = Mock(
+            return_value={
+                "status": "ok",
+                "embedder": {"reachable": True, "model_path": "bge-m3"},
+                "token_configured": True,
+            }
+        )
+        mock_client._sql = Mock(
+            return_value=[
+                {"memory_type": "experience", "c": 10},
+            ]
+        )
         mock_client.list_workspaces = Mock(return_value=[{"id": "ws1"}])
         result = runner.invoke(cli, ["diagnostics", "--json"])
         assert result.exit_code == 0
@@ -973,11 +1237,13 @@ class TestDiagnosticsFull:
     def test_diagnostics_exceptions(self, mocked_cli_runner):
         runner, mock_client = mocked_cli_runner
         mock_client.ping = Mock(return_value={"status": "ok", "latency_ms": 3})
-        mock_client.health = Mock(return_value={
-            "status": "ok",
-            "embedder": {"reachable": True},
-            "token_configured": False,
-        })
+        mock_client.health = Mock(
+            return_value={
+                "status": "ok",
+                "embedder": {"reachable": True},
+                "token_configured": False,
+            }
+        )
         mock_client._sql = Mock(side_effect=Exception("mock error"))
         mock_client.list_workspaces = Mock(side_effect=Exception("mock error"))
         result = runner.invoke(cli, ["diagnostics"])
@@ -988,14 +1254,17 @@ class TestDiagnosticsFull:
 # main() — error handling paths
 # ====================================================================
 
+
 class TestMainErrorPaths:
     """main() exception handlers for ClickException and httpx.ConnectError."""
 
     def test_main_click_exception(self, monkeypatch):
         import click
+
         monkeypatch.setattr("cli.stmem.cli", Mock(side_effect=click.ClickException("bad param")))
         with pytest.raises(SystemExit) as exc_info:
             from cli.stmem import main
+
             main()
         assert exc_info.value.code == 1
 
@@ -1003,14 +1272,19 @@ class TestMainErrorPaths:
         monkeypatch.setattr("cli.stmem.cli", Mock(side_effect=RuntimeError("oops")))
         with pytest.raises(SystemExit) as exc_info:
             from cli.stmem import main
+
             main()
         assert exc_info.value.code == 1
 
     def test_main_httpx_connect_error(self, monkeypatch):
         import httpx
-        monkeypatch.setattr("cli.stmem.cli", Mock(side_effect=httpx.ConnectError("connection refused")))
+
+        monkeypatch.setattr(
+            "cli.stmem.cli", Mock(side_effect=httpx.ConnectError("connection refused"))
+        )
         with pytest.raises(SystemExit) as exc_info:
             from cli.stmem import main
+
             main()
         assert exc_info.value.code == 1
 
@@ -1032,12 +1306,16 @@ class TestLintCLI:
 
     def test_lint_basic(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, ["lint", "--workspace", "test", "--no-contradictions", "--no-crossrefs"])
+        result = runner.invoke(
+            cli, ["lint", "--workspace", "test", "--no-contradictions", "--no-crossrefs"]
+        )
         assert result.exit_code == 0
 
     def test_lint_json_output(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, ["--output", "json", "lint", "-w", "test", "--no-contradictions"])
+        result = runner.invoke(
+            cli, ["--output", "json", "lint", "-w", "test", "--no-contradictions"]
+        )
         assert result.exit_code == 0
 
 
@@ -1090,7 +1368,9 @@ class TestSuggestConnectionsCLI:
 
     def test_suggest_connections_json_with_limit(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, ["--output", "json", "suggest-connections", "-w", "test", "-n", "10"])
+        result = runner.invoke(
+            cli, ["--output", "json", "suggest-connections", "-w", "test", "-n", "10"]
+        )
         assert result.exit_code == 0
 
 
@@ -1104,21 +1384,36 @@ class TestStoreAnswerCLI:
 
     def test_store_answer_basic(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answer", "-w", "test",
-            "--query", "What is testing?",
-            "--answer", "Testing verifies behavior.",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answer",
+                "-w",
+                "test",
+                "--query",
+                "What is testing?",
+                "--answer",
+                "Testing verifies behavior.",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_store_answer_with_source_ids(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answer", "-w", "test",
-            "-q", "What is testing?",
-            "-a", "Testing verifies behavior.",
-            "-s", "mem1,mem2",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answer",
+                "-w",
+                "test",
+                "-q",
+                "What is testing?",
+                "-a",
+                "Testing verifies behavior.",
+                "-s",
+                "mem1,mem2",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_store_answer_missing_required(self, mocked_cli_runner):
@@ -1138,91 +1433,137 @@ class TestStoreAnswersBatchCLI:
 
     def test_store_answers_batch_valid_pairs(self, mocked_cli_runner, monkeypatch):
         runner, mock_client = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch", "-w", "test",
-            "-p", '[["What is X?", "X is Y."], ["What is Z?", "Z is W."]]',
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-w",
+                "test",
+                "-p",
+                '[["What is X?", "X is Y."], ["What is Z?", "Z is W."]]',
+            ],
+        )
         assert result.exit_code == 0
 
     def test_store_answers_batch_empty_list(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-p", "[]",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-p",
+                "[]",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_store_answers_batch_single_pair(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-p", '[["Q1", "A1"]]',
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-p",
+                '[["Q1", "A1"]]',
+            ],
+        )
         assert result.exit_code == 0
 
     def test_store_answers_batch_invalid_json(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-p", "not valid json",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-p",
+                "not valid json",
+            ],
+        )
         assert result.exit_code == 1
         assert "Invalid JSON" in result.output
 
     def test_store_answers_batch_not_a_list(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-p", '"just a string"',
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-p",
+                '"just a string"',
+            ],
+        )
         assert result.exit_code == 1
         assert "Pairs must be" in result.output
 
     def test_store_answers_batch_wrong_structure(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-p", "[1, 2, 3]",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-p",
+                "[1, 2, 3]",
+            ],
+        )
         assert result.exit_code == 1
         assert "Pairs must be" in result.output
 
     def test_store_answers_batch_with_workspace(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-w", "custom_ws",
-            "-p", '[["Q", "A"]]',
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-w",
+                "custom_ws",
+                "-p",
+                '[["Q", "A"]]',
+            ],
+        )
         assert result.exit_code == 0
 
     def test_store_answers_batch_with_source_ids(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-p", '[["Q", "A"]]',
-            "-s", "mem1,mem2,mem3",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-p",
+                '[["Q", "A"]]',
+                "-s",
+                "mem1,mem2,mem3",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_store_answers_batch_file_input(self, mocked_cli_runner, tmp_path):
         runner, _ = mocked_cli_runner
         pairs_file = tmp_path / "pairs.json"
         pairs_file.write_text('[["Q1", "A1"], ["Q2", "A2"]]')
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-p", "[[ignored]]",  # --pairs is required, value overwritten by --file
-            "-f", str(pairs_file),
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-p",
+                "[[ignored]]",  # --pairs is required, value overwritten by --file
+                "-f",
+                str(pairs_file),
+            ],
+        )
         assert result.exit_code == 0
 
     def test_store_answers_batch_file_not_found(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "store-answers-batch",
-            "-p", "[[ignored]]",
-            "-f", "/nonexistent/pairs.json",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "store-answers-batch",
+                "-p",
+                "[[ignored]]",
+                "-f",
+                "/nonexistent/pairs.json",
+            ],
+        )
         assert result.exit_code == 1
         assert "File not found" in result.output
 
@@ -1237,31 +1578,54 @@ class TestEntityPageCLI:
 
     def test_entity_page_basic(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "entity-page",
-            "--name", "Neural Network",
-            "--description", "A computational model inspired by biological neurons.",
-            "-w", "test",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "entity-page",
+                "--name",
+                "Neural Network",
+                "--description",
+                "A computational model inspired by biological neurons.",
+                "-w",
+                "test",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_entity_page_with_type(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "entity-page",
-            "-n", "Alan Turing",
-            "-d", "British mathematician and computer scientist.",
-            "-t", "person",
-            "--tags", "AI,history",
-            "--related", "Turing Test,Enigma",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "entity-page",
+                "-n",
+                "Alan Turing",
+                "-d",
+                "British mathematician and computer scientist.",
+                "-t",
+                "person",
+                "--tags",
+                "AI,history",
+                "--related",
+                "Turing Test,Enigma",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_entity_page_json(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "--output", "json", "entity-page", "-n", "Test", "-d", "A test entity.",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "json",
+                "entity-page",
+                "-n",
+                "Test",
+                "-d",
+                "A test entity.",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_entity_page_missing_required(self, mocked_cli_runner):
@@ -1280,29 +1644,50 @@ class TestConceptPageCLI:
 
     def test_concept_page_basic(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "concept-page",
-            "--concept", "Backpropagation",
-            "--definition", "Algorithm for computing gradients in neural networks.",
-            "-w", "test",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "concept-page",
+                "--concept",
+                "Backpropagation",
+                "--definition",
+                "Algorithm for computing gradients in neural networks.",
+                "-w",
+                "test",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_concept_page_with_related(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "concept-page",
-            "-c", "Gradient Descent",
-            "-d", "First-order iterative optimization algorithm.",
-            "--related", "Backpropagation,Learning Rate",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "concept-page",
+                "-c",
+                "Gradient Descent",
+                "-d",
+                "First-order iterative optimization algorithm.",
+                "--related",
+                "Backpropagation,Learning Rate",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_concept_page_json(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "--output", "json", "concept-page", "-c", "Test", "-d", "A test concept.",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "json",
+                "concept-page",
+                "-c",
+                "Test",
+                "-d",
+                "A test concept.",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_concept_page_missing_required(self, mocked_cli_runner):
@@ -1321,29 +1706,50 @@ class TestComparisonPageCLI:
 
     def test_comparison_page_basic(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "comparison-page",
-            "--title", "PyTorch vs TensorFlow",
-            "--items", "PyTorch,TensorFlow",
-            "-w", "test",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "comparison-page",
+                "--title",
+                "PyTorch vs TensorFlow",
+                "--items",
+                "PyTorch,TensorFlow",
+                "-w",
+                "test",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_comparison_page_with_criteria(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "comparison-page",
-            "-t", "React vs Vue vs Svelte",
-            "-i", "React,Vue,Svelte",
-            "-c", "performance,learning curve,ecosystem,bundle size",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "comparison-page",
+                "-t",
+                "React vs Vue vs Svelte",
+                "-i",
+                "React,Vue,Svelte",
+                "-c",
+                "performance,learning curve,ecosystem,bundle size",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_comparison_page_json(self, mocked_cli_runner):
         runner, _ = mocked_cli_runner
-        result = runner.invoke(cli, [
-            "--output", "json", "comparison-page", "-t", "Test", "-i", "A,B",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--output",
+                "json",
+                "comparison-page",
+                "-t",
+                "Test",
+                "-i",
+                "A,B",
+            ],
+        )
         assert result.exit_code == 0
 
     def test_comparison_page_missing_required(self, mocked_cli_runner):

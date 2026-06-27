@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 import types
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -13,6 +13,7 @@ from spacetime_memory.local_llm import RECOMMENDED_MODELS, LocalLLM
 
 
 # ── Module-level mock for llama_cpp (lazy import inside _load) ─────────
+
 
 @pytest.fixture(autouse=True)
 def _inject_llama_cpp():
@@ -434,8 +435,10 @@ class TestDownloadModel:
         out_dir = tmp_path / "home" / "models"
         out_dir.mkdir(parents=True)
 
-        with patch("urllib.request.urlretrieve") as mock_retrieve, \
-             patch.object(Path, "home", return_value=tmp_path / "home"):
+        with (
+            patch("urllib.request.urlretrieve") as mock_retrieve,
+            patch.object(Path, "home", return_value=tmp_path / "home"),
+        ):
             mock_retrieve.side_effect = lambda url, path: Path(path).write_text("data")
             result = LocalLLM.download_model("qwen2.5-0.5b")
             call_args = mock_retrieve.call_args[0]
@@ -456,6 +459,7 @@ class TestDownloadModel:
     def test_import_error_returns_none(self, monkeypatch):
         """If urllib.request cannot be imported, returns None (line 280)."""
         import builtins
+
         _original_import = builtins.__import__
 
         def blocking_import(name, *args, **kwargs):

@@ -1,6 +1,7 @@
-import json
 import httpx
 from .base import Connector, Event
+
+
 class TwitterConnector(Connector):
     """Poll Twitter/X API v2 for tweets from a user or list.
 
@@ -50,13 +51,9 @@ class TwitterConnector(Connector):
         }
 
         if self.user_id:
-            url = (
-                f"https://api.twitter.com/2/users/{self.user_id}/tweets"
-            )
+            url = f"https://api.twitter.com/2/users/{self.user_id}/tweets"
         else:
-            url = (
-                f"https://api.twitter.com/2/lists/{self.list_id}/tweets"
-            )
+            url = f"https://api.twitter.com/2/lists/{self.list_id}/tweets"
 
         params = {
             "max_results": 30,
@@ -68,7 +65,10 @@ class TwitterConnector(Connector):
         with httpx.Client() as client:
             try:
                 resp = client.get(
-                    url, headers=headers, params=params, timeout=30,
+                    url,
+                    headers=headers,
+                    params=params,
+                    timeout=30,
                 )
             except httpx.RequestError as e:
                 print(f"  [Twitter HTTP error] {e}")
@@ -78,15 +78,10 @@ class TwitterConnector(Connector):
                 print("  [Twitter] Rate limited")
                 return events
             if resp.status_code == 401:
-                print(
-                    "  [Twitter] Unauthorized — check bearer token"
-                )
+                print("  [Twitter] Unauthorized — check bearer token")
                 return events
             if resp.status_code != 200:
-                print(
-                    f"  [Twitter] Unexpected status {resp.status_code}:"
-                    f" {resp.text[:200]}"
-                )
+                print(f"  [Twitter] Unexpected status {resp.status_code}: {resp.text[:200]}")
                 return events
 
             data = resp.json()
@@ -108,22 +103,22 @@ class TwitterConnector(Connector):
                 if created_at:
                     content = f"{text}\n\nDate: {created_at}"
 
-                events.append(Event(
-                    content=content,
-                    workspace_id=self.workspace_id,
-                    summary=text[:200],
-                    memory_type="experience",
-                    peer_id=self.peer_id,
-                    metadata={
-                        "source": "twitter",
-                        "tweet_id": tweet_id,
-                        "author_id": author_id,
-                    },
-                ))
+                events.append(
+                    Event(
+                        content=content,
+                        workspace_id=self.workspace_id,
+                        summary=text[:200],
+                        memory_type="experience",
+                        peer_id=self.peer_id,
+                        metadata={
+                            "source": "twitter",
+                            "tweet_id": tweet_id,
+                            "author_id": author_id,
+                        },
+                    )
+                )
 
         return events
 
 
 # ── Webhook Connector ───────────────────────────────────────────────
-
-

@@ -86,7 +86,7 @@ class TestDebinarize:
         binary = b"\xff\x00"  # 16 bits
         result = debinarize(binary, dim=12)
         assert len(result) == 12
-        assert result[0] == 1.0   # 0xFF bit 7
+        assert result[0] == 1.0  # 0xFF bit 7
         assert result[8] == -1.0  # 0x00 bit 7
 
     def test_zero_bits_become_negative_one(self):
@@ -147,7 +147,7 @@ class TestHammingDistance:
         assert hamming_distance(b"\x01", b"\x00") == 1
 
     def test_multi_byte(self):
-        a = binarize([0.1] * 16)   # all 1s
+        a = binarize([0.1] * 16)  # all 1s
         b = binarize([-0.1] * 16)  # all 0s
         assert hamming_distance(a, b) == 16
 

@@ -24,15 +24,20 @@ class TestContextTree:
 
     def test_context_in_search_results(self, mock_client):
         """Search results include context_json from hybrid_result."""
-        ctx = json.dumps({
-            "workspace_context": "Auth module docs",
-            "memory_context": "Login flow details",
-        })
+        ctx = json.dumps(
+            {
+                "workspace_context": "Auth module docs",
+                "memory_context": "Login flow details",
+            }
+        )
         mock_client._sql.return_value = [
             {
-                "entity_id": "mem-1", "entity_type": "memory",
-                "score": 0.95, "query_hash": "abc123",
-                "workspace_id": "ws-1", "context_json": ctx,
+                "entity_id": "mem-1",
+                "entity_type": "memory",
+                "score": 0.95,
+                "query_hash": "abc123",
+                "workspace_id": "ws-1",
+                "context_json": ctx,
             }
         ]
         mock_client._embed.return_value = [0.1] * 384
@@ -49,7 +54,6 @@ class TestContextTree:
 @pytest.fixture
 def mock_client():
     """Client with mocked HTTP layer."""
-    from unittest.mock import MagicMock
     from spacetime_memory import Client
 
     c = Client.__new__(Client)

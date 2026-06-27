@@ -90,9 +90,7 @@ class DeltaSync:
         self._client = client
         self._poll_interval = max(0.01, poll_interval)
         self._cursor: int = 0
-        self._callbacks: dict[
-            tuple[str, str], list[tuple[object, Callable[[Any], None]]]
-        ] = {}
+        self._callbacks: dict[tuple[str, str], list[tuple[object, Callable[[Any], None]]]] = {}
         self._running = False
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
@@ -138,9 +136,7 @@ class DeltaSync:
         """Unregister a callback by its token."""
         with self._lock:
             for key in list(self._callbacks.keys()):
-                self._callbacks[key] = [
-                    (t, cb) for t, cb in self._callbacks[key] if t is not token
-                ]
+                self._callbacks[key] = [(t, cb) for t, cb in self._callbacks[key] if t is not token]
                 if not self._callbacks[key]:
                     del self._callbacks[key]
 

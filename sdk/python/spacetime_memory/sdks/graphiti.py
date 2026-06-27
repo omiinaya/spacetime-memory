@@ -121,7 +121,9 @@ class EntityNode:
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
-        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
+        return cls(
+            **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
+        )
 
 
 @dataclass
@@ -200,7 +202,9 @@ class EntityEdge:
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
-        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
+        return cls(
+            **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
+        )
 
 
 @dataclass
@@ -227,7 +231,9 @@ class EpisodicNode:
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
-        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
+        return cls(
+            **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
+        )
 
 
 @dataclass
@@ -248,7 +254,9 @@ class CommunityNode:
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
-        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
+        return cls(
+            **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
+        )
 
 
 @dataclass
@@ -318,7 +326,9 @@ class SagaNode:
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
-        return cls(**{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]})
+        return cls(
+            **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
+        )
 
 
 @dataclass
@@ -462,7 +472,7 @@ class Graphiti:
         self._token_tracker = None
 
     @property
-    def token_tracker(self) -> "TokenTracker":
+    def token_tracker(self) -> None:
         """Token usage tracker (upstream compat — returns None for SpacetimeDB."""
         return self._token_tracker
 
@@ -625,9 +635,7 @@ class Graphiti:
         fuzzy_matches: list[tuple[dict[str, Any], float]] = []
         for n in all_nodes:
             label = n.get("label", "")
-            ratio = difflib.SequenceMatcher(
-                None, name_lower, label.lower()
-            ).ratio()
+            ratio = difflib.SequenceMatcher(None, name_lower, label.lower()).ratio()
             if ratio > 0.85:
                 fuzzy_matches.append((n, ratio))
 
@@ -684,25 +692,23 @@ class Graphiti:
         gid = group_id or source_node.group_id or edge.group_id or target_node.group_id
         ws_id = self._resolve_workspace(gid)
 
-        actual_source_id, source_dedup_score = self._get_or_create_node(
-            source_node, ws_id
-        )
-        actual_target_id, target_dedup_score = self._get_or_create_node(
-            target_node, ws_id
-        )
+        actual_source_id, source_dedup_score = self._get_or_create_node(source_node, ws_id)
+        actual_target_id, target_dedup_score = self._get_or_create_node(target_node, ws_id)
 
         # Create the edge
         try:
-            result = self._client.create_edge(
+            self._client.create_edge(
                 workspace_id=ws_id,
                 source_node_id=actual_source_id,
                 target_node_id=actual_target_id,
                 relation=edge.name,
                 weight=1.0,
-                metadata_json=json.dumps({
-                    "fact": edge.fact,
-                    **edge.attributes,
-                }),
+                metadata_json=json.dumps(
+                    {
+                        "fact": edge.fact,
+                        **edge.attributes,
+                    }
+                ),
             )
         except RuntimeError as e:
             raise RuntimeError(f"create_edge failed: {e}") from e
@@ -712,13 +718,16 @@ class Graphiti:
         actual_edge_id = edge.uuid  # fallback
         actual_version = 1
         actual_edge_group_id = ""
-        edge_rows = self._client._query("kg_edge", workspace_id=ws_id,
-                                 filter_dict={
-                                     "source_node_id": actual_source_id,
-                                     "target_node_id": actual_target_id,
-                                     "relation": edge.name
-                                 },
-                                 columns=["id", "version", "edge_group_id"])
+        edge_rows = self._client._query(
+            "kg_edge",
+            workspace_id=ws_id,
+            filter_dict={
+                "source_node_id": actual_source_id,
+                "target_node_id": actual_target_id,
+                "relation": edge.name,
+            },
+            columns=["id", "version", "edge_group_id"],
+        )
         if edge_rows:
             r = edge_rows[0]
             actual_edge_id = r.get("id", edge.uuid)
@@ -898,14 +907,16 @@ class Graphiti:
             if e_rows:
                 edge_id = e_rows[0].get("id", edge_id)
 
-            edges.append(EntityEdge(
-                uuid=edge_id,
-                name=relation,
-                fact=f"{source_name} {relation} {target_name}",
-                source_node_uuid=src_uuid,
-                target_node_uuid=tgt_uuid,
-                group_id=gid,
-            ))
+            edges.append(
+                EntityEdge(
+                    uuid=edge_id,
+                    name=relation,
+                    fact=f"{source_name} {relation} {target_name}",
+                    source_node_uuid=src_uuid,
+                    target_node_uuid=tgt_uuid,
+                    group_id=gid,
+                )
+            )
 
         return nodes, edges
 
@@ -956,9 +967,7 @@ class Graphiti:
                 source_session_id=episode_uuid,
             )
         except RuntimeError as exc:
-            raise RuntimeError(
-                f"graphiti.add_episode('{name}') failed: {exc}"
-            ) from exc
+            raise RuntimeError(f"graphiti.add_episode('{name}') failed: {exc}") from exc
 
         episode = EpisodicNode(
             uuid=episode_uuid,
@@ -976,7 +985,10 @@ class Graphiti:
             return AddEpisodeResults(episode=episode, nodes=[], edges=[])
 
         nodes, edges = self._build_entities_and_edges(
-            extracted, ws_id, gid, episode_uuid,
+            extracted,
+            ws_id,
+            gid,
+            episode_uuid,
         )
 
         return AddEpisodeResults(
@@ -1016,7 +1028,7 @@ class Graphiti:
                 source_description=raw.source_description or raw.source,
                 reference_time=raw.reference_time,
                 source=raw.source,
-                group_id=group_id or getattr(raw, 'group_id', 'default'),
+                group_id=group_id or getattr(raw, "group_id", "default"),
                 uuid=raw.uuid,
                 **kwargs,
             )
@@ -1142,9 +1154,7 @@ class Graphiti:
         valid_at_after = kwargs.get("valid_at_after")
         valid_at_before = kwargs.get("valid_at_before")
         if valid_at_after is not None or valid_at_before is not None:
-            edges = self._filter_by_valid_at(
-                edges, valid_at_after, valid_at_before
-            )
+            edges = self._filter_by_valid_at(edges, valid_at_after, valid_at_before)
 
         # Sort by score if available, then by name
         def _sort_key(e: EntityEdge) -> tuple[float, str]:
@@ -1231,9 +1241,7 @@ class Graphiti:
         valid_at_after = kwargs.get("valid_at_after")
         valid_at_before = kwargs.get("valid_at_before")
         if valid_at_after is not None or valid_at_before is not None:
-            edges = self._filter_by_valid_at(
-                edges, valid_at_after, valid_at_before
-            )
+            edges = self._filter_by_valid_at(edges, valid_at_after, valid_at_before)
 
         return SearchResults(edges=edges, nodes=nodes)
 
@@ -1290,9 +1298,7 @@ class Graphiti:
     # Community detection
     # -------------------------------------------------------------------
 
-    def build_communities(
-        self, group_ids: list[str] | None = None
-    ) -> list[CommunityNode]:
+    def build_communities(self, group_ids: list[str] | None = None) -> list[CommunityNode]:
         """Run community detection on the knowledge graph.
 
         Delegates to SpacetimeDB's ``detect_communities`` reducer.
@@ -1314,8 +1320,9 @@ class Graphiti:
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
-        community_nodes = self._client._query("kg_node", workspace_id=ws_id,
-                                     filter_dict={"node_type": "community"})
+        community_nodes = self._client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"node_type": "community"}
+        )
 
         communities: list[CommunityNode] = []
         community_edges: list[CommunityEdge] = []
@@ -1334,16 +1341,22 @@ class Graphiti:
                     filter_dict={"source_node_id": community.uuid},
                 )
                 for erow in edge_rows:
-                    community_edges.append(CommunityEdge(
-                        uuid=erow.get("id", ""),
-                        source_node_uuid=erow.get("source_node_id", ""),
-                        target_node_uuid=erow.get("target_node_id", ""),
-                        group_id=gid,
-                    ))
+                    community_edges.append(
+                        CommunityEdge(
+                            uuid=erow.get("id", ""),
+                            source_node_uuid=erow.get("source_node_id", ""),
+                            target_node_uuid=erow.get("target_node_id", ""),
+                            group_id=gid,
+                        )
+                    )
             except RuntimeError:
                 pass  # non-fatal — operation may fail under concurrent load or missing data
             # Generate LLM name and summary if not already set
-            if not community.summary or not community.name or community.name.startswith("community_"):
+            if (
+                not community.summary
+                or not community.name
+                or community.name.startswith("community_")
+            ):
                 try:
                     llm = LLMClient()
                     if llm.available:
@@ -1359,15 +1372,19 @@ class Graphiti:
                             f"WHERE ce.source_node_uuid = '{_esc(community.uuid)}'"
                         )
                         nodes_for_llm = [
-                            {"name": r.get("label", r.get("id", "")[:12]),
-                             "summary": r.get("summary", "")}
+                            {
+                                "name": r.get("label", r.get("id", "")[:12]),
+                                "summary": r.get("summary", ""),
+                            }
                             for r in member_rows
                         ]
                         edges_for_llm = [
-                            {"source_node": r.get("source_node_id", "")[:12],
-                             "target_node": r.get("target_node_id", "")[:12],
-                             "relation": r.get("relation", ""),
-                             "fact": r.get("fact", "")}
+                            {
+                                "source_node": r.get("source_node_id", "")[:12],
+                                "target_node": r.get("target_node_id", "")[:12],
+                                "relation": r.get("relation", ""),
+                                "fact": r.get("fact", ""),
+                            }
                             for r in edge_rows
                         ]
 
@@ -1381,7 +1398,10 @@ class Graphiti:
                         )
                         name_result = llm.chat(
                             [
-                                {"role": "system", "content": "You are a concise knowledge graph analyst. Return ONLY valid JSON, no markdown, no explanation."},
+                                {
+                                    "role": "system",
+                                    "content": "You are a concise knowledge graph analyst. Return ONLY valid JSON, no markdown, no explanation.",
+                                },
                                 {"role": "user", "content": name_prompt},
                             ],
                             response_format={"type": "json_object"},
@@ -1392,7 +1412,9 @@ class Graphiti:
                                 parsed = json.loads(name_result)
                                 llm_name = parsed.get("name", "").strip()
                                 llm_summary = parsed.get("summary", "").strip()
-                                if llm_name and (not community.name or community.name.startswith("community_")):
+                                if llm_name and (
+                                    not community.name or community.name.startswith("community_")
+                                ):
                                     community.name = llm_name
                                 if llm_summary:
                                     community.summary = llm_summary
@@ -1414,8 +1436,13 @@ class Graphiti:
                             try:
                                 self._client._call(
                                     "update_node",
-                                    [community.uuid, community.name, "community",
-                                     community.summary, "{}"],
+                                    [
+                                        community.uuid,
+                                        community.name,
+                                        "community",
+                                        community.summary,
+                                        "{}",
+                                    ],
                                 )
                             except RuntimeError:
                                 pass  # non-fatal — operation may fail under concurrent load or missing data
@@ -1504,7 +1531,10 @@ class Graphiti:
                 )
                 result = llm.chat(
                     [
-                        {"role": "system", "content": "You are a precise summarization assistant. Summarize the following episode log concisely while preserving key facts, entities, and narrative arc."},
+                        {
+                            "role": "system",
+                            "content": "You are a precise summarization assistant. Summarize the following episode log concisely while preserving key facts, entities, and narrative arc.",
+                        },
                         {"role": "user", "content": prompt},
                     ],
                     temperature=0.3,
@@ -1527,9 +1557,7 @@ class Graphiti:
             last_episode_uuid=last_ep_uuid,
             last_summarized_at=last_summarized_at,
             last_summarized_episode_valid_at=(
-                datetime.fromtimestamp(
-                    last_ep.get("created_at", 0) / 1_000_000, tz=timezone.utc
-                )
+                datetime.fromtimestamp(last_ep.get("created_at", 0) / 1_000_000, tz=timezone.utc)
                 if last_ep.get("created_at", 0) and last_ep.get("created_at", 0) > 1e12
                 else datetime.fromtimestamp(last_ep.get("created_at", 0), tz=timezone.utc)
                 if last_ep.get("created_at", 0)
@@ -1545,25 +1573,34 @@ class Graphiti:
                 label=saga_name,
                 node_type="saga",
                 summary=summary,
-                metadata_json=json.dumps({
-                    "saga_id": saga_id,
-                    "first_episode_uuid": first_ep_uuid,
-                    "last_episode_uuid": last_ep_uuid,
-                    "episode_count": len(episodes),
-                }),
+                metadata_json=json.dumps(
+                    {
+                        "saga_id": saga_id,
+                        "first_episode_uuid": first_ep_uuid,
+                        "last_episode_uuid": last_ep_uuid,
+                        "episode_count": len(episodes),
+                    }
+                ),
             )
         except RuntimeError:
             # Node may already exist — try updating
             try:
                 self._client._call(
                     "update_node",
-                    [saga_id, saga_name, "saga", summary,
-                     json.dumps({
-                         "saga_id": saga_id,
-                         "first_episode_uuid": first_ep_uuid,
-                         "last_episode_uuid": last_ep_uuid,
-                         "episode_count": len(episodes),
-                     })],
+                    [
+                        saga_id,
+                        saga_name,
+                        "saga",
+                        summary,
+                        json.dumps(
+                            {
+                                "saga_id": saga_id,
+                                "first_episode_uuid": first_ep_uuid,
+                                "last_episode_uuid": last_ep_uuid,
+                                "episode_count": len(episodes),
+                            }
+                        ),
+                    ],
                 )
             except RuntimeError:
                 pass  # non-fatal — operation may fail under concurrent load or missing data
@@ -1584,8 +1621,9 @@ class Graphiti:
         Returns:
             dict with ``status`` and ``episode_uuid`` keys.
         """
-        memories = self._client._query("memory", filter_dict={"source_session_id": episode_uuid},
-                               columns=["id"])
+        memories = self._client._query(
+            "memory", filter_dict={"source_session_id": episode_uuid}, columns=["id"]
+        )
 
         for mem in memories:
             try:
@@ -1624,8 +1662,7 @@ class Graphiti:
         memories = self._client._query(
             "memory",
             workspace_id=ws_id,
-            columns=["id", "content", "created_at", "source_session_id",
-                     "workspace_id", "peer_id"],
+            columns=["id", "content", "created_at", "source_session_id", "workspace_id", "peer_id"],
         )
 
         episodes: list[EpisodicNode] = []
@@ -1711,9 +1748,7 @@ class Graphiti:
             )
             return result
         except RuntimeError as exc:
-            raise RuntimeError(
-                f"graphiti.update_edge('{edge_id}') failed: {exc}"
-            ) from exc
+            raise RuntimeError(f"graphiti.update_edge('{edge_id}') failed: {exc}") from exc
 
     def get_edge_history(
         self,
@@ -1731,7 +1766,9 @@ class Graphiti:
             List of :class:`EntityEdge` objects, one per version.
         """
         # First find the edge_group_id from this edge
-        edge_rows = self._client._query("kg_edge", filter_dict={"id": edge_id}, columns=["edge_group_id"])
+        edge_rows = self._client._query(
+            "kg_edge", filter_dict={"id": edge_id}, columns=["edge_group_id"]
+        )
         if not edge_rows:
             return []
         edge_group_id = edge_rows[0].get("edge_group_id", "")
@@ -1745,8 +1782,7 @@ class Graphiti:
 
         # Read from the result table
         result_rows = self._sql_query(
-            "SELECT * FROM edge_history_result WHERE "
-            f"edge_group_id = '{_esc(edge_group_id)}'"
+            f"SELECT * FROM edge_history_result WHERE edge_group_id = '{_esc(edge_group_id)}'"
         )
         # Sort in Python
         result_rows.sort(key=lambda r: r.get("valid_at", 0))
@@ -1757,9 +1793,7 @@ class Graphiti:
     # Nodes and edges by episode
     # -------------------------------------------------------------------
 
-    def get_nodes_and_edges_by_episode(
-        self, episode_uuids: list[str]
-    ) -> SearchResults:
+    def get_nodes_and_edges_by_episode(self, episode_uuids: list[str]) -> SearchResults:
         """Get nodes and edges associated with episodes.
 
         Args:
@@ -1772,19 +1806,22 @@ class Graphiti:
         edges: list[EntityEdge] = []
 
         for ep_uuid in episode_uuids:
-            memories = self._client._query("memory",
-                                    filter_dict={"source_session_id": ep_uuid},
-                                    columns=["id", "content"])
+            memories = self._client._query(
+                "memory", filter_dict={"source_session_id": ep_uuid}, columns=["id", "content"]
+            )
 
             if not memories:
                 continue
 
             # Find memory IDs for this episode, then look up edges by source_node_id
-            mems = self._client._query("memory", filter_dict={"source_session_id": ep_uuid},
-                              columns=["id"])
+            mems = self._client._query(
+                "memory", filter_dict={"source_session_id": ep_uuid}, columns=["id"]
+            )
             edge_rows = []
             for mem in mems:
-                edges = self._client._query("kg_edge", filter_dict={"source_node_id": mem.get("id", "")})
+                edges = self._client._query(
+                    "kg_edge", filter_dict={"source_node_id": mem.get("id", "")}
+                )
                 edge_rows.extend(edges)
 
             for row in edge_rows:
@@ -1809,8 +1846,8 @@ class EntityNodeNamespace:
     def save(self, node: EntityNode) -> EntityNode:
         ws_id = self._g._resolve_workspace(node.group_id)
         existing = self._g._client._query(
-            "kg_node", workspace_id=ws_id,
-            filter_dict={"id": node.uuid}, columns=["id"])
+            "kg_node", workspace_id=ws_id, filter_dict={"id": node.uuid}, columns=["id"]
+        )
         if existing:
             return node  # already saved
         self._g._client.create_node(
@@ -1869,11 +1906,19 @@ class EpisodeNodeNamespace:
 
     def save(self, node: EpisodicNode) -> EpisodicNode:
         ws_id = self._g._resolve_workspace(node.group_id)
-        self._g._client._call("store_memory", [
-            ws_id, node.uuid, node.name, node.content,
-            node.source, node.source_description, "L2",
-            json.dumps(node.episode_metadata),
-        ])
+        self._g._client._call(
+            "store_memory",
+            [
+                ws_id,
+                node.uuid,
+                node.name,
+                node.content,
+                node.source,
+                node.source_description,
+                "L2",
+                json.dumps(node.episode_metadata),
+            ],
+        )
         return node
 
     def delete(self, node: EpisodicNode) -> None:
@@ -1956,8 +2001,8 @@ class CommunityNodeNamespace:
     def save(self, node: CommunityNode) -> CommunityNode:
         ws_id = self._g._resolve_workspace(node.group_id)
         existing = self._g._client._query(
-            "kg_node", workspace_id=ws_id,
-            filter_dict={"id": node.uuid}, columns=["id"])
+            "kg_node", workspace_id=ws_id, filter_dict={"id": node.uuid}, columns=["id"]
+        )
         if existing:
             return node
         self._g._client.create_node(
@@ -1998,8 +2043,9 @@ class CommunityNodeNamespace:
         communities: list[CommunityNode] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
-            rows = self._g._client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"node_type": "community"})
+            rows = self._g._client._query(
+                "kg_node", workspace_id=ws_id, filter_dict={"node_type": "community"}
+            )
             for r in rows:
                 communities.append(self._row_to_community(r))
         if limit:
@@ -2014,7 +2060,9 @@ class CommunityNodeNamespace:
             name=row.get("label", ""),
             group_id=row.get("workspace_id", "default"),
             summary=row.get("summary", ""),
-            labels=json.loads(row.get("labels", "[]")) if isinstance(row.get("labels"), str) else row.get("labels", []),
+            labels=json.loads(row.get("labels", "[]"))
+            if isinstance(row.get("labels"), str)
+            else row.get("labels", []),
             created_at=datetime.fromtimestamp(created / 1_000_000, tz=timezone.utc)
             if created and created > 1e12
             else datetime.fromtimestamp(created, tz=timezone.utc)
@@ -2032,8 +2080,8 @@ class SagaNodeNamespace:
     def save(self, node: SagaNode) -> SagaNode:
         ws_id = self._g._resolve_workspace(node.group_id)
         existing = self._g._client._query(
-            "kg_node", workspace_id=ws_id,
-            filter_dict={"id": node.uuid}, columns=["id"])
+            "kg_node", workspace_id=ws_id, filter_dict={"id": node.uuid}, columns=["id"]
+        )
         if existing:
             return node
         self._g._client.create_node(
@@ -2074,8 +2122,9 @@ class SagaNodeNamespace:
         sagas: list[SagaNode] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
-            rows = self._g._client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"node_type": "saga"})
+            rows = self._g._client._query(
+                "kg_node", workspace_id=ws_id, filter_dict={"node_type": "saga"}
+            )
             for r in rows:
                 sagas.append(self._row_to_saga(r))
         if limit:
@@ -2090,7 +2139,9 @@ class SagaNodeNamespace:
             name=row.get("label", ""),
             group_id=row.get("workspace_id", "default"),
             summary=row.get("summary", ""),
-            labels=json.loads(row.get("labels", "[]")) if isinstance(row.get("labels"), str) else row.get("labels", []),
+            labels=json.loads(row.get("labels", "[]"))
+            if isinstance(row.get("labels"), str)
+            else row.get("labels", []),
             created_at=datetime.fromtimestamp(created / 1_000_000, tz=timezone.utc)
             if created and created > 1e12
             else datetime.fromtimestamp(created, tz=timezone.utc)
@@ -2128,10 +2179,12 @@ class EntityEdgeNamespace:
             target_node_id=edge.target_node_uuid,
             relation=edge.name,
             weight=1.0,
-            metadata_json=json.dumps({
-                "fact": edge.fact,
-                **edge.attributes,
-            }),
+            metadata_json=json.dumps(
+                {
+                    "fact": edge.fact,
+                    **edge.attributes,
+                }
+            ),
         )
         return edge
 
@@ -2188,10 +2241,8 @@ class EntityEdgeNamespace:
         return [EntityEdge.from_stmem(r) for r in rows]
 
     def get_by_node_uuid(self, node_uuid: str) -> list[EntityEdge]:
-        rows_src = self._g._client._query(
-            "kg_edge", filter_dict={"source_node_id": node_uuid})
-        rows_tgt = self._g._client._query(
-            "kg_edge", filter_dict={"target_node_id": node_uuid})
+        rows_src = self._g._client._query("kg_edge", filter_dict={"source_node_id": node_uuid})
+        rows_tgt = self._g._client._query("kg_edge", filter_dict={"target_node_id": node_uuid})
         seen: set[str] = set()
         edges: list[EntityEdge] = []
         for r in rows_src + rows_tgt:
@@ -2243,12 +2294,14 @@ class EpisodicEdgeNamespace:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
             if rows:
                 r = rows[0]
-                results.append(EpisodicEdge(
-                    uuid=r.get("id", ""),
-                    source_node_uuid=r.get("source_node_id", ""),
-                    target_node_uuid=r.get("target_node_id", ""),
-                    group_id=r.get("workspace_id", "default"),
-                ))
+                results.append(
+                    EpisodicEdge(
+                        uuid=r.get("id", ""),
+                        source_node_uuid=r.get("source_node_id", ""),
+                        target_node_uuid=r.get("target_node_id", ""),
+                        group_id=r.get("workspace_id", "default"),
+                    )
+                )
         return results
 
     def get_by_group_ids(
@@ -2260,15 +2313,18 @@ class EpisodicEdgeNamespace:
         edges: list[EpisodicEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
-            rows = self._g._client._query("kg_edge", workspace_id=ws_id,
-                                   filter_dict={"relation": "MENTIONS"})
+            rows = self._g._client._query(
+                "kg_edge", workspace_id=ws_id, filter_dict={"relation": "MENTIONS"}
+            )
             for r in rows:
-                edges.append(EpisodicEdge(
-                    uuid=r.get("id", ""),
-                    source_node_uuid=r.get("source_node_id", ""),
-                    target_node_uuid=r.get("target_node_id", ""),
-                    group_id=r.get("workspace_id", "default"),
-                ))
+                edges.append(
+                    EpisodicEdge(
+                        uuid=r.get("id", ""),
+                        source_node_uuid=r.get("source_node_id", ""),
+                        target_node_uuid=r.get("target_node_id", ""),
+                        group_id=r.get("workspace_id", "default"),
+                    )
+                )
         if limit:
             edges = edges[:limit]
         return edges
@@ -2315,12 +2371,14 @@ class CommunityEdgeNamespace:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
             if rows:
                 r = rows[0]
-                results.append(CommunityEdge(
-                    uuid=r.get("id", ""),
-                    source_node_uuid=r.get("source_node_id", ""),
-                    target_node_uuid=r.get("target_node_id", ""),
-                    group_id=r.get("workspace_id", "default"),
-                ))
+                results.append(
+                    CommunityEdge(
+                        uuid=r.get("id", ""),
+                        source_node_uuid=r.get("source_node_id", ""),
+                        target_node_uuid=r.get("target_node_id", ""),
+                        group_id=r.get("workspace_id", "default"),
+                    )
+                )
         return results
 
     def get_by_group_ids(
@@ -2332,15 +2390,18 @@ class CommunityEdgeNamespace:
         edges: list[CommunityEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
-            rows = self._g._client._query("kg_edge", workspace_id=ws_id,
-                                   filter_dict={"relation": "MEMBER_OF"})
+            rows = self._g._client._query(
+                "kg_edge", workspace_id=ws_id, filter_dict={"relation": "MEMBER_OF"}
+            )
             for r in rows:
-                edges.append(CommunityEdge(
-                    uuid=r.get("id", ""),
-                    source_node_uuid=r.get("source_node_id", ""),
-                    target_node_uuid=r.get("target_node_id", ""),
-                    group_id=r.get("workspace_id", "default"),
-                ))
+                edges.append(
+                    CommunityEdge(
+                        uuid=r.get("id", ""),
+                        source_node_uuid=r.get("source_node_id", ""),
+                        target_node_uuid=r.get("target_node_id", ""),
+                        group_id=r.get("workspace_id", "default"),
+                    )
+                )
         if limit:
             edges = edges[:limit]
         return edges
@@ -2387,12 +2448,14 @@ class HasEpisodeEdgeNamespace:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
             if rows:
                 r = rows[0]
-                results.append(HasEpisodeEdge(
-                    uuid=r.get("id", ""),
-                    source_node_uuid=r.get("source_node_id", ""),
-                    target_node_uuid=r.get("target_node_id", ""),
-                    group_id=r.get("workspace_id", "default"),
-                ))
+                results.append(
+                    HasEpisodeEdge(
+                        uuid=r.get("id", ""),
+                        source_node_uuid=r.get("source_node_id", ""),
+                        target_node_uuid=r.get("target_node_id", ""),
+                        group_id=r.get("workspace_id", "default"),
+                    )
+                )
         return results
 
     def get_by_group_ids(
@@ -2404,15 +2467,18 @@ class HasEpisodeEdgeNamespace:
         edges: list[HasEpisodeEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
-            rows = self._g._client._query("kg_edge", workspace_id=ws_id,
-                                   filter_dict={"relation": "HAS_EPISODE"})
+            rows = self._g._client._query(
+                "kg_edge", workspace_id=ws_id, filter_dict={"relation": "HAS_EPISODE"}
+            )
             for r in rows:
-                edges.append(HasEpisodeEdge(
-                    uuid=r.get("id", ""),
-                    source_node_uuid=r.get("source_node_id", ""),
-                    target_node_uuid=r.get("target_node_id", ""),
-                    group_id=r.get("workspace_id", "default"),
-                ))
+                edges.append(
+                    HasEpisodeEdge(
+                        uuid=r.get("id", ""),
+                        source_node_uuid=r.get("source_node_id", ""),
+                        target_node_uuid=r.get("target_node_id", ""),
+                        group_id=r.get("workspace_id", "default"),
+                    )
+                )
         if limit:
             edges = edges[:limit]
         return edges
@@ -2459,12 +2525,14 @@ class NextEpisodeEdgeNamespace:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
             if rows:
                 r = rows[0]
-                results.append(NextEpisodeEdge(
-                    uuid=r.get("id", ""),
-                    source_node_uuid=r.get("source_node_id", ""),
-                    target_node_uuid=r.get("target_node_id", ""),
-                    group_id=r.get("workspace_id", "default"),
-                ))
+                results.append(
+                    NextEpisodeEdge(
+                        uuid=r.get("id", ""),
+                        source_node_uuid=r.get("source_node_id", ""),
+                        target_node_uuid=r.get("target_node_id", ""),
+                        group_id=r.get("workspace_id", "default"),
+                    )
+                )
         return results
 
     def get_by_group_ids(
@@ -2476,15 +2544,18 @@ class NextEpisodeEdgeNamespace:
         edges: list[NextEpisodeEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
-            rows = self._g._client._query("kg_edge", workspace_id=ws_id,
-                                   filter_dict={"relation": "NEXT_EPISODE"})
+            rows = self._g._client._query(
+                "kg_edge", workspace_id=ws_id, filter_dict={"relation": "NEXT_EPISODE"}
+            )
             for r in rows:
-                edges.append(NextEpisodeEdge(
-                    uuid=r.get("id", ""),
-                    source_node_uuid=r.get("source_node_id", ""),
-                    target_node_uuid=r.get("target_node_id", ""),
-                    group_id=r.get("workspace_id", "default"),
-                ))
+                edges.append(
+                    NextEpisodeEdge(
+                        uuid=r.get("id", ""),
+                        source_node_uuid=r.get("source_node_id", ""),
+                        target_node_uuid=r.get("target_node_id", ""),
+                        group_id=r.get("workspace_id", "default"),
+                    )
+                )
         if limit:
             edges = edges[:limit]
         return edges

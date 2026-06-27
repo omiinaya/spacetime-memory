@@ -10,9 +10,9 @@ Usage:
     python3 sdk/python/tests/smoke_test.py
     SPACETIMEDB_DB=<identity> python3 sdk/python/tests/smoke_test.py
 """
+
 from __future__ import annotations
 
-import json
 import os
 import sys
 import uuid
@@ -26,8 +26,9 @@ from spacetime_memory.auth import generate_token
 # ── Config ──────────────────────────────────────────────────────────
 HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
-DB = os.environ.get("SPACETIMEDB_DB",
-                     "c200f8da0f062b67001165d9379b9e2125dd73a7be4a0b1a1e4374d00cbcc079")
+DB = os.environ.get(
+    "SPACETIMEDB_DB", "c200f8da0f062b67001165d9379b9e2125dd73a7be4a0b1a1e4374d00cbcc079"
+)
 
 passed = 0
 failed = 0
@@ -56,11 +57,12 @@ print("=" * 60)
 # Auth
 key_paths = [
     os.path.expanduser("~/.config/spacetime/id_ecdsa"),
-    "data/id_ecdsa", "data/id_ecdsa_pkcs8.pem",
+    "data/id_ecdsa",
+    "data/id_ecdsa_pkcs8.pem",
 ]
 token = None
 for kp in key_paths:
-    if os.path.exists(kp) and not kp.endswith('.pub'):
+    if os.path.exists(kp) and not kp.endswith(".pub"):
         try:
             token = generate_token(kp)
             break
@@ -107,11 +109,21 @@ ok(f"create peers ({len(peers)} peers)")
 
 mem_id = None
 for i in range(3):
-    result = c._call("store_memory", [
-        ws_id, peers[i % len(peers)]["id"], peers[i % len(peers)]["id"],
-        "experience", f"Smoke test memory {i}: The sky is blue and pizza is good",
-        f"Summary {i}", "[]", 1.0, f"session-{suffix}", "",
-    ])
+    result = c._call(
+        "store_memory",
+        [
+            ws_id,
+            peers[i % len(peers)]["id"],
+            peers[i % len(peers)]["id"],
+            "experience",
+            f"Smoke test memory {i}: The sky is blue and pizza is good",
+            f"Summary {i}",
+            "[]",
+            1.0,
+            f"session-{suffix}",
+            "",
+        ],
+    )
     if i == 0:
         # Grab first memory ID from query
         mems = c._query("memory", filter_dict={"workspace_id": ws_id}, columns=["id"])
@@ -141,7 +153,7 @@ try:
         c.set_memory_context(mem_id, "This is a smoke test memory")
     chain = c.get_context_chain(mem_id) if mem_id else None
     if chain:
-        ok(f"context tree ({chain.get('workspace_context','')[:20]}...)")
+        ok(f"context tree ({chain.get('workspace_context', '')[:20]}...)")
     else:
         ok("context tree (no memory found — expected for fresh DB)")
 except RuntimeError as e:

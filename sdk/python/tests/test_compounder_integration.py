@@ -16,7 +16,6 @@ Tests cover the LLM Wiki pipeline end-to-end:
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 from pathlib import Path
@@ -162,10 +161,19 @@ class TestGraphPipeline:
         assert "NodeB" in node_map
 
         # Create an edge between them
-        edge_result = stdb_client._call("create_edge", [
-            ws, node_map["NodeA"], node_map["NodeB"],
-            "relates_to", 1.0, "EXTRACTED", "{}", "",
-        ])
+        edge_result = stdb_client._call(
+            "create_edge",
+            [
+                ws,
+                node_map["NodeA"],
+                node_map["NodeB"],
+                "relates_to",
+                1.0,
+                "EXTRACTED",
+                "{}",
+                "",
+            ],
+        )
         assert edge_result["status"] == "ok"
 
     def test_suggest_connections_finds_unlinked_nodes(self, stdb_client, ws):
@@ -181,20 +189,47 @@ class TestGraphPipeline:
         node_map = {r["label"]: r["id"] for r in rows if "label" in r}
 
         # A-B
-        stdb_client._call("create_edge", [
-            ws, node_map["Alpha"], node_map["Beta"],
-            "relates_to", 1.0, "EXTRACTED", "{}", "",
-        ])
+        stdb_client._call(
+            "create_edge",
+            [
+                ws,
+                node_map["Alpha"],
+                node_map["Beta"],
+                "relates_to",
+                1.0,
+                "EXTRACTED",
+                "{}",
+                "",
+            ],
+        )
         # B-C
-        stdb_client._call("create_edge", [
-            ws, node_map["Beta"], node_map["Gamma"],
-            "relates_to", 1.0, "EXTRACTED", "{}", "",
-        ])
+        stdb_client._call(
+            "create_edge",
+            [
+                ws,
+                node_map["Beta"],
+                node_map["Gamma"],
+                "relates_to",
+                1.0,
+                "EXTRACTED",
+                "{}",
+                "",
+            ],
+        )
         # C-D
-        stdb_client._call("create_edge", [
-            ws, node_map["Gamma"], node_map["Delta"],
-            "relates_to", 1.0, "EXTRACTED", "{}", "",
-        ])
+        stdb_client._call(
+            "create_edge",
+            [
+                ws,
+                node_map["Gamma"],
+                node_map["Delta"],
+                "relates_to",
+                1.0,
+                "EXTRACTED",
+                "{}",
+                "",
+            ],
+        )
 
         cp = Compounder(stdb_client)
         suggestions = cp.suggest_connections(workspace_id=ws)
@@ -202,21 +237,19 @@ class TestGraphPipeline:
 
         # Alpha and Gamma share Beta as a neighbour → should be suggested
         alpha_gamma = [
-            s for s in suggestions
+            s
+            for s in suggestions
             if {s.get("source_label"), s.get("target_label")} == {"Alpha", "Gamma"}
         ]
-        assert len(alpha_gamma) >= 1, (
-            f"Expected Alpha↔Gamma suggestion, got: {suggestions}"
-        )
+        assert len(alpha_gamma) >= 1, f"Expected Alpha↔Gamma suggestion, got: {suggestions}"
 
         # Beta and Delta share Gamma as a neighbour → should be suggested
         beta_delta = [
-            s for s in suggestions
+            s
+            for s in suggestions
             if {s.get("source_label"), s.get("target_label")} == {"Beta", "Delta"}
         ]
-        assert len(beta_delta) >= 1, (
-            f"Expected Beta↔Delta suggestion, got: {suggestions}"
-        )
+        assert len(beta_delta) >= 1, f"Expected Beta↔Delta suggestion, got: {suggestions}"
 
     def test_suggest_connections_empty_workspace(self, cp, ws):
         """Empty workspace should yield no suggestions."""
@@ -234,8 +267,7 @@ class TestLintPipeline:
 
     def test_lint_finds_orphan_nodes(self, stdb_client, ws):
         """A node with no edges should be reported as an orphan."""
-        stdb_client.create_node(ws, "OrphanNode", "concept",
-                                summary="I have no friends")
+        stdb_client.create_node(ws, "OrphanNode", "concept", summary="I have no friends")
         cp = Compounder(stdb_client)
         report = cp.lint_workspace(workspace_id=ws, check_contradictions=False)
         assert report["summary"]["orphan_count"] >= 1
@@ -248,10 +280,19 @@ class TestLintPipeline:
         stdb_client.create_node(ws, "LinkedB", "concept", summary="B")
         rows = stdb_client._query("kg_node", workspace_id=ws, filter_dict={})
         node_map = {r["label"]: r["id"] for r in rows if "label" in r}
-        stdb_client._call("create_edge", [
-            ws, node_map["LinkedA"], node_map["LinkedB"],
-            "relates_to", 1.0, "EXTRACTED", "{}", "",
-        ])
+        stdb_client._call(
+            "create_edge",
+            [
+                ws,
+                node_map["LinkedA"],
+                node_map["LinkedB"],
+                "relates_to",
+                1.0,
+                "EXTRACTED",
+                "{}",
+                "",
+            ],
+        )
         cp = Compounder(stdb_client)
         report = cp.lint_workspace(workspace_id=ws, check_contradictions=False)
         assert report["summary"]["orphan_count"] == 0
@@ -259,12 +300,12 @@ class TestLintPipeline:
     def test_lint_finds_missing_crossrefs(self, cp, ws, stdb_client):
         """A note mentioning a known entity without an edge should be flagged."""
         # Create a KG node
-        stdb_client.create_node(ws, "ReferencedEntity", "concept",
-                                summary="An entity to reference")
+        stdb_client.create_node(ws, "ReferencedEntity", "concept", summary="An entity to reference")
 
         # Create a note that mentions the entity label but has no edge to it
         stdb_client.create_note(
-            ws, "Note About Entity",
+            ws,
+            "Note About Entity",
             "This note mentions ReferencedEntity in its content.",
             embed=False,
         )
@@ -328,7 +369,9 @@ class TestExportPipeline:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = cp.export_workspace(
-                tmpdir, workspace_id=ws, include_system_notes=True,
+                tmpdir,
+                workspace_id=ws,
+                include_system_notes=True,
             )
             written = [f.name for f in Path(tmpdir).glob("*.md")]
             assert "_index.md" in written or any("_index" in f for f in written), (
@@ -353,8 +396,7 @@ class TestSearchEntitiesPipeline:
 
     def test_search_by_label(self, stdb_client, ws):
         """search_entities with exact label should find the node."""
-        stdb_client.create_node(ws, "UniqueLabel", "concept",
-                                summary="A unique entity")
+        stdb_client.create_node(ws, "UniqueLabel", "concept", summary="A unique entity")
         cp = Compounder(stdb_client)
         results = cp.search_entities(workspace_id=ws, label="UniqueLabel")
         assert len(results) >= 1
@@ -374,5 +416,3 @@ class TestSearchEntitiesPipeline:
         """Searching for a non-existent label should return empty."""
         results = cp.search_entities(workspace_id=ws, label="NonExistentEntity")
         assert results == []
-
-

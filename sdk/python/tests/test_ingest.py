@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import sys
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, PropertyMock, call
+from unittest.mock import Mock, MagicMock, patch
 
 import pytest
 
@@ -49,9 +47,11 @@ def _make_cursor_matches(*captures_list: list) -> Mock:
 class TestLangConfig:
     def test_init_compiles_queries(self):
         """_LangConfig compiles queries from _LANG_QUERIES."""
-        with patch("spacetime_memory.ingest.get_language") as mock_get_lang, \
-             patch("spacetime_memory.ingest.TSParser") as mock_parser_cls, \
-             patch("spacetime_memory.ingest.Query") as mock_query_cls:
+        with (
+            patch("spacetime_memory.ingest.get_language") as mock_get_lang,
+            patch("spacetime_memory.ingest.TSParser") as mock_parser_cls,
+            patch("spacetime_memory.ingest.Query") as mock_query_cls,
+        ):
             mock_lang = Mock()
             mock_get_lang.return_value = mock_lang
             mock_parser = Mock()
@@ -72,9 +72,11 @@ class TestLangConfig:
 
     def test_compile_queries_handles_error(self):
         """A malformed query is skipped, not fatal."""
-        with patch("spacetime_memory.ingest.get_language") as mock_get_lang, \
-             patch("spacetime_memory.ingest.TSParser") as mock_parser_cls, \
-             patch("spacetime_memory.ingest.Query") as mock_query_cls:
+        with (
+            patch("spacetime_memory.ingest.get_language") as mock_get_lang,
+            patch("spacetime_memory.ingest.TSParser") as mock_parser_cls,
+            patch("spacetime_memory.ingest.Query") as mock_query_cls,
+        ):
             mock_lang = Mock()
             mock_get_lang.return_value = mock_lang
 
@@ -200,9 +202,11 @@ class TestIngest:
         for i in range(5):
             (tmp_path / f"file_{i}.py").write_text(f"x{i} = {i}")
 
-        with patch("spacetime_memory.ingest.get_language") as mock_get_lang, \
-             patch("spacetime_memory.ingest.TSParser") as mock_parser_cls, \
-             patch("spacetime_memory.ingest.Query") as mock_query_cls:
+        with (
+            patch("spacetime_memory.ingest.get_language") as mock_get_lang,
+            patch("spacetime_memory.ingest.TSParser") as mock_parser_cls,
+            patch("spacetime_memory.ingest.Query") as mock_query_cls,
+        ):
             # Set up mock language and parser
             mock_lang = Mock()
             mock_get_lang.return_value = mock_lang
@@ -244,10 +248,12 @@ class TestIngest:
         # Create a regular file
         (tmp_path / "included.py").write_text("y = 2")
 
-        with patch("spacetime_memory.ingest.get_language") as mock_get_lang, \
-             patch("spacetime_memory.ingest.TSParser") as mock_parser_cls, \
-             patch("spacetime_memory.ingest.Query") as mock_query_cls, \
-             patch("spacetime_memory.ingest.QueryCursor") as mock_cursor_cls:
+        with (
+            patch("spacetime_memory.ingest.get_language") as mock_get_lang,
+            patch("spacetime_memory.ingest.TSParser") as mock_parser_cls,
+            patch("spacetime_memory.ingest.Query") as mock_query_cls,
+            patch("spacetime_memory.ingest.QueryCursor") as mock_cursor_cls,
+        ):
             mock_lang = Mock()
             mock_get_lang.return_value = mock_lang
             mock_parser = Mock()
@@ -443,10 +449,12 @@ class TestProcessFile:
         for i in range(51):
             (tmp_path / f"file_{i}.py").write_text(f"x{i} = {i}")
 
-        with patch("spacetime_memory.ingest.get_language") as mock_get_lang, \
-             patch("spacetime_memory.ingest.TSParser") as mock_parser_cls, \
-             patch("spacetime_memory.ingest.Query") as mock_query_cls, \
-             patch("spacetime_memory.ingest.QueryCursor") as mock_cursor_cls:
+        with (
+            patch("spacetime_memory.ingest.get_language") as mock_get_lang,
+            patch("spacetime_memory.ingest.TSParser") as mock_parser_cls,
+            patch("spacetime_memory.ingest.Query") as mock_query_cls,
+            patch("spacetime_memory.ingest.QueryCursor") as mock_cursor_cls,
+        ):
             mock_lang = Mock()
             mock_get_lang.return_value = mock_lang
             mock_parser = Mock()
@@ -492,15 +500,18 @@ class TestExtractDefs:
 
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
-            mock_cursor.matches.return_value = [
-                (0, {"name": [name_node], "func": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"name": [name_node], "func": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "file-node-1", def_nodes,
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "file-node-1",
+                def_nodes,
             )
 
         assert ingester._stats["defs"] == 1
@@ -527,15 +538,18 @@ class TestExtractDefs:
 
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
-            mock_cursor.matches.return_value = [
-                (0, {"name": [name_node], "class": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"name": [name_node], "class": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "file-node-1", def_nodes,
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "file-node-1",
+                def_nodes,
             )
 
         assert ingester._stats["defs"] == 1
@@ -560,15 +574,18 @@ class TestExtractDefs:
 
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
-            mock_cursor.matches.return_value = [
-                (0, {"name": [name_node], "call": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"name": [name_node], "call": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "file-node-1", def_nodes,
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "file-node-1",
+                def_nodes,
             )
 
         assert "test.py" in def_nodes
@@ -588,15 +605,18 @@ class TestExtractDefs:
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
             # Match has a 'var' capture but no 'name'
-            mock_cursor.matches.return_value = [
-                (0, {"var": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"var": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "file-node-1", def_nodes,
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "file-node-1",
+                def_nodes,
             )
 
         # No defs should be added (setdefault creates the key with empty list)
@@ -623,15 +643,18 @@ class TestExtractDefs:
 
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
-            mock_cursor.matches.return_value = [
-                (0, {"name": [name_node], "func": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"name": [name_node], "func": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "file-node-1", def_nodes,
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "file-node-1",
+                def_nodes,
             )
 
         # Def should still be recorded despite create_node failure
@@ -657,15 +680,18 @@ class TestExtractDefs:
 
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
-            mock_cursor.matches.return_value = [
-                (0, {"name": [name_node], "trait": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"name": [name_node], "trait": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "file-node-1", def_nodes,
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "file-node-1",
+                def_nodes,
             )
 
         assert ingester._stats["defs"] == 1
@@ -690,15 +716,18 @@ class TestExtractDefs:
 
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
-            mock_cursor.matches.return_value = [
-                (0, {"name": [name_node], "typealias": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"name": [name_node], "typealias": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "file-node-1", def_nodes,
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "file-node-1",
+                def_nodes,
             )
 
         assert ingester._stats["defs"] == 1
@@ -723,15 +752,17 @@ class TestExtractDefs:
 
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
-            mock_cursor.matches.return_value = [
-                (0, {"name": [name_node], "func": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"name": [name_node], "func": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "",  # empty file_node_id
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "",  # empty file_node_id
                 def_nodes,
             )
 
@@ -759,15 +790,18 @@ class TestExtractDefs:
 
         with patch("spacetime_memory.ingest.QueryCursor") as mock_cc:
             mock_cursor = Mock()
-            mock_cursor.matches.return_value = [
-                (0, {"name": [name_node], "func": [Mock()]})
-            ]
+            mock_cursor.matches.return_value = [(0, {"name": [name_node], "func": [Mock()]})]
             mock_cc.return_value = mock_cursor
 
             def_nodes: dict = {}
             ingester._extract_defs(
-                mock_cfg, mock_tree, source, "test.py",
-                "ws1", "file-node-1", def_nodes,
+                mock_cfg,
+                mock_tree,
+                source,
+                "test.py",
+                "ws1",
+                "file-node-1",
+                def_nodes,
             )
 
         # Def should still be recorded despite edge creation failure
@@ -797,7 +831,11 @@ class TestCreateDependencyEdges:
         ingester._create_dependency_edges("ws1", def_nodes)
 
         mock_client.create_edge.assert_called_once_with(
-            "ws1", "caller-id", "callee-id", "calls", weight=1.0,
+            "ws1",
+            "caller-id",
+            "callee-id",
+            "calls",
+            weight=1.0,
         )
         assert ingester._stats["edges"] == 1
 

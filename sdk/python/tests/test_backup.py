@@ -1,4 +1,5 @@
 """Backup/restore integration tests."""
+
 from __future__ import annotations
 
 import json
@@ -52,8 +53,12 @@ def test_backup_with_data(client):
     """Backup captures memory data."""
     ws_id = "bu-ws-" + os.urandom(4).hex()
     client._call("create_workspace", ["bu-ws", "backup test", ws_id])
-    r = client.store(workspace_id=ws_id, peer_id="bu-peer",
-                     content="backup test content", memory_type="experience")
+    r = client.store(
+        workspace_id=ws_id,
+        peer_id="bu-peer",
+        content="backup test content",
+        memory_type="experience",
+    )
     assert r["status"] == "ok"
 
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:

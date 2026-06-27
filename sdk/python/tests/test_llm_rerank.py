@@ -7,15 +7,19 @@ from unittest.mock import MagicMock, patch
 
 
 _MOCK_RERANK_RESPONSE = {
-    "choices": [{
-        "message": {
-            "content": json.dumps([
-                {"index": 0, "score": 9, "reason": "directly about auth"},
-                {"index": 1, "score": 3, "reason": "tangential mention only"},
-                {"index": 2, "score": 7, "reason": "related login flow"},
-            ])
+    "choices": [
+        {
+            "message": {
+                "content": json.dumps(
+                    [
+                        {"index": 0, "score": 9, "reason": "directly about auth"},
+                        {"index": 1, "score": 3, "reason": "tangential mention only"},
+                        {"index": 2, "score": 7, "reason": "related login flow"},
+                    ]
+                )
+            }
         }
-    }]
+    ]
 }
 
 
@@ -59,23 +63,31 @@ class TestLLMRerank:
     def test_rerank_no_results(self):
         """Empty results returned as-is."""
         from spacetime_memory.client import llm_rerank
+
         assert llm_rerank("query", []) == []
 
     def test_rerank_fallback_on_http_error(self):
         """HTTP failure returns original results unscathed."""
         from spacetime_memory.client import llm_rerank
+
         results = self._mock_results()
         original_scores = [r["score"] for r in results]
 
         with patch("httpx.post", side_effect=httpx.ConnectError("connection refused")):
-            out = llm_rerank("auth", results, model="test-model",
-                             endpoint="http://localhost:1/v1", api_key="sk-test")
+            out = llm_rerank(
+                "auth",
+                results,
+                model="test-model",
+                endpoint="http://localhost:1/v1",
+                api_key="sk-test",
+            )
         assert out is results  # same list object
         assert [r["score"] for r in out] == original_scores  # unchanged
 
     def test_rerank_replaces_scores(self):
         """LLM scores replace original scores and result is re-sorted."""
         from spacetime_memory.client import llm_rerank
+
         results = self._mock_results()
 
         mock_resp = MagicMock()
@@ -83,10 +95,13 @@ class TestLLMRerank:
         mock_resp.json.return_value = _MOCK_RERANK_RESPONSE
 
         with patch("httpx.post", return_value=mock_resp):
-            out = llm_rerank("auth login", results,
-                             endpoint="http://mock/v1",
-                             model="test-model",
-                             api_key="sk-test")
+            out = llm_rerank(
+                "auth login",
+                results,
+                endpoint="http://mock/v1",
+                model="test-model",
+                api_key="sk-test",
+            )
 
         # Re-sorted by LLM score: index 0 (9 → 0.9), index 2 (7 → 0.7),
         # index 1 (3 → 0.3), index 3 (unranked → 0.275)
@@ -104,17 +119,21 @@ class TestLLMRerank:
     def test_rerank_strips_markdown_fence(self):
         """LLM response wrapped in ```json``` fences is stripped."""
         from spacetime_memory.client import llm_rerank
+
         results = self._mock_results()
 
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
         mock_resp.json.return_value = {
-            "choices": [{"message": {"content": '```json\n[{"index":0,"score":5,"reason":"ok"}]\n```'}}]
+            "choices": [
+                {"message": {"content": '```json\n[{"index":0,"score":5,"reason":"ok"}]\n```'}}
+            ]
         }
 
         with patch("httpx.post", return_value=mock_resp):
-            out = llm_rerank("q", results, endpoint="http://mock/v1",
-                             model="test", api_key="sk-test")
+            out = llm_rerank(
+                "q", results, endpoint="http://mock/v1", model="test", api_key="sk-test"
+            )
 
         assert out[0]["score"] == 0.5
         assert out[0]["rerank_reason"] == "ok"
@@ -122,6 +141,7 @@ class TestLLMRerank:
     def test_rerank_env_fallback(self):
         """Config falls back to env vars."""
         from spacetime_memory.client import llm_rerank
+
         results = self._mock_results()
 
         mock_resp = MagicMock()
@@ -129,11 +149,14 @@ class TestLLMRerank:
         mock_resp.json.return_value = _MOCK_RERANK_RESPONSE
 
         with patch("httpx.post", return_value=mock_resp):
-            with patch.dict("os.environ", {
-                "LLM_RERANK_ENDPOINT": "http://env/v1",
-                "LLM_RERANK_MODEL": "env-model",
-                "LLM_RERANK_API_KEY": "env-key",
-            }):
+            with patch.dict(
+                "os.environ",
+                {
+                    "LLM_RERANK_ENDPOINT": "http://env/v1",
+                    "LLM_RERANK_MODEL": "env-model",
+                    "LLM_RERANK_API_KEY": "env-key",
+                },
+            ):
                 out = llm_rerank("test query", results)
                 # Should use env defaults, not crash
                 assert len(out) == 4
@@ -141,21 +164,36 @@ class TestLLMRerank:
     def test_search_with_rerank_integration(self, mock_client):
         """search(rerank=True) calls llm_rerank and returns re-scored results."""
         from unittest.mock import patch as _patch
+
         results = [
-            {"content": "auth flow", "score": 0.70, "entity_id": "m1",
-             "entity_type": "memory", "workspace_id": "ws-1"},
-            {"content": "pizza recipe", "score": 0.60, "entity_id": "m2",
-             "entity_type": "memory", "workspace_id": "ws-1"},
+            {
+                "content": "auth flow",
+                "score": 0.70,
+                "entity_id": "m1",
+                "entity_type": "memory",
+                "workspace_id": "ws-1",
+            },
+            {
+                "content": "pizza recipe",
+                "score": 0.60,
+                "entity_id": "m2",
+                "entity_type": "memory",
+                "workspace_id": "ws-1",
+            },
         ]
         mock_client._sql.return_value = results
         mock_client._embed.return_value = [0.1] * 384
 
         with _patch("spacetime_memory.client.llm_rerank") as mock_rerank:
             mock_rerank.return_value = results
-            out = mock_client.search("ws-1", "auth", rerank=True,
-                                     rerank_endpoint="http://mock/v1",
-                                     rerank_model="test",
-                                     rerank_api_key="sk-test")
+            out = mock_client.search(
+                "ws-1",
+                "auth",
+                rerank=True,
+                rerank_endpoint="http://mock/v1",
+                rerank_model="test",
+                rerank_api_key="sk-test",
+            )
             mock_rerank.assert_called_once()
             call_args = mock_rerank.call_args
             assert call_args[0][0] == "auth"  # query
@@ -164,9 +202,15 @@ class TestLLMRerank:
     def test_search_without_rerank_skips(self, mock_client):
         """search(rerank=False) does not call llm_rerank."""
         from unittest.mock import patch as _patch
+
         results = [
-            {"content": "test", "score": 0.80, "entity_id": "m1",
-             "entity_type": "memory", "workspace_id": "ws-1"},
+            {
+                "content": "test",
+                "score": 0.80,
+                "entity_id": "m1",
+                "entity_type": "memory",
+                "workspace_id": "ws-1",
+            },
         ]
         mock_client._sql.return_value = results
         mock_client._embed.return_value = [0.1] * 384

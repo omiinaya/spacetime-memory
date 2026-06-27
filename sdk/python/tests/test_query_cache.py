@@ -1,11 +1,11 @@
 """
 Unit tests for spacetime_memory.query_cache — QueryCache LRU cache.
 """
+
 from __future__ import annotations
 
 import time
 
-import pytest
 
 from spacetime_memory.query_cache import QueryCache
 

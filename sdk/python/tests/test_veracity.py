@@ -367,8 +367,12 @@ class TestCompound:
 
     def test_more_sources_increases_confidence(self):
         """More sources → higher confidence (for base < 1.0)."""
-        for tier in [VeracityTier.UNKNOWN, VeracityTier.INFERRED,
-                      VeracityTier.IMPORTED, VeracityTier.TOOL]:
+        for tier in [
+            VeracityTier.UNKNOWN,
+            VeracityTier.INFERRED,
+            VeracityTier.IMPORTED,
+            VeracityTier.TOOL,
+        ]:
             c1 = compound(tier, sources=1)
             c2 = compound(tier, sources=2)
             c3 = compound(tier, sources=5)

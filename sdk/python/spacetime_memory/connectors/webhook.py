@@ -1,8 +1,9 @@
 import json
 import hmac
-from typing import Any, Optional
-from dataclasses import dataclass, field
+from typing import Any
 from .base import Connector, Event
+
+
 class WebhookConnector(Connector):
     """Receive events via HTTP webhook.
 
@@ -69,17 +70,8 @@ class WebhookConnector(Connector):
 
         # Determine content from common fields
         if isinstance(body, dict):
-            content = (
-                body.get("content")
-                or body.get("text")
-                or body.get("message")
-                or str(body)
-            )
-            summary = (
-                body.get("summary")
-                or body.get("title")
-                or str(content)[:200]
-            )
+            content = body.get("content") or body.get("text") or body.get("message") or str(body)
+            summary = body.get("summary") or body.get("title") or str(content)[:200]
             metadata = dict(body)
         else:
             content = str(body)
@@ -117,7 +109,6 @@ class WebhookConnector(Connector):
         Raises:
             ValueError: If the signature is missing or does not match.
         """
-        import json
 
         assert self.secret is not None  # type-narrowing guard
 
@@ -130,16 +121,16 @@ class WebhookConnector(Connector):
         )
 
         if not signature:
-            raise ValueError(
-                "HMAC verification failed: no signature header found"
-            )
+            raise ValueError("HMAC verification failed: no signature header found")
 
         # Handle both "sha256=..." and raw hex formats
         if signature.startswith("sha256="):
             signature = signature[7:]
 
         body_bytes = json.dumps(
-            body, separators=(",", ":"), sort_keys=True,
+            body,
+            separators=(",", ":"),
+            sort_keys=True,
         ).encode()
         expected = hmac.new(
             self.secret.encode(),
@@ -148,11 +139,7 @@ class WebhookConnector(Connector):
         ).hexdigest()
 
         if not hmac.compare_digest(expected, signature):
-            raise ValueError(
-                "HMAC verification failed: signature mismatch"
-            )
+            raise ValueError("HMAC verification failed: signature mismatch")
 
 
 # ── Connector Registry ──────────────────────────────────────────────
-
-

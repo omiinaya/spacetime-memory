@@ -4,19 +4,20 @@ Covers: poll(), _paginate, _refresh_token, _get_channel_name,
 _fetch_thread_replies, channel join/leave filtering, dedup.
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
 import os as _os
 import shutil as _shutil
+
 _conn_cursor_dir = _os.path.expanduser("~/.spacetime-memory/connectors")
 if _os.path.exists(_conn_cursor_dir):
     _shutil.rmtree(_conn_cursor_dir, ignore_errors=True)
 
-from spacetime_memory.connectors import SlackConnector, Event
+from spacetime_memory.connectors import SlackConnector
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
 
 def _mock_ok_response(data):
     """Mock a Slack OK response with given data."""
@@ -26,10 +27,12 @@ def _mock_ok_response(data):
 
 
 def _channel_info_resp(name="general"):
-    return _mock_ok_response({
-        "ok": True,
-        "channel": {"id": "C001", "name": name},
-    })
+    return _mock_ok_response(
+        {
+            "ok": True,
+            "channel": {"id": "C001", "name": name},
+        }
+    )
 
 
 def _history_resp(messages=None, has_more=False, next_cursor=""):
@@ -44,13 +47,16 @@ def _history_resp(messages=None, has_more=False, next_cursor=""):
 
 # ── Token Refresh ────────────────────────────────────────────────────
 
+
 class TestSlackTokenRefresh:
     """_refresh_token behavior."""
 
     def test_no_callback_warns_once(self):
         """First call prints warning, second call doesn't."""
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         assert not connector._refresh_warned
         connector._refresh_token()
@@ -60,10 +66,14 @@ class TestSlackTokenRefresh:
 
     def test_callback_refreshes_token(self):
         """Callback updates token."""
+
         def refresh(old):
             return "new-tok"
+
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         connector._token_refresh_callback = refresh
         connector._refresh_token()
@@ -71,10 +81,14 @@ class TestSlackTokenRefresh:
 
     def test_callback_returns_none_keeps_old(self):
         """If callback returns None/falsy, token stays."""
+
         def refresh(old):
             return None
+
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         connector._token_refresh_callback = refresh
         connector._refresh_token()
@@ -83,24 +97,31 @@ class TestSlackTokenRefresh:
 
 # ── Pagination ───────────────────────────────────────────────────────
 
+
 class TestSlackPaginate:
     """_paginate with various API responses."""
 
     def test_single_page(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
-        client.get.return_value = _history_resp([
-            {"ts": "1.0", "text": "hello"},
-        ])
+        client.get.return_value = _history_resp(
+            [
+                {"ts": "1.0", "text": "hello"},
+            ]
+        )
         items = connector._paginate(client, "http://slack/api/history", {"channel": "C1"})
         assert len(items) == 1
         assert items[0]["text"] == "hello"
 
     def test_multi_page(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.side_effect = [
@@ -115,7 +136,9 @@ class TestSlackPaginate:
 
     def test_rate_limited_429(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         resp = Mock(status_code=429)
         resp.headers = {"Retry-After": "10"}
@@ -126,7 +149,9 @@ class TestSlackPaginate:
 
     def test_unexpected_status(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.return_value = Mock(status_code=500)
@@ -135,7 +160,9 @@ class TestSlackPaginate:
 
     def test_not_ok_response(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.return_value = _mock_ok_response({"ok": False, "error": "channel_not_found"})
@@ -145,7 +172,9 @@ class TestSlackPaginate:
     def test_not_in_channel(self):
         """not_in_channel error returns empty list gracefully."""
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.return_value = _mock_ok_response({"ok": False, "error": "not_in_channel"})
@@ -154,8 +183,11 @@ class TestSlackPaginate:
 
     def test_request_error(self):
         import httpx
+
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.side_effect = httpx.RequestError("timeout")
@@ -164,16 +196,22 @@ class TestSlackPaginate:
 
     def test_respects_max_pages(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws", max_pages=2,
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
+            max_pages=2,
         )
         client = Mock()
         # Return 5 pages but only 2 should be fetched
         pages = []
         for i in range(5):
-            pages.append(_history_resp(
-                [{"ts": str(i), "text": f"msg{i}"}],
-                has_more=True, next_cursor=f"c{i}",
-            ))
+            pages.append(
+                _history_resp(
+                    [{"ts": str(i), "text": f"msg{i}"}],
+                    has_more=True,
+                    next_cursor=f"c{i}",
+                )
+            )
         client.get.side_effect = pages
         items = connector._paginate(client, "http://slack/api/history", {"channel": "C1"})
         assert len(items) == 2
@@ -181,12 +219,15 @@ class TestSlackPaginate:
 
 # ── Channel Name ─────────────────────────────────────────────────────
 
+
 class TestSlackGetChannelName:
     """_get_channel_name with various responses."""
 
     def test_success_with_name(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.return_value = _channel_info_resp("random")
@@ -195,7 +236,9 @@ class TestSlackGetChannelName:
 
     def test_not_ok_falls_back_to_id(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.return_value = _mock_ok_response({"ok": False})
@@ -204,7 +247,9 @@ class TestSlackGetChannelName:
 
     def test_non_200_status(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.return_value = Mock(status_code=500)
@@ -213,7 +258,9 @@ class TestSlackGetChannelName:
 
     def test_connection_error(self):
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         client = Mock()
         client.get.side_effect = ConnectionError("refused")
@@ -223,23 +270,33 @@ class TestSlackGetChannelName:
 
 # ── Poll Integration ─────────────────────────────────────────────────
 
+
 class TestSlackPollIntegration:
     """poll() integration tests."""
 
     def test_poll_filters_join_leave(self):
         """Messages with subtype channel_join/leave are skipped."""
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         with patch("httpx.Client") as MockClient:
             mock_client = MockClient.return_value.__enter__.return_value
             mock_client.get.side_effect = [
                 _channel_info_resp("general"),
-                _history_resp([
-                    {"ts": "1", "text": "real msg", "user": "U1"},
-                    {"ts": "2", "text": "<@U2> joined", "user": "U2", "subtype": "channel_join"},
-                    {"ts": "3", "text": "<@U2> left", "user": "U2", "subtype": "channel_leave"},
-                ]),
+                _history_resp(
+                    [
+                        {"ts": "1", "text": "real msg", "user": "U1"},
+                        {
+                            "ts": "2",
+                            "text": "<@U2> joined",
+                            "user": "U2",
+                            "subtype": "channel_join",
+                        },
+                        {"ts": "3", "text": "<@U2> left", "user": "U2", "subtype": "channel_leave"},
+                    ]
+                ),
             ]
             events = connector.poll()
 
@@ -249,7 +306,9 @@ class TestSlackPollIntegration:
     def test_poll_deduplication(self):
         """Seen messages are not re-emitted."""
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
         )
         with patch("httpx.Client") as MockClient:
             mock_client = MockClient.return_value.__enter__.return_value
@@ -273,7 +332,9 @@ class TestSlackPollIntegration:
     def test_poll_thread_replies(self):
         """include_threads=True fetches thread replies."""
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
             include_threads=True,
         )
         with patch("httpx.Client") as MockClient:
@@ -283,13 +344,21 @@ class TestSlackPollIntegration:
             # Call 2: conversations.replies for thread
             mock_client.get.side_effect = [
                 _channel_info_resp("general"),
-                _history_resp([
-                    {"ts": "parent.1", "text": "parent msg", "user": "U1",
-                     "thread_ts": "parent.1"},
-                ]),
-                _history_resp([
-                    {"ts": "reply.1", "text": "reply msg", "user": "U2"},
-                ]),
+                _history_resp(
+                    [
+                        {
+                            "ts": "parent.1",
+                            "text": "parent msg",
+                            "user": "U1",
+                            "thread_ts": "parent.1",
+                        },
+                    ]
+                ),
+                _history_resp(
+                    [
+                        {"ts": "reply.1", "text": "reply msg", "user": "U2"},
+                    ]
+                ),
             ]
             events = connector.poll()
 
@@ -302,7 +371,9 @@ class TestSlackPollIntegration:
     def test_poll_thread_reply_dedup(self):
         """Thread replies already seen are skipped."""
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
             include_threads=True,
         )
         # Pre-seed _seen with the reply ts
@@ -312,13 +383,21 @@ class TestSlackPollIntegration:
             mock_client = MockClient.return_value.__enter__.return_value
             mock_client.get.side_effect = [
                 _channel_info_resp("general"),
-                _history_resp([
-                    {"ts": "parent.1", "text": "parent msg", "user": "U1",
-                     "thread_ts": "parent.1"},
-                ]),
-                _history_resp([
-                    {"ts": "reply.1", "text": "already seen", "user": "U2"},
-                ]),
+                _history_resp(
+                    [
+                        {
+                            "ts": "parent.1",
+                            "text": "parent msg",
+                            "user": "U1",
+                            "thread_ts": "parent.1",
+                        },
+                    ]
+                ),
+                _history_resp(
+                    [
+                        {"ts": "reply.1", "text": "already seen", "user": "U2"},
+                    ]
+                ),
             ]
             events = connector.poll()
 
@@ -328,7 +407,9 @@ class TestSlackPollIntegration:
     def test_poll_multiple_channels(self):
         """Poll fetches from all channels."""
         connector = SlackConnector(
-            token="tok", channel_ids=["C1", "C2"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1", "C2"],
+            workspace_id="ws",
         )
         with patch("httpx.Client") as MockClient:
             mock_client = MockClient.return_value.__enter__.return_value
@@ -347,21 +428,25 @@ class TestSlackPollIntegration:
     def test_thread_reply_metadata(self):
         """Thread replies have is_thread_reply flag."""
         connector = SlackConnector(
-            token="tok", channel_ids=["C1"], workspace_id="ws",
+            token="tok",
+            channel_ids=["C1"],
+            workspace_id="ws",
             include_threads=True,
         )
         with patch("httpx.Client") as MockClient:
             mock_client = MockClient.return_value.__enter__.return_value
             mock_client.get.side_effect = [
                 _channel_info_resp("general"),
-                _history_resp([
-                    {"ts": "p.1", "text": "parent", "user": "U1",
-                     "thread_ts": "p.1"},
-                ]),
-                _history_resp([
-                    {"ts": "r.1", "text": "reply", "user": "U2",
-                     "subtype": ""},
-                ]),
+                _history_resp(
+                    [
+                        {"ts": "p.1", "text": "parent", "user": "U1", "thread_ts": "p.1"},
+                    ]
+                ),
+                _history_resp(
+                    [
+                        {"ts": "r.1", "text": "reply", "user": "U2", "subtype": ""},
+                    ]
+                ),
             ]
             events = connector.poll()
 

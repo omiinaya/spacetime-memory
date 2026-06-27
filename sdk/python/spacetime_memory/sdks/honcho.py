@@ -105,7 +105,9 @@ class MessageConfiguration(BaseModel):
 class WorkspaceResponse(BaseModel):
     id: str
     metadata: dict[str, Any] = Field(default_factory=dict)
-    configuration: WorkspaceConfigurationResponse = Field(default_factory=WorkspaceConfigurationResponse)
+    configuration: WorkspaceConfigurationResponse = Field(
+        default_factory=WorkspaceConfigurationResponse
+    )
     created_at: datetime.datetime
 
 
@@ -122,7 +124,9 @@ class SessionResponse(BaseModel):
     is_active: bool
     workspace_id: str
     metadata: dict[str, Any] = Field(default_factory=dict)
-    configuration: SessionConfigurationResponse = Field(default_factory=SessionConfigurationResponse)
+    configuration: SessionConfigurationResponse = Field(
+        default_factory=SessionConfigurationResponse
+    )
     created_at: datetime.datetime
 
 
@@ -189,6 +193,7 @@ class ConclusionResponse(BaseModel):
 
 class ConclusionCreateParams(BaseModel):
     """Parameters for creating a conclusion — matches upstream honcho-ai."""
+
     content: str
     session_id: str | None = None
 
@@ -260,6 +265,7 @@ U = TypeVar("U")
 
 class SyncPage(Generic[T, U]):
     """Paginated response — matches honcho SyncPage[T, U]."""
+
     items: list[Any]
     total: int | None
     page: int | None
@@ -401,8 +407,13 @@ class Peer:
             content=content,
             peer_id=self._id,
             metadata=metadata or {},
-            created_at=datetime.datetime.utcnow() if created_at is None
-            else (created_at if isinstance(created_at, datetime.datetime) else datetime.datetime.fromisoformat(str(created_at))),
+            created_at=datetime.datetime.utcnow()
+            if created_at is None
+            else (
+                created_at
+                if isinstance(created_at, datetime.datetime)
+                else datetime.datetime.fromisoformat(str(created_at))
+            ),
         )
 
     def chat(
@@ -417,7 +428,9 @@ class Peer:
 
         # Search relevant memories
         try:
-            memories = self._honcho._client.search(self._ws_id, query=query, limit=10, semantic=True)
+            memories = self._honcho._client.search(
+                self._ws_id, query=query, limit=10, semantic=True
+            )
         except RuntimeError as exc:
             logger.warning("Peer.chat() search failed: %s", exc)
             memories = []
@@ -477,7 +490,10 @@ class Peer:
         # Gather peer messages
         try:
             memories = self._honcho._client.search(
-                self._ws_id, query="", limit=20, semantic=False,
+                self._ws_id,
+                query="",
+                limit=20,
+                semantic=False,
             )
         except RuntimeError:
             memories = []
@@ -555,14 +571,8 @@ class Peer:
 
         if not llm.available:
             if memories:
-                contents = [
-                    m.get("memory_content", m.get("content", ""))
-                    for m in memories[:5]
-                ]
-                return (
-                    f"Peer {self._id}: "
-                    + "; ".join(c[:100] for c in contents if c)
-                )
+                contents = [m.get("memory_content", m.get("content", "")) for m in memories[:5]]
+                return f"Peer {self._id}: " + "; ".join(c[:100] for c in contents if c)
             return f"Peer {self._id} (no context available)"
 
         prompt = (
@@ -621,21 +631,25 @@ class Peer:
     ) -> list[Message]:
         """Search messages from this peer."""
         try:
-            results = self._honcho._client.search(self._ws_id, query=query, limit=limit, semantic=True)
+            results = self._honcho._client.search(
+                self._ws_id, query=query, limit=limit, semantic=True
+            )
         except RuntimeError as exc:
             logger.warning("Peer.search() failed: %s", exc)
             results = []
 
         messages = []
         for i, r in enumerate(results[:limit]):
-            messages.append(Message(
-                id=r.get("id", str(i)),
-                content=r.get("memory_content", r.get("content", "")),
-                peer_id=self._id,
-                session_id="",
-                workspace_id=self._ws_id,
-                metadata=r.get("metadata", {}),
-            ))
+            messages.append(
+                Message(
+                    id=r.get("id", str(i)),
+                    content=r.get("memory_content", r.get("content", "")),
+                    peer_id=self._id,
+                    session_id="",
+                    workspace_id=self._ws_id,
+                    metadata=r.get("metadata", {}),
+                )
+            )
         return messages
 
     def sessions(
@@ -655,12 +669,16 @@ class Peer:
             filtered = list(reversed(filtered))
         total = len(filtered)
         start = (page - 1) * size
-        paged = filtered[start:start + size]
-        return SyncPage(data={
-            "items": paged, "total": total,
-            "page": page, "size": size,
-            "pages": max(1, (total + size - 1) // size or 1),
-        })
+        paged = filtered[start : start + size]
+        return SyncPage(
+            data={
+                "items": paged,
+                "total": total,
+                "page": page,
+                "size": size,
+                "pages": max(1, (total + size - 1) // size or 1),
+            }
+        )
 
     # -- Metadata / Config / Refresh ------------------------------------------
 
@@ -731,8 +749,11 @@ class PeerAio:
         created_at: datetime.datetime | str | None = None,
     ) -> MessageCreateParams:
         return await asyncio.to_thread(
-            self._peer.message, content,
-            metadata=metadata, configuration=configuration, created_at=created_at,
+            self._peer.message,
+            content,
+            metadata=metadata,
+            configuration=configuration,
+            created_at=created_at,
         )
 
     async def chat(
@@ -744,8 +765,11 @@ class PeerAio:
         reasoning_level: Literal["minimal", "low", "medium", "high", "max"] | None = None,
     ) -> str | None:
         return await asyncio.to_thread(
-            self._peer.chat, query,
-            target=target, session=session, reasoning_level=reasoning_level,
+            self._peer.chat,
+            query,
+            target=target,
+            session=session,
+            reasoning_level=reasoning_level,
         )
 
     async def search(
@@ -755,7 +779,10 @@ class PeerAio:
         limit: int = 10,
     ) -> list[Message]:
         return await asyncio.to_thread(
-            self._peer.search, query, filters=filters, limit=limit,
+            self._peer.search,
+            query,
+            filters=filters,
+            limit=limit,
         )
 
     async def sessions(
@@ -767,7 +794,11 @@ class PeerAio:
         reverse: bool = False,
     ) -> SyncPage[SessionResponse, Session]:
         return await asyncio.to_thread(
-            self._peer.sessions, filters=filters, page=page, size=size, reverse=reverse,
+            self._peer.sessions,
+            filters=filters,
+            page=page,
+            size=size,
+            reverse=reverse,
         )
 
     async def get_metadata(self) -> dict[str, object]:
@@ -794,8 +825,11 @@ class PeerAio:
         reasoning_level: Literal["minimal", "low", "medium", "high", "max"] | None = None,
     ):
         return await asyncio.to_thread(
-            self._peer.chat_stream, query,
-            target=target, session=session, reasoning_level=reasoning_level,
+            self._peer.chat_stream,
+            query,
+            target=target,
+            session=session,
+            reasoning_level=reasoning_level,
         )
 
     async def get_card(self, target: str | None = None) -> dict:
@@ -874,7 +908,10 @@ class ConclusionScope:
         session_id = session.id if isinstance(session, Session) else session
         try:
             results = self._honcho._client.search(
-                self.workspace_id, query="", limit=size * page, semantic=False,
+                self.workspace_id,
+                query="",
+                limit=size * page,
+                semantic=False,
             )
         except RuntimeError as exc:
             logger.warning("ConclusionScope.list() search failed: %s", exc)
@@ -891,25 +928,31 @@ class ConclusionScope:
                 continue
             if session_id and meta.get("session_id") != session_id:
                 continue
-            conclusions.append(Conclusion(
-                id=r.get("id", ""),
-                content=r.get("memory_content", r.get("content", "")),
-                observer_id=meta.get("observer_id", self.observer.id),
-                observed_id=meta.get("observed_id", self.observed.id),
-                session_id=meta.get("session_id"),
-                created_at=r.get("created_at"),
-            ))
+            conclusions.append(
+                Conclusion(
+                    id=r.get("id", ""),
+                    content=r.get("memory_content", r.get("content", "")),
+                    observer_id=meta.get("observer_id", self.observer.id),
+                    observed_id=meta.get("observed_id", self.observed.id),
+                    session_id=meta.get("session_id"),
+                    created_at=r.get("created_at"),
+                )
+            )
 
         if reverse:
             conclusions = list(reversed(conclusions))
 
         start = (page - 1) * size
-        paged = conclusions[start:start + size]
-        return SyncPage(data={
-            "items": paged, "total": len(conclusions),
-            "page": page, "size": size,
-            "pages": max(1, (len(conclusions) + size - 1) // size or 1),
-        })
+        paged = conclusions[start : start + size]
+        return SyncPage(
+            data={
+                "items": paged,
+                "total": len(conclusions),
+                "page": page,
+                "size": size,
+                "pages": max(1, (len(conclusions) + size - 1) // size or 1),
+            }
+        )
 
     def query(
         self,
@@ -920,7 +963,10 @@ class ConclusionScope:
         """Semantic search for conclusions."""
         try:
             results = self._honcho._client.search(
-                self.workspace_id, query=query, limit=top_k, semantic=True,
+                self.workspace_id,
+                query=query,
+                limit=top_k,
+                semantic=True,
             )
         except RuntimeError as exc:
             logger.warning("ConclusionScope.query() search failed: %s", exc)
@@ -935,14 +981,16 @@ class ConclusionScope:
                 continue
             if meta.get("observed_id") != self.observed.id:
                 continue
-            conclusions.append(Conclusion(
-                id=r.get("id", ""),
-                content=r.get("memory_content", r.get("content", "")),
-                observer_id=meta.get("observer_id", self.observer.id),
-                observed_id=meta.get("observed_id", self.observed.id),
-                session_id=meta.get("session_id"),
-                created_at=r.get("created_at"),
-            ))
+            conclusions.append(
+                Conclusion(
+                    id=r.get("id", ""),
+                    content=r.get("memory_content", r.get("content", "")),
+                    observer_id=meta.get("observer_id", self.observer.id),
+                    observed_id=meta.get("observed_id", self.observed.id),
+                    session_id=meta.get("session_id"),
+                    created_at=r.get("created_at"),
+                )
+            )
         return conclusions
 
     def delete(self, conclusion_id: str) -> None:
@@ -974,13 +1022,15 @@ class ConclusionScope:
                     summary="",
                     entities_json=json.dumps(meta),
                 )
-                result.append(Conclusion(
-                    id="",  # client doesn't have server-generated ID
-                    content=item.content,
-                    observer_id=self.observer.id,
-                    observed_id=self.observed.id,
-                    session_id=item.session_id,
-                ))
+                result.append(
+                    Conclusion(
+                        id="",  # client doesn't have server-generated ID
+                        content=item.content,
+                        observer_id=self.observer.id,
+                        observed_id=self.observed.id,
+                        session_id=item.session_id,
+                    )
+                )
             except RuntimeError as exc:
                 logger.warning("ConclusionScope.create() store failed: %s", exc)
         return result
@@ -1005,9 +1055,8 @@ class ConclusionScope:
         llm = LLMClient()
         if not llm.available:
             content_parts = [c.content[:100] for c in conclusions[:5]]
-            return (
-                f"Conclusions about {self.observed.id} "
-                f"by {self.observer.id}: " + "; ".join(content_parts)
+            return f"Conclusions about {self.observed.id} by {self.observer.id}: " + "; ".join(
+                content_parts
             )
 
         mem_text = "\n".join(f"- {c.content}" for c in conclusions[:10])
@@ -1043,7 +1092,11 @@ class ConclusionScopeAio:
         reverse: bool = False,
     ) -> SyncPage:
         return await asyncio.to_thread(
-            self._scope.list, page=page, size=size, session=session, reverse=reverse,
+            self._scope.list,
+            page=page,
+            size=size,
+            session=session,
+            reverse=reverse,
         )
 
     async def query(
@@ -1053,7 +1106,10 @@ class ConclusionScopeAio:
         distance: float | None = None,
     ) -> list[Conclusion]:
         return await asyncio.to_thread(
-            self._scope.query, query, top_k=top_k, distance=distance,
+            self._scope.query,
+            query,
+            top_k=top_k,
+            distance=distance,
         )
 
     async def delete(self, conclusion_id: str) -> None:
@@ -1167,21 +1223,24 @@ class Session:
                 )
             except RuntimeError as exc:
                 logger.warning(
-                    "Session.add_messages() failed to store message "
-                    "(peer=%s, session=%s): %s",
-                    msg.peer_id, self._id, exc,
+                    "Session.add_messages() failed to store message (peer=%s, session=%s): %s",
+                    msg.peer_id,
+                    self._id,
+                    exc,
                 )
                 continue
 
-            result.append(Message(
-                id=hash(msg.content + msg.peer_id + str(datetime.datetime.utcnow())) % (2**32),
-                content=msg.content,
-                peer_id=msg.peer_id,
-                session_id=self._id,
-                workspace_id=self._ws_id,
-                metadata=dict(msg.metadata or {}),
-                created_at=msg.created_at or datetime.datetime.utcnow(),
-            ))
+            result.append(
+                Message(
+                    id=hash(msg.content + msg.peer_id + str(datetime.datetime.utcnow())) % (2**32),
+                    content=msg.content,
+                    peer_id=msg.peer_id,
+                    session_id=self._id,
+                    workspace_id=self._ws_id,
+                    metadata=dict(msg.metadata or {}),
+                    created_at=msg.created_at or datetime.datetime.utcnow(),
+                )
+            )
         return result
 
     def messages(
@@ -1200,18 +1259,25 @@ class Session:
 
         items = []
         for r in results[:size]:
-            items.append(Message(
-                id=r.get("id", ""),
-                content=r.get("memory_content", r.get("content", "")),
-                peer_id=r.get("metadata", {}).get("peer_id", ""),
-                session_id=self._id,
-                workspace_id=self._ws_id,
-            ))
+            items.append(
+                Message(
+                    id=r.get("id", ""),
+                    content=r.get("memory_content", r.get("content", "")),
+                    peer_id=r.get("metadata", {}).get("peer_id", ""),
+                    session_id=self._id,
+                    workspace_id=self._ws_id,
+                )
+            )
 
-        return SyncPage(data={
-            "items": items, "total": len(items),
-            "page": page, "size": size, "pages": 1,
-        })
+        return SyncPage(
+            data={
+                "items": items,
+                "total": len(items),
+                "page": page,
+                "size": size,
+                "pages": 1,
+            }
+        )
 
     def search(
         self,
@@ -1221,20 +1287,24 @@ class Session:
     ) -> list[Message]:
         """Search messages within this session."""
         try:
-            results = self._honcho._client.search(self._ws_id, query=query, limit=limit, semantic=True)
+            results = self._honcho._client.search(
+                self._ws_id, query=query, limit=limit, semantic=True
+            )
         except RuntimeError as exc:
             logger.warning("Session.search() failed: %s", exc)
             results = []
 
         messages = []
         for i, r in enumerate(results[:limit]):
-            messages.append(Message(
-                id=r.get("id", str(i)),
-                content=r.get("memory_content", r.get("content", "")),
-                peer_id=r.get("metadata", {}).get("peer_id", ""),
-                session_id=self._id,
-                workspace_id=self._ws_id,
-            ))
+            messages.append(
+                Message(
+                    id=r.get("id", str(i)),
+                    content=r.get("memory_content", r.get("content", "")),
+                    peer_id=r.get("metadata", {}).get("peer_id", ""),
+                    session_id=self._id,
+                    workspace_id=self._ws_id,
+                )
+            )
         return messages
 
     def context(
@@ -1265,7 +1335,8 @@ class Session:
         except RuntimeError as exc:
             logger.warning(
                 "Session.delete() failed to delete workspace %s: %s",
-                self._ws_id, exc,
+                self._ws_id,
+                exc,
             )
         self._is_active = False
 
@@ -1297,14 +1368,16 @@ class Session:
                 if msg.id == message_id:
                     copying = True
                 if copying:
-                    new_session.add_messages([
-                        MessageCreateParams(
-                            content=msg.content,
-                            peer_id=msg.peer_id,
-                            metadata=msg.metadata,
-                            created_at=msg.created_at,
-                        )
-                    ])
+                    new_session.add_messages(
+                        [
+                            MessageCreateParams(
+                                content=msg.content,
+                                peer_id=msg.peer_id,
+                                metadata=msg.metadata,
+                                created_at=msg.created_at,
+                            )
+                        ]
+                    )
 
         return new_session
 
@@ -1357,9 +1430,7 @@ class Session:
         peer_id = peer.id if isinstance(peer, Peer) else peer
         return self._peer_configs.get(peer_id, SessionPeerConfig())
 
-    def set_peer_configuration(
-        self, peer: Peer | str, config: SessionPeerConfig
-    ) -> None:
+    def set_peer_configuration(self, peer: Peer | str, config: SessionPeerConfig) -> None:
         """Set configuration for a peer in this session."""
         peer_id = peer.id if isinstance(peer, Peer) else peer
         self._peer_configs[peer_id] = config
@@ -1384,9 +1455,7 @@ class Session:
             metadata=r.get("metadata", {}),
         )
 
-    def update_message(
-        self, message_id: str, metadata: dict[str, object]
-    ) -> None:
+    def update_message(self, message_id: str, metadata: dict[str, object]) -> None:
         """Update message metadata."""
         try:
             results = self._honcho._client.get_memory(message_id)
@@ -1396,9 +1465,7 @@ class Session:
             return
         r = results[0]
         content = r.get("memory_content", r.get("content", ""))
-        self._honcho._client.update_memory(
-            message_id, content=content, summary="", confidence=0.8
-        )
+        self._honcho._client.update_memory(message_id, content=content, summary="", confidence=0.8)
 
     # -- File upload shell -----------------------------------------------------
 
@@ -1434,6 +1501,7 @@ class Session:
         filename = "unknown"
         if isinstance(file, str):
             import os as _os
+
             filename = _os.path.basename(file)
         elif isinstance(file, tuple):
             # Upload-style tuple: (filename, fileobj, ...)
@@ -1489,7 +1557,11 @@ class SessionAio:
         reverse: bool = False,
     ) -> SyncPage[MessageResponse, Message]:
         return await asyncio.to_thread(
-            self._session.messages, filters=filters, page=page, size=size, reverse=reverse,
+            self._session.messages,
+            filters=filters,
+            page=page,
+            size=size,
+            reverse=reverse,
         )
 
     async def search(
@@ -1499,7 +1571,10 @@ class SessionAio:
         limit: int = 10,
     ) -> list[Message]:
         return await asyncio.to_thread(
-            self._session.search, query, filters=filters, limit=limit,
+            self._session.search,
+            query,
+            filters=filters,
+            limit=limit,
         )
 
     async def context(
@@ -1510,7 +1585,10 @@ class SessionAio:
         **kwargs: Any,
     ) -> SessionContext:
         return await asyncio.to_thread(
-            self._session.context, summary=summary, tokens=tokens, **kwargs,
+            self._session.context,
+            summary=summary,
+            tokens=tokens,
+            **kwargs,
         )
 
     async def summaries(self) -> SessionSummaries:
@@ -1534,12 +1612,8 @@ class SessionAio:
     async def get_configuration(self) -> SessionConfiguration:
         return await asyncio.to_thread(self._session.get_configuration)
 
-    async def set_configuration(
-        self, configuration: SessionConfiguration
-    ) -> None:
-        return await asyncio.to_thread(
-            self._session.set_configuration, configuration
-        )
+    async def set_configuration(self, configuration: SessionConfiguration) -> None:
+        return await asyncio.to_thread(self._session.set_configuration, configuration)
 
     async def set_peers(self, peers: Any | list[Any]) -> None:
         return await asyncio.to_thread(self._session.set_peers, peers)
@@ -1547,29 +1621,17 @@ class SessionAio:
     async def remove_peers(self, peers: Any | list[Any]) -> None:
         return await asyncio.to_thread(self._session.remove_peers, peers)
 
-    async def get_peer_configuration(
-        self, peer: Peer | str
-    ) -> SessionPeerConfig:
-        return await asyncio.to_thread(
-            self._session.get_peer_configuration, peer
-        )
+    async def get_peer_configuration(self, peer: Peer | str) -> SessionPeerConfig:
+        return await asyncio.to_thread(self._session.get_peer_configuration, peer)
 
-    async def set_peer_configuration(
-        self, peer: Peer | str, config: SessionPeerConfig
-    ) -> None:
-        return await asyncio.to_thread(
-            self._session.set_peer_configuration, peer, config
-        )
+    async def set_peer_configuration(self, peer: Peer | str, config: SessionPeerConfig) -> None:
+        return await asyncio.to_thread(self._session.set_peer_configuration, peer, config)
 
     async def get_message(self, message_id: str) -> Message | None:
         return await asyncio.to_thread(self._session.get_message, message_id)
 
-    async def update_message(
-        self, message_id: str, metadata: dict[str, object]
-    ) -> None:
-        return await asyncio.to_thread(
-            self._session.update_message, message_id, metadata
-        )
+    async def update_message(self, message_id: str, metadata: dict[str, object]) -> None:
+        return await asyncio.to_thread(self._session.update_message, message_id, metadata)
 
 
 # ---------------------------------------------------------------------------
@@ -1678,10 +1740,15 @@ class Honcho:
         peers = list(self._peer_cache.values())
         if reverse:
             peers = list(reversed(peers))
-        return SyncPage(data={
-            "items": peers, "total": len(peers),
-            "page": page, "size": size, "pages": max(1, (len(peers) + size - 1) // size or 1),
-        })
+        return SyncPage(
+            data={
+                "items": peers,
+                "total": len(peers),
+                "page": page,
+                "size": size,
+                "pages": max(1, (len(peers) + size - 1) // size or 1),
+            }
+        )
 
     # -- Session methods ------------------------------------------------------
 
@@ -1722,10 +1789,15 @@ class Honcho:
         sessions = list(self._session_cache.values())
         if reverse:
             sessions = list(reversed(sessions))
-        return SyncPage(data={
-            "items": sessions, "total": len(sessions),
-            "page": page, "size": size, "pages": max(1, (len(sessions) + size - 1) // size or 1),
-        })
+        return SyncPage(
+            data={
+                "items": sessions,
+                "total": len(sessions),
+                "page": page,
+                "size": size,
+                "pages": max(1, (len(sessions) + size - 1) // size or 1),
+            }
+        )
 
     # -- Search ---------------------------------------------------------------
 
@@ -1744,13 +1816,15 @@ class Honcho:
 
         messages = []
         for i, r in enumerate(results[:limit]):
-            messages.append(Message(
-                id=r.get("id", str(i)),
-                content=r.get("memory_content", r.get("content", "")),
-                peer_id=r.get("metadata", {}).get("peer_id", ""),
-                session_id="",
-                workspace_id=self._ws_id,
-            ))
+            messages.append(
+                Message(
+                    id=r.get("id", str(i)),
+                    content=r.get("memory_content", r.get("content", "")),
+                    peer_id=r.get("metadata", {}).get("peer_id", ""),
+                    session_id="",
+                    workspace_id=self._ws_id,
+                )
+            )
         return messages
 
     # -- Workspace management -------------------------------------------------
@@ -1764,10 +1838,15 @@ class Honcho:
         reverse: bool = False,
     ) -> SyncPage[WorkspaceResponse, str]:
         """List accessible workspace IDs."""
-        return SyncPage(data={
-            "items": [self._ws_id], "total": 1,
-            "page": page, "size": size, "pages": 1,
-        })
+        return SyncPage(
+            data={
+                "items": [self._ws_id],
+                "total": 1,
+                "page": page,
+                "size": size,
+                "pages": 1,
+            }
+        )
 
     def delete_workspace(self, workspace_id: str | None = None) -> None:
         """Delete a workspace."""
@@ -1836,14 +1915,14 @@ class Honcho:
                 (self-reflection).
         """
         # Resolve IDs
-        observer_id = observer.id if hasattr(observer, 'id') else str(observer)
+        observer_id = observer.id if hasattr(observer, "id") else str(observer)
         observed_id = observer_id
         if observed is not None:
-            observed_id = observed.id if hasattr(observed, 'id') else str(observed)
+            observed_id = observed.id if hasattr(observed, "id") else str(observed)
 
         session_id = None
         if session is not None:
-            session_id = session.id if hasattr(session, 'id') else str(session)
+            session_id = session.id if hasattr(session, "id") else str(session)
 
         # Gather existing conclusions about the observed peer
         try:
@@ -1853,9 +1932,9 @@ class Honcho:
             )
             # Filter to conclusions about the observed peer
             peer_conclusions = [
-                c for c in conclusions
-                if c.get("peer_id") == observed_id
-                or str(observed_id) in c.get("content", "")
+                c
+                for c in conclusions
+                if c.get("peer_id") == observed_id or str(observed_id) in c.get("content", "")
             ]
         except RuntimeError:
             peer_conclusions = []
@@ -1863,11 +1942,14 @@ class Honcho:
         # Generate dream via LLM
         try:
             from ..llm import LLMClient
+
             llm = LLMClient()
             if llm.available:
                 conclusion_text = "\n".join(
                     f"- {c.get('content', '')}"
-                    for c in (peer_conclusions or [{"content": "No prior conclusions available."}])[:20]
+                    for c in (peer_conclusions or [{"content": "No prior conclusions available."}])[
+                        :20
+                    ]
                 )
                 prompt = (
                     f"You are dreaming about observed peer '{observed_id}'.\n"
@@ -1877,10 +1959,17 @@ class Honcho:
                     f"(2-4 sentences). Focus on patterns, personality traits, "
                     f"preferences, or behavioral predictions."
                 )
-                dream_content = llm.chat([
-                    {"role": "system", "content": "You are a dream consolidation engine. Synthesize observations into concise insights."},
-                    {"role": "user", "content": prompt},
-                ], temperature=0.7, max_tokens=256)
+                dream_content = llm.chat(
+                    [
+                        {
+                            "role": "system",
+                            "content": "You are a dream consolidation engine. Synthesize observations into concise insights.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    temperature=0.7,
+                    max_tokens=256,
+                )
                 if dream_content:
                     self._client.store(
                         workspace_id=self._ws_id,
@@ -1938,7 +2027,10 @@ class HonchoAio:
         configuration: PeerConfig | None = None,
     ) -> Peer:
         return await asyncio.to_thread(
-            self._honcho.peer, id, metadata=metadata, configuration=configuration,
+            self._honcho.peer,
+            id,
+            metadata=metadata,
+            configuration=configuration,
         )
 
     async def peers(
@@ -1950,7 +2042,11 @@ class HonchoAio:
         reverse: bool = False,
     ) -> SyncPage[PeerResponse, Peer]:
         return await asyncio.to_thread(
-            self._honcho.peers, filters=filters, page=page, size=size, reverse=reverse,
+            self._honcho.peers,
+            filters=filters,
+            page=page,
+            size=size,
+            reverse=reverse,
         )
 
     async def session(
@@ -1962,8 +2058,11 @@ class HonchoAio:
         peers: Any = None,
     ) -> Session:
         return await asyncio.to_thread(
-            self._honcho.session, id,
-            metadata=metadata, configuration=configuration, peers=peers,
+            self._honcho.session,
+            id,
+            metadata=metadata,
+            configuration=configuration,
+            peers=peers,
         )
 
     async def sessions(
@@ -1975,7 +2074,11 @@ class HonchoAio:
         reverse: bool = False,
     ) -> SyncPage[SessionResponse, Session]:
         return await asyncio.to_thread(
-            self._honcho.sessions, filters=filters, page=page, size=size, reverse=reverse,
+            self._honcho.sessions,
+            filters=filters,
+            page=page,
+            size=size,
+            reverse=reverse,
         )
 
     async def search(
@@ -1985,7 +2088,10 @@ class HonchoAio:
         limit: int = 10,
     ) -> list[Message]:
         return await asyncio.to_thread(
-            self._honcho.search, query, filters=filters, limit=limit,
+            self._honcho.search,
+            query,
+            filters=filters,
+            limit=limit,
         )
 
     async def workspaces(
@@ -1997,7 +2103,11 @@ class HonchoAio:
         reverse: bool = False,
     ) -> SyncPage[WorkspaceResponse, str]:
         return await asyncio.to_thread(
-            self._honcho.workspaces, filters=filters, page=page, size=size, reverse=reverse,
+            self._honcho.workspaces,
+            filters=filters,
+            page=page,
+            size=size,
+            reverse=reverse,
         )
 
     async def delete_workspace(self, workspace_id: str | None = None) -> None:
@@ -2010,7 +2120,10 @@ class HonchoAio:
         session: Any = None,
     ) -> QueueStatusResponse:
         return await asyncio.to_thread(
-            self._honcho.queue_status, observer=observer, sender=sender, session=session,
+            self._honcho.queue_status,
+            observer=observer,
+            sender=sender,
+            session=session,
         )
 
     async def schedule_dream(
@@ -2020,7 +2133,10 @@ class HonchoAio:
         observed: Any | None = None,
     ) -> None:
         return await asyncio.to_thread(
-            self._honcho.schedule_dream, observer, session=session, observed=observed,
+            self._honcho.schedule_dream,
+            observer,
+            session=session,
+            observed=observed,
         )
 
     async def close(self) -> None:
@@ -2035,12 +2151,8 @@ class HonchoAio:
     async def get_configuration(self) -> WorkspaceConfiguration:
         return await asyncio.to_thread(self._honcho.get_configuration)
 
-    async def set_configuration(
-        self, configuration: WorkspaceConfiguration
-    ) -> None:
-        return await asyncio.to_thread(
-            self._honcho.set_configuration, configuration
-        )
+    async def set_configuration(self, configuration: WorkspaceConfiguration) -> None:
+        return await asyncio.to_thread(self._honcho.set_configuration, configuration)
 
     async def refresh(self) -> None:
         return await asyncio.to_thread(self._honcho.refresh)

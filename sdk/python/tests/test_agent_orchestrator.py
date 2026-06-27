@@ -1,10 +1,7 @@
 """Tests for the AgentOrchestrator."""
 
-import re
-from unittest.mock import MagicMock
-
 import pytest
-from spacetime_memory.agent_orchestrator import AgentOrchestrator, AgentSessionState
+from spacetime_memory.agent_orchestrator import AgentOrchestrator
 
 
 class TestAgentOrchestrator:
@@ -34,10 +31,7 @@ class TestAgentOrchestrator:
         assert state.workspace_id == "ws1"
 
         # Should have called the API with metadata JSON
-        create_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "create_session"
-        ]
+        create_calls = [c for c in mock_client._call.call_args_list if c[0][0] == "create_session"]
         assert len(create_calls) >= 1
         _reducer, args = create_calls[0][0]
         assert args[0] == "ws1"
@@ -95,10 +89,7 @@ class TestAgentOrchestrator:
         assert result == "call-step-456"
 
         # Should have called add_agent_step at least twice (tool_call + tool_result)
-        add_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "add_agent_step"
-        ]
+        add_calls = [c for c in mock_client._call.call_args_list if c[0][0] == "add_agent_step"]
         assert len(add_calls) >= 2
 
     def test_get_context(self, mock_client):
@@ -128,17 +119,16 @@ class TestAgentOrchestrator:
 
         # Provide a SQL result for session steps
         mock_client._query.return_value = [
-            {"step_type": "thought", "id": "step-1", "content": "thinking...",
-             "summary": "think"},
+            {"step_type": "thought", "id": "step-1", "content": "thinking...", "summary": "think"},
         ]
 
         context = orch.get_context("test query", top_k=5, session_id=session_id)
 
         assert isinstance(context, list)
         # The context should contain a step entry (either from search or steps)
-        assert any(
-            entry.get("source") == "session_steps" for entry in context
-        ) or not context  # empty is also acceptable if mock returns empty
+        assert (
+            any(entry.get("source") == "session_steps" for entry in context) or not context
+        )  # empty is also acceptable if mock returns empty
 
     def test_end_session(self, mock_client):
         """end_session should clean up and return session summary."""
@@ -215,7 +205,6 @@ class TestAgentOrchestrator:
         This test ensures that when errors occur in get_context's session
         steps path, they are logged rather than silently ignored.
         """
-        import logging
 
         orch = AgentOrchestrator(mock_client, workspace_id="ws1")
         session_id = orch.start_session(agent_name="test", user_id="user1")
@@ -255,10 +244,7 @@ class TestAgentOrchestrator:
         )
         assert session_id
         # The metadata should have {"context": "this is not json at all"}
-        create_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "create_session"
-        ]
+        create_calls = [c for c in mock_client._call.call_args_list if c[0][0] == "create_session"]
         assert len(create_calls) >= 1
         _reducer, args = create_calls[0][0]
         assert '"context"' in args[2]
@@ -273,10 +259,7 @@ class TestAgentOrchestrator:
             context='{"key": "value", "nested": {"a": 1}}',
         )
         assert session_id
-        create_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "create_session"
-        ]
+        create_calls = [c for c in mock_client._call.call_args_list if c[0][0] == "create_session"]
         assert len(create_calls) >= 1
         _reducer, args = create_calls[0][0]
         assert '"key": "value"' in args[2]
@@ -363,7 +346,6 @@ class TestAgentOrchestrator:
 
     def test_get_context_session_steps_error(self, mock_client):
         """get_context catches RuntimeError from session steps path."""
-        import logging
 
         orch = AgentOrchestrator(mock_client, workspace_id="ws1")
         session_id = orch.start_session(agent_name="test", user_id="user1")
@@ -427,10 +409,7 @@ class TestAgentOrchestrator:
             context={"key": "value", "nested": {"a": 1}},
         )
         assert session_id
-        create_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "create_session"
-        ]
+        create_calls = [c for c in mock_client._call.call_args_list if c[0][0] == "create_session"]
         assert len(create_calls) >= 1
         _reducer, args = create_calls[0][0]
         assert '"key": "value"' in args[2]

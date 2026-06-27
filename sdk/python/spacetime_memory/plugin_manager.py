@@ -96,6 +96,7 @@ class CompressionPlugin(BasePlugin):
     ) -> tuple[str, dict[str, Any]]:
         try:
             from .aaak import aaak_compress
+
             if len(content) > 500:  # only compress longer content
                 compressed = aaak_compress(content)
                 metadata["compressed"] = True
@@ -125,7 +126,7 @@ class FilterPlugin(BasePlugin):
         if len(content) < self.min_length:
             raise ValueError(f"Content too short (min {self.min_length} chars)")
         if len(content) > self.max_length:
-            content = content[:self.max_length]
+            content = content[: self.max_length]
         return content, metadata
 
 

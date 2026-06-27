@@ -1,4 +1,5 @@
 """Tests for observability features: structured logging, request_id, Prometheus export."""
+
 import json
 import os
 import types
@@ -29,16 +30,22 @@ def _reset_otel_available_cache() -> None:
 from spacetime_memory.client import Client, JSONFormatter, configure_logging
 from spacetime_memory.metrics import MetricsCollector
 
-DB = os.environ.get("SPACETIMEDB_DB", "c200e409f602c06527d0aa66dc2d05718a6b62c4c3317b5498951cea41782713")
+DB = os.environ.get(
+    "SPACETIMEDB_DB", "c200e409f602c06527d0aa66dc2d05718a6b62c4c3317b5498951cea41782713"
+)
 
 
 class TestJSONFormatter:
     def test_basic_format(self):
         fmt = JSONFormatter()
         record = logging.LogRecord(
-            name="test_logger", level=logging.INFO,
-            pathname=__file__, lineno=42, msg="hello world",
-            args=(), exc_info=None,
+            name="test_logger",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=42,
+            msg="hello world",
+            args=(),
+            exc_info=None,
         )
         output = fmt.format(record)
         parsed = json.loads(output)
@@ -50,9 +57,13 @@ class TestJSONFormatter:
     def test_with_extra_fields(self):
         fmt = JSONFormatter()
         record = logging.LogRecord(
-            name="test", level=logging.WARNING,
-            pathname=__file__, lineno=1, msg="test message",
-            args=(), exc_info=None,
+            name="test",
+            level=logging.WARNING,
+            pathname=__file__,
+            lineno=1,
+            msg="test message",
+            args=(),
+            exc_info=None,
         )
         record.extra_fields = {"request_id": "abc123", "endpoint": "test"}
         output = fmt.format(record)
@@ -145,31 +156,37 @@ class TestTracerNoOpSpan:
 
     def test_noop_span_set_attribute(self):
         from spacetime_memory.tracer import _NoOpSpan
+
         span = _NoOpSpan()
         span.set_attribute("key", "value")  # should not raise
 
     def test_noop_span_set_attributes(self):
         from spacetime_memory.tracer import _NoOpSpan
+
         span = _NoOpSpan()
         span.set_attributes({"a": 1})  # should not raise
 
     def test_noop_span_record_exception(self):
         from spacetime_memory.tracer import _NoOpSpan
+
         span = _NoOpSpan()
         span.record_exception(ValueError("test"))  # should not raise
 
     def test_noop_span_set_status(self):
         from spacetime_memory.tracer import _NoOpSpan
+
         span = _NoOpSpan()
         span.set_status("ok")  # should not raise
 
     def test_noop_span_end(self):
         from spacetime_memory.tracer import _NoOpSpan
+
         span = _NoOpSpan()
         span.end()  # should not raise
 
     def test_noop_span_context_manager(self):
         from spacetime_memory.tracer import _NoOpSpan
+
         with _NoOpSpan() as span:
             assert span is not None
 
@@ -179,12 +196,15 @@ class TestCheckOtelAvailable:
 
     def test_otel_not_available_on_import_error(self, monkeypatch):
         from spacetime_memory.tracer import _check_otel_available
+
         # Reset the cached value
         import spacetime_memory.tracer as tracer_mod
+
         tracer_mod._OTEL_AVAILABLE = None
         monkeypatch.setattr(tracer_mod, "import opentelemetry", None, raising=False)
         # Make the import fail
         import builtins
+
         orig_import = builtins.__import__
 
         def _mock_import(name, *args, **kwargs):
@@ -198,6 +218,7 @@ class TestCheckOtelAvailable:
     def test_otel_available_cached(self, monkeypatch):
         from spacetime_memory.tracer import _check_otel_available
         import spacetime_memory.tracer as tracer_mod
+
         tracer_mod._OTEL_AVAILABLE = None
         # First call caches
         monkeypatch.setattr(tracer_mod, "_OTEL_AVAILABLE", True)
@@ -212,6 +233,7 @@ class TestTracerInit:
         monkeypatch.delenv("OTEL_ENABLED", raising=False)
         monkeypatch.delenv("OTEL_SAMPLING_RATIO", raising=False)
         from spacetime_memory.tracer import Tracer
+
         t = Tracer()
         assert t._service_name == "spacetime-memory"
         assert t._otlp_endpoint == "http://localhost:4318"
@@ -225,6 +247,7 @@ class TestTracerInit:
         monkeypatch.setenv("OTEL_ENABLED", "false")
         monkeypatch.setenv("OTEL_SAMPLING_RATIO", "0.5")
         from spacetime_memory.tracer import Tracer
+
         t = Tracer()
         assert t._service_name == "my-service"
         assert t._enabled is False
@@ -233,6 +256,7 @@ class TestTracerInit:
     def test_init_explicit_params(self, monkeypatch):
         monkeypatch.delenv("OTEL_SERVICE_NAME", raising=False)
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(
             service_name="explicit",
             otlp_endpoint="http://custom:4318",
@@ -247,12 +271,14 @@ class TestTracerInit:
     def test_init_explicit_disabled_overrides_env(self, monkeypatch):
         monkeypatch.setenv("OTEL_ENABLED", "true")
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(enabled=False)
         assert t._enabled is False
 
     def test_init_default_endpoint_no_env(self, monkeypatch):
         monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
         from spacetime_memory.tracer import Tracer
+
         t = Tracer()
         assert t._otlp_endpoint == "http://localhost:4318"
 
@@ -262,18 +288,21 @@ class TestTracerIsEnabled:
 
     def test_enabled_and_otel_available(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(enabled=True)
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: True)
         assert t.is_enabled is True
 
     def test_enabled_but_otel_not_available(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(enabled=True)
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: False)
         assert t.is_enabled is False
 
     def test_disabled_even_if_otel_available(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(enabled=False)
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: True)
         assert t.is_enabled is False
@@ -284,6 +313,7 @@ class TestTracerSetup:
 
     def test_setup_already_done(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         t = Tracer()
         t._setup_done = True
         calls = []
@@ -294,6 +324,7 @@ class TestTracerSetup:
 
     def test_setup_disabled(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(enabled=False)
         t.setup()
         assert t._setup_done is True
@@ -301,6 +332,7 @@ class TestTracerSetup:
 
     def test_setup_otel_not_available(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(enabled=True)
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: False)
         t.setup()
@@ -310,6 +342,7 @@ class TestTracerSetup:
     def test_setup_full_path(self, monkeypatch):
         """Test the full OTel setup path with mock OTel packages."""
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(enabled=True)
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: True)
 
@@ -321,6 +354,7 @@ class TestTracerSetup:
             """A module mock that returns AutoMockModule for any attribute access,
             making sub-imports like ``from opentelemetry.sdk.resources import Resource``
             work automatically."""
+
             def __getattr__(self, name):
                 if name.startswith("_"):
                     raise AttributeError(name)
@@ -338,7 +372,9 @@ class TestTracerSetup:
         mock_otel.trace.get_tracer = lambda *a: contextlib.nullcontext()
         _provider_obj = type("_Provider", (), {"add_span_processor": lambda s, p: None})()
         mock_otel.sdk.trace.TracerProvider = lambda **kw: _provider_obj
-        mock_otel.sdk.resources.Resource = type("Resource", (), {"create": staticmethod(lambda attrs: {})})
+        mock_otel.sdk.resources.Resource = type(
+            "Resource", (), {"create": staticmethod(lambda attrs: {})}
+        )
         mock_otel.sdk.trace.export.BatchSpanProcessor = lambda *a: None
         mock_otel.sdk.trace.export.ConsoleSpanExporter = lambda: None
         mock_otel.sdk.trace.sampling.ParentBasedTraceIdRatio = lambda r: None
@@ -358,8 +394,10 @@ class TestTracerSetup:
         _install_mock(mock_otel.exporter.otlp, "opentelemetry.exporter.otlp")
         _install_mock(mock_otel.exporter.otlp.proto, "opentelemetry.exporter.otlp.proto")
         _install_mock(mock_otel.exporter.otlp.proto.http, "opentelemetry.exporter.otlp.proto.http")
-        _install_mock(mock_otel.exporter.otlp.proto.http.trace_exporter,
-                      "opentelemetry.exporter.otlp.proto.http.trace_exporter")
+        _install_mock(
+            mock_otel.exporter.otlp.proto.http.trace_exporter,
+            "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+        )
 
         monkeypatch.setattr("spacetime_memory.tracer._tracer", None)
 
@@ -375,10 +413,12 @@ class TestCheckOtelAvailableSuccess:
         """Import succeeds — _OTEL_AVAILABLE should be set to True."""
         from spacetime_memory.tracer import _check_otel_available
         import spacetime_memory.tracer as tracer_mod
+
         tracer_mod._OTEL_AVAILABLE = None
 
         # Make opentelemetry import succeed by putting a mock in sys.modules
         import types
+
         mock = types.ModuleType("opentelemetry")
         mock_t = types.ModuleType("opentelemetry.trace")
         mock_t.ok = True
@@ -395,12 +435,14 @@ class TestTracerSetupConsoleExporter:
     """Test the OTEL_TRACES_EXPORTER=console path in setup()."""
 
     def test_console_exporter_path(self, monkeypatch):
-        from spacetime_memory.tracer import Tracer, _check_otel_available
+        from spacetime_memory.tracer import Tracer
+
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: True)
         monkeypatch.setenv("OTEL_TRACES_EXPORTER", "console")
 
         # Build mock OTel hierarchy
         import types
+
         class AutoMockMod(types.ModuleType):
             def __getattr__(self, name):
                 if name.startswith("_"):
@@ -412,6 +454,7 @@ class TestTracerSetupConsoleExporter:
                 return m
 
         import contextlib
+
         mock_otel = AutoMockMod("opentelemetry")
         mock_otel.__path__ = ["/fake/opentelemetry"]
         mock_otel.__package__ = "opentelemetry"
@@ -428,6 +471,7 @@ class TestTracerSetupConsoleExporter:
 
         def _inst(mod, name):
             monkeypatch.setitem(sys.modules, name, mod)
+
         _inst(mock_otel, "opentelemetry")
         _inst(mock_otel.trace, "opentelemetry.trace")
         _inst(mock_otel.sdk, "opentelemetry.sdk")
@@ -439,8 +483,10 @@ class TestTracerSetupConsoleExporter:
         _inst(mock_otel.exporter.otlp, "opentelemetry.exporter.otlp")
         _inst(mock_otel.exporter.otlp.proto, "opentelemetry.exporter.otlp.proto")
         _inst(mock_otel.exporter.otlp.proto.http, "opentelemetry.exporter.otlp.proto.http")
-        _inst(mock_otel.exporter.otlp.proto.http.trace_exporter,
-              "opentelemetry.exporter.otlp.proto.http.trace_exporter")
+        _inst(
+            mock_otel.exporter.otlp.proto.http.trace_exporter,
+            "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+        )
 
         monkeypatch.setattr("spacetime_memory.tracer._tracer", None)
         t = Tracer(enabled=True)
@@ -453,6 +499,7 @@ class TestTracerSetupOtlpImportError:
 
     def test_otlp_exporter_import_error(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: True)
 
         import types
@@ -524,15 +571,18 @@ class TestTracerGetVersion:
 
     def test_get_version_success(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         monkeypatch.setattr("spacetime_memory.__version__", "1.2.3", raising=False)
         t = Tracer()
         assert t._get_version() == "1.2.3"
 
     def test_get_version_fallback(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         monkeypatch.setattr("spacetime_memory.__version__", None, raising=False)
         # Remove __version__ to cause ImportError
         import spacetime_memory
+
         monkeypatch.delattr(spacetime_memory, "__version__", raising=False)
         t = Tracer()
         assert t._get_version() == "0.0.0"
@@ -543,14 +593,18 @@ class TestTracerStartSpan:
 
     def test_start_span_disabled_yields_noop(self, monkeypatch):
         from spacetime_memory.tracer import Tracer, _NOOP_SPAN
+
         t = Tracer(enabled=False)
         with t.start_span("test") as span:
             assert span is _NOOP_SPAN
 
     def test_start_span_enabled_path(self, monkeypatch):
         from spacetime_memory.tracer import Tracer, _check_otel_available
+
         if not _check_otel_available():
-            pytest.skip("OpenTelemetry not installed — install with: pip install spacetime-memory[otel]")
+            pytest.skip(
+                "OpenTelemetry not installed — install with: pip install spacetime-memory[otel]"
+            )
         t = Tracer(enabled=True)
         t._enabled = True
         # is_enabled is True because OTel is now installed
@@ -563,6 +617,7 @@ class TestTracerInstrumentMethod:
 
     def test_instrument_disabled_calls_directly(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
+
         t = Tracer(enabled=False)
         called = False
 
@@ -577,6 +632,7 @@ class TestTracerInstrumentMethod:
     def test_instrument_enabled_executes(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
         import contextlib
+
         t = Tracer(enabled=True)
         t._enabled = True
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: True)
@@ -594,6 +650,7 @@ class TestTracerInstrumentMethod:
     def test_instrument_with_attr_fn(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
         import contextlib
+
         t = Tracer(enabled=True)
         t._enabled = True
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: True)
@@ -616,6 +673,7 @@ class TestTracerInstrumentMethod:
     def test_instrument_raises_preserves_error(self, monkeypatch):
         from spacetime_memory.tracer import Tracer
         import contextlib
+
         t = Tracer(enabled=True)
         t._enabled = True
         monkeypatch.setattr("spacetime_memory.tracer._check_otel_available", lambda: True)
@@ -633,7 +691,8 @@ class TestGetTracer:
     """Tests for module-level get_tracer()."""
 
     def test_get_tracer_first_call(self, monkeypatch):
-        from spacetime_memory.tracer import get_tracer, _tracer
+        from spacetime_memory.tracer import get_tracer
+
         monkeypatch.setattr("spacetime_memory.tracer._tracer", None)
         t = get_tracer(service_name="test-svc", setup=False)
         assert t._service_name == "test-svc"
@@ -641,6 +700,7 @@ class TestGetTracer:
 
     def test_get_tracer_returns_cached(self, monkeypatch):
         from spacetime_memory.tracer import get_tracer, Tracer
+
         cached = Tracer(service_name="cached")
         monkeypatch.setattr("spacetime_memory.tracer._tracer", cached)
         t = get_tracer(service_name="different")
@@ -649,6 +709,7 @@ class TestGetTracer:
 
     def test_get_tracer_auto_setup(self, monkeypatch):
         from spacetime_memory.tracer import get_tracer
+
         monkeypatch.setattr("spacetime_memory.tracer._tracer", None)
         calls = []
         monkeypatch.setattr("spacetime_memory.tracer.Tracer.setup", lambda s: calls.append(1))
@@ -662,9 +723,11 @@ class TestStartSpanModuleLevel:
     def test_module_start_span(self, monkeypatch):
         from spacetime_memory.tracer import start_span, Tracer
         import contextlib
+
         mock_tracer = Tracer(enabled=True)
-        monkeypatch.setattr(mock_tracer, "start_span",
-                            lambda n, attributes=None: contextlib.nullcontext())
+        monkeypatch.setattr(
+            mock_tracer, "start_span", lambda n, attributes=None: contextlib.nullcontext()
+        )
         monkeypatch.setattr("spacetime_memory.tracer._tracer", mock_tracer)
         with start_span("test") as span:
             pass

@@ -71,6 +71,7 @@ def client(stdb_session: dict) -> Client:
     )
     # Auto-register for auth
     import secrets
+
     try:
         c._call("register", [f"graphiti_test_{secrets.token_hex(4)}", "Graphiti Test", "testpass"])
     except RuntimeError:
@@ -99,6 +100,7 @@ def workspace_id(client: Client) -> str:
 # =====================================================================
 # Tests
 # =====================================================================
+
 
 class TestAddTriplet:
     """Tests for ``add_triplet`` — the primary KG manipulation API."""
@@ -182,9 +184,7 @@ class TestAddTriplet:
         )
         graphiti.add_triplet(
             source_node=source,
-            edge=EntityEdge(
-                name="prefers", fact="Charlie prefers tea", group_id=workspace_id
-            ),
+            edge=EntityEdge(name="prefers", fact="Charlie prefers tea", group_id=workspace_id),
             target_node=target,
         )
 
@@ -332,7 +332,8 @@ class TestGetEntityEdgeSummary:
         result = graphiti.add_triplet(
             source_node=src,
             edge=EntityEdge(
-                name="relates_to", fact="SummarySource relates to Target1",
+                name="relates_to",
+                fact="SummarySource relates to Target1",
                 group_id=workspace_id,
             ),
             target_node=tgt1,
@@ -342,7 +343,8 @@ class TestGetEntityEdgeSummary:
         graphiti.add_triplet(
             source_node=src,
             edge=EntityEdge(
-                name="also_relates", fact="SummarySource also relates to Target2",
+                name="also_relates",
+                fact="SummarySource also relates to Target2",
                 group_id=workspace_id,
             ),
             target_node=tgt2,
@@ -402,7 +404,6 @@ class TestLifecycle:
         """close() should not raise."""
         # Note: this closes the underlying HTTP session
         # We create a new one for this test
-        import uuid
 
         c = Client(host=HOST, port=PORT)
         g = Graphiti(client=c)
@@ -438,9 +439,7 @@ class TestTemporalEdgeTracking:
         )
         assert update_result["status"] == "ok"
 
-    def test_get_edge_history_returns_all_versions(
-        self, graphiti: Graphiti, workspace_id: str
-    ):
+    def test_get_edge_history_returns_all_versions(self, graphiti: Graphiti, workspace_id: str):
         """get_edge_history returns all temporal versions of an edge."""
         src = EntityNode(name="HistorySource", group_id=workspace_id)
         tgt = EntityNode(name="HistoryTarget", group_id=workspace_id)
@@ -480,9 +479,7 @@ class TestTemporalEdgeTracking:
         assert edge.edge_group_id
         assert edge.version == 1
 
-    def test_update_edge_invalidates_old_version(
-        self, graphiti: Graphiti, workspace_id: str
-    ):
+    def test_update_edge_invalidates_old_version(self, graphiti: Graphiti, workspace_id: str):
         """After update_edge, the old version has invalid_at set and new version has valid_at."""
         src = EntityNode(name="InvalidateSource", group_id=workspace_id)
         tgt = EntityNode(name="InvalidateTarget", group_id=workspace_id)
@@ -663,6 +660,7 @@ class TestGraphitiDataModels:
     def test_entity_node_from_stmem_small_timestamp(self):
         """EntityNode.from_stmem() with Unix timestamp (< 1e12)."""
         import time
+
         ts = int(time.time())
         row = {
             "id": "unix-node",
@@ -754,6 +752,7 @@ class TestGraphitiDataModels:
     def test_entity_edge_from_stmem_small_timestamps(self):
         """EntityEdge.from_stmem() with Unix timestamps (< 1e12)."""
         import time
+
         ts = int(time.time())
         row = {
             "id": "unix-edge",
@@ -791,6 +790,7 @@ class TestGraphitiSearchEdgeCases:
     def test_build_communities_empty(self, graphiti: Graphiti):
         """build_communities on empty workspace returns list."""
         import uuid
+
         fresh_name = f"community-empty-{uuid.uuid4().hex[:8]}"
         try:
             graphiti._client.create_workspace(fresh_name)
@@ -893,6 +893,7 @@ class TestGraphitiNamespaceOps:
 # =====================================================================
 # NEW TESTS — increasing coverage on namespace operations
 # =====================================================================
+
 
 class TestEntityNodeNamespaceFull:
     """Full coverage for EntityNodeNamespace operations."""
@@ -1012,9 +1013,7 @@ class TestEpisodeNodeNamespaceFull:
             source_description="test",
             group_id=workspace_id,
         )
-        episodes = graphiti.nodes.episode.get_by_uuids([
-            r1.episode.uuid, r2.episode.uuid
-        ])
+        episodes = graphiti.nodes.episode.get_by_uuids([r1.episode.uuid, r2.episode.uuid])
         assert isinstance(episodes, list)
         assert len(episodes) == 2
 
@@ -1026,6 +1025,7 @@ class TestEpisodeNodeNamespaceFull:
     def test_retrieve_episodes_namespace(self, graphiti: Graphiti, workspace_id: str):
         """nodes.episode.retrieve_episodes returns episodes."""
         from datetime import datetime, timezone
+
         episodes = graphiti.nodes.episode.retrieve_episodes(
             reference_time=datetime.now(timezone.utc),
             last_n=5,
@@ -1168,9 +1168,7 @@ class TestEntityEdgeNamespaceFull:
             edge=EntityEdge(name="multi_e2", fact="test", group_id=workspace_id),
             target_node=EntityNode(name="MultiEdgeTgt2", group_id=workspace_id),
         )
-        edges = graphiti.edges.entity.get_by_uuids([
-            r1.edges[0].uuid, r2.edges[0].uuid
-        ])
+        edges = graphiti.edges.entity.get_by_uuids([r1.edges[0].uuid, r2.edges[0].uuid])
         assert isinstance(edges, list)
         assert len(edges) == 2
 
@@ -1183,9 +1181,7 @@ class TestEntityEdgeNamespaceFull:
             edge=EntityEdge(name="between_edge", fact="between test", group_id=workspace_id),
             target_node=tgt,
         )
-        edges = graphiti.edges.entity.get_between_nodes(
-            result.nodes[0].uuid, result.nodes[1].uuid
-        )
+        edges = graphiti.edges.entity.get_between_nodes(result.nodes[0].uuid, result.nodes[1].uuid)
         assert isinstance(edges, list)
         assert len(edges) >= 1
 
@@ -1379,6 +1375,7 @@ class TestNextEpisodeEdgeNamespaceFull:
 # Mock-based tests for hard-to-reach code paths
 # =====================================================================
 
+
 class TestHelperFunctions:
     """Tests for internal helper functions."""
 
@@ -1537,16 +1534,15 @@ class TestGraphitiMocked:
         e3 = EntityEdge(uuid="e3", valid_at=datetime(2020, 1, 1, tzinfo=timezone.utc))
 
         edges = [e1, e2, e3]
-        filtered = g._filter_by_valid_at(edges,
-            valid_at_after=datetime(2024, 1, 1, tzinfo=timezone.utc),
-            valid_at_before=None)
+        filtered = g._filter_by_valid_at(
+            edges, valid_at_after=datetime(2024, 1, 1, tzinfo=timezone.utc), valid_at_before=None
+        )
         # e1 should pass (now > 2024), e2 excluded (no valid_at), e3 excluded (too old)
         assert len(filtered) == 1
         assert filtered[0].uuid == "e1"
 
     def test_filter_by_valid_at_none_filters(self):
         """_filter_by_valid_at with no filters returns all."""
-        from datetime import datetime, timezone
 
         e1 = EntityEdge(uuid="e1")
         e2 = EntityEdge(uuid="e2")
@@ -1563,8 +1559,9 @@ class TestGraphitiMocked:
         e2 = EntityEdge(uuid="e2", valid_at=now)
 
         g = Graphiti()
-        filtered = g._filter_by_valid_at([e1, e2],
-            valid_at_before=datetime(2021, 1, 1, tzinfo=timezone.utc))
+        filtered = g._filter_by_valid_at(
+            [e1, e2], valid_at_before=datetime(2021, 1, 1, tzinfo=timezone.utc)
+        )
         assert len(filtered) == 1
         assert filtered[0].uuid == "e1"
 
@@ -1713,7 +1710,7 @@ class TestGraphitiMocked:
 
     def test_summarize_saga_with_episodes_no_llm(self):
         """summarize_saga with episodes but no LLM returns saga with empty summary."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
 
         mock_client = MagicMock()
         mock_client._query.return_value = [
@@ -1796,6 +1793,7 @@ class TestGraphitiInit:
 # Additional coverage tests
 # =====================================================================
 
+
 class TestAdditionalCoverage:
     """Additional tests to cover edge cases and push coverage higher."""
 
@@ -1821,6 +1819,7 @@ class TestAdditionalCoverage:
     def test_search_with_valid_at_filter(self, graphiti: Graphiti, workspace_id: str):
         """search with valid_at_after filter."""
         from datetime import datetime, timezone
+
         edges = graphiti.search(
             "test",
             group_ids=[workspace_id],
@@ -1831,6 +1830,7 @@ class TestAdditionalCoverage:
     def test_search_with_valid_at_before_filter(self, graphiti: Graphiti, workspace_id: str):
         """search_ with valid_at filters."""
         from datetime import datetime, timezone
+
         results = graphiti.search_(
             "test",
             group_ids=[workspace_id],
@@ -1841,6 +1841,7 @@ class TestAdditionalCoverage:
     def test_retrieve_episodes_with_reference_time(self, graphiti: Graphiti, workspace_id: str):
         """retrieve_episodes with reference_time filter."""
         from datetime import datetime, timezone
+
         episodes = graphiti.retrieve_episodes(
             reference_time=datetime(2020, 1, 1, tzinfo=timezone.utc),
             group_ids=[workspace_id],
@@ -1854,13 +1855,17 @@ class TestAdditionalCoverage:
         assert isinstance(episodes, list)
         assert len(episodes) <= 3
 
-    def test_edges_episodic_get_by_group_ids_with_limit(self, graphiti: Graphiti, workspace_id: str):
+    def test_edges_episodic_get_by_group_ids_with_limit(
+        self, graphiti: Graphiti, workspace_id: str
+    ):
         """edges.episodic.get_by_group_ids with limit."""
         edges = graphiti.edges.episodic.get_by_group_ids([workspace_id], limit=2)
         assert isinstance(edges, list)
         assert len(edges) <= 2
 
-    def test_nodes_community_get_by_group_ids_with_limit(self, graphiti: Graphiti, workspace_id: str):
+    def test_nodes_community_get_by_group_ids_with_limit(
+        self, graphiti: Graphiti, workspace_id: str
+    ):
         """nodes.community.get_by_group_ids with limit."""
         communities = graphiti.nodes.community.get_by_group_ids([workspace_id], limit=1)
         assert isinstance(communities, list)
@@ -1872,19 +1877,25 @@ class TestAdditionalCoverage:
         assert isinstance(sagas, list)
         assert len(sagas) <= 1
 
-    def test_edges_community_get_by_group_ids_with_limit(self, graphiti: Graphiti, workspace_id: str):
+    def test_edges_community_get_by_group_ids_with_limit(
+        self, graphiti: Graphiti, workspace_id: str
+    ):
         """edges.community.get_by_group_ids with limit."""
         edges = graphiti.edges.community.get_by_group_ids([workspace_id], limit=2)
         assert isinstance(edges, list)
         assert len(edges) <= 2
 
-    def test_edges_has_episode_get_by_group_ids_with_limit(self, graphiti: Graphiti, workspace_id: str):
+    def test_edges_has_episode_get_by_group_ids_with_limit(
+        self, graphiti: Graphiti, workspace_id: str
+    ):
         """edges.has_episode.get_by_group_ids with limit."""
         edges = graphiti.edges.has_episode.get_by_group_ids([workspace_id], limit=2)
         assert isinstance(edges, list)
         assert len(edges) <= 2
 
-    def test_edges_next_episode_get_by_group_ids_with_limit(self, graphiti: Graphiti, workspace_id: str):
+    def test_edges_next_episode_get_by_group_ids_with_limit(
+        self, graphiti: Graphiti, workspace_id: str
+    ):
         """edges.next_episode.get_by_group_ids with limit."""
         edges = graphiti.edges.next_episode.get_by_group_ids([workspace_id], limit=2)
         assert isinstance(edges, list)
@@ -1893,7 +1904,7 @@ class TestAdditionalCoverage:
     def test_episodic_node_from_stmem_row(self):
         """EpisodeNodeNamespace._row_to_episode static method."""
         from spacetime_memory.sdks.graphiti import EpisodeNodeNamespace
-        
+
         row = {
             "id": "mem-1",
             "source_session_id": "ep-uuid-1",
@@ -1911,7 +1922,7 @@ class TestAdditionalCoverage:
     def test_episodic_node_from_stmem_no_session_id(self):
         """_row_to_episode falls back to id when no source_session_id."""
         from spacetime_memory.sdks.graphiti import EpisodeNodeNamespace
-        
+
         row = {
             "id": "mem-2",
             "peer_id": "fallback-peer",
@@ -1925,7 +1936,7 @@ class TestAdditionalCoverage:
     def test_community_row_to_community(self):
         """CommunityNodeNamespace._row_to_community static method."""
         from spacetime_memory.sdks.graphiti import CommunityNodeNamespace
-        
+
         row = {
             "id": "comm-1",
             "label": "Test Community",
@@ -1943,7 +1954,7 @@ class TestAdditionalCoverage:
     def test_saga_row_to_saga(self):
         """SagaNodeNamespace._row_to_saga static method."""
         from spacetime_memory.sdks.graphiti import SagaNodeNamespace
-        
+
         row = {
             "id": "saga-1",
             "label": "Test Saga",
@@ -2495,7 +2506,7 @@ class TestGraphitiMockedExtended:
             "summary": "",
             "node_type": "community",
             "created_at": 1700000000000000,
-            "labels": '[]',
+            "labels": "[]",
         }
         mock_client._query.side_effect = [
             [community_row],  # community nodes
@@ -2854,8 +2865,16 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.side_effect = [
-            [{"id": "saga-1", "label": "Saga 1", "workspace_id": "ws-uuid",
-              "summary": "", "labels": "[]", "created_at": 1700000000000000}],
+            [
+                {
+                    "id": "saga-1",
+                    "label": "Saga 1",
+                    "workspace_id": "ws-uuid",
+                    "summary": "",
+                    "labels": "[]",
+                    "created_at": 1700000000000000,
+                }
+            ],
             [],  # second uuid not found
         ]
 
@@ -2873,8 +2892,14 @@ class TestGraphitiMockedExtended:
             {"id": "ws-uuid", "name": "default"},
         ]
         mock_client._query.return_value = [
-            {"id": "saga-ws", "label": "Workspace Saga", "workspace_id": "ws-uuid",
-             "summary": "", "labels": "[]", "created_at": 1700000000000000},
+            {
+                "id": "saga-ws",
+                "label": "Workspace Saga",
+                "workspace_id": "ws-uuid",
+                "summary": "",
+                "labels": "[]",
+                "created_at": 1700000000000000,
+            },
         ]
 
         g = Graphiti(client=mock_client)
@@ -2900,10 +2925,19 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.side_effect = [
-            [{"id": "ep-edge-1", "source_node_id": "n1", "target_node_id": "n2",
-              "workspace_id": "default", "created_at": 1700000000000000,
-              "valid_at": 1700000000000000, "invalid_at": 0,
-              "metadata_json": "{}", "relation": "HAS_EPISODE"}],
+            [
+                {
+                    "id": "ep-edge-1",
+                    "source_node_id": "n1",
+                    "target_node_id": "n2",
+                    "workspace_id": "default",
+                    "created_at": 1700000000000000,
+                    "valid_at": 1700000000000000,
+                    "invalid_at": 0,
+                    "metadata_json": "{}",
+                    "relation": "HAS_EPISODE",
+                }
+            ],
             [],  # second not found
         ]
 
@@ -2918,10 +2952,19 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.side_effect = [
-            [{"id": "comm-edge-1", "source_node_id": "c1", "target_node_id": "n1",
-              "workspace_id": "default", "created_at": 1700000000000000,
-              "valid_at": 1700000000000000, "invalid_at": 0,
-              "metadata_json": "{}", "relation": "MEMBER_OF"}],
+            [
+                {
+                    "id": "comm-edge-1",
+                    "source_node_id": "c1",
+                    "target_node_id": "n1",
+                    "workspace_id": "default",
+                    "created_at": 1700000000000000,
+                    "valid_at": 1700000000000000,
+                    "invalid_at": 0,
+                    "metadata_json": "{}",
+                    "relation": "MEMBER_OF",
+                }
+            ],
         ]
 
         g = Graphiti(client=mock_client)
@@ -2935,10 +2978,19 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.side_effect = [
-            [{"id": "he-edge-1", "source_node_id": "e1", "target_node_id": "e2",
-              "workspace_id": "default", "created_at": 1700000000000000,
-              "valid_at": 1700000000000000, "invalid_at": 0,
-              "metadata_json": "{}", "relation": "HAS_EPISODE"}],
+            [
+                {
+                    "id": "he-edge-1",
+                    "source_node_id": "e1",
+                    "target_node_id": "e2",
+                    "workspace_id": "default",
+                    "created_at": 1700000000000000,
+                    "valid_at": 1700000000000000,
+                    "invalid_at": 0,
+                    "metadata_json": "{}",
+                    "relation": "HAS_EPISODE",
+                }
+            ],
         ]
 
         g = Graphiti(client=mock_client)
@@ -2952,10 +3004,19 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.side_effect = [
-            [{"id": "ne-edge-1", "source_node_id": "ep1", "target_node_id": "ep2",
-              "workspace_id": "default", "created_at": 1700000000000000,
-              "valid_at": 1700000000000000, "invalid_at": 0,
-              "metadata_json": "{}", "relation": "NEXT_EPISODE"}],
+            [
+                {
+                    "id": "ne-edge-1",
+                    "source_node_id": "ep1",
+                    "target_node_id": "ep2",
+                    "workspace_id": "default",
+                    "created_at": 1700000000000000,
+                    "valid_at": 1700000000000000,
+                    "invalid_at": 0,
+                    "metadata_json": "{}",
+                    "relation": "NEXT_EPISODE",
+                }
+            ],
         ]
 
         g = Graphiti(client=mock_client)
@@ -2973,8 +3034,14 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.return_value = [
-            {"id": "comm-found", "label": "FoundComm", "workspace_id": "ws",
-             "summary": "desc", "labels": '["tag"]', "created_at": 1700000000000000},
+            {
+                "id": "comm-found",
+                "label": "FoundComm",
+                "workspace_id": "ws",
+                "summary": "desc",
+                "labels": '["tag"]',
+                "created_at": 1700000000000000,
+            },
         ]
 
         g = Graphiti(client=mock_client)
@@ -2988,8 +3055,14 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.return_value = [
-            {"id": "saga-found", "label": "FoundSaga", "workspace_id": "ws",
-             "summary": "saga desc", "labels": "[]", "created_at": 1700000000000000},
+            {
+                "id": "saga-found",
+                "label": "FoundSaga",
+                "workspace_id": "ws",
+                "summary": "saga desc",
+                "labels": "[]",
+                "created_at": 1700000000000000,
+            },
         ]
 
         g = Graphiti(client=mock_client)
@@ -3003,10 +3076,17 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.return_value = [
-            {"id": "ep-edge-found", "source_node_id": "n1", "target_node_id": "n2",
-             "workspace_id": "default", "created_at": 1700000000000000,
-             "valid_at": 1700000000000000, "invalid_at": 0,
-             "metadata_json": "{}", "relation": "HAS_EPISODE"},
+            {
+                "id": "ep-edge-found",
+                "source_node_id": "n1",
+                "target_node_id": "n2",
+                "workspace_id": "default",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+                "relation": "HAS_EPISODE",
+            },
         ]
 
         g = Graphiti(client=mock_client)
@@ -3019,10 +3099,17 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.return_value = [
-            {"id": "comm-edge-found", "source_node_id": "c1", "target_node_id": "n1",
-             "workspace_id": "default", "created_at": 1700000000000000,
-             "valid_at": 1700000000000000, "invalid_at": 0,
-             "metadata_json": "{}", "relation": "MEMBER_OF"},
+            {
+                "id": "comm-edge-found",
+                "source_node_id": "c1",
+                "target_node_id": "n1",
+                "workspace_id": "default",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+                "relation": "MEMBER_OF",
+            },
         ]
 
         g = Graphiti(client=mock_client)
@@ -3035,10 +3122,17 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.return_value = [
-            {"id": "he-edge-found", "source_node_id": "e1", "target_node_id": "e2",
-             "workspace_id": "default", "created_at": 1700000000000000,
-             "valid_at": 1700000000000000, "invalid_at": 0,
-             "metadata_json": "{}", "relation": "HAS_EPISODE"},
+            {
+                "id": "he-edge-found",
+                "source_node_id": "e1",
+                "target_node_id": "e2",
+                "workspace_id": "default",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+                "relation": "HAS_EPISODE",
+            },
         ]
 
         g = Graphiti(client=mock_client)
@@ -3051,10 +3145,17 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.return_value = [
-            {"id": "ne-edge-found", "source_node_id": "ep1", "target_node_id": "ep2",
-             "workspace_id": "default", "created_at": 1700000000000000,
-             "valid_at": 1700000000000000, "invalid_at": 0,
-             "metadata_json": "{}", "relation": "NEXT_EPISODE"},
+            {
+                "id": "ne-edge-found",
+                "source_node_id": "ep1",
+                "target_node_id": "ep2",
+                "workspace_id": "default",
+                "created_at": 1700000000000000,
+                "valid_at": 1700000000000000,
+                "invalid_at": 0,
+                "metadata_json": "{}",
+                "relation": "NEXT_EPISODE",
+            },
         ]
 
         g = Graphiti(client=mock_client)
@@ -3094,6 +3195,7 @@ class TestGraphitiMockedExtended:
 
         # Patch EntityEdge.from_stmem to add a non-numeric _score
         original_from_stmem = EntityEdge.from_stmem
+
         def from_stmem_with_bad_score(row):
             edge = original_from_stmem(row)
             object.__setattr__(edge, "_score", "not-a-number")
@@ -3151,8 +3253,16 @@ class TestGraphitiMockedExtended:
 
         mock_client = MagicMock()
         mock_client._query.side_effect = [
-            [{"id": "comm-a", "label": "CommA", "workspace_id": "ws",
-              "summary": "", "labels": "[]", "created_at": 1700000000000000}],
+            [
+                {
+                    "id": "comm-a",
+                    "label": "CommA",
+                    "workspace_id": "ws",
+                    "summary": "",
+                    "labels": "[]",
+                    "created_at": 1700000000000000,
+                }
+            ],
             [],  # second not found
         ]
 
@@ -3170,8 +3280,14 @@ class TestGraphitiMockedExtended:
             {"id": "ws-uuid", "name": "default"},
         ]
         mock_client._query.return_value = [
-            {"id": "comm-gid", "label": "GroupComm", "workspace_id": "ws-uuid",
-             "summary": "", "labels": "[]", "created_at": 1700000000000000},
+            {
+                "id": "comm-gid",
+                "label": "GroupComm",
+                "workspace_id": "ws-uuid",
+                "summary": "",
+                "labels": "[]",
+                "created_at": 1700000000000000,
+            },
         ]
 
         g = Graphiti(client=mock_client)

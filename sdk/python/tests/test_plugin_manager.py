@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -177,6 +176,7 @@ class TestCompressionPlugin:
         # `from .aaak import aaak_compress` will raise ImportError when the
         # attribute is missing, exercising the except ImportError: pass path.
         import spacetime_memory.aaak as aaak_mod
+
         original = getattr(aaak_mod, "aaak_compress", None)
         if original is not None:
             del aaak_mod.aaak_compress
@@ -198,6 +198,7 @@ class TestCompressionPlugin:
             # spacetime_memory.aaak. We'll just mock the import
             # to raise ImportError.
             import builtins
+
             real_import = builtins.__import__
 
             def mock_import(name, *args, **kwargs):
@@ -402,7 +403,7 @@ class TestPluginManagerDispatchStore:
         """A plugin that raises an exception does not block others."""
         pm = PluginManager()
         pm.register(FaultyPlugin())  # raises RuntimeError
-        pm.register(EchoPlugin())    # should still run
+        pm.register(EchoPlugin())  # should still run
         content, meta = pm.dispatch_store("data", {"k": "v"})
         assert content == "[echo] data"
         assert meta == {"k": "v"}
@@ -566,13 +567,16 @@ class TestPluginManagerFullLifecycle:
         class CountingPlugin(BasePlugin):
             name = "counter"
             version = "1.0"
+
             def __init__(self):
                 super().__init__()
                 self.count = 0
+
             def on_store(self, content, metadata):
                 self.count += 1
                 metadata["count"] = self.count
                 return content, metadata
+
             def on_consolidate(self, workspace_id, stats):
                 self.count += 1
                 stats["counter_runs"] = True
@@ -596,7 +600,7 @@ class TestPluginManagerFullLifecycle:
         """Filter truncates first, then compression plugin runs."""
         pm = PluginManager()
         pm.register(FilterPlugin(max_length=501))  # longer than compression threshold
-        pm.register(CompressionPlugin())           # compresses > 500 chars
+        pm.register(CompressionPlugin())  # compresses > 500 chars
 
         long_content = "x" * 600
         with patch(
@@ -620,14 +624,19 @@ class TestPluginManagerEdgeCases:
         class FakePlugin:
             name = "fake"
             version = "0.0"
+
             def on_store(self, content, metadata):
                 return f"fake:{content}", metadata
+
             def on_search(self, query, results):
                 return query, results
+
             def on_consolidate(self, workspace_id, stats):
                 return stats
+
             def on_export(self, data):
                 return data
+
             def on_import(self, data):
                 return data
 

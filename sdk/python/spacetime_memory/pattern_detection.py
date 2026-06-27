@@ -10,15 +10,14 @@ and co-mention graph construction.
 Integrated via Client.detect_patterns(workspace_id).
 """
 
-import math
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
 from typing import Any
 
 
 def _tokenize(text: str, min_len: int = 3) -> list[str]:
     """Tokenize and filter text to meaningful terms."""
     import re
+
     tokens = re.findall(r"[a-zA-Z0-9_]+", text.lower())
     return [t for t in tokens if len(t) >= min_len]
 
@@ -56,13 +55,15 @@ def detect_temporal_clusters(
     for bucket_key, items in buckets.items():
         if len(items) >= min_cluster_size:
             start = bucket_key * bucket_secs
-            clusters.append({
-                "start_time": start,
-                "end_time": start + bucket_secs,
-                "count": len(items),
-                "ids": [m.get("id", "") for m in items],
-                "summary_terms": _extract_common_terms(items, top_n=5),
-            })
+            clusters.append(
+                {
+                    "start_time": start,
+                    "end_time": start + bucket_secs,
+                    "count": len(items),
+                    "ids": [m.get("id", "") for m in items],
+                    "summary_terms": _extract_common_terms(items, top_n=5),
+                }
+            )
 
     clusters.sort(key=lambda c: c["start_time"], reverse=True)
     return clusters
@@ -140,12 +141,14 @@ def detect_co_occurrences(
     for (a, b), count in co_occur.most_common(top_n):
         # Strength = co-occurrence count / total docs (Jaccard-like)
         strength = count / total_docs if total_docs > 0 else 0.0
-        pairs.append({
-            "term_a": a,
-            "term_b": b,
-            "count": count,
-            "strength": round(strength, 3),
-        })
+        pairs.append(
+            {
+                "term_a": a,
+                "term_b": b,
+                "count": count,
+                "strength": round(strength, 3),
+            }
+        )
 
     return pairs
 

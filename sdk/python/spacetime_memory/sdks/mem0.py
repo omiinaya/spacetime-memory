@@ -95,6 +95,7 @@ class _GraphStore:
 
         Uses proper JSON parsing to avoid fragility of string-based matching.
         """
+
         def _has_tag(row: dict[str, Any], tag: str) -> bool:
             # Try metadata_json first (kg_node format)
             meta = row.get("metadata_json", "")
@@ -183,10 +184,7 @@ class _GraphStore:
                 limit=5,
                 semantic=True,
             )
-            node_rows = [
-                r for r in semantic_rows
-                if r.get("entity_type") == "node"
-            ]
+            node_rows = [r for r in semantic_rows if r.get("entity_type") == "node"]
             for r in node_rows:
                 score = r.get("score", 0.0)
                 if score < 0.85:
@@ -196,7 +194,8 @@ class _GraphStore:
                     continue
                 # Found a close match — resolve existing entity and add alias
                 rows = self._memory._client._query(
-                    "kg_node", filter_dict={"id": nid},
+                    "kg_node",
+                    filter_dict={"id": nid},
                 )
                 if not rows:
                     continue
@@ -205,7 +204,8 @@ class _GraphStore:
                 # Look up entity_link ID for this node
                 try:
                     el_rows = self._memory._client._query(
-                        "entity_link", workspace_id=ws_id,
+                        "entity_link",
+                        workspace_id=ws_id,
                         filter_dict={"entity_name": existing_name},
                     )
                     if el_rows:
@@ -215,7 +215,9 @@ class _GraphStore:
                     pass  # alias already exists or entity_link not available
                 logger.debug(
                     "graph.add: merged '%s' into existing '%s' (cos=%.3f)",
-                    cleaned, existing_name, score,
+                    cleaned,
+                    existing_name,
+                    score,
                 )
                 return {
                     "id": nid,
@@ -250,16 +252,15 @@ class _GraphStore:
                 description=json.dumps(meta),
             )
             rows = self._memory._client._query(
-                "entity_link", workspace_id=ws_id,
+                "entity_link",
+                workspace_id=ws_id,
                 filter_dict={"entity_name": text},
             )
             if rows:
                 return self._entity_link_to_dict(rows[0], tag)
             return {"status": "ok", "id": ""}
         except RuntimeError:
-            logger.debug(
-                "entity_link unavailable for graph.add, falling back to kg_node"
-            )
+            logger.debug("entity_link unavailable for graph.add, falling back to kg_node")
 
         result = self._call(
             "create_node",
@@ -304,10 +305,7 @@ class _GraphStore:
                 semantic=True,
             )
             # Filter to node-type results only
-            node_rows = [
-                r for r in semantic_rows
-                if r.get("entity_type") == "node"
-            ]
+            node_rows = [r for r in semantic_rows if r.get("entity_type") == "node"]
             if node_rows:
                 results = []
                 for r in node_rows[:limit]:
@@ -315,20 +313,23 @@ class _GraphStore:
                     if not nid:
                         continue
                     rows = self._memory._client._query(
-                        "kg_node", filter_dict={"id": nid},
+                        "kg_node",
+                        filter_dict={"id": nid},
                     )
                     if rows:
                         n = rows[0]
-                        results.append({
-                            "id": n.get("id", ""),
-                            "label": n.get("label", ""),
-                            "node_type": n.get("node_type", "entity"),
-                            "entity_type": n.get("node_type", "entity"),
-                            "summary": n.get("summary", ""),
-                            "metadata_json": n.get("metadata_json", "{}"),
-                            "created_at": n.get("created_at", 0),
-                            "score": r.get("score", 0.0),
-                        })
+                        results.append(
+                            {
+                                "id": n.get("id", ""),
+                                "label": n.get("label", ""),
+                                "node_type": n.get("node_type", "entity"),
+                                "entity_type": n.get("node_type", "entity"),
+                                "summary": n.get("summary", ""),
+                                "metadata_json": n.get("metadata_json", "{}"),
+                                "created_at": n.get("created_at", 0),
+                                "score": r.get("score", 0.0),
+                            }
+                        )
                 if results:
                     return self._tag_filter(results, tag)[:limit]
         except RuntimeError:
@@ -350,36 +351,42 @@ class _GraphStore:
                         continue
                     if etype == "node":
                         rows = self._memory._client._query(
-                            "kg_node", filter_dict={"id": nid},
+                            "kg_node",
+                            filter_dict={"id": nid},
                         )
                         if rows:
                             n = rows[0]
-                            results.append({
-                                "id": n.get("id", ""),
-                                "label": n.get("label", ""),
-                                "node_type": n.get("node_type", "entity"),
-                                "entity_type": n.get("node_type", "entity"),
-                                "summary": n.get("summary", ""),
-                                "metadata_json": n.get("metadata_json", "{}"),
-                                "created_at": n.get("created_at", 0),
-                                "score": th.get("score", 0.0),
-                            })
+                            results.append(
+                                {
+                                    "id": n.get("id", ""),
+                                    "label": n.get("label", ""),
+                                    "node_type": n.get("node_type", "entity"),
+                                    "entity_type": n.get("node_type", "entity"),
+                                    "summary": n.get("summary", ""),
+                                    "metadata_json": n.get("metadata_json", "{}"),
+                                    "created_at": n.get("created_at", 0),
+                                    "score": th.get("score", 0.0),
+                                }
+                            )
                     elif etype == "memory":
                         rows = self._memory._client._query(
-                            "memory", filter_dict={"id": nid},
+                            "memory",
+                            filter_dict={"id": nid},
                         )
                         if rows:
                             m = rows[0]
-                            results.append({
-                                "id": m.get("id", ""),
-                                "label": m.get("content", "")[:80],
-                                "node_type": "memory",
-                                "entity_type": "memory",
-                                "summary": m.get("summary", ""),
-                                "metadata_json": "{}",
-                                "created_at": m.get("created_at", 0),
-                                "score": th.get("score", 0.0),
-                            })
+                            results.append(
+                                {
+                                    "id": m.get("id", ""),
+                                    "label": m.get("content", "")[:80],
+                                    "node_type": "memory",
+                                    "entity_type": "memory",
+                                    "summary": m.get("summary", ""),
+                                    "metadata_json": "{}",
+                                    "created_at": m.get("created_at", 0),
+                                    "score": th.get("score", 0.0),
+                                }
+                            )
                 if results:
                     return self._tag_filter(results, tag)[:limit]
         except RuntimeError:
@@ -395,19 +402,11 @@ class _GraphStore:
 
             rows = self._memory._client._query("entity_link", workspace_id=ws_id)
             q = query.lower()
-            matched = [
-                r for r in rows
-                if q in r.get("entity_name", "").lower()
-            ]
+            matched = [r for r in rows if q in r.get("entity_name", "").lower()]
             filtered = self._tag_filter(matched, tag)
-            return [
-                self._entity_link_to_dict(r, tag)
-                for r in filtered[:limit]
-            ]
+            return [self._entity_link_to_dict(r, tag) for r in filtered[:limit]]
         except RuntimeError:
-            logger.debug(
-                "entity_link unavailable for graph.search, falling back to kg_node"
-            )
+            logger.debug("entity_link unavailable for graph.search, falling back to kg_node")
 
         rows = self._call("query_graph", workspace_id=ws_id, query=query)
         filtered = self._tag_filter(rows, tag)
@@ -437,15 +436,10 @@ class _GraphStore:
         try:
             rows = self._memory._client._query("entity_link", workspace_id=ws_id)
             filtered = self._tag_filter(rows, tag)
-            return [
-                self._entity_link_to_dict(r, tag)
-                for r in filtered[:limit]
-            ]
+            return [self._entity_link_to_dict(r, tag) for r in filtered[:limit]]
         except RuntimeError:
             # Graceful fallback to kg_node
-            logger.debug(
-                "entity_link unavailable for graph.get_all, falling back to kg_node"
-            )
+            logger.debug("entity_link unavailable for graph.get_all, falling back to kg_node")
 
         rows = self._call("query_graph", workspace_id=ws_id, query="")
         filtered = self._tag_filter(rows, tag)
@@ -631,14 +625,18 @@ class Memory:
             return result
         except RuntimeError as exc:
             msg = str(exc).lower()
-            if self._token_refresh_callback and ("unauthorized" in msg or "authentication" in msg or "401" in msg):
+            if self._token_refresh_callback and (
+                "unauthorized" in msg or "authentication" in msg or "401" in msg
+            ):
                 self._token_refresh_callback()
                 # Retry once after refresh
                 result = getattr(self._client, method)(*args, **kwargs)
                 return result
             raise
 
-    def _extract_ids_from_filters(self, filters: dict[str, Any] | None) -> tuple[str | None, str | None, str | None]:
+    def _extract_ids_from_filters(
+        self, filters: dict[str, Any] | None
+    ) -> tuple[str | None, str | None, str | None]:
         """Extract user_id, agent_id, run_id from a Mem0 v2 filters dict."""
         if not filters:
             return None, None, None
@@ -726,8 +724,7 @@ class Memory:
         """
         # Format conversation for LLM extraction
         conversation = "\n".join(
-            f"{m.get('role', 'user')}: {m.get('content', '')}"
-            for m in messages if m.get('content')
+            f"{m.get('role', 'user')}: {m.get('content', '')}" for m in messages if m.get("content")
         )
 
         # Try LLM memory extraction from conversation (real Mem0 behavior)
@@ -745,17 +742,18 @@ class Memory:
             all_results = []
             for fact in extracted_memories:
                 r = self.add(
-                    fact, user_id=user_id, agent_id=agent_id,
-                    run_id=run_id, infer=False,
+                    fact,
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    run_id=run_id,
+                    infer=False,
                 )
                 all_results.extend(r.get("results", []))
             raise _InferMergeDone({"results": all_results, "relation_events": []})
 
         # Fallback: concatenate
         if infer:
-            content = " ".join(
-                m.get("content", "") for m in messages if m.get("content")
-            )
+            content = " ".join(m.get("content", "") for m in messages if m.get("content"))
             summary = ""
         else:
             content = conversation
@@ -773,10 +771,7 @@ class Memory:
         Returns the merge result dict if a close match was found, None otherwise.
         """
         search_result = self.search(query=content, user_id=user_id, limit=5)
-        close_matches = [
-            r for r in search_result.get("results", [])
-            if r.get("score", 0) > 0.85
-        ]
+        close_matches = [r for r in search_result.get("results", []) if r.get("score", 0) > 0.85]
         if not close_matches:
             return None
 
@@ -793,19 +788,22 @@ class Memory:
                 if facts:
                     self._store_facts_as_kg_nodes(facts, user_id, agent_id)
                     self._call(
-                        "update_memory", mem_id,
+                        "update_memory",
+                        mem_id,
                         json.dumps({"extracted_facts": facts}),
                     )
         except RuntimeError as exc:
             logger.warning("Failed to update memory with KG facts: %s", exc)
         return {
-            "results": [{
-                "id": mem_id,
-                "memory": merged,
-                "event": "UPDATE",
-                "user_id": user_id or "",
-                "agent_id": agent_id or "",
-            }],
+            "results": [
+                {
+                    "id": mem_id,
+                    "memory": merged,
+                    "event": "UPDATE",
+                    "user_id": user_id or "",
+                    "agent_id": agent_id or "",
+                }
+            ],
             "relation_events": [],
         }
 
@@ -871,7 +869,11 @@ class Memory:
         try:
             if isinstance(messages, list):
                 content, summary = self._handle_message_list(
-                    messages, user_id, agent_id, run_id, infer,
+                    messages,
+                    user_id,
+                    agent_id,
+                    run_id,
+                    infer,
                 )
             else:
                 content = str(messages)
@@ -926,7 +928,8 @@ class Memory:
                         except RuntimeError as exc:
                             logger.warning(
                                 "mem0.add: set_memory_scope failed for %s: %s",
-                                mem_id, exc,
+                                mem_id,
+                                exc,
                             )
 
             # Return Mem0-compatible shape — search for the stored memory
@@ -1093,14 +1096,16 @@ class Memory:
                 if graph_entities:
                     meta["graph_context"] = graph_entities
 
-                results.append({
-                    "id": mem_id,
-                    "memory": r.get("memory_content", r.get("content", "")),
-                    "score": score,
-                    "user_id": user_id or "",
-                    "agent_id": agent_id or "",
-                    "metadata": meta,
-                })
+                results.append(
+                    {
+                        "id": mem_id,
+                        "memory": r.get("memory_content", r.get("content", "")),
+                        "score": score,
+                        "user_id": user_id or "",
+                        "agent_id": agent_id or "",
+                        "metadata": meta,
+                    }
+                )
             return {"results": results}
         except RuntimeError:
             raise
@@ -1161,10 +1166,9 @@ class Memory:
                 ws_id = self._ws(user_id)
                 # List all memories in workspace, then filter by user_scope
                 all_mems = self._call("list_memories", workspace_id=ws_id, limit=1000)
-                rows = [
-                    r for r in all_mems
-                    if r.get("user_scope", "") in ("", user_id)
-                ][:effective_limit]
+                rows = [r for r in all_mems if r.get("user_scope", "") in ("", user_id)][
+                    :effective_limit
+                ]
             else:
                 ws_id = self._ws(None)
                 rows = self._call("list_memories", workspace_id=ws_id, limit=effective_limit)
@@ -1218,9 +1222,7 @@ class Memory:
                 content = data.get("content", data.get("memory", str(data)))
             else:
                 content = str(data)
-            self._call(
-                "update_memory", memory_id, content=content, summary=content[:200]
-            )
+            self._call("update_memory", memory_id, content=content, summary=content[:200])
             return {"message": "Memory updated successfully!"}
         except RuntimeError:
             raise
@@ -1425,8 +1427,7 @@ class Memory:
             limit=10,
         )
         context_texts = [
-            r.get("memory", "") for r in search_results.get("results", [])
-            if r.get("memory")
+            r.get("memory", "") for r in search_results.get("results", []) if r.get("memory")
         ]
 
         # 3. Build the prompt
@@ -1438,34 +1439,30 @@ class Memory:
 
         context_block = ""
         if context_texts:
-            context_block = "\nRelevant memories:\n" + "\n".join(
-                f"- {t}" for t in context_texts
-            )
+            context_block = "\nRelevant memories:\n" + "\n".join(f"- {t}" for t in context_texts)
 
         history_block = ""
         if messages:
             history_block = "\nConversation history:\n" + "\n".join(
-                f"{m.get('role', 'user')}: {m.get('content', '')}"
-                for m in messages
+                f"{m.get('role', 'user')}: {m.get('content', '')}" for m in messages
             )
 
-        user_prompt = (
-            f"{context_block}"
-            f"{history_block}"
-            f"\nUser: {query}\nAssistant:"
-        )
+        user_prompt = f"{context_block}{history_block}\nUser: {query}\nAssistant:"
 
         # 4. Generate response via LLM
         llm = _resolve_llm(llm_config)
         response_text = query  # fallback
         if llm and llm.available:
             try:
-                response_text = llm.chat(
-                    [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                ) or query
+                response_text = (
+                    llm.chat(
+                        [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                    )
+                    or query
+                )
             except RuntimeError as exc:
                 logger.warning("mem0.chat() LLM call failed: %s", exc)
                 response_text = query
@@ -1509,5 +1506,5 @@ class Memory:
         return {
             "status": "not_implemented",
             "note": "create_memory_tool was removed from Mem0 v2.0. "
-                    "Use chat() for RAG or search()+add() directly.",
+            "Use chat() for RAG or search()+add() directly.",
         }

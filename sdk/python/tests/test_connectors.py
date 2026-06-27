@@ -17,6 +17,7 @@ from unittest.mock import Mock, patch, MagicMock
 # from persistent cursor state stored in ~/.spacetime-memory/connectors/
 import os as _os
 import shutil as _shutil
+
 _conn_cursor_dir = _os.path.expanduser("~/.spacetime-memory/connectors")
 if _os.path.exists(_conn_cursor_dir):
     _shutil.rmtree(_conn_cursor_dir, ignore_errors=True)
@@ -43,6 +44,7 @@ class TestConnectorBase:
 
     def test_concrete_subclass_must_implement_poll(self):
         """A subclass without poll() is still abstract."""
+
         class BadConnector(Connector):
             pass
 
@@ -51,6 +53,7 @@ class TestConnectorBase:
 
     def test_concrete_subclass_can_be_instantiated(self):
         """A subclass that implements poll() can be instantiated."""
+
         class GoodConnector(Connector):
             def poll(self):
                 return []
@@ -460,10 +463,12 @@ class TestWebhookConnector:
             workspace_id="ws-1",
         )
 
-        events = connector.handle({
-            "content": "Hello from webhook",
-            "summary": "Greeting",
-        })
+        events = connector.handle(
+            {
+                "content": "Hello from webhook",
+                "summary": "Greeting",
+            }
+        )
 
         assert len(events) == 1
         assert events[0].content == "Hello from webhook"
@@ -501,7 +506,7 @@ class TestWebhookConnector:
             workspace_id="ws-1",
             secret="my-secret",
         )
-        import hmac, json
+        import hmac
 
         body = {"content": "verified"}
         body_bytes = json.dumps(body, separators=(",", ":"), sort_keys=True).encode()

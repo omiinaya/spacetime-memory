@@ -21,7 +21,6 @@ Usage::
 
 from __future__ import annotations
 
-import struct
 from typing import List, Sequence
 
 
@@ -42,10 +41,7 @@ def binarize(embedding: Sequence[float]) -> bytes:
     """
     dim = len(embedding)
     if dim % 8 != 0:
-        raise ValueError(
-            f"Embedding dimension {dim} must be divisible by 8 "
-            f"for byte-packing"
-        )
+        raise ValueError(f"Embedding dimension {dim} must be divisible by 8 for byte-packing")
 
     num_bytes = dim // 8
     result = bytearray(num_bytes)
@@ -55,7 +51,7 @@ def binarize(embedding: Sequence[float]) -> bytes:
         base = byte_idx * 8
         for bit in range(8):
             if embedding[base + bit] > 0.0:
-                byte_val |= (1 << (7 - bit))  # MSB first
+                byte_val |= 1 << (7 - bit)  # MSB first
         result[byte_idx] = byte_val
 
     return bytes(result)
@@ -119,9 +115,7 @@ def hamming_distance(a: bytes, b: bytes) -> int:
         Number of differing bits (0 = identical, dim = completely dissimilar).
     """
     if len(a) != len(b):
-        raise ValueError(
-            f"Binary vectors must be equal length: {len(a)} vs {len(b)}"
-        )
+        raise ValueError(f"Binary vectors must be equal length: {len(a)} vs {len(b)}")
 
     dist = 0
     for byte_a, byte_b in zip(a, b):
@@ -188,9 +182,7 @@ def binarize_batch(embeddings: List[Sequence[float]]) -> List[bytes]:
     return [binarize(emb) for emb in embeddings]
 
 
-def similarity_matrix(
-    query: bytes, candidates: List[bytes]
-) -> List[float]:
+def similarity_matrix(query: bytes, candidates: List[bytes]) -> List[float]:
     """Compute Hamming similarity between a query and multiple candidates.
 
     Args:

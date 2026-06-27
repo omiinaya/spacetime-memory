@@ -1,12 +1,9 @@
 """
 Unit tests for spacetime_memory.streaming — EventBus and MemoryEvent.
 """
+
 from __future__ import annotations
 
-import time
-from unittest.mock import patch
-
-import pytest
 
 from spacetime_memory.streaming import (
     MemoryEvent,

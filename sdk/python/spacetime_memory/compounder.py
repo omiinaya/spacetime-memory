@@ -126,8 +126,12 @@ class Compounder:
         semantic_node_ids: set[str] = set()
         if semantic_query:
             search_results = self._client.search(
-                workspace_id, semantic_query, limit=limit,
-                semantic=True, memory_type="", tier="",
+                workspace_id,
+                semantic_query,
+                limit=limit,
+                semantic=True,
+                memory_type="",
+                tier="",
             )
             for r in search_results:
                 if r.get("entity_type") == "node":
@@ -139,7 +143,9 @@ class Compounder:
         semantic_results: list[dict[str, Any]] = []
         if semantic_node_ids:
             all_nodes = self._client._query(
-                "kg_node", workspace_id=workspace_id, filter_dict={},
+                "kg_node",
+                workspace_id=workspace_id,
+                filter_dict={},
             )
             node_map = {n.get("id", ""): n for n in all_nodes}
             for nid in semantic_node_ids:
@@ -203,10 +209,7 @@ class Compounder:
             memory_type="",
             tier="",
         )
-        duplicates = [
-            r for r in results
-            if r.get("score", 0.0) >= threshold
-        ]
+        duplicates = [r for r in results if r.get("score", 0.0) >= threshold]
         return duplicates
 
     # ------------------------------------------------------------------
@@ -261,14 +264,15 @@ class Compounder:
         # ── Near-duplicate detection ──
         if skip_duplicates:
             dupes = self.find_near_duplicates(
-                answer, workspace_id=workspace_id,
-                threshold=duplicate_threshold, limit=3,
+                answer,
+                workspace_id=workspace_id,
+                threshold=duplicate_threshold,
+                limit=3,
             )
             if dupes:
                 best = dupes[0]
                 logger.info(
-                    "Skipping store_answer — near-duplicate found "
-                    "(score=%.3f): %s",
+                    "Skipping store_answer — near-duplicate found (score=%.3f): %s",
                     best.get("score", 0.0),
                     str(best.get("content", ""))[:80],
                 )
@@ -331,10 +335,16 @@ class Compounder:
             for mid in source_memory_ids:
                 try:
                     self._client._call(
-                        "create_edge", [
-                            workspace_id, note_id, mid,
-                            "informed_by", 1.0, "INFERRED",
-                            "{}", "",
+                        "create_edge",
+                        [
+                            workspace_id,
+                            note_id,
+                            mid,
+                            "informed_by",
+                            1.0,
+                            "INFERRED",
+                            "{}",
+                            "",
                         ],
                     )
                     result["links"].append(mid)
@@ -349,20 +359,25 @@ class Compounder:
         if entities:
             for ent in entities:
                 self._ripple_update_entity(
-                    workspace_id, ent.get("name", ""),
-                    answer, note.get("id", ""),
+                    workspace_id,
+                    ent.get("name", ""),
+                    answer,
+                    note.get("id", ""),
                 )
 
         # 6. Log the activity
         self._log_activity(
-            workspace_id, "store_answer",
+            workspace_id,
+            "store_answer",
             f"'{generated_title}' ({len(result['entities'])} entities, "
             f"{len(result['links'])} links)",
         )
 
         logger.info(
             "Stored answer note '%s' (%d entities, %d links)",
-            generated_title, len(result["entities"]), len(result["links"]),
+            generated_title,
+            len(result["entities"]),
+            len(result["links"]),
         )
         return result
 
@@ -420,21 +435,19 @@ class Compounder:
                 results.append({"note": {}, "entities": [], "links": []})
 
         # Single consolidated log entry for the batch
-        total_entities = sum(
-            len(r.get("entities", [])) for r in results
-        )
-        total_links = sum(
-            len(r.get("links", [])) for r in results
-        )
+        total_entities = sum(len(r.get("entities", [])) for r in results)
+        total_links = sum(len(r.get("links", [])) for r in results)
         self._log_activity(
-            workspace_id, "store_answers",
-            f"Batch of {len(qa_pairs)} answers "
-            f"({total_entities} entities, {total_links} links)",
+            workspace_id,
+            "store_answers",
+            f"Batch of {len(qa_pairs)} answers ({total_entities} entities, {total_links} links)",
         )
 
         logger.info(
             "Stored batch of %d answers (%d entities, %d links)",
-            len(qa_pairs), total_entities, total_links,
+            len(qa_pairs),
+            total_entities,
+            total_links,
         )
         return results
 
@@ -471,9 +484,7 @@ class Compounder:
         if not memories:
             return {"links_created": 0, "pairs_checked": 0}
 
-        memories = sorted(
-            memories, key=lambda r: r.get("created_at", 0), reverse=True
-        )[:limit]
+        memories = sorted(memories, key=lambda r: r.get("created_at", 0), reverse=True)[:limit]
 
         links_created = 0
         pairs_checked = 0
@@ -488,8 +499,12 @@ class Compounder:
 
             # Find semantically similar memories
             similar = self._client.search(
-                workspace_id, content, limit=5, semantic=True,
-                memory_type="", tier="",
+                workspace_id,
+                content,
+                limit=5,
+                semantic=True,
+                memory_type="",
+                tier="",
             )
             for match in similar:
                 match_id = match.get("entity_id", "")
@@ -505,10 +520,16 @@ class Compounder:
                 if score >= similarity_threshold:
                     try:
                         self._client._call(
-                            "create_edge", [
-                                workspace_id, mid, match_id,
-                                "related_to", score, "INFERRED",
-                                "{}", "",
+                            "create_edge",
+                            [
+                                workspace_id,
+                                mid,
+                                match_id,
+                                "related_to",
+                                score,
+                                "INFERRED",
+                                "{}",
+                                "",
                             ],
                         )
                         links_created += 1
@@ -583,14 +604,16 @@ class Compounder:
                 if len(common) >= 1:  # Shared context suggests a link
                     s1 = self._node_label(n1, nodes)
                     s2 = self._node_label(n2, nodes)
-                    suggestions.append({
-                        "source_id": n1,
-                        "target_id": n2,
-                        "source_label": s1,
-                        "target_label": s2,
-                        "common_neighbours": list(common)[:5],
-                        "common_count": len(common),
-                    })
+                    suggestions.append(
+                        {
+                            "source_id": n1,
+                            "target_id": n2,
+                            "source_label": s1,
+                            "target_label": s2,
+                            "common_neighbours": list(common)[:5],
+                            "common_count": len(common),
+                        }
+                    )
 
         suggestions.sort(key=lambda s: s["common_count"], reverse=True)
         return suggestions
@@ -629,11 +652,11 @@ class Compounder:
                     return matches[0]
                 # Fallback: scan recent notes
                 all_notes = self._client._query(
-                    "note", workspace_id=workspace_id, filter_dict={},
+                    "note",
+                    workspace_id=workspace_id,
+                    filter_dict={},
                 )
-                for n in sorted(
-                    all_notes, key=lambda r: r.get("created_at", 0), reverse=True
-                ):
+                for n in sorted(all_notes, key=lambda r: r.get("created_at", 0), reverse=True):
                     if n.get("title", "") == title:
                         return n
             except RuntimeError:
@@ -797,14 +820,21 @@ class Compounder:
         new_summary = self._llm.summarize(prompt)
         if new_summary and new_summary != existing_summary:
             try:
-                self._client._call("update_node", [
-                    node_id, entity_name,
-                    node.get("node_type", "concept"),
-                    new_summary, "{}", source_note_id,
-                ])
+                self._client._call(
+                    "update_node",
+                    [
+                        node_id,
+                        entity_name,
+                        node.get("node_type", "concept"),
+                        new_summary,
+                        "{}",
+                        source_note_id,
+                    ],
+                )
                 logger.info(
                     "Ripple-updated node '%s' (%s) with new summary",
-                    entity_name, node_id[:12],
+                    entity_name,
+                    node_id[:12],
                 )
             except RuntimeError:
                 pass
@@ -914,24 +944,28 @@ class Compounder:
         # ── Missing cross-references ──
         if check_missing_crossrefs:
             result["missing_crossrefs"] = self._find_missing_crossrefs(
-                workspace_id, limit,
+                workspace_id,
+                limit,
             )
 
         # ── Note orphan detection ──
         if check_note_orphans:
             result["note_orphans"] = self._find_note_orphans(
-                workspace_id, limit,
+                workspace_id,
+                limit,
             )
 
         # ── Contradiction detection ──
         if check_contradictions:
             result["contradictions"] = self._find_contradictions(
-                workspace_id, limit,
+                workspace_id,
+                limit,
             )
             # Auto-create notes for any contradictions found
             if result["contradictions"]:
                 self._create_contradiction_notes(
-                    workspace_id, result["contradictions"],
+                    workspace_id,
+                    result["contradictions"],
                 )
 
         result["summary"] = {
@@ -948,7 +982,8 @@ class Compounder:
         }
 
         self._log_activity(
-            workspace_id, "lint",
+            workspace_id,
+            "lint",
             f"{result['summary']['total_issues']} issues found "
             f"({result['summary']['orphan_count']} orphans, "
             f"{result['summary']['missing_crossref_count']} missing crossrefs, "
@@ -960,10 +995,14 @@ class Compounder:
     def _find_orphan_nodes(self, workspace_id: str) -> list[dict[str, Any]]:
         """Find KG nodes with no edges to any other node."""
         nodes = self._client._query(
-            "kg_node", workspace_id=workspace_id, filter_dict={},
+            "kg_node",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
         edges = self._client._query(
-            "kg_edge", workspace_id=workspace_id, filter_dict={},
+            "kg_edge",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
         connected: set[str] = set()
         for e in edges:
@@ -978,27 +1017,34 @@ class Compounder:
         for n in nodes:
             nid = n.get("id", "")
             if nid and nid not in connected:
-                orphans.append({
-                    "id": nid,
-                    "label": n.get("label", nid[:12]),
-                    "node_type": n.get("node_type", "unknown"),
-                })
+                orphans.append(
+                    {
+                        "id": nid,
+                        "label": n.get("label", nid[:12]),
+                        "node_type": n.get("node_type", "unknown"),
+                    }
+                )
         return orphans
 
     def _find_missing_crossrefs(
-        self, workspace_id: str, limit: int = 100,
+        self,
+        workspace_id: str,
+        limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Find notes/memories whose content mentions a KG node label
         but has no edge to that node."""
         # Get all KG nodes and their labels
         nodes = self._client._query(
-            "kg_node", workspace_id=workspace_id, filter_dict={},
+            "kg_node",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
         # Get all edges to know what's already connected
         edges = self._client._query(
-            "kg_edge", workspace_id=workspace_id, filter_dict={},
+            "kg_edge",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
-        linked_labels: set[str] = set()
         # Also track which memory IDs are linked to which nodes
         mem_to_node: dict[str, set[str]] = {}
         for e in edges:
@@ -1022,10 +1068,14 @@ class Compounder:
         # Scan memories and notes
         missing: list[dict[str, Any]] = []
         memories = self._client._query(
-            "memory", workspace_id=workspace_id, filter_dict={},
+            "memory",
+            workspace_id=workspace_id,
+            filter_dict={},
         )[:limit]
         notes = self._client._query(
-            "note", workspace_id=workspace_id, filter_dict={},
+            "note",
+            workspace_id=workspace_id,
+            filter_dict={},
         )[:limit]
 
         for mem in memories:
@@ -1037,12 +1087,14 @@ class Compounder:
                 if label_lower in content:
                     # Check if already linked
                     if node_id not in mem_to_node.get(mid, set()):
-                        missing.append({
-                            "entity_id": mid,
-                            "entity_type": "memory",
-                            "mentioned_label": label_lower,
-                            "target_node_id": node_id,
-                        })
+                        missing.append(
+                            {
+                                "entity_id": mid,
+                                "entity_type": "memory",
+                                "mentioned_label": label_lower,
+                                "target_node_id": node_id,
+                            }
+                        )
 
         for note in notes:
             content = (note.get("content", "") or "").lower()
@@ -1052,17 +1104,21 @@ class Compounder:
             for label_lower, node_id in label_map.items():
                 if label_lower in content:
                     if node_id not in mem_to_node.get(nid, set()):
-                        missing.append({
-                            "entity_id": nid,
-                            "entity_type": "note",
-                            "mentioned_label": label_lower,
-                            "target_node_id": node_id,
-                        })
+                        missing.append(
+                            {
+                                "entity_id": nid,
+                                "entity_type": "note",
+                                "mentioned_label": label_lower,
+                                "target_node_id": node_id,
+                            }
+                        )
 
         return missing
 
     def _find_note_orphans(
-        self, workspace_id: str, limit: int = 100,
+        self,
+        workspace_id: str,
+        limit: int = 100,
     ) -> list[dict[str, Any]]:
         """Find notes entirely disconnected from the knowledge graph.
 
@@ -1074,14 +1130,18 @@ class Compounder:
             List of note dicts with ``id``, ``title``, ``reason``.
         """
         notes = self._client._query(
-            "note", workspace_id=workspace_id, filter_dict={},
+            "note",
+            workspace_id=workspace_id,
+            filter_dict={},
         )[:limit]
         if not notes:
             return []
 
         # Get KG node labels for content-matching
         nodes = self._client._query(
-            "kg_node", workspace_id=workspace_id, filter_dict={},
+            "kg_node",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
         label_map: dict[str, str] = {}
         for n in nodes:
@@ -1091,7 +1151,9 @@ class Compounder:
 
         # Get all edges to check which IDs are connected
         edges = self._client._query(
-            "kg_edge", workspace_id=workspace_id, filter_dict={},
+            "kg_edge",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
         connected_ids: set[str] = set()
         for e in edges:
@@ -1114,23 +1176,25 @@ class Compounder:
             content = (note.get("content", "") or "").lower()
             title = (note.get("title", "") or "").lower()
             combined = f"{title} {content}"
-            mentions_entity = any(
-                label in combined for label in label_map
-            )
+            mentions_entity = any(label in combined for label in label_map)
             if mentions_entity:
                 continue
             # Note is disconnected from KG
-            orphans.append({
-                "id": note_id,
-                "title": note.get("title", "untitled"),
-                "reason": "Note content and title mention no KG entities, "
-                          "and note has no edges to the KG.",
-            })
+            orphans.append(
+                {
+                    "id": note_id,
+                    "title": note.get("title", "untitled"),
+                    "reason": "Note content and title mention no KG entities, "
+                    "and note has no edges to the KG.",
+                }
+            )
 
         return orphans
 
     def _find_contradictions(
-        self, workspace_id: str, limit: int = 50,
+        self,
+        workspace_id: str,
+        limit: int = 50,
     ) -> list[dict[str, Any]]:
         """Use LLM to find contradictory claims between semantically
         similar memories.
@@ -1146,15 +1210,15 @@ class Compounder:
             return []
 
         memories = self._client._query(
-            "memory", workspace_id=workspace_id, filter_dict={},
+            "memory",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
         if len(memories) < 2:
             return []
 
         # Take the most recent N
-        memories = sorted(
-            memories, key=lambda r: r.get("created_at", 0), reverse=True
-        )[:limit]
+        memories = sorted(memories, key=lambda r: r.get("created_at", 0), reverse=True)[:limit]
 
         contradictions: list[dict[str, Any]] = []
         checked = 0
@@ -1188,18 +1252,21 @@ class Compounder:
                 try:
                     data = json.loads(result)
                     if data.get("is_contradiction"):
-                        contradictions.append({
-                            "id_a": mem_a.get("id", ""),
-                            "id_b": mem_b.get("id", ""),
-                            "content_a": content_a[:200],
-                            "content_b": content_b[:200],
-                            "explanation": data.get("explanation", ""),
-                        })
+                        contradictions.append(
+                            {
+                                "id_a": mem_a.get("id", ""),
+                                "id_b": mem_b.get("id", ""),
+                                "content_a": content_a[:200],
+                                "content_b": content_b[:200],
+                                "explanation": data.get("explanation", ""),
+                            }
+                        )
                 except (json.JSONDecodeError, TypeError):
                     continue
 
         self._log_activity(
-            workspace_id, "contradiction_check",
+            workspace_id,
+            "contradiction_check",
             f"Checked {checked} pairs, found {len(contradictions)} contradictions",
         )
         return contradictions
@@ -1271,12 +1338,13 @@ class Compounder:
             ``contradictions`` keys.
         """
         if not source_text.strip():
-            return {"note": {}, "entities": [], "links": [],
-                    "contradictions": []}
+            return {"note": {}, "entities": [], "links": [], "contradictions": []}
 
         result: dict[str, Any] = {
-            "note": {}, "entities": [],
-            "links": [], "contradictions": [],
+            "note": {},
+            "entities": [],
+            "links": [],
+            "contradictions": [],
         }
 
         # 1. Summarize and create source-summary note
@@ -1293,7 +1361,10 @@ class Compounder:
                 summary_text = llm_summary
 
         content = self._format_source_page(
-            source_title, source_text, summary_text, source_type,
+            source_title,
+            source_text,
+            summary_text,
+            source_type,
         )
         note = self._client.create_note(
             workspace_id=workspace_id,
@@ -1306,7 +1377,9 @@ class Compounder:
         # If create_note only returned status, resolve the full record
         if not note.get("id"):
             resolved = self._resolve_created_note(
-                workspace_id, f"Source: {source_title}", note,
+                workspace_id,
+                f"Source: {source_title}",
+                note,
             )
             note = resolved
             result["note"] = resolved
@@ -1338,10 +1411,16 @@ class Compounder:
             if node_id and note_id:
                 try:
                     self._client._call(
-                        "create_edge", [
-                            workspace_id, note_id, node_id,
-                            "informed_by", 1.0, "INFERRED",
-                            "{}", "",
+                        "create_edge",
+                        [
+                            workspace_id,
+                            note_id,
+                            node_id,
+                            "informed_by",
+                            1.0,
+                            "INFERRED",
+                            "{}",
+                            "",
                         ],
                     )
                     result["links"].append(node_id)
@@ -1352,23 +1431,30 @@ class Compounder:
         if self._llm.available and entities:
             for ent in entities:
                 self._ripple_update_entity(
-                    workspace_id, ent.get("name", ""),
-                    summary_text, note_id,
+                    workspace_id,
+                    ent.get("name", ""),
+                    summary_text,
+                    note_id,
                 )
 
         # 5. Proactive contradiction check
         if self._llm.available:
             result["contradictions"] = self._check_contradictions_on_ingest(
-                workspace_id, summary_text, note_id,
+                workspace_id,
+                summary_text,
+                note_id,
             )
 
         # 6. Update index
-        ingest_summary = summary_text[:100] if len(summary_text) < 100 else summary_text[:97] + "..."
+        ingest_summary = (
+            summary_text[:100] if len(summary_text) < 100 else summary_text[:97] + "..."
+        )
         self._update_index(workspace_id, f"Source: {source_title}", note, summary=ingest_summary)
 
         # 7. Log
         self._log_activity(
-            workspace_id, "ingest_source",
+            workspace_id,
+            "ingest_source",
             f"'{source_title}' ({len(result['entities'])} entities, "
             f"{len(result['links'])} links, "
             f"{len(result['contradictions'])} contradictions)",
@@ -1376,8 +1462,10 @@ class Compounder:
 
         logger.info(
             "Ingested source '%s' (%d entities, %d links, %d contradictions)",
-            source_title, len(result["entities"]),
-            len(result["links"]), len(result["contradictions"]),
+            source_title,
+            len(result["entities"]),
+            len(result["links"]),
+            len(result["contradictions"]),
         )
         return result
 
@@ -1434,9 +1522,12 @@ class Compounder:
 
         # Find semantically similar existing memories
         similar = self._client.search(
-            workspace_id, new_content[:1000],
-            limit=limit, semantic=True,
-            memory_type="", tier="",
+            workspace_id,
+            new_content[:1000],
+            limit=limit,
+            semantic=True,
+            memory_type="",
+            tier="",
         )
         if not similar:
             return []
@@ -1467,22 +1558,27 @@ class Compounder:
             try:
                 data = json.loads(result)
                 if data.get("is_contradiction"):
-                    contradictions.append({
-                        "memory_id": existing_id,
-                        "existing_content": existing_content[:200],
-                        "explanation": data.get("explanation", ""),
-                    })
+                    contradictions.append(
+                        {
+                            "memory_id": existing_id,
+                            "existing_content": existing_content[:200],
+                            "explanation": data.get("explanation", ""),
+                        }
+                    )
                     # Create a contradiction note linking source to existing
                     self._create_ingest_contradiction_note(
-                        workspace_id, source_note_id,
-                        existing_id, data.get("explanation", ""),
+                        workspace_id,
+                        source_note_id,
+                        existing_id,
+                        data.get("explanation", ""),
                     )
             except (json.JSONDecodeError, TypeError):
                 continue
 
         if contradictions:
             self._log_activity(
-                workspace_id, "contradiction_on_ingest",
+                workspace_id,
+                "contradiction_on_ingest",
                 f"Found {len(contradictions)} contradictions with existing knowledge",
             )
 
@@ -1548,7 +1644,8 @@ class Compounder:
         # 1. Create or find KG node
         node = None
         existing = self._client._query(
-            "kg_node", workspace_id=workspace_id,
+            "kg_node",
+            workspace_id=workspace_id,
             filter_dict={"label": name},
         )
         if existing:
@@ -1603,10 +1700,16 @@ class Compounder:
         if node and note.get("id"):
             try:
                 self._client._call(
-                    "create_edge", [
-                        workspace_id, note["id"], node["id"],
-                        "describes", 1.0, "INFERRED",
-                        "{}", "",
+                    "create_edge",
+                    [
+                        workspace_id,
+                        note["id"],
+                        node["id"],
+                        "describes",
+                        1.0,
+                        "INFERRED",
+                        "{}",
+                        "",
                     ],
                 )
             except RuntimeError:
@@ -1614,13 +1717,16 @@ class Compounder:
 
         # 4. Update index
         self._update_index(
-            workspace_id, name, note,
+            workspace_id,
+            name,
+            note,
             summary=description[:100],
         )
 
         # 5. Log
         self._log_activity(
-            workspace_id, "create_entity_page",
+            workspace_id,
+            "create_entity_page",
             f"'{name}' ({entity_type})",
         )
 
@@ -1663,7 +1769,8 @@ class Compounder:
         """
         # 1. Find the existing KG node by label
         existing = self._client._query(
-            "kg_node", workspace_id=workspace_id,
+            "kg_node",
+            workspace_id=workspace_id,
             filter_dict={"label": name},
         )
         if not existing:
@@ -1673,7 +1780,8 @@ class Compounder:
 
         # 2. Find the associated wiki note (entity pages use name as title)
         notes = self._client._query(
-            "note", workspace_id=workspace_id,
+            "note",
+            workspace_id=workspace_id,
             filter_dict={"title": name, "is_active": "true"},
         )
         note = notes[0] if notes else {}
@@ -1722,7 +1830,9 @@ class Compounder:
                 if relations:
                     rel_lines = "\n## Relations\n\n"
                     for r in relations:
-                        rel_lines += f"- **{r.get('relation', 'related_to')}**: {r.get('name', '')}\n"
+                        rel_lines += (
+                            f"- **{r.get('relation', 'related_to')}**: {r.get('name', '')}\n"
+                        )
             else:
                 # Extract existing relations section
                 rel_lines = ""
@@ -1757,13 +1867,16 @@ class Compounder:
 
         # 5. Update the index entry
         self._update_index(
-            workspace_id, name, note,
+            workspace_id,
+            name,
+            note,
             summary=(description or node.get("summary", ""))[:100],
         )
 
         # 6. Log
         self._log_activity(
-            workspace_id, "update_entity_page",
+            workspace_id,
+            "update_entity_page",
             f"'{name}' ({new_type})",
         )
 
@@ -1830,10 +1943,16 @@ class Compounder:
         if node and note.get("id"):
             try:
                 self._client._call(
-                    "create_edge", [
-                        workspace_id, note["id"], node["id"],
-                        "describes", 1.0, "INFERRED",
-                        "{}", "",
+                    "create_edge",
+                    [
+                        workspace_id,
+                        note["id"],
+                        node["id"],
+                        "describes",
+                        1.0,
+                        "INFERRED",
+                        "{}",
+                        "",
                     ],
                 )
             except RuntimeError:
@@ -1841,12 +1960,16 @@ class Compounder:
 
         # Update index
         self._update_index(
-            workspace_id, f"Concept: {concept}", note,
+            workspace_id,
+            f"Concept: {concept}",
+            note,
             summary=definition[:100],
         )
 
         self._log_activity(
-            workspace_id, "create_concept_page", concept,
+            workspace_id,
+            "create_concept_page",
+            concept,
         )
         return {"node": node, "note": note}
 
@@ -1908,9 +2031,7 @@ class Compounder:
         sep = "| " + " | ".join("---" for _ in all_keys) + " |"
         rows = []
         for item in dict_items:
-            row = "| " + " | ".join(
-                item.get(k, "") for k in all_keys
-            ) + " |"
+            row = "| " + " | ".join(item.get(k, "") for k in all_keys) + " |"
             rows.append(row)
 
         table = "\n".join([header, sep] + rows)
@@ -1934,16 +2055,18 @@ class Compounder:
         )
 
         # Update index
-        item_names = ", ".join(
-            i.get("name", "") for i in dict_items[:5]
-        )
+        item_names = ", ".join(i.get("name", "") for i in dict_items[:5])
         self._update_index(
-            workspace_id, f"Comparison: {title}", note,
+            workspace_id,
+            f"Comparison: {title}",
+            note,
             summary=item_names[:100],
         )
 
         self._log_activity(
-            workspace_id, "create_comparison_page", title,
+            workspace_id,
+            "create_comparison_page",
+            title,
         )
         return {"note": note}
 
@@ -1975,9 +2098,7 @@ class Compounder:
         Returns:
             Dict with ``files_written``, ``output_dir``, ``errors``.
         """
-        import os
         import pathlib
-        from datetime import datetime as dt
 
         out = pathlib.Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
@@ -1990,7 +2111,9 @@ class Compounder:
 
         # Fetch all notes
         notes = self._client._query(
-            "note", workspace_id=workspace_id, filter_dict={},
+            "note",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
         if not notes and not include_kg:
             return result
@@ -1998,7 +2121,9 @@ class Compounder:
         # Build backlink map (memory → list of notes that reference it)
         backlink_map: dict[str, list[str]] = {}
         edges = self._client._query(
-            "kg_edge", workspace_id=workspace_id, filter_dict={},
+            "kg_edge",
+            workspace_id=workspace_id,
+            filter_dict={},
         )
         for e in edges:
             src = e.get("source_node_id", "")
@@ -2021,14 +2146,12 @@ class Compounder:
 
             # Build frontmatter
             backlinks = backlink_map.get(note_id, [])
-            bl_lines = "\n".join(
-                f"    - \"{b}\"" for b in backlinks[:20]
-            )
+            bl_lines = "\n".join(f'    - "{b}"' for b in backlinks[:20])
 
             frontmatter = (
                 "---\n"
-                f"id: \"{note_id}\"\n"
-                f"title: \"{title}\"\n"
+                f'id: "{note_id}"\n'
+                f'title: "{title}"\n'
                 f"created: {created}\n"
                 f"updated: {updated}\n"
                 f"backlinks:\n{bl_lines}\n"
@@ -2036,10 +2159,7 @@ class Compounder:
             )
 
             # Sanitize filename
-            safe_title = "".join(
-                c if c.isalnum() or c in " -_" else "_"
-                for c in title
-            ).strip()
+            safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
             if not safe_title:
                 safe_title = note_id[:12]
             filename = out / f"{safe_title[:100]}.md"
@@ -2048,16 +2168,16 @@ class Compounder:
                 filename.write_text(frontmatter + content, encoding="utf-8")
                 result["files_written"] += 1
             except OSError as e:
-                result["errors"].append(
-                    f"{safe_title}: {e}"
-                )
+                result["errors"].append(f"{safe_title}: {e}")
 
         # Optionally export KG nodes as markdown entity pages
         if include_kg:
             kg_dir = out / "_kg_nodes"
             kg_dir.mkdir(exist_ok=True)
             nodes = self._client._query(
-                "kg_node", workspace_id=workspace_id, filter_dict={},
+                "kg_node",
+                workspace_id=workspace_id,
+                filter_dict={},
             )
             for node in nodes:
                 label = node.get("label", "unknown")
@@ -2066,23 +2186,18 @@ class Compounder:
                 node_id = node.get("id", "")
                 kg_content = (
                     "---\n"
-                    f"id: \"{node_id}\"\n"
+                    f'id: "{node_id}"\n'
                     f"type: kg_node\n"
                     f"node_type: {ntype}\n"
-                    f"label: \"{label}\"\n"
+                    f'label: "{label}"\n'
                     "---\n\n"
                     f"## {label}\n\n"
                     f"**Type:** {ntype}\n\n"
                     f"{summary}\n"
                 )
-                safe_label = "".join(
-                    c if c.isalnum() or c in " -_" else "_"
-                    for c in label
-                ).strip()
+                safe_label = "".join(c if c.isalnum() or c in " -_" else "_" for c in label).strip()
                 try:
-                    (kg_dir / f"{safe_label[:100]}.md").write_text(
-                        kg_content, encoding="utf-8"
-                    )
+                    (kg_dir / f"{safe_label[:100]}.md").write_text(kg_content, encoding="utf-8")
                     result["files_written"] += 1
                 except OSError as e:
                     result["errors"].append(f"kg_{label}: {e}")
@@ -2110,35 +2225,53 @@ class Compounder:
             Dict with ``note`` key if created, or empty dict if
             the workspace is empty.
         """
-        notes = self._client._query(
-            "note", workspace_id=workspace_id, filter_dict={},
-        ) or []
-        nodes = self._client._query(
-            "kg_node", workspace_id=workspace_id, filter_dict={},
-        ) or []
-        edges = self._client._query(
-            "kg_edge", workspace_id=workspace_id, filter_dict={},
-        ) or []
+        notes = (
+            self._client._query(
+                "note",
+                workspace_id=workspace_id,
+                filter_dict={},
+            )
+            or []
+        )
+        nodes = (
+            self._client._query(
+                "kg_node",
+                workspace_id=workspace_id,
+                filter_dict={},
+            )
+            or []
+        )
+        edges = (
+            self._client._query(
+                "kg_edge",
+                workspace_id=workspace_id,
+                filter_dict={},
+            )
+            or []
+        )
 
         if not notes and not nodes:
             return {"note": {}}
 
         # Count by note type from frontmatter (best-effort)
-        entity_notes = [n for n in notes
-                        if "type: person" in n.get("content", "")
-                        or "type: organization" in n.get("content", "")]
-        concept_notes = [n for n in notes
-                         if "type: concept" in n.get("content", "")]
-        source_notes = [n for n in notes
-                        if n.get("title", "").startswith("Source:")]
-        comparison_notes = [n for n in notes
-                            if n.get("title", "").startswith("Comparison:")]
-        regular_notes = [n for n in notes
-                         if not n.get("title", "").startswith("_")
-                         and n not in entity_notes
-                         and n not in concept_notes
-                         and n not in source_notes
-                         and n not in comparison_notes]
+        entity_notes = [
+            n
+            for n in notes
+            if "type: person" in n.get("content", "")
+            or "type: organization" in n.get("content", "")
+        ]
+        concept_notes = [n for n in notes if "type: concept" in n.get("content", "")]
+        source_notes = [n for n in notes if n.get("title", "").startswith("Source:")]
+        comparison_notes = [n for n in notes if n.get("title", "").startswith("Comparison:")]
+        regular_notes = [
+            n
+            for n in notes
+            if not n.get("title", "").startswith("_")
+            and n not in entity_notes
+            and n not in concept_notes
+            and n not in source_notes
+            and n not in comparison_notes
+        ]
 
         # Count node types
         node_types: dict[str, int] = {}
@@ -2161,15 +2294,13 @@ class Compounder:
                 connected_ids.add(src)
             if tgt:
                 connected_ids.add(tgt)
-        orphan_count = sum(
-            1 for nd in nodes
-            if nd.get("id", "") not in connected_ids
-        )
+        orphan_count = sum(1 for nd in nodes if nd.get("id", "") not in connected_ids)
 
         # Top entities table
         entity_rows = ""
         top_nodes = sorted(
-            nodes, key=lambda n: len(n.get("summary", "")),
+            nodes,
+            key=lambda n: len(n.get("summary", "")),
             reverse=True,
         )[:10]
         if top_nodes:
@@ -2185,12 +2316,9 @@ class Compounder:
         log_notes = [n for n in notes if n.get("title") == "_log"]
         if log_notes:
             log_content = log_notes[-1].get("content", "")
-            log_lines = [
-                l for l in log_content.split("\n")
-                if l.startswith("## [")
-            ][-5:]
+            log_lines = [line for line in log_content.split("\n") if line.startswith("## [")][-5:]
             if log_lines:
-                recent_items = "\n".join(f"- {l.strip('# ')}" for l in log_lines)
+                recent_items = "\n".join(f"- {line.strip('# ')}" for line in log_lines)
 
         type_table = ""
         if node_types:
@@ -2218,7 +2346,7 @@ class Compounder:
             summary_prompt = (
                 f"Workspace '{workspace_id}' has {len(notes)} notes, "
                 f"{len(nodes)} KG nodes ({node_types}), and {len(edges)} edges. "
-                f"Top entities: {[n.get('label','') for n in top_nodes[:5]]}. "
+                f"Top entities: {[n.get('label', '') for n in top_nodes[:5]]}. "
                 "Write a 3-5 sentence synthesis of what this workspace "
                 "contains. Focus on the main themes and knowledge domains."
             )
@@ -2233,15 +2361,17 @@ class Compounder:
 
         # Stats sections
         lines.append("### Notes by Category\n")
-        lines.append(f"| Category | Count |")
-        lines.append(f"|----------|:-----:|")
+        lines.append("| Category | Count |")
+        lines.append("|----------|:-----:|")
         lines.append(f"| Sources | {len(source_notes)} |")
         lines.append(f"| Entity pages | {len(entity_notes)} |")
         lines.append(f"| Concept pages | {len(concept_notes)} |")
         lines.append(f"| Comparisons | {len(comparison_notes)} |")
         lines.append(f"| Other | {len(regular_notes)} |")
-        lines.append(f"| System (_index, _log) | "
-                     f"{sum(1 for n in notes if n.get('title','').startswith('_'))} |")
+        lines.append(
+            f"| System (_index, _log) | "
+            f"{sum(1 for n in notes if n.get('title', '').startswith('_'))} |"
+        )
         lines.append("")
 
         if type_table:
@@ -2286,9 +2416,9 @@ class Compounder:
         )
 
         self._log_activity(
-            workspace_id, "generate_overview",
-            f"Workspace overview — {len(notes)} notes, "
-            f"{len(nodes)} nodes, {len(edges)} edges",
+            workspace_id,
+            "generate_overview",
+            f"Workspace overview — {len(notes)} notes, {len(nodes)} nodes, {len(edges)} edges",
         )
 
         return {"note": note}

@@ -10,10 +10,9 @@ Tests cover:
 
 import os
 import tempfile
-import pytest
 from unittest.mock import patch
 
-from spacetime_memory.connectors import OrgModeParser, Event
+from spacetime_memory.connectors import OrgModeParser
 
 
 class TestOrgModeParserInit:
@@ -278,10 +277,7 @@ class TestParse:
             os.unlink(path)
 
     def test_parse_with_tags(self):
-        content = (
-            "* Review PR #42 :dev:review:\n"
-            "  Feedback provided.\n"
-        )
+        content = "* Review PR #42 :dev:review:\n  Feedback provided.\n"
         path = self._write_org_file(content)
         try:
             p = OrgModeParser(file_path=path, workspace_id="ws-x")
@@ -312,13 +308,7 @@ class TestParse:
             os.unlink(path)
 
     def test_parse_with_properties(self):
-        content = (
-            "* Meeting notes\n"
-            ":PROPERTIES:\n"
-            ":DATE: 2024-01-15\n"
-            ":END:\n"
-            "  Discussed roadmap.\n"
-        )
+        content = "* Meeting notes\n:PROPERTIES:\n:DATE: 2024-01-15\n:END:\n  Discussed roadmap.\n"
         path = self._write_org_file(content)
         try:
             p = OrgModeParser(file_path=path, workspace_id="ws-z")
@@ -331,10 +321,7 @@ class TestParse:
 
     def test_parse_with_comment_lines(self):
         content = (
-            "* Heading\n"
-            "# This is a comment, should be hidden\n"
-            "  Visible text\n"
-            "# Another comment\n"
+            "* Heading\n# This is a comment, should be hidden\n  Visible text\n# Another comment\n"
         )
         path = self._write_org_file(content)
         try:

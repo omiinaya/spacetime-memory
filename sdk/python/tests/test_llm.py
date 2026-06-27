@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -486,11 +485,13 @@ class TestLLMClientSummarizeCommunity:
 
     def test_summarize_community_edges_with_name_fallback(self, client):
         """Edges use 'name' fallback for relation."""
-        edges = [{
-            "name": "custom_rel",
-            "source_node": "src-uuid-123",
-            "target_node": "tgt-uuid-456",
-        }]
+        edges = [
+            {
+                "name": "custom_rel",
+                "source_node": "src-uuid-123",
+                "target_node": "tgt-uuid-456",
+            }
+        ]
         mock_resp = _make_mock_response("summary")
         with patch("httpx.post", return_value=mock_resp) as mock_post:
             client.summarize_community("C", [], edges)
@@ -499,11 +500,13 @@ class TestLLMClientSummarizeCommunity:
 
     def test_summarize_community_edges_source_node_uuid_fallback(self, client):
         """Edges use source_node_uuid when source_node is missing."""
-        edges = [{
-            "relation": "test_rel",
-            "source_node_uuid": "src-fallback-uuid-here",
-            "target_node": "tgt-uuid-456",
-        }]
+        edges = [
+            {
+                "relation": "test_rel",
+                "source_node_uuid": "src-fallback-uuid-here",
+                "target_node": "tgt-uuid-456",
+            }
+        ]
         mock_resp = _make_mock_response("summary")
         with patch("httpx.post", return_value=mock_resp) as mock_post:
             client.summarize_community("C", [], edges)
@@ -513,11 +516,13 @@ class TestLLMClientSummarizeCommunity:
 
     def test_summarize_community_edges_target_node_uuid_fallback(self, client):
         """Edges use target_node_uuid when target_node is missing."""
-        edges = [{
-            "relation": "test_rel",
-            "source_node": "src-uuid-123",
-            "target_node_uuid": "tgt-fallback-uuid",
-        }]
+        edges = [
+            {
+                "relation": "test_rel",
+                "source_node": "src-uuid-123",
+                "target_node_uuid": "tgt-fallback-uuid",
+            }
+        ]
         mock_resp = _make_mock_response("summary")
         with patch("httpx.post", return_value=mock_resp) as mock_post:
             client.summarize_community("C", [], edges)
@@ -583,12 +588,19 @@ class TestLLMClientExtractEntitiesLLM:
 
     def test_extract_entities_with_entities_key(self, client):
         """Result has 'entities' key with list."""
-        json_str = json.dumps({
-            "entities": [
-                {"name": "Alice", "entity_type": "person", "aliases": ["Al"], "description": "Engineer"},
-                {"name": "Acme Corp", "entity_type": "company"},
-            ]
-        })
+        json_str = json.dumps(
+            {
+                "entities": [
+                    {
+                        "name": "Alice",
+                        "entity_type": "person",
+                        "aliases": ["Al"],
+                        "description": "Engineer",
+                    },
+                    {"name": "Acme Corp", "entity_type": "company"},
+                ]
+            }
+        )
         with patch.object(client, "chat", return_value=json_str):
             result = client.extract_entities_llm("text")
             assert len(result) == 2
@@ -598,11 +610,13 @@ class TestLLMClientExtractEntitiesLLM:
 
     def test_extract_entities_with_items_key(self, client):
         """Result has 'items' key instead of 'entities'."""
-        json_str = json.dumps({
-            "items": [
-                {"name": "Bob", "entity_type": "person"},
-            ]
-        })
+        json_str = json.dumps(
+            {
+                "items": [
+                    {"name": "Bob", "entity_type": "person"},
+                ]
+            }
+        )
         with patch.object(client, "chat", return_value=json_str):
             result = client.extract_entities_llm("text")
             assert len(result) == 1

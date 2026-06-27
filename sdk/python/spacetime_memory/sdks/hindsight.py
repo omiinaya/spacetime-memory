@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 
 class TokenUsage(BaseModel):
     """Token usage metrics for LLM calls."""
+
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
@@ -52,6 +53,7 @@ class TokenUsage(BaseModel):
 
 class ChunkData(BaseModel):
     """Chunk data for a single chunk."""
+
     id: str
     text: str
     chunk_index: int
@@ -60,12 +62,14 @@ class ChunkData(BaseModel):
 
 class EntityObservationResponse(BaseModel):
     """An observation about an entity."""
+
     text: str
     mentioned_at: Optional[str] = None
 
 
 class EntityStateResponse(BaseModel):
     """Current mental model of an entity."""
+
     entity_id: str
     canonical_name: str
     observations: list[EntityObservationResponse]
@@ -73,6 +77,7 @@ class EntityStateResponse(BaseModel):
 
 class RecallResult(BaseModel):
     """Single recall result item."""
+
     id: str
     text: str
     type: Optional[str] = None
@@ -91,6 +96,7 @@ class RecallResult(BaseModel):
 
 class RetainResponse(BaseModel):
     """Response model for retain endpoint."""
+
     success: bool
     bank_id: str
     items_count: int
@@ -104,6 +110,7 @@ class RetainResponse(BaseModel):
 
 class RecallResponse(BaseModel):
     """Response model for recall endpoints."""
+
     results: list[RecallResult]
     trace: Optional[dict[str, Any]] = None
     entities: Optional[dict[str, EntityStateResponse]] = None
@@ -113,6 +120,7 @@ class RecallResponse(BaseModel):
 
 class ReflectFact(BaseModel):
     """A fact used in reflect response."""
+
     id: Optional[str] = None
     text: str
     type: Optional[str] = None
@@ -123,6 +131,7 @@ class ReflectFact(BaseModel):
 
 class ReflectDirective(BaseModel):
     """A directive applied during reflect."""
+
     id: str
     name: str
     content: str
@@ -130,6 +139,7 @@ class ReflectDirective(BaseModel):
 
 class ReflectMentalModel(BaseModel):
     """A mental model used during reflect."""
+
     id: str
     text: str
     context: Optional[str] = None
@@ -137,6 +147,7 @@ class ReflectMentalModel(BaseModel):
 
 class ReflectBasedOn(BaseModel):
     """Evidence the response is based on: memories, mental models, directives."""
+
     memories: Optional[list[ReflectFact]] = None
     mental_models: Optional[list[ReflectMentalModel]] = None
     directives: Optional[list[ReflectDirective]] = None
@@ -144,6 +155,7 @@ class ReflectBasedOn(BaseModel):
 
 class ReflectToolCall(BaseModel):
     """A tool call made during reflect agent execution."""
+
     tool: str = Field(description="Tool name: lookup, recall, learn, expand")
     input: dict[str, Any]
     output: Optional[dict[str, Any]] = None
@@ -153,18 +165,21 @@ class ReflectToolCall(BaseModel):
 
 class ReflectLLMCall(BaseModel):
     """An LLM call made during reflect agent execution."""
+
     scope: str = Field(description="Call scope: agent_1, agent_2, final, etc.")
     duration_ms: int = Field(description="Execution time in milliseconds")
 
 
 class ReflectTrace(BaseModel):
     """Execution trace of LLM and tool calls during reflection."""
+
     tool_calls: Optional[list[ReflectToolCall]] = None
     llm_calls: Optional[list[ReflectLLMCall]] = None
 
 
 class ReflectResponse(BaseModel):
     """Response model for reflect (think) endpoint."""
+
     text: str = Field(description="The reflect response as well-formatted markdown")
     based_on: Optional[ReflectBasedOn] = None
     structured_output: Optional[dict[str, Any]] = None
@@ -174,27 +189,47 @@ class ReflectResponse(BaseModel):
 
 class FileRetainResponse(BaseModel):
     """Response model for file upload endpoint."""
-    operation_ids: list[str] = Field(description="Operation IDs for tracking file conversion operations.")
+
+    operation_ids: list[str] = Field(
+        description="Operation IDs for tracking file conversion operations."
+    )
 
 
 class DispositionTraits(BaseModel):
     """Disposition traits that influence how memories are formed and interpreted."""
-    skepticism: int = Field(default=3, ge=1, le=5, description="How skeptical vs trusting (1=trusting, 5=skeptical)")
-    literalism: int = Field(default=3, ge=1, le=5, description="How literally to interpret information (1=flexible, 5=literal)")
-    empathy: int = Field(default=3, ge=1, le=5, description="How much to consider emotional context (1=detached, 5=empathetic)")
+
+    skepticism: int = Field(
+        default=3, ge=1, le=5, description="How skeptical vs trusting (1=trusting, 5=skeptical)"
+    )
+    literalism: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+        description="How literally to interpret information (1=flexible, 5=literal)",
+    )
+    empathy: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+        description="How much to consider emotional context (1=detached, 5=empathetic)",
+    )
 
 
 class BankProfileResponse(BaseModel):
     """Response model for bank profile."""
+
     bank_id: str
     name: str
     disposition: DispositionTraits
-    mission: str = Field(description="The agent's mission statement that guides memory formation and reflection")
+    mission: str = Field(
+        description="The agent's mission statement that guides memory formation and reflection"
+    )
     background: Optional[str] = None
 
 
 class ListMemoryUnitsResponse(BaseModel):
     """Response model for list memory units endpoint."""
+
     items: list[dict[str, Any]]
     total: int
     limit: int
@@ -203,6 +238,7 @@ class ListMemoryUnitsResponse(BaseModel):
 
 class CreateBankResponse(BaseModel):
     """Response model for create_bank endpoint."""
+
     id: str
     name: str
     config: dict[str, Any] = Field(default_factory=dict)
@@ -211,6 +247,7 @@ class CreateBankResponse(BaseModel):
 
 class CreateMentalModelResponse(BaseModel):
     """Response model for create_mental_model endpoint."""
+
     id: str
     name: str
     content: str = ""
@@ -219,6 +256,7 @@ class CreateMentalModelResponse(BaseModel):
 
 class CreateDirectiveResponse(BaseModel):
     """Response model for create_directive endpoint."""
+
     id: str
     name: str
     content: str = ""
@@ -228,6 +266,7 @@ class CreateDirectiveResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _run_async(coro):
     """Run an async coroutine synchronously.
@@ -252,6 +291,7 @@ def _make_op_id() -> str:
     """Generate a short unique operation ID."""
     import hashlib
     import os
+
     return hashlib.md5(os.urandom(16)).hexdigest()[:12]
 
 
@@ -298,7 +338,9 @@ class _HindsightMentalModelsShell:
     def __init__(self, hindsight: Hindsight) -> None:
         self._h = hindsight
 
-    def create(self, bank_id: str, name: str, query: str | None = None, **params: Any) -> "CreateMentalModelResponse":
+    def create(
+        self, bank_id: str, name: str, query: str | None = None, **params: Any
+    ) -> "CreateMentalModelResponse":
         return self._h.create_mental_model(bank_id=bank_id, name=name, query=query, **params)
 
 
@@ -308,7 +350,9 @@ class _HindsightDirectivesShell:
     def __init__(self, hindsight: Hindsight) -> None:
         self._h = hindsight
 
-    def create(self, bank_id: str, name: str, prompt: str, **params: Any) -> "CreateDirectiveResponse":
+    def create(
+        self, bank_id: str, name: str, prompt: str, **params: Any
+    ) -> "CreateDirectiveResponse":
         return self._h.create_directive(bank_id=bank_id, name=name, prompt=prompt, **params)
 
 
@@ -332,6 +376,7 @@ class _HindsightFilesShell:
             context=context,
             files_metadata=files_metadata,
         )
+
 
 class Hindsight:
     """Drop-in replacement for ``hindsight_client.Hindsight`` (v0.8.1).
@@ -368,13 +413,15 @@ class Hindsight:
     ) -> None:
 
         import hashlib
+
         self._timeout = timeout
         self._user_agent = user_agent or "spacetime-memory-hindsight/0.0.0"
         self._api_key = api_key
 
-        db = stdb_database or hashlib.md5(
-            (base_url or f"{stdb_host}:{stdb_port}").encode()
-        ).hexdigest()[:16]
+        db = (
+            stdb_database
+            or hashlib.md5((base_url or f"{stdb_host}:{stdb_port}").encode()).hexdigest()[:16]
+        )
 
         self._client = Client(
             host=stdb_host,
@@ -468,7 +515,9 @@ class Hindsight:
     def __enter__(self) -> "Hindsight":
         return self
 
-    def __exit__(self, exc_type: type | None, exc_val: BaseException | None, exc_tb: Any | None) -> None:
+    def __exit__(
+        self, exc_type: type | None, exc_val: BaseException | None, exc_tb: Any | None
+    ) -> None:
         self.close()
 
     def close(self) -> None:
@@ -498,9 +547,15 @@ class Hindsight:
         """Store a single memory (sync wrapper)."""
         return _run_async(
             self.aretain(
-                bank_id=bank_id, content=content, timestamp=timestamp,
-                context=context, document_id=document_id, metadata=metadata,
-                entities=entities, tags=tags, update_mode=update_mode,
+                bank_id=bank_id,
+                content=content,
+                timestamp=timestamp,
+                context=context,
+                document_id=document_id,
+                metadata=metadata,
+                entities=entities,
+                tags=tags,
+                update_mode=update_mode,
                 retain_async=retain_async,
             )
         )
@@ -517,8 +572,11 @@ class Hindsight:
         """Store multiple memories in batch (sync wrapper)."""
         return _run_async(
             self.aretain_batch(
-                bank_id=bank_id, items=items, document_id=document_id,
-                document_tags=document_tags, retain_async=retain_async,
+                bank_id=bank_id,
+                items=items,
+                document_id=document_id,
+                document_tags=document_tags,
+                retain_async=retain_async,
             )
         )
 
@@ -575,13 +633,22 @@ class Hindsight:
         """Recall memories using semantic similarity (sync wrapper)."""
         return _run_async(
             self.arecall(
-                bank_id=bank_id, query=query, types=types,
-                max_tokens=max_tokens, budget=budget, trace=trace,
-                query_timestamp=query_timestamp, include_entities=include_entities,
-                max_entity_tokens=max_entity_tokens, include_chunks=include_chunks,
-                max_chunk_tokens=max_chunk_tokens, include_source_facts=include_source_facts,
+                bank_id=bank_id,
+                query=query,
+                types=types,
+                max_tokens=max_tokens,
+                budget=budget,
+                trace=trace,
+                query_timestamp=query_timestamp,
+                include_entities=include_entities,
+                max_entity_tokens=max_entity_tokens,
+                include_chunks=include_chunks,
+                max_chunk_tokens=max_chunk_tokens,
+                include_source_facts=include_source_facts,
                 max_source_facts_tokens=max_source_facts_tokens,
-                tags=tags, tags_match=tags_match, tag_groups=tag_groups,
+                tags=tags,
+                tags_match=tags_match,
+                tag_groups=tag_groups,
             )
         )
 
@@ -609,13 +676,19 @@ class Hindsight:
         """Generate a contextual answer based on bank identity and memories (sync wrapper)."""
         return _run_async(
             self.areflect(
-                bank_id=bank_id, query=query, budget=budget,
-                context=context, max_tokens=max_tokens,
-                response_schema=response_schema, tags=tags,
-                tags_match=tags_match, include_facts=include_facts,
+                bank_id=bank_id,
+                query=query,
+                budget=budget,
+                context=context,
+                max_tokens=max_tokens,
+                response_schema=response_schema,
+                tags=tags,
+                tags_match=tags_match,
+                include_facts=include_facts,
                 include_tool_calls=include_tool_calls,
                 include_tool_call_output=include_tool_call_output,
-                tag_groups=tag_groups, fact_types=fact_types,
+                tag_groups=tag_groups,
+                fact_types=fact_types,
                 exclude_mental_models=exclude_mental_models,
                 exclude_mental_model_ids=exclude_mental_model_ids,
             )
@@ -648,20 +721,25 @@ class Hindsight:
         if tags:
             merged_meta["tags"] = json.dumps(tags)
         if timestamp:
-            merged_meta["timestamp"] = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
+            merged_meta["timestamp"] = (
+                timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
+            )
         if document_id:
             merged_meta["document_id"] = document_id
 
         try:
-            self._client.store(ws_id, content=content, summary=summary,
-                               entities_json=entities_json)
+            self._client.store(ws_id, content=content, summary=summary, entities_json=entities_json)
             return RetainResponse(
-                success=True, bank_id=bank_id, items_count=1,
+                success=True,
+                bank_id=bank_id,
+                items_count=1,
                 async_=retain_async,
             )
         except RuntimeError:
             return RetainResponse(
-                success=False, bank_id=bank_id, items_count=0,
+                success=False,
+                bank_id=bank_id,
+                items_count=0,
                 async_=retain_async,
             )
 
@@ -687,14 +765,17 @@ class Hindsight:
             summary = item.get("context", "")
             entities_json = json.dumps(item.get("entities", []))
             try:
-                self._client.store(ws_id, content=content, summary=summary,
-                                   entities_json=entities_json)
+                self._client.store(
+                    ws_id, content=content, summary=summary, entities_json=entities_json
+                )
                 count += 1
             except RuntimeError as exc:
                 logger.warning("aretain_batch() failed to store item: %s", exc)
 
         return RetainResponse(
-            success=True, bank_id=bank_id, items_count=count,
+            success=True,
+            bank_id=bank_id,
+            items_count=count,
             async_=retain_async,
         )
 
@@ -727,7 +808,10 @@ class Hindsight:
 
         try:
             rows = self._client.search(
-                ws_id, query=query, limit=limit, semantic=True,
+                ws_id,
+                query=query,
+                limit=limit,
+                semantic=True,
             )
         except RuntimeError as exc:
             logger.warning("arecall() search failed: %s", exc)
@@ -736,13 +820,15 @@ class Hindsight:
         results: list[RecallResult] = []
         for i, row in enumerate(rows[:10]):
             content = row.get("memory_content", row.get("content", ""))
-            results.append(RecallResult(
-                id=row.get("id", row.get("entity_id", str(i))),
-                text=content,
-                type=row.get("entity_type", "experience"),
-                score=row.get("score", 0.0),
-                context=row.get("context"),
-            ))
+            results.append(
+                RecallResult(
+                    id=row.get("id", row.get("entity_id", str(i))),
+                    text=content,
+                    type=row.get("entity_type", "experience"),
+                    score=row.get("score", 0.0),
+                    context=row.get("context"),
+                )
+            )
 
         return RecallResponse(results=results)
 
@@ -783,8 +869,7 @@ class Hindsight:
             memories = []
 
         memory_snippets = "\n".join(
-            f"- {m.get('memory_content', m.get('content', ''))}"
-            for m in memories[:10]
+            f"- {m.get('memory_content', m.get('content', ''))}" for m in memories[:10]
         )
 
         prompt = (
@@ -795,10 +880,18 @@ class Hindsight:
         )
 
         try:
-            insight_result = self._client._call("create_insight", [
-                ws_id, prompt, "", "reflect",
-            ])
-            answer_text = insight_result.get("insight", insight_result.get("content", str(insight_result)))
+            insight_result = self._client._call(
+                "create_insight",
+                [
+                    ws_id,
+                    prompt,
+                    "",
+                    "reflect",
+                ],
+            )
+            answer_text = insight_result.get(
+                "insight", insight_result.get("content", str(insight_result))
+            )
         except RuntimeError as exc:
             logger.warning("areflect() LLM insight failed: %s", exc)
             answer_text = (
@@ -843,9 +936,7 @@ class Hindsight:
         offset: int = 0,
     ) -> ListMemoryUnitsResponse:
         """List memory units in a bank (sync wrapper)."""
-        return _run_async(
-            self.alist_memories(bank_id=bank_id, limit=limit, offset=offset)
-        )
+        return _run_async(self.alist_memories(bank_id=bank_id, limit=limit, offset=offset))
 
     async def alist_memories(
         self,
@@ -860,9 +951,7 @@ class Hindsight:
         ws_id = self._ensure_bank(bank_id)
 
         try:
-            rows = self._client.search(
-                ws_id, query="", limit=limit + offset, semantic=False
-            )
+            rows = self._client.search(ws_id, query="", limit=limit + offset, semantic=False)
         except RuntimeError as exc:
             logger.warning("alist_memories() search failed: %s", exc)
             rows = []
@@ -871,12 +960,14 @@ class Hindsight:
 
         items: list[dict[str, Any]] = []
         for row in rows:
-            items.append({
-                "id": row.get("id", ""),
-                "content": row.get("memory_content", row.get("content", "")),
-                "created_at": row.get("created_at", ""),
-                "metadata": row.get("metadata", {}),
-            })
+            items.append(
+                {
+                    "id": row.get("id", ""),
+                    "content": row.get("memory_content", row.get("content", "")),
+                    "created_at": row.get("created_at", ""),
+                    "metadata": row.get("metadata", {}),
+                }
+            )
 
         return ListMemoryUnitsResponse(
             items=items,
@@ -889,9 +980,7 @@ class Hindsight:
 
     def delete_bank(self, bank_id: str) -> None:
         """Delete a memory bank (sync wrapper)."""
-        return _run_async(
-            self.adelete_bank(bank_id=bank_id)
-        )
+        return _run_async(self.adelete_bank(bank_id=bank_id))
 
     async def adelete_bank(self, bank_id: str) -> None:
         """Delete a memory bank (async)."""
@@ -901,7 +990,6 @@ class Hindsight:
         ws_id = self._ensure_bank(bank_id)
         self._client._call("delete_workspace", [ws_id])
         self._ws_cache.pop(bank_id, None)
-
 
     # -- create_bank -----------------------------------------------------------
 
@@ -915,9 +1003,7 @@ class Hindsight:
 
         Sync wrapper — see ``acreate_bank`` for async implementation.
         """
-        return _run_async(
-            self.acreate_bank(name=name, description=description, **config)
-        )
+        return _run_async(self.acreate_bank(name=name, description=description, **config))
 
     async def acreate_bank(
         self,
@@ -947,7 +1033,8 @@ class Hindsight:
                 ws_id = ws["id"]
                 self._ws_cache[bank_name] = ws_id
                 return CreateBankResponse(
-                    id=ws_id, name=bank_name,
+                    id=ws_id,
+                    name=bank_name,
                     config={**config, "pre_existing": True},
                     success=True,
                 )
@@ -985,21 +1072,26 @@ class Hindsight:
                     except (json.JSONDecodeError, TypeError):
                         bank_config["_llm_raw"] = response
             else:
-                bank_config.update({
+                bank_config.update(
+                    {
+                        "disposition": {"skepticism": 3, "literalism": 3, "empathy": 3},
+                        "mission": f"Memory bank for {bank_name}",
+                        "extraction_modes": ["facts", "entities"],
+                    }
+                )
+        except RuntimeError as exc:
+            logger.warning("acreate_bank() LLM config generation failed: %s", exc)
+            bank_config.update(
+                {
                     "disposition": {"skepticism": 3, "literalism": 3, "empathy": 3},
                     "mission": f"Memory bank for {bank_name}",
                     "extraction_modes": ["facts", "entities"],
-                })
-        except RuntimeError as exc:
-            logger.warning("acreate_bank() LLM config generation failed: %s", exc)
-            bank_config.update({
-                "disposition": {"skepticism": 3, "literalism": 3, "empathy": 3},
-                "mission": f"Memory bank for {bank_name}",
-                "extraction_modes": ["facts", "entities"],
-            })
+                }
+            )
 
         return CreateBankResponse(
-            id=ws_id, name=bank_name,
+            id=ws_id,
+            name=bank_name,
             config=bank_config,
             success=True,
         )
@@ -1018,9 +1110,7 @@ class Hindsight:
         Sync wrapper — see ``acreate_mental_model`` for async implementation.
         """
         return _run_async(
-            self.acreate_mental_model(
-                bank_id=bank_id, name=name, query=query, **params
-            )
+            self.acreate_mental_model(bank_id=bank_id, name=name, query=query, **params)
         )
 
     async def acreate_mental_model(
@@ -1054,7 +1144,10 @@ class Hindsight:
         memories: list[dict[str, Any]] = []
         try:
             memories = self._client.search(
-                ws_id, query=search_query, limit=10, semantic=True,
+                ws_id,
+                query=search_query,
+                limit=10,
+                semantic=True,
             )
         except RuntimeError as exc:
             logger.warning("acreate_mental_model() search failed: %s", exc)
@@ -1065,8 +1158,7 @@ class Hindsight:
             llm = self._get_llm()
             if llm.available and memories:
                 memory_snippets = "\n".join(
-                    f"- {m.get('memory_content', m.get('content', ''))}"
-                    for m in memories[:10]
+                    f"- {m.get('memory_content', m.get('content', ''))}" for m in memories[:10]
                 )
                 prompt = (
                     f"Synthesize a mental model named '{name}' from these memories:\n\n"
@@ -1077,7 +1169,10 @@ class Hindsight:
                 )
                 response = llm.chat(
                     [
-                        {"role": "system", "content": "You are a knowledge synthesis assistant. Create concise mental models from memory fragments."},
+                        {
+                            "role": "system",
+                            "content": "You are a knowledge synthesis assistant. Create concise mental models from memory fragments.",
+                        },
                         {"role": "user", "content": prompt},
                     ],
                     temperature=0.3,
@@ -1087,16 +1182,14 @@ class Hindsight:
             elif memories:
                 # Fallback: join memory contents
                 content = " / ".join(
-                    m.get("memory_content", m.get("content", ""))
-                    for m in memories[:5]
+                    m.get("memory_content", m.get("content", "")) for m in memories[:5]
                 )
             # else: no memories, content stays empty
         except RuntimeError as exc:
             logger.warning("acreate_mental_model() LLM synthesis failed: %s", exc)
             if not content and memories:
                 content = " / ".join(
-                    m.get("memory_content", m.get("content", ""))
-                    for m in memories[:5]
+                    m.get("memory_content", m.get("content", "")) for m in memories[:5]
                 )
 
         if not content:
@@ -1111,13 +1204,18 @@ class Hindsight:
                 summary=f"Mental model: {name}",
                 memory_type="mental_model",
             )
-            model_id = result.get("id", _make_op_id()) if isinstance(result, dict) else _make_op_id()
+            model_id = (
+                result.get("id", _make_op_id()) if isinstance(result, dict) else _make_op_id()
+            )
         except RuntimeError as exc:
             logger.warning("acreate_mental_model() store failed: %s", exc)
             model_id = _make_op_id()
 
         return CreateMentalModelResponse(
-            id=model_id, name=name, content=content, success=True,
+            id=model_id,
+            name=name,
+            content=content,
+            success=True,
         )
 
     # -- create_directive ------------------------------------------------------
@@ -1134,9 +1232,7 @@ class Hindsight:
         Sync wrapper — see ``acreate_directive`` for async implementation.
         """
         return _run_async(
-            self.acreate_directive(
-                bank_id=bank_id, name=name, prompt=prompt, **params
-            )
+            self.acreate_directive(bank_id=bank_id, name=name, prompt=prompt, **params)
         )
 
     async def acreate_directive(
@@ -1173,13 +1269,18 @@ class Hindsight:
                 summary=f"Directive: {name}",
                 memory_type="directive",
             )
-            directive_id = result.get("id", _make_op_id()) if isinstance(result, dict) else _make_op_id()
+            directive_id = (
+                result.get("id", _make_op_id()) if isinstance(result, dict) else _make_op_id()
+            )
         except RuntimeError as exc:
             logger.warning("acreate_directive() store failed: %s", exc)
             directive_id = _make_op_id()
 
         return CreateDirectiveResponse(
-            id=directive_id, name=name, content=prompt, success=True,
+            id=directive_id,
+            name=name,
+            content=prompt,
+            success=True,
         )
 
 

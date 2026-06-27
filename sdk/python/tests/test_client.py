@@ -142,6 +142,7 @@ class TestClientEmbed:
         """_embed() returns [] on connection error."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
         import httpx
+
         mock_http_client._http.post.side_effect = httpx.ConnectError("Connection refused")
 
         result = mock_http_client._embed("hello")
@@ -183,10 +184,12 @@ class TestClientWorkspace:
         # (the _query() method internally queries query_result after calling the reducer)
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
-            text=make_sql_response([
-                {"id": "1", "name": "ws-one"},
-                {"id": "2", "name": "ws-two"},
-            ]),
+            text=make_sql_response(
+                [
+                    {"id": "1", "name": "ws-one"},
+                    {"id": "2", "name": "ws-two"},
+                ]
+            ),
         )
 
         workspaces = mock_http_client.list_workspaces()
@@ -257,6 +260,7 @@ class TestRequestRetry:
     def test_circuit_breaker_open(self, client):
         """When circuit is open, fails fast without attempting request."""
         import time
+
         client._circuit_open_until = time.time() + 60  # open for 60s
         client._consecutive_failures = 5
 
@@ -429,11 +433,13 @@ class TestBackup:
             assert "tables" in data
         finally:
             import os
+
             os.unlink(out_path)
 
     def test_backup_default_path(self, client: Client):
         """Backup with default path uses today's date."""
         import datetime
+
         client._query = lambda *a, **kw: []
 
         result = client.backup()
@@ -441,6 +447,7 @@ class TestBackup:
         date = datetime.date.today().isoformat()
         assert date in result["path"]
         import os
+
         os.unlink(result["path"])
 
     def test_backup_runtime_error_skipped(self, client: Client):
@@ -469,6 +476,7 @@ class TestBackup:
         assert result["status"] == "ok"
         pm.dispatch_export.assert_called_once()
         import os
+
         os.unlink(result["path"])
 
 
@@ -599,10 +607,12 @@ class TestStoreBatchIndexing:
         c._call = Mock(return_value=[{"status": "ok"}])
         c._embed_batch = Mock(return_value=[[0.1] * 1024, [0.2] * 1024])
         c._embed = Mock(return_value=[[0.1] * 1024])
-        c._query = Mock(return_value=[
-            {"id": "mem-1", "created_at": 200},
-            {"id": "mem-2", "created_at": 100},
-        ])
+        c._query = Mock(
+            return_value=[
+                {"id": "mem-1", "created_at": 200},
+                {"id": "mem-2", "created_at": 100},
+            ]
+        )
         c._tantivy_index = Mock()
         c._extract_and_store_entities = Mock()
         c._binary_cache = {}
@@ -653,9 +663,7 @@ class TestLLMRerankRateLimit:
         with pytest.MonkeyPatch().context() as mp:
             mp.setattr("httpx.post", mock_post)
             mp.setattr("time.sleep", lambda s: None)
-            results = llm_rerank(
-                "query", [{"id": "a", "content": "x"}], api_key="sk-test"
-            )
+            results = llm_rerank("query", [{"id": "a", "content": "x"}], api_key="sk-test")
             assert len(results) >= 1
             assert results[0]["score"] == pytest.approx(0.9)
 
@@ -671,9 +679,7 @@ class TestLLMRerankRateLimit:
             mp.setattr("httpx.post", Mock(return_value=resp_429))
             mp.setattr("time.sleep", lambda s: None)
             original = [{"id": "a", "content": "x", "score": 0.5}]
-            results = llm_rerank(
-                "query", original, api_key="sk-test"
-            )
+            results = llm_rerank("query", original, api_key="sk-test")
             # Falls back to original results
             assert results == original
 
@@ -685,10 +691,14 @@ class TestLLMRerankRateLimit:
         resp = Mock(spec=httpx.Response)
         resp.status_code = 200
         resp.json.return_value = {
-            "choices": [{"message": {
-                "content": "",
-                "reasoning_content": '[{"index":0,"score":8.8}]',
-            }}]
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "reasoning_content": '[{"index":0,"score":8.8}]',
+                    }
+                }
+            ]
         }
         resp.request = Mock()
 
@@ -712,9 +722,11 @@ class TestStorePostIndexing:
         c = Client(host="localhost", port="3001", database="test-db")
         c._call = Mock(return_value={"status": "ok"})
         c._embed = Mock(return_value=[0.1] * 1024)  # non-empty → triggers indexing
-        c._query = Mock(return_value=[
-            {"id": "mem-1", "content": "hello world"},
-        ])
+        c._query = Mock(
+            return_value=[
+                {"id": "mem-1", "content": "hello world"},
+            ]
+        )
         c._tantivy_index = Mock()
         c._extract_and_store_entities = Mock()
         c._binary_cache = {}
@@ -752,9 +764,11 @@ class TestStorePostIndexing:
         c = Client(host="localhost", port="3001", database="test-db")
         c._call = Mock(return_value={"status": "ok"})
         c._embed = Mock(return_value=[0.1] * 1024)
-        c._query = Mock(return_value=[
-            {"id": "mem-1", "content": "hello world"},
-        ])
+        c._query = Mock(
+            return_value=[
+                {"id": "mem-1", "content": "hello world"},
+            ]
+        )
         c._tantivy_index = Mock()
         c._extract_and_store_entities = Mock()
         c._binary_cache = {}
@@ -783,7 +797,12 @@ class TestExtractAndStoreEntities:
         mock_llm = Mock()
         mock_llm.available = True
         mock_llm.extract_entities_llm.return_value = [
-            {"name": "Alice", "entity_type": "person", "aliases": ["Al"], "description": "A person"},
+            {
+                "name": "Alice",
+                "entity_type": "person",
+                "aliases": ["Al"],
+                "description": "A person",
+            },
             {"name": "Bob", "entity_type": "person", "aliases": [], "description": "Another"},
         ]
 
@@ -881,7 +900,7 @@ class TestExtractEntitiesSkip:
         mock_llm.available = True
         mock_llm.extract_entities_llm.return_value = [
             {"name": "A", "entity_type": "letter"},  # too short
-            {"name": "OK", "entity_type": "word"},   # ok
+            {"name": "OK", "entity_type": "word"},  # ok
         ]
 
         with patch("spacetime_memory.llm.LLMClient", return_value=mock_llm):
@@ -946,10 +965,12 @@ class TestPatternDetection:
         from unittest.mock import patch
 
         c = Client(host="localhost", port="3001", database="test-db")
-        c._query = Mock(return_value=[
-            {"id": "1", "content": "a"},
-            {"id": "2", "content": "b"},
-        ])
+        c._query = Mock(
+            return_value=[
+                {"id": "1", "content": "a"},
+                {"id": "2", "content": "b"},
+            ]
+        )
 
         mock_detect = Mock(return_value={"patterns": [], "clusters": []})
         with patch("spacetime_memory.pattern_detection.detect_patterns", mock_detect):
@@ -966,9 +987,11 @@ class TestBatchUpdateMemoriesSuccess:
 
     def test_batch_update_success(self):
         c = Client(host="localhost", port="3001", database="test-db")
-        c._query = Mock(return_value=[
-            {"id": "m1", "content": "old", "summary": "s", "confidence": 0.5},
-        ])
+        c._query = Mock(
+            return_value=[
+                {"id": "m1", "content": "old", "summary": "s", "confidence": 0.5},
+            ]
+        )
         c.update_memory = Mock(return_value={"status": "ok"})
 
         result = c.batch_update_memories("ws1", ["m1"], {"content": "new"})
@@ -1016,10 +1039,12 @@ class TestProfileStubs:
 
     def test_search_profiles(self, client):
         """search_profiles filters client-side by static_facts_json."""
-        client.list_profiles = Mock(return_value=[
-            {"peer_id": "p1", "static_facts_json": "likes coffee"},
-            {"peer_id": "p2", "static_facts_json": "prefers tea"},
-        ])
+        client.list_profiles = Mock(
+            return_value=[
+                {"peer_id": "p1", "static_facts_json": "likes coffee"},
+                {"peer_id": "p2", "static_facts_json": "prefers tea"},
+            ]
+        )
         results = client.search_profiles("ws1", "coffee")
         assert len(results) == 1
         assert results[0]["peer_id"] == "p1"
@@ -1064,9 +1089,16 @@ class TestEntityLinkStubs:
 
     def test_create_entity_link(self, client):
         client.create_entity_link("ws1", "Alice", "person", "Alice in Wonderland")
-        client._call.assert_called_with("create_entity_link", [
-            "ws1", "Alice", "[]", "person", "Alice in Wonderland",
-        ])
+        client._call.assert_called_with(
+            "create_entity_link",
+            [
+                "ws1",
+                "Alice",
+                "[]",
+                "person",
+                "Alice in Wonderland",
+            ],
+        )
 
     def test_add_alias(self, client):
         client.add_alias("link-1", "Alias")
@@ -1085,10 +1117,12 @@ class TestGetContextChain:
 
     def test_returns_context(self):
         c = Client(host="localhost", port="3001", database="test-db")
-        c._query = Mock(side_effect=[
-            [{"id": "mem-1", "workspace_id": "ws1", "context": "mem context"}],
-            [{"id": "ws1", "context": "ws context"}],
-        ])
+        c._query = Mock(
+            side_effect=[
+                [{"id": "mem-1", "workspace_id": "ws1", "context": "mem context"}],
+                [{"id": "ws1", "context": "ws context"}],
+            ]
+        )
         result = c.get_context_chain("mem-1")
         assert result["memory_context"] == "mem context"
         assert result["workspace_context"] == "ws context"
@@ -1102,10 +1136,12 @@ class TestGetContextChain:
 
     def test_no_workspace_context(self):
         c = Client(host="localhost", port="3001", database="test-db")
-        c._query = Mock(side_effect=[
-            [{"id": "mem-1", "workspace_id": "ws1", "context": "mem ctx"}],
-            [],  # workspace lookup returns empty
-        ])
+        c._query = Mock(
+            side_effect=[
+                [{"id": "mem-1", "workspace_id": "ws1", "context": "mem ctx"}],
+                [],  # workspace lookup returns empty
+            ]
+        )
         result = c.get_context_chain("mem-1")
         assert result["memory_context"] == "mem ctx"
         assert result["workspace_context"] == ""
@@ -1150,7 +1186,9 @@ class TestMethodStubs:
 
     def test_add_node_citation(self, client):
         client.add_node_citation("ws1", "node-1", "mem-1", "citation desc")
-        client._call.assert_called_with("add_node_citation", ["ws1", "node-1", "mem-1", "citation desc"])
+        client._call.assert_called_with(
+            "add_node_citation", ["ws1", "node-1", "mem-1", "citation desc"]
+        )
 
     def test_add_edge_citation(self, client):
         client.add_edge_citation("ws1", "src", "tgt", "desc")
@@ -1171,11 +1209,14 @@ class TestMethodStubs:
     def test_get_edges_with_labels(self, client):
         """get_neighbors resolves node IDs to labels."""
         c = Client(host="localhost", port="3001", database="test-db")
-        c._call = Mock(return_value=[
-            {"source_node_id": "n1", "target_node_id": "n2", "weight": 1.0},
-        ])
+        c._call = Mock(
+            return_value=[
+                {"source_node_id": "n1", "target_node_id": "n2", "weight": 1.0},
+            ]
+        )
         # _query side-effect: edges_src, edges_tgt, then node resolutions
         calls = []
+
         def mock_query(*args, **kw):
             calls.append((args, kw))
             if "source_node_id" in str(kw.get("filter_dict", {})):
@@ -1186,6 +1227,7 @@ class TestMethodStubs:
             filt = kw.get("filter_dict", {})
             nid = filt.get("id", "")
             return [{"id": nid, "label": f"Label-{nid}"}]
+
         c._query = mock_query
 
         edges = c.get_neighbors("n1", "ws1")
@@ -1312,13 +1354,15 @@ class TestNoteCrudStubs:
 
     def test_get_note_by_date(self, client):
         client.get_note_by_date("2026-06-22")
-        client._query.assert_called_with("note", filter_dict={
-            "note_date": "2026-06-22", "is_active": "true"})
+        client._query.assert_called_with(
+            "note", filter_dict={"note_date": "2026-06-22", "is_active": "true"}
+        )
 
     def test_get_note_by_title(self, client):
         client.get_note_by_title("My Note")
-        client._query.assert_called_with("note", filter_dict={
-            "title": "My Note", "is_active": "true"})
+        client._query.assert_called_with(
+            "note", filter_dict={"title": "My Note", "is_active": "true"}
+        )
 
 
 class TestNoteSearchIndexing:
@@ -1347,20 +1391,43 @@ class TestNoteSearchIndexing:
             embed=True,
         )
         # Should call create_note reducer (embedding is [0.1,0.2,0.3] from mock)
-        client._call.assert_any_call("create_note", [
-            "ws-1", "Test Note", "My test content", "", "[0.1, 0.2, 0.3]",
-        ])
+        client._call.assert_any_call(
+            "create_note",
+            [
+                "ws-1",
+                "Test Note",
+                "My test content",
+                "",
+                "[0.1, 0.2, 0.3]",
+            ],
+        )
         # Should call index_entity for search index
-        client._call.assert_any_call("index_entity", [
-            "ws-1", "note", "note-abc", "My test content", "[0.1, 0.2, 0.3]",
-        ])
+        client._call.assert_any_call(
+            "index_entity",
+            [
+                "ws-1",
+                "note",
+                "note-abc",
+                "My test content",
+                "[0.1, 0.2, 0.3]",
+            ],
+        )
         # Should call index_terms for BM25
-        client._call.assert_any_call("index_terms", [
-            "ws-1", "note", "note-abc", "My test content",
-        ])
+        client._call.assert_any_call(
+            "index_terms",
+            [
+                "ws-1",
+                "note",
+                "note-abc",
+                "My test content",
+            ],
+        )
         # Should index into Tantivy
         client._tantivy_index.assert_called_with(
-            "ws-1", "note-abc", "My test content", "note",
+            "ws-1",
+            "note-abc",
+            "My test content",
+            "note",
         )
 
     def test_create_note_no_index_when_status_not_ok(self, client):
@@ -1387,12 +1454,25 @@ class TestNoteSearchIndexing:
         # Should remove old index entries
         client._call.assert_any_call("remove_from_index", ["note", "note-abc"])
         # Should re-index with new content
-        client._call.assert_any_call("index_entity", [
-            "ws-1", "note", "note-abc", "Updated content", "[0.1, 0.2, 0.3]",
-        ])
-        client._call.assert_any_call("index_terms", [
-            "ws-1", "note", "note-abc", "Updated content",
-        ])
+        client._call.assert_any_call(
+            "index_entity",
+            [
+                "ws-1",
+                "note",
+                "note-abc",
+                "Updated content",
+                "[0.1, 0.2, 0.3]",
+            ],
+        )
+        client._call.assert_any_call(
+            "index_terms",
+            [
+                "ws-1",
+                "note",
+                "note-abc",
+                "Updated content",
+            ],
+        )
 
     def test_update_note_resolves_workspace_id(self, client):
         """update_note queries the note to resolve workspace_id."""
@@ -1400,9 +1480,16 @@ class TestNoteSearchIndexing:
             [{"id": "n1", "workspace_id": "ws-42", "content": "x"}],
         ]
         client.update_note("n1", content="x", embed=False)
-        client._call.assert_any_call("index_entity", [
-            "ws-42", "note", "n1", "x", "[]",
-        ])
+        client._call.assert_any_call(
+            "index_entity",
+            [
+                "ws-42",
+                "note",
+                "n1",
+                "x",
+                "[]",
+            ],
+        )
 
     def test_delete_note_removes_from_index(self, client):
         """delete_note must call remove_from_index."""
@@ -1420,32 +1507,37 @@ class TestNoteSearchIndexing:
     def test_enrich_content_handles_note_entity_type(self):
         """_enrich_content must look up note content for entity_type='note'."""
         c = Client(host="h", port="1", database="d")
-        c._query = Mock(return_value=[
-            {"id": "n1", "title": "My Note", "content": "Hello world"},
-        ])
+        c._query = Mock(
+            return_value=[
+                {"id": "n1", "title": "My Note", "content": "Hello world"},
+            ]
+        )
         rows = [
             {"entity_id": "n1", "entity_type": "note", "fused_score": 0.9},
         ]
         result = c._enrich_content(rows, "ws-1")
         assert result[0]["memory_content"] == "My Note\n\nHello world"
         c._query.assert_called_with(
-            "note", filter_dict={"id": "n1"},
+            "note",
+            filter_dict={"id": "n1"},
             columns=["id", "title", "content"],
         )
 
     def test_keyword_fallback_includes_notes(self):
         """_keyword_fallback must merge notes with memories."""
         c = Client(host="h", port="1", database="d")
-        c._query = Mock(side_effect=[
-            # First call: memory query
-            [{"id": "m1", "content": "alpha memory", "created_at": 100}],
-            # Second call: note query
-            [{"id": "n1", "content": "beta note", "title": "Beta", "created_at": 200}],
-            # _boost_with_entity_signal: kg_node query
-            [],
-            # _boost_with_entity_signal: entity_link query
-            [],
-        ])
+        c._query = Mock(
+            side_effect=[
+                # First call: memory query
+                [{"id": "m1", "content": "alpha memory", "created_at": 100}],
+                # Second call: note query
+                [{"id": "n1", "content": "beta note", "title": "Beta", "created_at": 200}],
+                # _boost_with_entity_signal: kg_node query
+                [],
+                # _boost_with_entity_signal: entity_link query
+                [],
+            ]
+        )
         c._emit_event = Mock()
         results = c._keyword_fallback("ws-1", "beta", "", "", 10)
         # Must include the note
@@ -1458,16 +1550,18 @@ class TestNoteSearchIndexing:
     def test_keyword_fallback_applies_entity_boost(self):
         """_keyword_fallback calls _boost_with_entity_signal when query is set."""
         c = Client(host="h", port="1", database="d")
-        c._query = Mock(side_effect=[
-            # First call: memory query
-            [{"id": "m1", "content": "RLHF is a technique", "created_at": 100}],
-            # Second call: note query
-            [],
-            # _boost_with_entity_signal: kg_node query
-            [],
-            # _boost_with_entity_signal: entity_link query
-            [],
-        ])
+        c._query = Mock(
+            side_effect=[
+                # First call: memory query
+                [{"id": "m1", "content": "RLHF is a technique", "created_at": 100}],
+                # Second call: note query
+                [],
+                # _boost_with_entity_signal: kg_node query
+                [],
+                # _boost_with_entity_signal: entity_link query
+                [],
+            ]
+        )
         c._emit_event = Mock()
         # Mock the boost method to track that it was called
         c._boost_with_entity_signal = Mock(wraps=c._boost_with_entity_signal)
@@ -1481,10 +1575,12 @@ class TestNoteSearchIndexing:
     def test_keyword_fallback_boost_no_crash_empty_query(self):
         """_keyword_fallback with empty query still works (no boost applied)."""
         c = Client(host="h", port="1", database="d")
-        c._query = Mock(side_effect=[
-            [{"id": "m1", "content": "test", "created_at": 100}],
-            [],
-        ])
+        c._query = Mock(
+            side_effect=[
+                [{"id": "m1", "content": "test", "created_at": 100}],
+                [],
+            ]
+        )
         c._emit_event = Mock()
         c._boost_with_entity_signal = Mock()
         results = c._keyword_fallback("ws-1", "", "", "", 10)
@@ -1494,10 +1590,12 @@ class TestNoteSearchIndexing:
     def test_keyword_fallback_boost_no_crash_no_entities(self):
         """_keyword_fallback with query but no KG entities doesn't crash."""
         c = Client(host="h", port="1", database="d")
-        c._query = Mock(side_effect=[
-            [{"id": "m1", "content": "hello world content", "created_at": 100}],
-            [],
-        ])
+        c._query = Mock(
+            side_effect=[
+                [{"id": "m1", "content": "hello world content", "created_at": 100}],
+                [],
+            ]
+        )
         c._emit_event = Mock()
         c._boost_with_entity_signal = Mock(
             wraps=lambda q, rows, ws: rows  # passthrough
@@ -1591,9 +1689,12 @@ class TestMultiRegionFailover:
             call_log.append(url)
             if "dead" in url:
                 raise httpx.ConnectError("dead host")
-            return Mock(status_code=200, headers={
-                "spacetime-identity-token": "tok123",
-            })
+            return Mock(
+                status_code=200,
+                headers={
+                    "spacetime-identity-token": "tok123",
+                },
+            )
 
         c._http.get = mock_get
 
@@ -1615,33 +1716,34 @@ class TestGetMemoryHistory:
         memory_id = "mem_001"
 
         # Mock _query to return revision records for memory_revision
-        client._query = MagicMock(return_value=[
-            {
-                "version": 1,
-                "previous_content": "",
-                "previous_summary": "",
-                "previous_confidence": 0.0,
-                "new_content": "original content",
-                "new_summary": "original summary",
-                "new_confidence": 0.8,
-                "changed_at": 1000,
-                "changed_by": "user1",
-            },
-            {
-                "version": 2,
-                "previous_content": "original content",
-                "previous_summary": "original summary",
-                "previous_confidence": 0.8,
-                "new_content": "updated content",
-                "new_summary": "updated summary",
-                "new_confidence": 0.9,
-                "changed_at": 2000,
-                "changed_by": "user2",
-            },
-        ])
+        client._query = MagicMock(
+            return_value=[
+                {
+                    "version": 1,
+                    "previous_content": "",
+                    "previous_summary": "",
+                    "previous_confidence": 0.0,
+                    "new_content": "original content",
+                    "new_summary": "original summary",
+                    "new_confidence": 0.8,
+                    "changed_at": 1000,
+                    "changed_by": "user1",
+                },
+                {
+                    "version": 2,
+                    "previous_content": "original content",
+                    "previous_summary": "original summary",
+                    "previous_confidence": 0.8,
+                    "new_content": "updated content",
+                    "new_summary": "updated summary",
+                    "new_confidence": 0.9,
+                    "changed_at": 2000,
+                    "changed_by": "user2",
+                },
+            ]
+        )
 
         # The second _query call (for current memory state) should return the latest
-        from unittest.mock import call
         client._query.side_effect = None  # Reset
         # Make repeated calls return different values based on the table name
         orig_query = client._query
@@ -1649,18 +1751,39 @@ class TestGetMemoryHistory:
         def side_effect(table, **kw):
             if table == "memory_revision":
                 return [
-                    {"version": 1, "previous_content": "", "previous_summary": "",
-                     "previous_confidence": 0.0, "new_content": "original content",
-                     "new_summary": "original summary", "new_confidence": 0.8,
-                     "changed_at": 1000, "changed_by": "user1"},
-                    {"version": 2, "previous_content": "original content", "previous_summary": "original summary",
-                     "previous_confidence": 0.8, "new_content": "updated content",
-                     "new_summary": "updated summary", "new_confidence": 0.9,
-                     "changed_at": 2000, "changed_by": "user2"},
+                    {
+                        "version": 1,
+                        "previous_content": "",
+                        "previous_summary": "",
+                        "previous_confidence": 0.0,
+                        "new_content": "original content",
+                        "new_summary": "original summary",
+                        "new_confidence": 0.8,
+                        "changed_at": 1000,
+                        "changed_by": "user1",
+                    },
+                    {
+                        "version": 2,
+                        "previous_content": "original content",
+                        "previous_summary": "original summary",
+                        "previous_confidence": 0.8,
+                        "new_content": "updated content",
+                        "new_summary": "updated summary",
+                        "new_confidence": 0.9,
+                        "changed_at": 2000,
+                        "changed_by": "user2",
+                    },
                 ]
             if table == "memory":
-                return [{"content": "updated content", "summary": "updated summary",
-                         "version": 2, "updated_at": 2000, "confidence": 0.9}]
+                return [
+                    {
+                        "content": "updated content",
+                        "summary": "updated summary",
+                        "version": 2,
+                        "updated_at": 2000,
+                        "confidence": 0.9,
+                    }
+                ]
             return []
 
         client._query = MagicMock(side_effect=side_effect)
@@ -1694,8 +1817,15 @@ class TestGetMemoryHistory:
             if table == "memory_revision":
                 return []
             if table == "memory":
-                return [{"content": "current content", "summary": "current summary",
-                         "version": 1, "updated_at": 3000, "confidence": 0.7}]
+                return [
+                    {
+                        "content": "current content",
+                        "summary": "current summary",
+                        "version": 1,
+                        "updated_at": 3000,
+                        "confidence": 0.7,
+                    }
+                ]
             return []
 
         client._query = MagicMock(side_effect=side_effect)
@@ -1714,14 +1844,28 @@ class TestGetMemoryHistory:
         def side_effect(table, **kw):
             if table == "memory_revision":
                 return [
-                    {"version": 1, "previous_content": "", "previous_summary": "",
-                     "previous_confidence": 0.0, "new_content": "v1 content",
-                     "new_summary": "v1 summary", "new_confidence": 0.8,
-                     "changed_at": 1000, "changed_by": "user1"},
+                    {
+                        "version": 1,
+                        "previous_content": "",
+                        "previous_summary": "",
+                        "previous_confidence": 0.0,
+                        "new_content": "v1 content",
+                        "new_summary": "v1 summary",
+                        "new_confidence": 0.8,
+                        "changed_at": 1000,
+                        "changed_by": "user1",
+                    },
                 ]
             if table == "memory":
-                return [{"content": "v2 content", "summary": "v2 summary",
-                         "version": 2, "updated_at": 2000, "confidence": 0.9}]
+                return [
+                    {
+                        "content": "v2 content",
+                        "summary": "v2 summary",
+                        "version": 2,
+                        "updated_at": 2000,
+                        "confidence": 0.9,
+                    }
+                ]
             return []
 
         client._query = MagicMock(side_effect=side_effect)
@@ -1741,9 +1885,16 @@ class TestEntityAwareBoost:
 
     def test_boost_no_entities_in_query(self, mock_http_client):
         """No boost when query doesn't match any KG node labels."""
-        mock_http_client._query = MagicMock(return_value=[
-            {"id": "n1", "label": "RLHF", "summary": "Reinforcement learning from human feedback", "node_type": "concept"},
-        ])
+        mock_http_client._query = MagicMock(
+            return_value=[
+                {
+                    "id": "n1",
+                    "label": "RLHF",
+                    "summary": "Reinforcement learning from human feedback",
+                    "node_type": "concept",
+                },
+            ]
+        )
 
         rows = [
             {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is a training method"},
@@ -1756,15 +1907,39 @@ class TestEntityAwareBoost:
 
     def test_boost_entity_exact_match(self, mock_http_client):
         """Boost when query exactly matches an entity label."""
-        mock_http_client._query = MagicMock(return_value=[
-            {"id": "n1", "label": "RLHF", "summary": "Reinforcement learning from human feedback", "node_type": "concept"},
-            {"id": "n2", "label": "LoRA", "summary": "Low-rank adaptation", "node_type": "concept"},
-        ])
+        mock_http_client._query = MagicMock(
+            return_value=[
+                {
+                    "id": "n1",
+                    "label": "RLHF",
+                    "summary": "Reinforcement learning from human feedback",
+                    "node_type": "concept",
+                },
+                {
+                    "id": "n2",
+                    "label": "LoRA",
+                    "summary": "Low-rank adaptation",
+                    "node_type": "concept",
+                },
+            ]
+        )
 
         rows = [
-            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is a training method for LLMs"},
-            {"entity_id": "m2", "fused_score": 0.6, "memory_content": "Supervised fine-tuning of base models"},
-            {"entity_id": "m3", "fused_score": 0.4, "memory_content": "LoRA is a parameter-efficient technique"},
+            {
+                "entity_id": "m1",
+                "fused_score": 0.8,
+                "memory_content": "RLHF is a training method for LLMs",
+            },
+            {
+                "entity_id": "m2",
+                "fused_score": 0.6,
+                "memory_content": "Supervised fine-tuning of base models",
+            },
+            {
+                "entity_id": "m3",
+                "fused_score": 0.4,
+                "memory_content": "LoRA is a parameter-efficient technique",
+            },
         ]
 
         result = mock_http_client._boost_with_entity_signal(
@@ -1786,10 +1961,12 @@ class TestEntityAwareBoost:
 
     def test_boost_multiple_entity_hits(self, mock_http_client):
         """Boost scales with proportion of matched entities in content."""
-        mock_http_client._query = MagicMock(return_value=[
-            {"id": "n1", "label": "RLHF", "summary": "", "node_type": "concept"},
-            {"id": "n2", "label": "LoRA", "summary": "", "node_type": "concept"},
-        ])
+        mock_http_client._query = MagicMock(
+            return_value=[
+                {"id": "n1", "label": "RLHF", "summary": "", "node_type": "concept"},
+                {"id": "n2", "label": "LoRA", "summary": "", "node_type": "concept"},
+            ]
+        )
 
         rows = [
             # Mentions both RLHF and LoRA when both entities match query
@@ -1814,12 +1991,18 @@ class TestEntityAwareBoost:
 
     def test_boost_word_level_overlap(self, mock_http_client):
         """Boost fires when a word from entity label overlaps query words."""
-        mock_http_client._query = MagicMock(return_value=[
-            {"id": "n1", "label": "Neural Networks", "summary": "", "node_type": "concept"},
-        ])
+        mock_http_client._query = MagicMock(
+            return_value=[
+                {"id": "n1", "label": "Neural Networks", "summary": "", "node_type": "concept"},
+            ]
+        )
 
         rows = [
-            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "neural networks are powerful"},
+            {
+                "entity_id": "m1",
+                "fused_score": 0.8,
+                "memory_content": "neural networks are powerful",
+            },
             {"entity_id": "m2", "fused_score": 0.6, "memory_content": "just some text"},
         ]
 
@@ -1835,13 +2018,24 @@ class TestEntityAwareBoost:
 
     def test_boost_summary_match(self, mock_http_client):
         """Boost fires when the query substring appears in entity summary, and result content mentions the entity label."""
-        mock_http_client._query = MagicMock(return_value=[
-            {"id": "n1", "label": "PEFT", "summary": "Parameter-efficient fine-tuning for large models", "node_type": "concept"},
-        ])
+        mock_http_client._query = MagicMock(
+            return_value=[
+                {
+                    "id": "n1",
+                    "label": "PEFT",
+                    "summary": "Parameter-efficient fine-tuning for large models",
+                    "node_type": "concept",
+                },
+            ]
+        )
 
         rows = [
             # Content mentions the entity label "PEFT"
-            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "PEFT (parameter efficient fine tuning) is useful"},
+            {
+                "entity_id": "m1",
+                "fused_score": 0.8,
+                "memory_content": "PEFT (parameter efficient fine tuning) is useful",
+            },
             # Content doesn't mention the entity label — no boost
             {"entity_id": "m2", "fused_score": 0.6, "memory_content": "just some unrelated text"},
         ]
@@ -1883,6 +2077,7 @@ class TestEntityAwareBoost:
     def test_boost_integrated_in_search_called(self, mock_http_client):
         """Verify _boost_with_entity_signal is called during search()."""
         from unittest.mock import patch
+
         # Mock _embed to return valid embedding
         mock_http_client._embed = MagicMock(return_value=[0.1, 0.2, 0.3])
         # Mock _call for hybrid_search and query_table
@@ -1892,8 +2087,11 @@ class TestEntityAwareBoost:
         # Mock _tantivy_search
         mock_http_client._tantivy_search = MagicMock(return_value=[])
         # Spy on _boost_with_entity_signal
-        with patch.object(mock_http_client, '_boost_with_entity_signal',
-                          wraps=mock_http_client._boost_with_entity_signal) as spy:
+        with patch.object(
+            mock_http_client,
+            "_boost_with_entity_signal",
+            wraps=mock_http_client._boost_with_entity_signal,
+        ) as spy:
             mock_http_client.search("default", "RLHF", semantic=True, limit=5)
             spy.assert_called_once()
 
@@ -1902,17 +2100,19 @@ class TestEntityAwareBoost:
     def test_boost_entity_link_alias_in_query(self, mock_http_client):
         """Boost fires when query contains an entity_link alias."""
         # First _query call returns kg_node (empty), second returns entity_link
-        mock_http_client._query = MagicMock(side_effect=[
-            [],  # kg_node: no nodes
-            [   # entity_link: one record with aliases
-                {
-                    "id": "el1",
-                    "entity_name": "RLHF",
-                    "aliases_json": '["reinforcement learning from human feedback", "RL from human feedback"]',
-                    "entity_type": "concept",
-                }
-            ],
-        ])
+        mock_http_client._query = MagicMock(
+            side_effect=[
+                [],  # kg_node: no nodes
+                [  # entity_link: one record with aliases
+                    {
+                        "id": "el1",
+                        "entity_name": "RLHF",
+                        "aliases_json": '["reinforcement learning from human feedback", "RL from human feedback"]',
+                        "entity_type": "concept",
+                    }
+                ],
+            ]
+        )
 
         rows = [
             {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is a training method"},
@@ -1934,28 +2134,32 @@ class TestEntityAwareBoost:
 
     def test_boost_entity_link_alias_in_content(self, mock_http_client):
         """Boost fires when result content contains an alias, not just canonical name."""
-        mock_http_client._query = MagicMock(side_effect=[
-            [],  # kg_node: empty
-            [
-                {
-                    "id": "el1",
-                    "entity_name": "PEFT",
-                    "aliases_json": '["parameter-efficient fine-tuning", "lightweight fine-tuning"]',
-                    "entity_type": "concept",
-                }
-            ],
-        ])
+        mock_http_client._query = MagicMock(
+            side_effect=[
+                [],  # kg_node: empty
+                [
+                    {
+                        "id": "el1",
+                        "entity_name": "PEFT",
+                        "aliases_json": '["parameter-efficient fine-tuning", "lightweight fine-tuning"]',
+                        "entity_type": "concept",
+                    }
+                ],
+            ]
+        )
 
         rows = [
             # Content doesn't mention "PEFT" but mentions the alias
-            {"entity_id": "m1", "fused_score": 0.8, "memory_content": "parameter-efficient fine-tuning is useful for LLMs"},
+            {
+                "entity_id": "m1",
+                "fused_score": 0.8,
+                "memory_content": "parameter-efficient fine-tuning is useful for LLMs",
+            },
             # No alias mention
             {"entity_id": "m2", "fused_score": 0.6, "memory_content": "some unrelated content"},
         ]
 
-        result = mock_http_client._boost_with_entity_signal(
-            "PEFT methods", rows, "default"
-        )
+        result = mock_http_client._boost_with_entity_signal("PEFT methods", rows, "default")
 
         # m1 mentions the alias "parameter-efficient fine-tuning" → boosted
         assert result[0]["entity_id"] == "m1"
@@ -1967,24 +2171,35 @@ class TestEntityAwareBoost:
 
     def test_boost_entity_link_and_kg_node_combined(self, mock_http_client):
         """Both KG nodes and entity_link aliases contribute to matching."""
-        mock_http_client._query = MagicMock(side_effect=[
-            [  # kg_node
-                {"id": "n1", "label": "RLHF", "summary": "Reinforcement learning from human feedback", "node_type": "concept"},
-            ],
-            [  # entity_link
-                {
-                    "id": "el1",
-                    "entity_name": "LoRA",
-                    "aliases_json": '["low-rank adaptation"]',
-                    "entity_type": "concept",
-                }
-            ],
-        ])
+        mock_http_client._query = MagicMock(
+            side_effect=[
+                [  # kg_node
+                    {
+                        "id": "n1",
+                        "label": "RLHF",
+                        "summary": "Reinforcement learning from human feedback",
+                        "node_type": "concept",
+                    },
+                ],
+                [  # entity_link
+                    {
+                        "id": "el1",
+                        "entity_name": "LoRA",
+                        "aliases_json": '["low-rank adaptation"]',
+                        "entity_type": "concept",
+                    }
+                ],
+            ]
+        )
 
         rows = [
             {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF and LoRA combined"},
             {"entity_id": "m2", "fused_score": 0.6, "memory_content": "only RLHF here"},
-            {"entity_id": "m3", "fused_score": 0.4, "memory_content": "low-rank adaptation is efficient"},
+            {
+                "entity_id": "m3",
+                "fused_score": 0.4,
+                "memory_content": "low-rank adaptation is efficient",
+            },
         ]
 
         result = mock_http_client._boost_with_entity_signal(
@@ -2006,12 +2221,14 @@ class TestEntityAwareBoost:
 
     def test_boost_entity_link_table_unavailable(self, mock_http_client):
         """Graceful degradation when entity_link query raises RuntimeError."""
-        mock_http_client._query = MagicMock(side_effect=[
-            [  # kg_node succeeds
-                {"id": "n1", "label": "RLHF", "summary": "", "node_type": "concept"},
-            ],
-            RuntimeError("no entity_link table"),  # entity_link fails
-        ])
+        mock_http_client._query = MagicMock(
+            side_effect=[
+                [  # kg_node succeeds
+                    {"id": "n1", "label": "RLHF", "summary": "", "node_type": "concept"},
+                ],
+                RuntimeError("no entity_link table"),  # entity_link fails
+            ]
+        )
 
         rows = [
             {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is great"},
@@ -2024,17 +2241,19 @@ class TestEntityAwareBoost:
 
     def test_boost_entity_link_empty_aliases_json(self, mock_http_client):
         """entity_link with empty or invalid aliases_json is handled gracefully."""
-        mock_http_client._query = MagicMock(side_effect=[
-            [],
-            [
-                {
-                    "id": "el1",
-                    "entity_name": "RLHF",
-                    "aliases_json": "",  # empty aliases field
-                    "entity_type": "concept",
-                }
-            ],
-        ])
+        mock_http_client._query = MagicMock(
+            side_effect=[
+                [],
+                [
+                    {
+                        "id": "el1",
+                        "entity_name": "RLHF",
+                        "aliases_json": "",  # empty aliases field
+                        "entity_type": "concept",
+                    }
+                ],
+            ]
+        )
 
         rows = [
             {"entity_id": "m1", "fused_score": 0.8, "memory_content": "RLHF is awesome"},
@@ -2070,11 +2289,18 @@ class TestSearchEntityTypes:
             with patch.object(mock_client, "_call", return_value={"status": "ok"}):
                 with patch.object(mock_client, "_sql", return_value=mock_rows):
                     with patch.object(mock_client, "_tantivy_search", return_value=[]):
-                        with patch.object(mock_client, "_fuse_and_deduplicate", return_value=mock_rows):
-                            with patch.object(mock_client, "_enrich_content", return_value=mock_rows):
+                        with patch.object(
+                            mock_client, "_fuse_and_deduplicate", return_value=mock_rows
+                        ):
+                            with patch.object(
+                                mock_client, "_enrich_content", return_value=mock_rows
+                            ):
                                 result = mock_client.search(
-                                    "ws1", "test query", semantic=True,
-                                    limit=20, entity_types=["memory", "note"],
+                                    "ws1",
+                                    "test query",
+                                    semantic=True,
+                                    limit=20,
+                                    entity_types=["memory", "note"],
                                 )
         # Should only contain memories and notes
         assert all(r["entity_type"] in ("memory", "note") for r in result)
@@ -2094,14 +2320,22 @@ class TestSearchEntityTypes:
         mock_notes = [
             {"id": "n1", "content": "world of notes", "entity_type": "note", "created_at": 90},
         ]
-        with patch.object(mock_client, "_query", side_effect=[
-            mock_memories, mock_notes,
-            [],  # _boost_with_entity_signal: kg_node
-            [],  # _boost_with_entity_signal: entity_link
-        ]):
+        with patch.object(
+            mock_client,
+            "_query",
+            side_effect=[
+                mock_memories,
+                mock_notes,
+                [],  # _boost_with_entity_signal: kg_node
+                [],  # _boost_with_entity_signal: entity_link
+            ],
+        ):
             result = mock_client.search(
-                "ws1", "world", semantic=False,
-                limit=20, entity_types=["memory"],
+                "ws1",
+                "world",
+                semantic=False,
+                limit=20,
+                entity_types=["memory"],
             )
         # Only memories survive (notes are filtered out)
         assert all(r.get("entity_type") == "memory" for r in result)
@@ -2117,10 +2351,17 @@ class TestSearchEntityTypes:
             with patch.object(mock_client, "_call", return_value={"status": "ok"}):
                 with patch.object(mock_client, "_sql", return_value=mock_rows):
                     with patch.object(mock_client, "_tantivy_search", return_value=[]):
-                        with patch.object(mock_client, "_fuse_and_deduplicate", return_value=mock_rows):
-                            with patch.object(mock_client, "_enrich_content", return_value=mock_rows):
+                        with patch.object(
+                            mock_client, "_fuse_and_deduplicate", return_value=mock_rows
+                        ):
+                            with patch.object(
+                                mock_client, "_enrich_content", return_value=mock_rows
+                            ):
                                 result = mock_client.search(
-                                    "ws1", "test query", semantic=True, limit=20,
+                                    "ws1",
+                                    "test query",
+                                    semantic=True,
+                                    limit=20,
                                 )
         # All types present (no filtering)
         assert len(result) == 3
@@ -2131,8 +2372,11 @@ class TestSearchEntityTypes:
         """entity_types=[] returns empty results."""
         with patch.object(mock_client, "_query", return_value=[]):
             result = mock_client.search(
-                "ws1", "test", semantic=False,
-                limit=20, entity_types=[],
+                "ws1",
+                "test",
+                semantic=False,
+                limit=20,
+                entity_types=[],
             )
         assert result == []
 
@@ -2143,6 +2387,7 @@ class TestMakeSnippet:
     def test_short_text_no_truncation(self):
         """Text shorter than max_chars is returned unchanged."""
         from spacetime_memory.client import _make_snippet
+
         text = "Hello world"
         result = _make_snippet(text, max_chars=200)
         assert result == "Hello world"
@@ -2150,6 +2395,7 @@ class TestMakeSnippet:
     def test_exact_boundary_no_truncation(self):
         """Text exactly at max_chars is returned without '...'."""
         from spacetime_memory.client import _make_snippet
+
         text = "A" * 200
         result = _make_snippet(text, max_chars=200)
         assert result == "A" * 200
@@ -2158,6 +2404,7 @@ class TestMakeSnippet:
     def test_truncate_at_word_boundary(self):
         """Long text is truncated at the last space within the first max_chars."""
         from spacetime_memory.client import _make_snippet
+
         # "quick brown fox..." — first 20 chars: "quick brown fox jump"
         # last space within those 20 is after "fox" (pos 15)
         text = "quick brown fox jumped over the lazy dog"
@@ -2167,6 +2414,7 @@ class TestMakeSnippet:
     def test_truncate_no_good_boundary_uses_hard_cut(self):
         """When no suitable word boundary (space before max_chars//2), use hard cut at max_chars."""
         from spacetime_memory.client import _make_snippet
+
         # "abcdefghijklmnopqrstuvwxyz" — 26 chars, max_chars=10, no space at all
         text = "abcdefghijklmnopqrstuvwxyz"
         result = _make_snippet(text, max_chars=10)
@@ -2175,11 +2423,13 @@ class TestMakeSnippet:
     def test_empty_string_returns_empty(self):
         """Empty string returns empty string."""
         from spacetime_memory.client import _make_snippet
+
         assert _make_snippet("") == ""
 
     def test_none_falsy_returns_empty(self):
         """Falsy input (None, empty) returns empty string."""
         from spacetime_memory.client import _make_snippet
+
         assert _make_snippet(None) == ""  # type: ignore[arg-type]
         assert _make_snippet("") == ""
         assert _make_snippet("   ".strip()[:0]) == ""
@@ -2187,6 +2437,7 @@ class TestMakeSnippet:
     def test_custom_max_chars(self):
         """max_chars parameter controls truncation length."""
         from spacetime_memory.client import _make_snippet
+
         text = "this is a test of the emergency broadcast system"
         result = _make_snippet(text, max_chars=10)
         # First 10 chars: "this is a " — last space at pos 9 ("this is a")
@@ -2195,6 +2446,7 @@ class TestMakeSnippet:
     def test_very_long_text(self):
         """Very long text (multi-KB) truncates correctly."""
         from spacetime_memory.client import _make_snippet
+
         text = "hello world " * 500  # ~6000 chars
         result = _make_snippet(text, max_chars=200)
         assert result.endswith("...")
@@ -2206,6 +2458,7 @@ class TestMakeSnippet:
     def test_single_word_no_space(self):
         """A single unbroken word longer than max_chars uses hard cut."""
         from spacetime_memory.client import _make_snippet
+
         text = "Supercalifragilisticexpialidocious"
         result = _make_snippet(text, max_chars=10)
         assert result == "Supercalif..."  # Hard cut at 10 + "..."
@@ -2213,6 +2466,7 @@ class TestMakeSnippet:
     def test_rstrip_trailing_spaces(self):
         """Trailing whitespace before '...' is stripped."""
         from spacetime_memory.client import _make_snippet
+
         # First 20 chars: "hello world      a" with lots of trailing spaces
         text = "hello world" + " " * 20 + "this part is after the boundary"
         result = _make_snippet(text, max_chars=20)

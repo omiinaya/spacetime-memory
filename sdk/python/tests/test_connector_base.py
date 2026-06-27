@@ -8,9 +8,6 @@ ConnectorRegistry, and ConnectorDaemon.
 import json
 import os
 import sys
-import tempfile
-import time
-from pathlib import Path
 from unittest import mock
 
 import httpx
@@ -422,10 +419,12 @@ class TestRun:
 
     def test_run_processes_events(self):
         """run() calls poll(), feeds events to on_event(), and tracks status."""
-        conn = TestConnector(events=[
-            Event(content="ev1"),
-            Event(content="ev2"),
-        ])
+        conn = TestConnector(
+            events=[
+                Event(content="ev1"),
+                Event(content="ev2"),
+            ]
+        )
         mock_client = mock.Mock()
 
         with mock.patch("time.sleep"):
@@ -438,9 +437,7 @@ class TestRun:
 
     def test_run_respects_max_per_tick(self):
         """max_per_tick caps the number of events processed."""
-        conn = TestConnector(events=[
-            Event(content=f"ev{i}") for i in range(10)
-        ])
+        conn = TestConnector(events=[Event(content=f"ev{i}") for i in range(10)])
         mock_client = mock.Mock()
 
         with mock.patch("time.sleep"):
@@ -472,17 +469,21 @@ class TestRun:
 
     def test_run_handles_on_event_error(self):
         """When on_event() raises, error is logged and count increments."""
-        conn = TestConnector(events=[
-            Event(content="ev1"),
-            Event(content="ev2"),
-        ])
+        conn = TestConnector(
+            events=[
+                Event(content="ev1"),
+                Event(content="ev2"),
+            ]
+        )
         mock_client = mock.Mock()
+
         # Make the second event crash
         def crashing_on_event(event, client):
             if event.content == "ev2":
                 raise RuntimeError("handler crash")
             conn._on_event_calls.append((event, client))
             super(TestConnector, conn).on_event(event, client)
+
         conn.on_event = crashing_on_event
 
         with mock.patch("time.sleep"):
@@ -497,8 +498,7 @@ class TestRun:
         conn = TestConnector(events=[])
         mock_client = mock.Mock()
 
-        with mock.patch.object(conn, "_save_cursor") as mock_save, \
-             mock.patch("time.sleep"):
+        with mock.patch.object(conn, "_save_cursor") as mock_save, mock.patch("time.sleep"):
             conn.run(mock_client, interval_secs=0.01, stop_after=1)
 
         mock_save.assert_called_once()
@@ -599,9 +599,15 @@ class TestConnectorDaemon:
     def test_load_configs(self):
         client = mock.Mock()
         client._query.return_value = [
-            {"id": "c1", "name": "My RSS", "connector_type": "rss",
-             "config_json": '{"feed_url":"https://example.com/feed"}',
-             "workspace_id": "ws-1", "schedule_secs": 300, "is_active": "true"}
+            {
+                "id": "c1",
+                "name": "My RSS",
+                "connector_type": "rss",
+                "config_json": '{"feed_url":"https://example.com/feed"}',
+                "workspace_id": "ws-1",
+                "schedule_secs": 300,
+                "is_active": "true",
+            }
         ]
         daemon = ConnectorDaemon(client)
         rows = daemon._load_configs()
@@ -612,21 +618,21 @@ class TestConnectorDaemon:
     def test_build_connector_rss(self):
         daemon = ConnectorDaemon(mock.Mock())
         cfg = {
-            "id": "c1", "name": "RSS Feed",
+            "id": "c1",
+            "name": "RSS Feed",
             "connector_type": "rss",
             "config_json": '{"feed_url": "https://example.com/rss"}',
             "workspace_id": "ws-1",
         }
         with mock.patch("spacetime_memory.connectors.RssFeedConnector") as MockRSS:
             result = daemon._build_connector(cfg)
-            MockRSS.assert_called_once_with(
-                feed_url="https://example.com/rss", workspace_id="ws-1"
-            )
+            MockRSS.assert_called_once_with(feed_url="https://example.com/rss", workspace_id="ws-1")
 
     def test_build_connector_unknown_type(self):
         daemon = ConnectorDaemon(mock.Mock())
         cfg = {
-            "id": "c1", "name": "Bad",
+            "id": "c1",
+            "name": "Bad",
             "connector_type": "nonexistent",
             "config_json": "{}",
             "workspace_id": "ws-1",
@@ -637,7 +643,8 @@ class TestConnectorDaemon:
     def test_build_connector_github(self):
         daemon = ConnectorDaemon(mock.Mock())
         cfg = {
-            "id": "c2", "name": "GH",
+            "id": "c2",
+            "name": "GH",
             "connector_type": "github",
             "config_json": '{"token": "tok", "username": "user"}',
             "workspace_id": "ws-2",
@@ -649,7 +656,8 @@ class TestConnectorDaemon:
     def test_build_connector_twitter(self):
         daemon = ConnectorDaemon(mock.Mock())
         cfg = {
-            "id": "c3", "name": "Twitter",
+            "id": "c3",
+            "name": "Twitter",
             "connector_type": "twitter",
             "config_json": '{"bearer_token": "bear", "user_id": "uid"}',
             "workspace_id": "ws-3",
@@ -661,7 +669,8 @@ class TestConnectorDaemon:
     def test_build_connector_slack(self):
         daemon = ConnectorDaemon(mock.Mock())
         cfg = {
-            "id": "c4", "name": "Slack",
+            "id": "c4",
+            "name": "Slack",
             "connector_type": "slack",
             "config_json": '{"token": "tok", "channel_ids": ["c1"]}',
             "workspace_id": "ws-4",
@@ -673,7 +682,8 @@ class TestConnectorDaemon:
     def test_build_connector_discord(self):
         daemon = ConnectorDaemon(mock.Mock())
         cfg = {
-            "id": "c5", "name": "Discord",
+            "id": "c5",
+            "name": "Discord",
             "connector_type": "discord",
             "config_json": '{"token": "tok", "channel_ids": ["c2"]}',
             "workspace_id": "ws-5",
@@ -686,13 +696,22 @@ class TestConnectorDaemon:
         """start() runs a single tick and stops."""
         daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
 
-        configs = [{"id": "c1", "name": "RSS", "connector_type": "rss",
-                     "config_json": '{"feed_url":"http://ex.com/rss"}',
-                     "workspace_id": "ws-1", "schedule_secs": 300}]
+        configs = [
+            {
+                "id": "c1",
+                "name": "RSS",
+                "connector_type": "rss",
+                "config_json": '{"feed_url":"http://ex.com/rss"}',
+                "workspace_id": "ws-1",
+                "schedule_secs": 300,
+            }
+        ]
 
-        with mock.patch.object(daemon, "_load_configs", return_value=configs), \
-             mock.patch.object(daemon, "_build_connector") as mock_build, \
-             mock.patch("time.sleep") as mock_sleep:
+        with (
+            mock.patch.object(daemon, "_load_configs", return_value=configs),
+            mock.patch.object(daemon, "_build_connector") as mock_build,
+            mock.patch("time.sleep") as mock_sleep,
+        ):
             # Make start() return after 1 tick
             mock_sleep.side_effect = [None, None, KeyboardInterrupt()]
 
@@ -709,8 +728,10 @@ class TestConnectorDaemon:
         daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
 
         # Return empty configs — any existing runners should be removed
-        with mock.patch.object(daemon, "_load_configs", return_value=[]), \
-             mock.patch("time.sleep") as mock_sleep:
+        with (
+            mock.patch.object(daemon, "_load_configs", return_value=[]),
+            mock.patch("time.sleep") as mock_sleep,
+        ):
             mock_sleep.side_effect = [None, KeyboardInterrupt()]
 
             # Manually inject a runner that should be removed
@@ -726,14 +747,23 @@ class TestConnectorDaemon:
         """start() catches _build_connector errors (lines 431-432)."""
         daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
 
-        configs = [{"id": "bad1", "name": "Bad", "connector_type": "rss",
-                     "config_json": '{"feed_url":"http://ex.com/rss"}',
-                     "workspace_id": "ws-1", "schedule_secs": 300}]
+        configs = [
+            {
+                "id": "bad1",
+                "name": "Bad",
+                "connector_type": "rss",
+                "config_json": '{"feed_url":"http://ex.com/rss"}',
+                "workspace_id": "ws-1",
+                "schedule_secs": 300,
+            }
+        ]
 
-        with mock.patch.object(daemon, "_load_configs", return_value=configs), \
-             mock.patch.object(daemon, "_build_connector", side_effect=RuntimeError("build fail")), \
-             mock.patch("time.sleep") as mock_sleep, \
-             mock.patch("logging.getLogger") as mock_logger:
+        with (
+            mock.patch.object(daemon, "_load_configs", return_value=configs),
+            mock.patch.object(daemon, "_build_connector", side_effect=RuntimeError("build fail")),
+            mock.patch("time.sleep") as mock_sleep,
+            mock.patch("logging.getLogger") as mock_logger,
+        ):
             mock_sleep.side_effect = [None, KeyboardInterrupt()]
             with pytest.raises(KeyboardInterrupt):
                 daemon.start()
@@ -743,15 +773,24 @@ class TestConnectorDaemon:
         """start() catches conn.poll() errors (lines 444-445)."""
         daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
 
-        configs = [{"id": "c1", "name": "RSS", "connector_type": "rss",
-                     "config_json": '{"feed_url":"http://ex.com/rss"}',
-                     "workspace_id": "ws-1", "schedule_secs": 300}]
+        configs = [
+            {
+                "id": "c1",
+                "name": "RSS",
+                "connector_type": "rss",
+                "config_json": '{"feed_url":"http://ex.com/rss"}',
+                "workspace_id": "ws-1",
+                "schedule_secs": 300,
+            }
+        ]
 
         bad_conn = TestConnector(poll_side_effect=RuntimeError("poll fail"))
 
-        with mock.patch.object(daemon, "_load_configs", return_value=configs), \
-             mock.patch.object(daemon, "_build_connector", return_value=bad_conn), \
-             mock.patch("time.sleep") as mock_sleep:
+        with (
+            mock.patch.object(daemon, "_load_configs", return_value=configs),
+            mock.patch.object(daemon, "_build_connector", return_value=bad_conn),
+            mock.patch("time.sleep") as mock_sleep,
+        ):
             mock_sleep.side_effect = [None, KeyboardInterrupt()]
             with pytest.raises(KeyboardInterrupt):
                 daemon.start()
@@ -761,20 +800,31 @@ class TestConnectorDaemon:
         """start() catches conn.on_event errors (lines 440-441)."""
         daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
 
-        configs = [{"id": "c1", "name": "RSS", "connector_type": "rss",
-                     "config_json": '{"feed_url":"http://ex.com/rss"}',
-                     "workspace_id": "ws-1", "schedule_secs": 300}]
+        configs = [
+            {
+                "id": "c1",
+                "name": "RSS",
+                "connector_type": "rss",
+                "config_json": '{"feed_url":"http://ex.com/rss"}',
+                "workspace_id": "ws-1",
+                "schedule_secs": 300,
+            }
+        ]
 
         # Connector that returns events but raises in on_event
         conn = TestConnector(events=[Event(content="ev1")])
         orig_on_event = conn.on_event
+
         def failing_on_event(ev, client):
             raise RuntimeError("handler fail")
+
         conn.on_event = failing_on_event
 
-        with mock.patch.object(daemon, "_load_configs", return_value=configs), \
-             mock.patch.object(daemon, "_build_connector", return_value=conn), \
-             mock.patch("time.sleep") as mock_sleep:
+        with (
+            mock.patch.object(daemon, "_load_configs", return_value=configs),
+            mock.patch.object(daemon, "_build_connector", return_value=conn),
+            mock.patch("time.sleep") as mock_sleep,
+        ):
             mock_sleep.side_effect = [None, KeyboardInterrupt()]
             with pytest.raises(KeyboardInterrupt):
                 daemon.start()
@@ -784,8 +834,10 @@ class TestConnectorDaemon:
         """start() catches outer daemon tick errors (lines 447-448)."""
         daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=1)
 
-        with mock.patch.object(daemon, "_load_configs", side_effect=RuntimeError("load fail")), \
-             mock.patch("time.sleep") as mock_sleep:
+        with (
+            mock.patch.object(daemon, "_load_configs", side_effect=RuntimeError("load fail")),
+            mock.patch("time.sleep") as mock_sleep,
+        ):
             mock_sleep.side_effect = [None, KeyboardInterrupt()]
             with pytest.raises(KeyboardInterrupt):
                 daemon.start()
@@ -795,11 +847,14 @@ class TestConnectorDaemon:
         """start() breaks out of sleep loop when _running is set False (line 452)."""
         daemon = ConnectorDaemon(mock.Mock(), db_poll_secs=3)
 
-        with mock.patch.object(daemon, "_load_configs", return_value=[]), \
-             mock.patch("time.sleep") as mock_sleep:
+        with (
+            mock.patch.object(daemon, "_load_configs", return_value=[]),
+            mock.patch("time.sleep") as mock_sleep,
+        ):
             # After first tick, set _running = False to trigger break
             def stop_daemon(*a, **kw):
                 daemon._running = False
+
             mock_sleep.side_effect = stop_daemon
 
             daemon.start()  # Should return gracefully, not raise KeyboardInterrupt

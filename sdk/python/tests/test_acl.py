@@ -76,12 +76,12 @@ def test_01_admin_bypass(admin, user):
     ws_u = f"acl-user-{SUFFIX}"
     admin._call("create_workspace", ["admin-ws", "admin ws", ws_a])
     user._call("create_workspace", ["user-ws", "user ws", ws_u])
-    r = admin.store(workspace_id=ws_u, peer_id="p1",
-                    content="admin bypass", memory_type="experience")
+    r = admin.store(
+        workspace_id=ws_u, peer_id="p1", content="admin bypass", memory_type="experience"
+    )
     assert r["status"] == "ok"
     with pytest.raises(RuntimeError, match="Access denied"):
-        user.store(workspace_id=ws_a, peer_id="p1",
-                   content="should fail", memory_type="experience")
+        user.store(workspace_id=ws_a, peer_id="p1", content="should fail", memory_type="experience")
 
 
 def test_02_admin_grant_revoke(admin, user):
@@ -90,13 +90,11 @@ def test_02_admin_grant_revoke(admin, user):
     uid = user._whoami()
     assert uid, "Could not determine user identity"
     admin._call("grant_space_access", [ws, uid, "editor"])
-    r = user.store(workspace_id=ws, peer_id="p1",
-                   content="granted", memory_type="experience")
+    r = user.store(workspace_id=ws, peer_id="p1", content="granted", memory_type="experience")
     assert r["status"] == "ok"
     admin._call("revoke_space_access", [ws, uid])
     with pytest.raises(RuntimeError, match="Access denied"):
-        user.store(workspace_id=ws, peer_id="p1",
-                   content="post-revoke", memory_type="experience")
+        user.store(workspace_id=ws, peer_id="p1", content="post-revoke", memory_type="experience")
 
 
 def test_03_promote_demote(admin, user):
@@ -128,5 +126,7 @@ def test_06_user_no_delete(admin, user):
     uid = user._whoami()
     assert uid, "Could not determine user identity"
     admin._call("grant_space_access", [ws, uid, "editor"])
-    with pytest.raises(RuntimeError, match="Access denied|'editor' permission but 'owner' is required"):
+    with pytest.raises(
+        RuntimeError, match="Access denied|'editor' permission but 'owner' is required"
+    ):
         user._call("delete_workspace", [ws])

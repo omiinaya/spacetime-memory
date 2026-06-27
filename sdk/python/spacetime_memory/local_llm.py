@@ -113,6 +113,7 @@ class LocalLLM:
             return
         try:
             from llama_cpp import Llama
+
             self._llm = Llama(
                 model_path=self.model_path,
                 n_ctx=self.n_ctx,
@@ -122,12 +123,13 @@ class LocalLLM:
             self._available = True
             logger.info(
                 "Loaded local model: %s (ctx=%d, threads=%d)",
-                self.model_path, self.n_ctx, self.n_threads,
+                self.model_path,
+                self.n_ctx,
+                self.n_threads,
             )
         except ImportError:
             logger.warning(
-                "llama-cpp-python not installed. "
-                "Install with: pip install llama-cpp-python"
+                "llama-cpp-python not installed. Install with: pip install llama-cpp-python"
             )
         except Exception as e:
             logger.warning("Failed to load model %s: %s", self.model_path, e)
@@ -228,6 +230,7 @@ class LocalLLM:
 
         try:
             import json as _json
+
             raw = self.generate(prompt, max_tokens=200, temperature=0.1, stop=["\n\n"])
             # Try to extract JSON array
             start = raw.find("[")
@@ -254,8 +257,9 @@ class LocalLLM:
             Path to downloaded model, or None on failure.
         """
         if model_name not in RECOMMENDED_MODELS:
-            logger.error("Unknown model: %s. Available: %s",
-                         model_name, list(RECOMMENDED_MODELS.keys()))
+            logger.error(
+                "Unknown model: %s. Available: %s", model_name, list(RECOMMENDED_MODELS.keys())
+            )
             return None
 
         model_info = RECOMMENDED_MODELS[model_name]
@@ -272,6 +276,7 @@ class LocalLLM:
 
         try:
             from urllib.request import urlretrieve
+
             logger.info("Downloading %s (%s)...", model_name, model_info["description"])
             urlretrieve(url, out_path)
             logger.info("Downloaded to: %s", out_path)

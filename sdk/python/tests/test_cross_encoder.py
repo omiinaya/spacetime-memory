@@ -1,7 +1,7 @@
 """Tests for cross_encoder.py — ONNX reranker."""
 
 import pytest
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, Mock
 
 
 # ── CrossEncoderReranker.__init__ ────────────────────────────────────────────
@@ -27,10 +27,14 @@ class TestInit:
         r = CrossEncoderReranker()
         assert r._model_path == "/env/model.onnx"
 
-    @patch.dict("os.environ", {
-        "CROSS_ENCODER_MODEL_PATH": "/env/model.onnx",
-        "CROSS_ENCODER_TOKENIZER_PATH": "/env/tok.json",
-    }, clear=True)
+    @patch.dict(
+        "os.environ",
+        {
+            "CROSS_ENCODER_MODEL_PATH": "/env/model.onnx",
+            "CROSS_ENCODER_TOKENIZER_PATH": "/env/tok.json",
+        },
+        clear=True,
+    )
     def test_env_model_and_tokenizer(self):
         from spacetime_memory.cross_encoder import CrossEncoderReranker
 
@@ -42,8 +46,9 @@ class TestInit:
     def test_explicit_overrides_env(self):
         from spacetime_memory.cross_encoder import CrossEncoderReranker
 
-        r = CrossEncoderReranker(model_path="/explicit/model.onnx",
-                                 tokenizer_path="/explicit/tok.json")
+        r = CrossEncoderReranker(
+            model_path="/explicit/model.onnx", tokenizer_path="/explicit/tok.json"
+        )
         assert r._model_path == "/explicit/model.onnx"
         assert r._tokenizer_path == "/explicit/tok.json"
 
@@ -64,7 +69,6 @@ class TestEnsureLoaded:
 
     def test_missing_tokenizer_raises(self, tmp_path):
         """When model exists but tokenizer is missing, FileNotFoundError."""
-        import os
         from spacetime_memory.cross_encoder import CrossEncoderReranker
 
         model = tmp_path / "model.onnx"
@@ -89,8 +93,8 @@ class TestRerank:
     @pytest.fixture
     def reranker(self):
         from spacetime_memory.cross_encoder import CrossEncoderReranker
-        r = CrossEncoderReranker(model_path="/fake/model.onnx",
-                                 tokenizer_path="/fake/tok.json")
+
+        r = CrossEncoderReranker(model_path="/fake/model.onnx", tokenizer_path="/fake/tok.json")
         # Prevent real model loading
         r._loaded = True
         r._session = Mock()
@@ -139,8 +143,7 @@ class TestRerank:
 
     def test_scoring_error_falls_back(self, reranker):
         """ONNX errors fall back to original score."""
-        with patch.object(reranker, "_score_pair",
-                          side_effect=ValueError("bad input")):
+        with patch.object(reranker, "_score_pair", side_effect=ValueError("bad input")):
             candidates = [{"id": "e", "memory_content": "bad", "score": 0.55}]
             result = reranker.rerank("q", candidates)
 
@@ -150,9 +153,7 @@ class TestRerank:
     def test_top_k_truncation(self, reranker):
         """Only scores top_k candidates."""
         with patch.object(reranker, "_score_pair", return_value=0.5):
-            candidates = [
-                {"id": str(i), "memory_content": f"c{i}"} for i in range(10)
-            ]
+            candidates = [{"id": str(i), "memory_content": f"c{i}"} for i in range(10)]
             result = reranker.rerank("q", candidates, top_k=3)
             assert len(result) == 3
             assert len(reranker._score_pair.call_args_list) == 3
@@ -173,11 +174,13 @@ class TestSingleton:
 
     def test_creates_singleton_on_first_call(self):
         from spacetime_memory import cross_encoder
+
         # Reset singleton
         cross_encoder._reranker = None
 
-        with patch.object(cross_encoder.CrossEncoderReranker, "rerank",
-                          return_value=[{"id": "s", "score": 0.5}]):
+        with patch.object(
+            cross_encoder.CrossEncoderReranker, "rerank", return_value=[{"id": "s", "score": 0.5}]
+        ):
             result = cross_encoder.cross_encoder_rerank("q", [{"memory_content": "x"}])
             assert result == [{"id": "s", "score": 0.5}]
             assert cross_encoder._reranker is not None

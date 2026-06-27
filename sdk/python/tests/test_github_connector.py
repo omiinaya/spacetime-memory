@@ -6,25 +6,32 @@ _parse_next_link, _format_event, _summarize_event.
 
 import os
 import shutil
-import pytest
 from unittest.mock import Mock, patch
 
 _conn_cursor_dir = os.path.expanduser("~/.spacetime-memory/connectors")
+
 
 def _clear_cursor():
     if os.path.exists(_conn_cursor_dir):
         shutil.rmtree(_conn_cursor_dir, ignore_errors=True)
 
+
 _clear_cursor()
 
-from spacetime_memory.connectors import GitHubConnector, Event
+from spacetime_memory.connectors import GitHubConnector
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
-def _make_gh_event(event_id, event_type, actor="octocat",
-                   repo_name="octocat/repo", payload=None,
-                   created_at="2024-01-01T00:00:00Z"):
+
+def _make_gh_event(
+    event_id,
+    event_type,
+    actor="octocat",
+    repo_name="octocat/repo",
+    payload=None,
+    created_at="2024-01-01T00:00:00Z",
+):
     """Build a GitHub API event dict."""
     return {
         "id": event_id,
@@ -46,12 +53,15 @@ def _mock_response(status_code=200, json_data=None, headers=None):
 
 # ── Event Formatting ─────────────────────────────────────────────────
 
+
 class TestGitHubFormatEvent:
     """_format_event for all event types."""
 
     def test_push_event(self):
         result = GitHubConnector._format_event(
-            "PushEvent", "alice", "alice/repo",
+            "PushEvent",
+            "alice",
+            "alice/repo",
             {
                 "ref": "refs/heads/main",
                 "commits": [
@@ -69,7 +79,9 @@ class TestGitHubFormatEvent:
         """More than 5 commits shows truncation message."""
         commits = [{"message": f"commit {i}"} for i in range(10)]
         result = GitHubConnector._format_event(
-            "PushEvent", "bob", "bob/repo",
+            "PushEvent",
+            "bob",
+            "bob/repo",
             {"ref": "refs/heads/dev", "commits": commits},
             "2024-01-01",
         )
@@ -78,7 +90,9 @@ class TestGitHubFormatEvent:
     def test_push_event_no_ref(self):
         """Push with empty ref is handled."""
         result = GitHubConnector._format_event(
-            "PushEvent", "cat", "cat/repo",
+            "PushEvent",
+            "cat",
+            "cat/repo",
             {"ref": "", "commits": []},
             "2024-01-01",
         )
@@ -86,7 +100,9 @@ class TestGitHubFormatEvent:
 
     def test_issues_event(self):
         result = GitHubConnector._format_event(
-            "IssuesEvent", "alice", "alice/repo",
+            "IssuesEvent",
+            "alice",
+            "alice/repo",
             {
                 "action": "closed",
                 "issue": {
@@ -103,7 +119,9 @@ class TestGitHubFormatEvent:
 
     def test_create_event_branch(self):
         result = GitHubConnector._format_event(
-            "CreateEvent", "dev", "dev/repo",
+            "CreateEvent",
+            "dev",
+            "dev/repo",
             {"ref_type": "branch", "ref": "feature-x"},
             "2024-01-01",
         )
@@ -111,7 +129,9 @@ class TestGitHubFormatEvent:
 
     def test_create_event_tag(self):
         result = GitHubConnector._format_event(
-            "CreateEvent", "dev", "dev/repo",
+            "CreateEvent",
+            "dev",
+            "dev/repo",
             {"ref_type": "tag"},
             "2024-01-01",
         )
@@ -119,7 +139,9 @@ class TestGitHubFormatEvent:
 
     def test_watch_event(self):
         result = GitHubConnector._format_event(
-            "WatchEvent", "star", "cool/repo",
+            "WatchEvent",
+            "star",
+            "cool/repo",
             {"action": "started"},
             "2024-01-01",
         )
@@ -127,7 +149,9 @@ class TestGitHubFormatEvent:
 
     def test_fork_event(self):
         result = GitHubConnector._format_event(
-            "ForkEvent", "forker", "orig/repo",
+            "ForkEvent",
+            "forker",
+            "orig/repo",
             {"forkee": {"full_name": "forker/repo"}},
             "2024-01-01",
         )
@@ -135,7 +159,9 @@ class TestGitHubFormatEvent:
 
     def test_pull_request_event(self):
         result = GitHubConnector._format_event(
-            "PullRequestEvent", "contributor", "main/repo",
+            "PullRequestEvent",
+            "contributor",
+            "main/repo",
             {
                 "action": "opened",
                 "pull_request": {
@@ -151,7 +177,9 @@ class TestGitHubFormatEvent:
 
     def test_issue_comment_event(self):
         result = GitHubConnector._format_event(
-            "IssueCommentEvent", "commenter", "main/repo",
+            "IssueCommentEvent",
+            "commenter",
+            "main/repo",
             {
                 "action": "created",
                 "issue": {"number": 55},
@@ -162,13 +190,17 @@ class TestGitHubFormatEvent:
 
     def test_unknown_event(self):
         result = GitHubConnector._format_event(
-            "SomeUnknownEvent", "user", "repo/x",
-            {}, "2024-01-01",
+            "SomeUnknownEvent",
+            "user",
+            "repo/x",
+            {},
+            "2024-01-01",
         )
         assert "triggered SomeUnknownEvent in repo/x" in result
 
 
 # ── Event Summarization ──────────────────────────────────────────────
+
 
 class TestGitHubSummarizeEvent:
     """_summarize_event coverage."""
@@ -187,6 +219,7 @@ class TestGitHubSummarizeEvent:
 
 
 # ── Link Header Parsing ──────────────────────────────────────────────
+
 
 class TestGitHubParseNextLink:
     """_parse_next_link static method."""
@@ -212,6 +245,7 @@ class TestGitHubParseNextLink:
 
 # ── Poll Integration ─────────────────────────────────────────────────
 
+
 class TestGitHubPollIntegration:
     """poll() with mocked HTTP client."""
 
@@ -222,10 +256,16 @@ class TestGitHubPollIntegration:
     def test_poll_multiple_event_types(self):
         """Poll returns Events for multiple event types."""
         events_data = [
-            _make_gh_event("multi-1", "PushEvent", "a", "a/r",
-                           {"ref": "refs/heads/main", "commits": []}),
-            _make_gh_event("multi-2", "IssuesEvent", "b", "b/r",
-                           {"action": "opened", "issue": {"title": "x", "number": 1}}),
+            _make_gh_event(
+                "multi-1", "PushEvent", "a", "a/r", {"ref": "refs/heads/main", "commits": []}
+            ),
+            _make_gh_event(
+                "multi-2",
+                "IssuesEvent",
+                "b",
+                "b/r",
+                {"action": "opened", "issue": {"title": "x", "number": 1}},
+            ),
             _make_gh_event("multi-3", "WatchEvent", "c", "c/r"),
         ]
         mock_resp = _mock_response(200, events_data, {"Link": ""})
@@ -235,7 +275,9 @@ class TestGitHubPollIntegration:
             mock_client.get.return_value = mock_resp
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -243,12 +285,17 @@ class TestGitHubPollIntegration:
 
     def test_poll_with_pagination(self):
         """Follows Link header to next page."""
-        page1 = _mock_response(200,
-            [_make_gh_event("pag-1", "PushEvent", "a", "a/r",
-                           {"ref": "refs/heads/main", "commits": []})],
+        page1 = _mock_response(
+            200,
+            [
+                _make_gh_event(
+                    "pag-1", "PushEvent", "a", "a/r", {"ref": "refs/heads/main", "commits": []}
+                )
+            ],
             {"Link": '<https://api.github.com/page2>; rel="next"'},
         )
-        page2 = _mock_response(200,
+        page2 = _mock_response(
+            200,
             [_make_gh_event("pag-2", "WatchEvent", "b", "b/r")],
             {"Link": ""},
         )
@@ -258,7 +305,9 @@ class TestGitHubPollIntegration:
             mock_client.get.side_effect = [page1, page2]
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -275,7 +324,9 @@ class TestGitHubPollIntegration:
             mock_client.get.return_value = mock_resp
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -285,8 +336,11 @@ class TestGitHubPollIntegration:
 
     def test_poll_deduplication(self):
         """Previously seen events are skipped."""
-        events_data = [_make_gh_event("dup-1", "PushEvent", "a", "a/r",
-                                      {"ref": "refs/heads/main", "commits": []})]
+        events_data = [
+            _make_gh_event(
+                "dup-1", "PushEvent", "a", "a/r", {"ref": "refs/heads/main", "commits": []}
+            )
+        ]
         mock_resp = _mock_response(200, events_data, {"Link": ""})
 
         with patch("httpx.Client") as MockClient:
@@ -294,7 +348,9 @@ class TestGitHubPollIntegration:
             mock_client.get.return_value = mock_resp
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             e1 = connector.poll()
             e2 = connector.poll()
@@ -305,23 +361,26 @@ class TestGitHubPollIntegration:
     def test_poll_rate_limit_exhausted(self):
         """403 with X-RateLimit-Remaining=0 triggers sleep and retry."""
         import time
+
         rate_limited = Mock(status_code=403)
         rate_limited.headers = {
             "X-RateLimit-Remaining": "0",
             "X-RateLimit-Reset": str(int(time.time()) + 2),
         }
-        success = _mock_response(200,
+        success = _mock_response(
+            200,
             [_make_gh_event("rl-1", "WatchEvent", "a", "a/r")],
             {"Link": ""},
         )
 
-        with patch("httpx.Client") as MockClient, \
-             patch("time.sleep") as mock_sleep:
+        with patch("httpx.Client") as MockClient, patch("time.sleep") as mock_sleep:
             mock_client = MockClient.return_value.__enter__.return_value
             mock_client.get.side_effect = [rate_limited, success]
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -330,24 +389,25 @@ class TestGitHubPollIntegration:
 
     def test_poll_rate_limit_invalid_reset_epoch(self):
         """Rate limit with non-integer reset epoch falls back to 60s sleep."""
-        import time
         rate_limited = Mock(status_code=403)
         rate_limited.headers = {
             "X-RateLimit-Remaining": "0",
             "X-RateLimit-Reset": "not-a-number",
         }
-        success = _mock_response(200,
+        success = _mock_response(
+            200,
             [_make_gh_event("rl-bad-1", "WatchEvent", "a", "a/r")],
             {"Link": ""},
         )
 
-        with patch("httpx.Client") as MockClient, \
-             patch("time.sleep") as mock_sleep:
+        with patch("httpx.Client") as MockClient, patch("time.sleep") as mock_sleep:
             mock_client = MockClient.return_value.__enter__.return_value
             mock_client.get.side_effect = [rate_limited, success]
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -364,7 +424,9 @@ class TestGitHubPollIntegration:
             mock_client.get.return_value = forbidden
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -379,7 +441,9 @@ class TestGitHubPollIntegration:
             mock_client.get.return_value = mock_resp
 
             connector = GitHubConnector(
-                token="tok", username="nobody", workspace_id="ws",
+                token="tok",
+                username="nobody",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -394,7 +458,9 @@ class TestGitHubPollIntegration:
             mock_client.get.return_value = mock_resp
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -409,7 +475,9 @@ class TestGitHubPollIntegration:
             mock_client.get.side_effect = httpx.RequestError("network down")
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             events = connector.poll()
 
@@ -417,9 +485,12 @@ class TestGitHubPollIntegration:
 
     def test_cursor_persistence(self):
         """Cursor saves seen IDs across polls."""
-        import json, os
-        events_data = [_make_gh_event("c1", "PushEvent", "a", "a/r",
-                                      {"ref": "refs/heads/main", "commits": []})]
+        import json
+        import os
+
+        events_data = [
+            _make_gh_event("c1", "PushEvent", "a", "a/r", {"ref": "refs/heads/main", "commits": []})
+        ]
         mock_resp = _mock_response(200, events_data, {"Link": ""})
 
         with patch("httpx.Client") as MockClient:
@@ -427,7 +498,9 @@ class TestGitHubPollIntegration:
             mock_client.get.return_value = mock_resp
 
             connector = GitHubConnector(
-                token="tok", username="u", workspace_id="ws",
+                token="tok",
+                username="u",
+                workspace_id="ws",
             )
             connector.poll()
 

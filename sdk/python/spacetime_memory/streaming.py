@@ -89,8 +89,7 @@ class EventBus:
         with self._lock:
             if event_type in self._subscribers:
                 self._subscribers[event_type] = [
-                    cb for cb in self._subscribers[event_type]
-                    if cb is not callback
+                    cb for cb in self._subscribers[event_type] if cb is not callback
                 ]
 
     def emit(self, event: MemoryEvent):
@@ -104,7 +103,7 @@ class EventBus:
             # Log event
             self._event_log.append(event.to_dict())
             if len(self._event_log) > self._max_log_size:
-                self._event_log = self._event_log[-self._max_log_size:]
+                self._event_log = self._event_log[-self._max_log_size :]
 
             # Collect all callbacks (matching + wildcard)
             callbacks: list[Callable] = list(self._subscribers.get(event.event_type, []))
@@ -117,7 +116,8 @@ class EventBus:
             except Exception as e:
                 logger.warning(
                     "Event handler for %s failed: %s",
-                    event.event_type, e,
+                    event.event_type,
+                    e,
                 )
 
     def clear_log(self):

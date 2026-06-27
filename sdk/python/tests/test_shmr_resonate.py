@@ -21,6 +21,7 @@ from spacetime_memory.shmr import (
 
 # ── Fixtures ──────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_client():
     """A MagicMock with the interface expected by shmr_resonate()."""
@@ -59,26 +60,28 @@ def sample_embedding():
 @pytest.fixture
 def sample_llm_response():
     """A valid LLM harmonization JSON response."""
-    return json.dumps([
-        {
-            "subject": "User",
-            "predicate": "prefers",
-            "object": "Python for data science",
-            "confidence": 0.9,
-            "action": "create",
-            "source_memory_ids": ["mem-1", "mem-2"],
-            "rationale": "Both memories corroborate Python preference",
-        },
-        {
-            "subject": "User",
-            "predicate": "dislikes",
-            "object": "JavaScript verbosity",
-            "confidence": 0.6,
-            "action": "dampen",
-            "source_memory_ids": ["mem-1"],
-            "rationale": "Implicit from preference contrast",
-        },
-    ])
+    return json.dumps(
+        [
+            {
+                "subject": "User",
+                "predicate": "prefers",
+                "object": "Python for data science",
+                "confidence": 0.9,
+                "action": "create",
+                "source_memory_ids": ["mem-1", "mem-2"],
+                "rationale": "Both memories corroborate Python preference",
+            },
+            {
+                "subject": "User",
+                "predicate": "dislikes",
+                "object": "JavaScript verbosity",
+                "confidence": 0.6,
+                "action": "dampen",
+                "source_memory_ids": ["mem-1"],
+                "rationale": "Implicit from preference contrast",
+            },
+        ]
+    )
 
 
 # ── Tests: _call_client_llm ────────────────────────────────────────────────
@@ -343,7 +346,11 @@ class TestShmrResonate:
         """Full happy path: search → embed → cluster → LLM → store → log."""
         mock_client.search.return_value = [
             {"entity_id": "mem-1", "content": "User likes Python", "trust_score": 0.9},
-            {"entity_id": "mem-2", "content": "Python is great for data science", "trust_score": 0.8},
+            {
+                "entity_id": "mem-2",
+                "content": "Python is great for data science",
+                "trust_score": 0.8,
+            },
         ]
         mock_client._embed.side_effect = [
             [1.0, 0.1, 0.0],
@@ -369,15 +376,13 @@ class TestShmrResonate:
 
         # Check _call was used for store_harmonic_beliefs
         store_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "store_harmonic_beliefs"
+            c for c in mock_client._call.call_args_list if c[0][0] == "store_harmonic_beliefs"
         ]
         assert len(store_calls) == 1
 
         # Check log_resonance_session was called
         log_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "log_resonance_session"
+            c for c in mock_client._call.call_args_list if c[0][0] == "log_resonance_session"
         ]
         assert len(log_calls) == 1
 
@@ -466,7 +471,9 @@ class TestShmrResonate:
 
         with patch(
             "spacetime_memory.shmr._call_client_llm",
-            return_value=json.dumps([{"subject": "X", "predicate": "Y", "confidence": 0.9, "action": "create"}]),
+            return_value=json.dumps(
+                [{"subject": "X", "predicate": "Y", "confidence": 0.9, "action": "create"}]
+            ),
         ):
             result = shmr_resonate(mock_client, workspace_id="ws-storefail")
 
@@ -496,7 +503,9 @@ class TestShmrResonate:
 
         with patch(
             "spacetime_memory.shmr._call_client_llm",
-            return_value=json.dumps([{"subject": "X", "predicate": "Y", "confidence": 0.9, "action": "create"}]),
+            return_value=json.dumps(
+                [{"subject": "X", "predicate": "Y", "confidence": 0.9, "action": "create"}]
+            ),
         ):
             result = shmr_resonate(mock_client, workspace_id="ws-logfail")
 
@@ -512,8 +521,7 @@ class TestShmrResonate:
         result = shmr_resonate(mock_client, workspace_id="ws-empty")
 
         log_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "log_resonance_session"
+            c for c in mock_client._call.call_args_list if c[0][0] == "log_resonance_session"
         ]
         assert len(log_calls) == 0
 
@@ -528,9 +536,9 @@ class TestShmrResonate:
             {"entity_id": "m4", "content": "JS has many quirks", "trust_score": 0.6},
         ]
         mock_client._embed.side_effect = [
-            [1.0, 0.1],   # m1
+            [1.0, 0.1],  # m1
             [0.95, 0.05],  # m2 (similar to m1)
-            [0.0, 1.0],   # m3
+            [0.0, 1.0],  # m3
             [0.0, 0.95],  # m4 (similar to m3)
         ]
 
@@ -559,8 +567,7 @@ class TestShmrResonate:
         result = shmr_resonate(mock_client, workspace_id="ws-dry-log", dry_run=True)
 
         log_calls = [
-            c for c in mock_client._call.call_args_list
-            if c[0][0] == "log_resonance_session"
+            c for c in mock_client._call.call_args_list if c[0][0] == "log_resonance_session"
         ]
         assert len(log_calls) == 0
         assert result.clusters_found == 1
@@ -604,7 +611,9 @@ class TestShmrResonate:
 
         with patch(
             "spacetime_memory.shmr._call_client_llm",
-            return_value=json.dumps([{"subject": "X", "predicate": "Y", "confidence": 0.9, "action": "create"}]),
+            return_value=json.dumps(
+                [{"subject": "X", "predicate": "Y", "confidence": 0.9, "action": "create"}]
+            ),
         ):
             result = shmr_resonate(mock_client, workspace_id="ws-noid")
 
@@ -653,8 +662,8 @@ class TestShmrResonateEdgeCases:
         ]
         # Only m1 and m3 get embeddings; m2 returns empty
         mock_client._embed.side_effect = [
-            [1.0, 0.0],   # m1
-            [],            # m2 — no embedding
+            [1.0, 0.0],  # m1
+            [],  # m2 — no embedding
             [0.95, 0.0],  # m3
         ]
 
@@ -685,7 +694,9 @@ class TestShmrResonateEdgeCases:
             llm_call_count[0] += 1
             if llm_call_count[0] == 1:
                 raise RuntimeError("LLM failed")
-            return json.dumps([{"subject": "X", "predicate": "Y", "confidence": 0.9, "action": "create"}])
+            return json.dumps(
+                [{"subject": "X", "predicate": "Y", "confidence": 0.9, "action": "create"}]
+            )
 
         def _call_side_effect(reducer, args):
             if reducer == "store_harmonic_beliefs":

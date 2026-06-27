@@ -86,6 +86,10 @@ jobs:
           pip install pytest httpx
       - name: Syntax check
         run: python -m compileall spacetime_memory/
+      - name: Ruff lint
+        run: python -m ruff check spacetime_memory/ --no-cache
+      - name: Ruff format check
+        run: python -m ruff format spacetime_memory/ --check
       - name: Unit tests (no STDB required)
         run: python -m pytest tests/ -v --ignore=tests/smoke_test.py -k "not integration and not concurrency and not embedder" --tb=short
 

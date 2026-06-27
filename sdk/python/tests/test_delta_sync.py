@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import json
-import threading
 import time
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import patch
 
 import pytest
 
@@ -51,8 +50,13 @@ class TestChangeEvent:
     def test_data_property_empty_object(self):
         """Data property handles empty JSON object."""
         ev = ChangeEvent(
-            id="e", workspace_id="w", table_name="t", operation="o",
-            record_id="r", data_json="{}", created_at=0,
+            id="e",
+            workspace_id="w",
+            table_name="t",
+            operation="o",
+            record_id="r",
+            data_json="{}",
+            created_at=0,
         )
         assert ev.data == {}
 
@@ -282,8 +286,13 @@ class TestDeltaSyncDispatch:
         ds.on("memory", "insert", received.append)
 
         ev = ChangeEvent(
-            id="1", workspace_id="w", table_name="memory",
-            operation="insert", record_id="r", data_json="{}", created_at=0,
+            id="1",
+            workspace_id="w",
+            table_name="memory",
+            operation="insert",
+            record_id="r",
+            data_json="{}",
+            created_at=0,
         )
         ds._dispatch(ev)
         assert len(received) == 1
@@ -296,8 +305,13 @@ class TestDeltaSyncDispatch:
         ds.on("*", "insert", received.append)
 
         ev = ChangeEvent(
-            id="1", workspace_id="w", table_name="kg_node",
-            operation="insert", record_id="r", data_json="{}", created_at=0,
+            id="1",
+            workspace_id="w",
+            table_name="kg_node",
+            operation="insert",
+            record_id="r",
+            data_json="{}",
+            created_at=0,
         )
         ds._dispatch(ev)
         assert len(received) == 1
@@ -309,8 +323,13 @@ class TestDeltaSyncDispatch:
         ds.on("memory", "*", received.append)
 
         ev = ChangeEvent(
-            id="1", workspace_id="w", table_name="memory",
-            operation="delete", record_id="r", data_json="{}", created_at=0,
+            id="1",
+            workspace_id="w",
+            table_name="memory",
+            operation="delete",
+            record_id="r",
+            data_json="{}",
+            created_at=0,
         )
         ds._dispatch(ev)
         assert len(received) == 1
@@ -322,8 +341,13 @@ class TestDeltaSyncDispatch:
         ds.on("kg_node", "insert", received.append)
 
         ev = ChangeEvent(
-            id="1", workspace_id="w", table_name="memory",
-            operation="insert", record_id="r", data_json="{}", created_at=0,
+            id="1",
+            workspace_id="w",
+            table_name="memory",
+            operation="insert",
+            record_id="r",
+            data_json="{}",
+            created_at=0,
         )
         ds._dispatch(ev)
         assert len(received) == 0
@@ -335,8 +359,13 @@ class TestDeltaSyncDispatch:
         ds.on("memory", "update", received.append)
 
         ev = ChangeEvent(
-            id="1", workspace_id="w", table_name="memory",
-            operation="insert", record_id="r", data_json="{}", created_at=0,
+            id="1",
+            workspace_id="w",
+            table_name="memory",
+            operation="insert",
+            record_id="r",
+            data_json="{}",
+            created_at=0,
         )
         ds._dispatch(ev)
         assert len(received) == 0
@@ -353,8 +382,13 @@ class TestDeltaSyncDispatch:
         ds.on("memory", "insert", received.append)
 
         ev = ChangeEvent(
-            id="1", workspace_id="w", table_name="memory",
-            operation="insert", record_id="r", data_json="{}", created_at=0,
+            id="1",
+            workspace_id="w",
+            table_name="memory",
+            operation="insert",
+            record_id="r",
+            data_json="{}",
+            created_at=0,
         )
         ds._dispatch(ev)
         # The second callback should still be called
@@ -369,8 +403,13 @@ class TestDeltaSyncDispatch:
         ds.on("memory", "insert", received2.append)
 
         ev = ChangeEvent(
-            id="1", workspace_id="w", table_name="memory",
-            operation="insert", record_id="r", data_json="{}", created_at=0,
+            id="1",
+            workspace_id="w",
+            table_name="memory",
+            operation="insert",
+            record_id="r",
+            data_json="{}",
+            created_at=0,
         )
         ds._dispatch(ev)
         assert len(received1) == 1
@@ -381,9 +420,7 @@ class TestDeltaSyncGetInitialCursor:
     def test_returns_cursor_from_rows(self, mock_client):
         """_get_initial_cursor parses cursor from SQL response."""
         ds = DeltaSync(mock_client)
-        mock_client._sql.return_value = [
-            {"events_json": json.dumps({"cursor": 999})}
-        ]
+        mock_client._sql.return_value = [{"events_json": json.dumps({"cursor": 999})}]
         cursor = ds._get_initial_cursor()
         assert cursor == 999
         mock_client._call.assert_called_with("get_latest_change_cursor", [])
@@ -398,9 +435,7 @@ class TestDeltaSyncGetInitialCursor:
     def test_returns_zero_when_cursor_missing(self, mock_client):
         """Returns 0 when cursor field missing from JSON."""
         ds = DeltaSync(mock_client)
-        mock_client._sql.return_value = [
-            {"events_json": json.dumps({"other": "data"})}
-        ]
+        mock_client._sql.return_value = [{"events_json": json.dumps({"other": "data"})}]
         cursor = ds._get_initial_cursor()
         assert cursor == 0
 
@@ -434,9 +469,7 @@ class TestDeltaSyncFetchChanges:
                 "created_at": 200,
             },
         ]
-        mock_client._sql.return_value = [
-            {"events_json": json.dumps(raw_events)}
-        ]
+        mock_client._sql.return_value = [{"events_json": json.dumps(raw_events)}]
         events = ds._fetch_changes()
         assert len(events) == 1
         assert events[0].id == "ev1"

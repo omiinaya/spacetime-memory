@@ -1,4 +1,6 @@
 from .base import Connector, Event
+
+
 class OrgModeParser(Connector):
     """Parse Emacs org-mode files and convert to memories / KG nodes.
 
@@ -49,9 +51,7 @@ class OrgModeParser(Connector):
             with open(self.file_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
         except FileNotFoundError:
-            print(
-                f"  [OrgMode] File not found: {self.file_path}"
-            )
+            print(f"  [OrgMode] File not found: {self.file_path}")
             return []
         except OSError as e:
             print(f"  [OrgMode] Error reading file: {e}")
@@ -79,19 +79,22 @@ class OrgModeParser(Connector):
                 "todo_state": todo_state,
             }
 
-            events.append(Event(
-                content=content,
-                workspace_id=self.workspace_id,
-                summary=heading_text[:200],
-                memory_type="experience",
-                peer_id=self.peer_id,
-                metadata=metadata,
-            ))
+            events.append(
+                Event(
+                    content=content,
+                    workspace_id=self.workspace_id,
+                    summary=heading_text[:200],
+                    memory_type="experience",
+                    peer_id=self.peer_id,
+                    metadata=metadata,
+                )
+            )
 
         return events
 
     def _parse_sections(
-        self, lines: list[str],
+        self,
+        lines: list[str],
     ) -> list[dict]:
         """Split org-mode lines into heading-anchored sections."""
         sections: list[dict] = []
@@ -195,15 +198,8 @@ class OrgModeParser(Connector):
             # Tags are colon-surrounded words at end
             space_idx = rest.rfind(" ", 0, -1)
             maybe_tags = rest[space_idx + 1 :] if space_idx >= 0 else rest
-            if (
-                maybe_tags.startswith(":")
-                and maybe_tags.count(":") >= 2
-            ):
-                tags = [
-                    t
-                    for t in maybe_tags.strip(":").split(":")
-                    if t
-                ]
+            if maybe_tags.startswith(":") and maybe_tags.count(":") >= 2:
+                tags = [t for t in maybe_tags.strip(":").split(":") if t]
                 rest = rest[:space_idx].strip() if space_idx >= 0 else ""
 
         # Extract TODO state (TODO, DONE, or any known keyword)
@@ -218,11 +214,9 @@ class OrgModeParser(Connector):
             "WAITING",
         ]
         for kw in keywords:
-            if rest.startswith(kw) and (
-                len(rest) == len(kw) or rest[len(kw)] in (" ", "\t")
-            ):
+            if rest.startswith(kw) and (len(rest) == len(kw) or rest[len(kw)] in (" ", "\t")):
                 todo_state = kw
-                rest = rest[len(kw):].strip()
+                rest = rest[len(kw) :].strip()
                 break
 
         return {
@@ -234,5 +228,3 @@ class OrgModeParser(Connector):
 
 
 # ── Connector Daemon ────────────────────────────────────────────
-
-

@@ -1,4 +1,5 @@
 """Tests for P2 polish features: query cache, event bus, plugin manager, local LLM."""
+
 from __future__ import annotations
 
 import time
@@ -6,8 +7,10 @@ import time
 
 # ── QueryCache ──────────────────────────────────────────────────────────
 
+
 def test_query_cache_basic():
     from spacetime_memory.query_cache import QueryCache
+
     cache = QueryCache(maxsize=4, ttl=30)
     key = cache.make_key("ws-1", "test query", 10, "semantic")
     cache.set(key, [{"id": "1", "score": 0.9}])
@@ -19,6 +22,7 @@ def test_query_cache_basic():
 
 def test_query_cache_lru_eviction():
     from spacetime_memory.query_cache import QueryCache
+
     cache = QueryCache(maxsize=2, ttl=60)
     for i in range(4):
         key = cache.make_key("ws-1", f"query-{i}", 10, "semantic")
@@ -34,6 +38,7 @@ def test_query_cache_lru_eviction():
 
 def test_query_cache_ttl_expiry():
     from spacetime_memory.query_cache import QueryCache
+
     cache = QueryCache(maxsize=4, ttl=0.01)  # 10ms TTL
     key = cache.make_key("ws-1", "test", 10, "semantic")
     cache.set(key, [{"id": "1"}])
@@ -43,6 +48,7 @@ def test_query_cache_ttl_expiry():
 
 def test_query_cache_invalidate_workspace():
     from spacetime_memory.query_cache import QueryCache
+
     cache = QueryCache(maxsize=8, ttl=60)
     k1 = cache.make_key("ws-A", "q", 10, "semantic")
     k2 = cache.make_key("ws-B", "q", 10, "semantic")
@@ -55,6 +61,7 @@ def test_query_cache_invalidate_workspace():
 
 def test_query_cache_stats():
     from spacetime_memory.query_cache import QueryCache
+
     cache = QueryCache(maxsize=4, ttl=60)
     key = cache.make_key("ws-1", "q", 10, "semantic")
     cache.get("nonexistent")  # miss
@@ -68,6 +75,7 @@ def test_query_cache_stats():
 
 def test_query_cache_clear():
     from spacetime_memory.query_cache import QueryCache
+
     cache = QueryCache(maxsize=4, ttl=60)
     cache.set(cache.make_key("ws-1", "q", 10, "semantic"), [{"id": "1"}])
     cache.clear()
@@ -77,6 +85,7 @@ def test_query_cache_clear():
 def test_query_cache_set_existing_key():
     """set() on an existing key moves it to end (line 72) and setdefault reuses ws_keys."""
     from spacetime_memory.query_cache import QueryCache
+
     cache = QueryCache(maxsize=4, ttl=60)
     key = cache.make_key("ws-1", "q", 10, "semantic")
     cache.set(key, [{"id": "first"}], workspace_id="ws-1")
@@ -89,6 +98,7 @@ def test_query_cache_set_existing_key():
 def test_query_cache_invalidate_all():
     """invalidate with workspace_id=None clears everything (lines 84-85)."""
     from spacetime_memory.query_cache import QueryCache
+
     cache = QueryCache(maxsize=8, ttl=60)
     k1 = cache.make_key("ws-A", "q", 10, "semantic")
     k2 = cache.make_key("ws-B", "q", 10, "semantic")
@@ -103,8 +113,10 @@ def test_query_cache_invalidate_all():
 
 # ── EventBus ────────────────────────────────────────────────────────────
 
+
 def test_event_bus_subscribe_and_emit():
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     received = []
     bus = EventBus()
     bus.subscribe("memory.created", lambda e: received.append(e.data))
@@ -115,6 +127,7 @@ def test_event_bus_subscribe_and_emit():
 
 def test_event_bus_wildcard_subscriber():
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     received = []
     bus = EventBus()
     bus.subscribe("*", lambda e: received.append(e.event_type))
@@ -125,6 +138,7 @@ def test_event_bus_wildcard_subscriber():
 
 def test_event_bus_unsubscribe():
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     received = []
     bus = EventBus()
 
@@ -142,6 +156,7 @@ def test_event_bus_unsubscribe():
 
 def test_event_bus_handler_exception_isolated():
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     received = []
     bus = EventBus()
 
@@ -159,6 +174,7 @@ def test_event_bus_handler_exception_isolated():
 
 def test_event_bus_log():
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     bus = EventBus()
     bus.emit(MemoryEvent("memory.created", data={"id": "1"}))
     bus.emit(MemoryEvent("memory.deleted", data={"id": "2"}))
@@ -169,6 +185,7 @@ def test_event_bus_log():
 
 def test_event_bus_filter_log():
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     bus = EventBus()
     bus.emit(MemoryEvent("memory.created", data={"id": "1"}))
     bus.emit(MemoryEvent("search.performed", data={"q": "x"}))
@@ -179,6 +196,7 @@ def test_event_bus_filter_log():
 
 def test_event_bus_subscriber_count():
     from spacetime_memory.streaming import EventBus
+
     bus = EventBus()
     bus.subscribe("memory.created", lambda e: None)
     bus.subscribe("search.performed", lambda e: None)
@@ -189,6 +207,7 @@ def test_event_bus_subscriber_count():
 def test_event_bus_trim_log():
     """Event log trims when exceeding max_log_size (line 107)."""
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     bus = EventBus()
     bus._max_log_size = 5
     for i in range(10):
@@ -201,6 +220,7 @@ def test_event_bus_trim_log():
 def test_event_bus_clear_log():
     """clear_log empties the event log (lines 125-126)."""
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     bus = EventBus()
     bus.emit(MemoryEvent("memory.created", data={"id": "1"}))
     assert bus.event_count == 1
@@ -212,6 +232,7 @@ def test_event_bus_clear_log():
 def test_event_bus_event_count():
     """event_count property returns log length (lines 157-158)."""
     from spacetime_memory.streaming import EventBus, MemoryEvent
+
     bus = EventBus()
     assert bus.event_count == 0
     bus.emit(MemoryEvent("memory.created"))
@@ -221,8 +242,10 @@ def test_event_bus_event_count():
 
 # ── PluginManager ───────────────────────────────────────────────────────
 
+
 def test_plugin_manager_register_and_list():
     from spacetime_memory.plugin_manager import PluginManager, FilterPlugin
+
     pm = PluginManager()
     pm.register(FilterPlugin(min_length=10))
     plugins = pm.list_plugins()
@@ -232,6 +255,7 @@ def test_plugin_manager_register_and_list():
 
 def test_plugin_manager_unregister():
     from spacetime_memory.plugin_manager import PluginManager, FilterPlugin
+
     pm = PluginManager()
     pm.register(FilterPlugin(min_length=10))
     pm.unregister("filter")
@@ -241,6 +265,7 @@ def test_plugin_manager_unregister():
 def test_plugin_manager_dispatch_store_filter():
     """FilterPlugin catches ValueError and logs it — content passes through."""
     from spacetime_memory.plugin_manager import PluginManager, FilterPlugin
+
     pm = PluginManager()
     pm.register(FilterPlugin(min_length=5))
     # Content too short — FilterPlugin raises ValueError, dispatch catches it,
@@ -324,12 +349,14 @@ def test_plugin_manager_error_isolation():
 
 # ── LocalLLM unit tests (model-free) ────────────────────────────────────
 
+
 def test_local_llm_auto_no_models(tmp_path):
     """When no GGUF files exist, auto() returns unavailable instance."""
     from spacetime_memory.local_llm import LocalLLM
     import os
     from pathlib import Path
     from unittest.mock import patch
+
     # Ensure no models in search paths
     old_env = os.environ.pop("LOCAL_LLM_MODEL_PATH", None)
     try:
@@ -343,6 +370,7 @@ def test_local_llm_auto_no_models(tmp_path):
 
 def test_local_llm_unavailable_generate_raises():
     from spacetime_memory.local_llm import LocalLLM
+
     llm = LocalLLM(model_path=None)
     try:
         llm.generate("test")
@@ -354,6 +382,7 @@ def test_local_llm_unavailable_generate_raises():
 def test_local_llm_summarize_fallback():
     """Summarize should return truncated content when model unavailable."""
     from spacetime_memory.local_llm import LocalLLM
+
     llm = LocalLLM(model_path=None)
     result = llm.summarize("a" * 300, max_length=50)
     assert len(result) <= 53  # 50 + "..."
@@ -363,6 +392,7 @@ def test_local_llm_summarize_fallback():
 def test_local_llm_extract_entities_fallback():
     """extract_entities returns empty list when unavailable."""
     from spacetime_memory.local_llm import LocalLLM
+
     llm = LocalLLM(model_path=None)
     result = llm.extract_entities("John works at Acme.")
     assert result == []
@@ -370,6 +400,7 @@ def test_local_llm_extract_entities_fallback():
 
 def test_local_llm_recommended_models_keys():
     from spacetime_memory.local_llm import RECOMMENDED_MODELS
+
     assert "minicpm5-1b" in RECOMMENDED_MODELS
     assert "qwen2.5-0.5b" in RECOMMENDED_MODELS
     assert "url" in RECOMMENDED_MODELS["minicpm5-1b"]
@@ -377,5 +408,6 @@ def test_local_llm_recommended_models_keys():
 
 def test_local_llm_download_unknown_model():
     from spacetime_memory.local_llm import LocalLLM
+
     result = LocalLLM.download_model("nonexistent-model")
     assert result is None

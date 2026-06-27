@@ -9,13 +9,13 @@ Tests cover:
 - Deduplication via _seen set
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
 from spacetime_memory.connectors import NotionConnector, Event
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
+
 
 def _make_page(page_id: str, title_text: str, properties: dict, **extra):
     """Build a minimal Notion API page dict."""
@@ -54,6 +54,7 @@ def _make_api_response(results: list, has_more=False, next_cursor=None):
 
 # ── Constructor tests ────────────────────────────────────────────────
 
+
 class TestNotionConnectorInit:
     def test_default_values(self):
         c = NotionConnector(token="sekrit", database_id="db-1", workspace_id="ws-1")
@@ -66,14 +67,18 @@ class TestNotionConnectorInit:
 
     def test_custom_values(self):
         c = NotionConnector(
-            token="tok", database_id="db-2",
-            workspace_id="ws-2", peer_id="my-bot", max_pages=50,
+            token="tok",
+            database_id="db-2",
+            workspace_id="ws-2",
+            peer_id="my-bot",
+            max_pages=50,
         )
         assert c.peer_id == "my-bot"
         assert c.max_pages == 50
 
 
 # ── _get_prop_value tests ────────────────────────────────────────────
+
 
 class TestGetPropValue:
     """Static _get_prop_value() — all Notion property types."""
@@ -90,49 +95,69 @@ class TestGetPropValue:
         assert val == "World"
 
     def test_select(self):
-        val = NotionConnector._get_prop_value("select", {"type": "select", "select": {"name": "Option A"}})
+        val = NotionConnector._get_prop_value(
+            "select", {"type": "select", "select": {"name": "Option A"}}
+        )
         assert val == "Option A"
 
     def test_select_none(self):
         assert NotionConnector._get_prop_value("select", {"type": "select", "select": None}) is None
 
     def test_multi_select(self):
-        val = NotionConnector._get_prop_value("multi_select", {
-            "type": "multi_select",
-            "multi_select": [{"name": "A"}, {"name": "B"}],
-        })
+        val = NotionConnector._get_prop_value(
+            "multi_select",
+            {
+                "type": "multi_select",
+                "multi_select": [{"name": "A"}, {"name": "B"}],
+            },
+        )
         assert val == "A, B"
 
     def test_multi_select_empty(self):
-        val = NotionConnector._get_prop_value("multi_select", {"type": "multi_select", "multi_select": []})
+        val = NotionConnector._get_prop_value(
+            "multi_select", {"type": "multi_select", "multi_select": []}
+        )
         assert val is None
 
     def test_status(self):
-        val = NotionConnector._get_prop_value("status", {"type": "status", "status": {"name": "In Progress"}})
+        val = NotionConnector._get_prop_value(
+            "status", {"type": "status", "status": {"name": "In Progress"}}
+        )
         assert val == "In Progress"
 
     def test_status_none(self):
         assert NotionConnector._get_prop_value("status", {"type": "status", "status": None}) is None
 
     def test_date_start_only(self):
-        val = NotionConnector._get_prop_value("date", {"type": "date", "date": {"start": "2024-01-01"}})
+        val = NotionConnector._get_prop_value(
+            "date", {"type": "date", "date": {"start": "2024-01-01"}}
+        )
         assert val == "2024-01-01"
 
     def test_date_range(self):
-        val = NotionConnector._get_prop_value("date", {
-            "type": "date",
-            "date": {"start": "2024-01-01", "end": "2024-01-10"},
-        })
+        val = NotionConnector._get_prop_value(
+            "date",
+            {
+                "type": "date",
+                "date": {"start": "2024-01-01", "end": "2024-01-10"},
+            },
+        )
         assert val == "2024-01-01 → 2024-01-10"
 
     def test_date_none(self):
         assert NotionConnector._get_prop_value("date", {"type": "date", "date": None}) is None
 
     def test_checkbox_true(self):
-        assert NotionConnector._get_prop_value("checkbox", {"type": "checkbox", "checkbox": True}) is True
+        assert (
+            NotionConnector._get_prop_value("checkbox", {"type": "checkbox", "checkbox": True})
+            is True
+        )
 
     def test_checkbox_false(self):
-        assert NotionConnector._get_prop_value("checkbox", {"type": "checkbox", "checkbox": False}) is False
+        assert (
+            NotionConnector._get_prop_value("checkbox", {"type": "checkbox", "checkbox": False})
+            is False
+        )
 
     def test_number(self):
         assert NotionConnector._get_prop_value("number", {"type": "number", "number": 42}) == 42
@@ -149,121 +174,180 @@ class TestGetPropValue:
         assert val == "a@b.com"
 
     def test_phone_number(self):
-        val = NotionConnector._get_prop_value("phone_number", {"type": "phone_number", "phone_number": "555-1234"})
+        val = NotionConnector._get_prop_value(
+            "phone_number", {"type": "phone_number", "phone_number": "555-1234"}
+        )
         assert val == "555-1234"
 
     def test_unique_id_with_prefix(self):
-        val = NotionConnector._get_prop_value("unique_id", {
-            "type": "unique_id",
-            "unique_id": {"prefix": "TASK", "number": 42},
-        })
+        val = NotionConnector._get_prop_value(
+            "unique_id",
+            {
+                "type": "unique_id",
+                "unique_id": {"prefix": "TASK", "number": 42},
+            },
+        )
         assert val == "TASK-42"
 
     def test_unique_id_no_prefix(self):
-        val = NotionConnector._get_prop_value("unique_id", {
-            "type": "unique_id",
-            "unique_id": {"prefix": None, "number": 7},
-        })
+        val = NotionConnector._get_prop_value(
+            "unique_id",
+            {
+                "type": "unique_id",
+                "unique_id": {"prefix": None, "number": 7},
+            },
+        )
         assert val == "7"
 
     def test_unique_id_none(self):
-        assert NotionConnector._get_prop_value("unique_id", {"type": "unique_id", "unique_id": None}) is None
+        assert (
+            NotionConnector._get_prop_value("unique_id", {"type": "unique_id", "unique_id": None})
+            is None
+        )
 
     def test_unique_id_prefix_no_number(self):
         """When unique_id has prefix but number is None, returns None."""
-        assert NotionConnector._get_prop_value("unique_id", {
-            "type": "unique_id",
-            "unique_id": {"prefix": "TASK", "number": None},
-        }) is None
+        assert (
+            NotionConnector._get_prop_value(
+                "unique_id",
+                {
+                    "type": "unique_id",
+                    "unique_id": {"prefix": "TASK", "number": None},
+                },
+            )
+            is None
+        )
 
     def test_formula_string(self):
-        val = NotionConnector._get_prop_value("formula", {
-            "type": "formula",
-            "formula": {"type": "string", "string": "hello"},
-        })
+        val = NotionConnector._get_prop_value(
+            "formula",
+            {
+                "type": "formula",
+                "formula": {"type": "string", "string": "hello"},
+            },
+        )
         assert val == "hello"
 
     def test_formula_number(self):
-        val = NotionConnector._get_prop_value("formula", {
-            "type": "formula",
-            "formula": {"type": "number", "number": 3.14},
-        })
+        val = NotionConnector._get_prop_value(
+            "formula",
+            {
+                "type": "formula",
+                "formula": {"type": "number", "number": 3.14},
+            },
+        )
         assert val == 3.14
 
     def test_formula_boolean(self):
-        val = NotionConnector._get_prop_value("formula", {
-            "type": "formula",
-            "formula": {"type": "boolean", "boolean": True},
-        })
+        val = NotionConnector._get_prop_value(
+            "formula",
+            {
+                "type": "formula",
+                "formula": {"type": "boolean", "boolean": True},
+            },
+        )
         assert val is True
 
     def test_formula_date(self):
-        val = NotionConnector._get_prop_value("formula", {
-            "type": "formula",
-            "formula": {"type": "date", "date": {"start": "2024-06-01"}},
-        })
+        val = NotionConnector._get_prop_value(
+            "formula",
+            {
+                "type": "formula",
+                "formula": {"type": "date", "date": {"start": "2024-06-01"}},
+            },
+        )
         assert val == "2024-06-01"
 
     def test_formula_unknown_type(self):
-        assert NotionConnector._get_prop_value("formula", {
-            "type": "formula",
-            "formula": {"type": "unknown_stuff"},
-        }) is None
+        assert (
+            NotionConnector._get_prop_value(
+                "formula",
+                {
+                    "type": "formula",
+                    "formula": {"type": "unknown_stuff"},
+                },
+            )
+            is None
+        )
 
     def test_rollup_array(self):
-        val = NotionConnector._get_prop_value("rollup", {
-            "type": "rollup",
-            "rollup": {
-                "type": "array",
-                "array": [
-                    {"type": "title", "title": _rich_text("Item 1")},
-                    {"type": "number", "number": 10},
-                ],
+        val = NotionConnector._get_prop_value(
+            "rollup",
+            {
+                "type": "rollup",
+                "rollup": {
+                    "type": "array",
+                    "array": [
+                        {"type": "title", "title": _rich_text("Item 1")},
+                        {"type": "number", "number": 10},
+                    ],
+                },
             },
-        })
+        )
         assert "Item 1" in val
         assert "10" in val
 
     def test_rollup_number(self):
-        val = NotionConnector._get_prop_value("rollup", {
-            "type": "rollup",
-            "rollup": {"type": "number", "number": 99},
-        })
+        val = NotionConnector._get_prop_value(
+            "rollup",
+            {
+                "type": "rollup",
+                "rollup": {"type": "number", "number": 99},
+            },
+        )
         assert val == 99
 
     def test_rollup_date(self):
-        val = NotionConnector._get_prop_value("rollup", {
-            "type": "rollup",
-            "rollup": {"type": "date", "date": {"start": "2024-12-25"}},
-        })
+        val = NotionConnector._get_prop_value(
+            "rollup",
+            {
+                "type": "rollup",
+                "rollup": {"type": "date", "date": {"start": "2024-12-25"}},
+            },
+        )
         assert val == "2024-12-25"
 
     def test_rollup_incomplete(self):
-        val = NotionConnector._get_prop_value("rollup", {
-            "type": "rollup",
-            "rollup": {"type": "incomplete"},
-        })
+        val = NotionConnector._get_prop_value(
+            "rollup",
+            {
+                "type": "rollup",
+                "rollup": {"type": "incomplete"},
+            },
+        )
         assert val == "(incomplete rollup)"
 
     def test_rollup_unknown_type(self):
         """Rollup with an unrecognised type returns None."""
-        assert NotionConnector._get_prop_value("rollup", {
-            "type": "rollup",
-            "rollup": {"type": "bogus_rollup"},
-        }) is None
+        assert (
+            NotionConnector._get_prop_value(
+                "rollup",
+                {
+                    "type": "rollup",
+                    "rollup": {"type": "bogus_rollup"},
+                },
+            )
+            is None
+        )
 
     def test_people(self):
-        val = NotionConnector._get_prop_value("people", {
-            "type": "people",
-            "people": [{"name": "Alice"}, {"name": "Bob"}],
-        })
+        val = NotionConnector._get_prop_value(
+            "people",
+            {
+                "type": "people",
+                "people": [{"name": "Alice"}, {"name": "Bob"}],
+            },
+        )
         assert val == "Alice, Bob"
 
     def test_people_fallback_to_id(self):
-        val = NotionConnector._get_prop_value("people", {
-            "type": "people",
-            "people": [{"id": "user-1"}, {"name": "Charlie"}],
-        })
+        val = NotionConnector._get_prop_value(
+            "people",
+            {
+                "type": "people",
+                "people": [{"id": "user-1"}, {"name": "Charlie"}],
+            },
+        )
         assert "user-1" in val
         assert "Charlie" in val
 
@@ -271,13 +355,16 @@ class TestGetPropValue:
         assert NotionConnector._get_prop_value("people", {"type": "people", "people": []}) is None
 
     def test_files_with_names_and_urls(self):
-        val = NotionConnector._get_prop_value("files", {
-            "type": "files",
-            "files": [
-                {"name": "doc.pdf", "file": {"url": "https://s3/file1"}},
-                {"name": "img.png", "external": {"url": "https://cdn/file2"}},
-            ],
-        })
+        val = NotionConnector._get_prop_value(
+            "files",
+            {
+                "type": "files",
+                "files": [
+                    {"name": "doc.pdf", "file": {"url": "https://s3/file1"}},
+                    {"name": "img.png", "external": {"url": "https://cdn/file2"}},
+                ],
+            },
+        )
         assert "doc.pdf" in val
         assert "img.png" in val
         assert "https://s3/file1" in val
@@ -288,61 +375,82 @@ class TestGetPropValue:
 
     def test_files_name_only_no_url(self):
         """Files with a name but no URL are still included."""
-        val = NotionConnector._get_prop_value("files", {
-            "type": "files",
-            "files": [
-                {"name": "readme.md", "file": {}},
-                {"name": "LICENSE"},
-            ],
-        })
+        val = NotionConnector._get_prop_value(
+            "files",
+            {
+                "type": "files",
+                "files": [
+                    {"name": "readme.md", "file": {}},
+                    {"name": "LICENSE"},
+                ],
+            },
+        )
         assert "readme.md" in val
         assert "LICENSE" in val
 
     def test_files_url_only_no_name(self):
         """Files with a URL but no name are still included."""
-        val = NotionConnector._get_prop_value("files", {
-            "type": "files",
-            "files": [
-                {"file": {"url": "https://s3/bucket/key"}},
-                {"external": {"url": "https://cdn/asset"}},
-            ],
-        })
+        val = NotionConnector._get_prop_value(
+            "files",
+            {
+                "type": "files",
+                "files": [
+                    {"file": {"url": "https://s3/bucket/key"}},
+                    {"external": {"url": "https://cdn/asset"}},
+                ],
+            },
+        )
         assert "https://s3/bucket/key" in val
         assert "https://cdn/asset" in val
 
     def test_created_by(self):
-        val = NotionConnector._get_prop_value("created_by", {
-            "type": "created_by",
-            "created_by": {"name": "Alice"},
-        })
+        val = NotionConnector._get_prop_value(
+            "created_by",
+            {
+                "type": "created_by",
+                "created_by": {"name": "Alice"},
+            },
+        )
         assert val == "Alice"
 
     def test_created_time(self):
-        val = NotionConnector._get_prop_value("created_time", {
-            "type": "created_time",
-            "created_time": "2024-06-15T10:00:00Z",
-        })
+        val = NotionConnector._get_prop_value(
+            "created_time",
+            {
+                "type": "created_time",
+                "created_time": "2024-06-15T10:00:00Z",
+            },
+        )
         assert val == "2024-06-15T10:00:00Z"
 
     def test_last_edited_by(self):
-        val = NotionConnector._get_prop_value("last_edited_by", {
-            "type": "last_edited_by",
-            "last_edited_by": {"id": "user-2"},
-        })
+        val = NotionConnector._get_prop_value(
+            "last_edited_by",
+            {
+                "type": "last_edited_by",
+                "last_edited_by": {"id": "user-2"},
+            },
+        )
         assert val == "user-2"
 
     def test_last_edited_time(self):
-        val = NotionConnector._get_prop_value("last_edited_time", {
-            "type": "last_edited_time",
-            "last_edited_time": "2024-07-01T12:00:00Z",
-        })
+        val = NotionConnector._get_prop_value(
+            "last_edited_time",
+            {
+                "type": "last_edited_time",
+                "last_edited_time": "2024-07-01T12:00:00Z",
+            },
+        )
         assert val == "2024-07-01T12:00:00Z"
 
     def test_button(self):
-        val = NotionConnector._get_prop_value("button", {
-            "type": "button",
-            "button": {"text": "Click me"},
-        })
+        val = NotionConnector._get_prop_value(
+            "button",
+            {
+                "type": "button",
+                "button": {"text": "Click me"},
+            },
+        )
         assert val == "Click me"
 
     def test_button_empty(self):
@@ -354,6 +462,7 @@ class TestGetPropValue:
 
 
 # ── _extract_title tests ─────────────────────────────────────────────
+
 
 class TestExtractTitle:
     def test_title_property_first(self):
@@ -377,6 +486,7 @@ class TestExtractTitle:
 
 
 # ── _extract_body tests ──────────────────────────────────────────────
+
 
 class TestExtractBody:
     def test_extract_body_from_props(self):
@@ -403,6 +513,7 @@ class TestExtractBody:
 
 # ── _extract_property_summary tests ──────────────────────────────────
 
+
 class TestExtractPropertySummary:
     def test_extracts_all_props(self):
         props = {
@@ -427,11 +538,13 @@ class TestExtractPropertySummary:
 
 # ── poll() tests ─────────────────────────────────────────────────────
 
+
 class TestNotionPoll:
     def test_poll_success(self):
         """poll() fetches pages and produces Events."""
         page = _make_page(
-            "page-1", "Test Page",
+            "page-1",
+            "Test Page",
             {
                 "Title": _make_title_prop("Test Page"),
                 "Description": _make_rich_text_prop("A test page."),
@@ -507,9 +620,9 @@ class TestNotionPoll:
         rate_limit_resp = Mock(status_code=429)
         rate_limit_resp.headers = {"Retry-After": "1"}  # 1 second
 
-        success_resp = _make_api_response([
-            _make_page("p-1", "Page", {"Title": _make_title_prop("Page")})
-        ])
+        success_resp = _make_api_response(
+            [_make_page("p-1", "Page", {"Title": _make_title_prop("Page")})]
+        )
 
         with patch("httpx.Client") as MockClient:
             mock_cli = MockClient.return_value.__enter__.return_value
@@ -529,9 +642,9 @@ class TestNotionPoll:
         # Some responses might not include Retry-After
         rate_limit_resp.headers = {}  # no Retry-After
 
-        success_resp = _make_api_response([
-            _make_page("p-1", "Page", {"Title": _make_title_prop("Page")})
-        ])
+        success_resp = _make_api_response(
+            [_make_page("p-1", "Page", {"Title": _make_title_prop("Page")})]
+        )
 
         with patch("httpx.Client") as MockClient:
             mock_cli = MockClient.return_value.__enter__.return_value
@@ -571,8 +684,9 @@ class TestNotionPoll:
         import httpx
 
         with patch("httpx.Client") as MockClient:
-            MockClient.return_value.__enter__.return_value.post.side_effect = \
-                httpx.RequestError("Connection failed")
+            MockClient.return_value.__enter__.return_value.post.side_effect = httpx.RequestError(
+                "Connection failed"
+            )
             c = NotionConnector(token="tok", database_id="db-1", workspace_id="ws-1")
             events = c.poll()
 
@@ -581,7 +695,8 @@ class TestNotionPoll:
     def test_poll_metadata_property_merge(self):
         """poll() merges property summary into metadata without overwriting reserved keys."""
         page = _make_page(
-            "page-meta", "Meta Page",
+            "page-meta",
+            "Meta Page",
             {
                 "Title": _make_title_prop("Meta Page"),
                 # This property key clashes with reserved metadata key "source"

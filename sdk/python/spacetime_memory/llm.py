@@ -49,9 +49,7 @@ class LLMClient:
             or os.environ.get("LITELLM_MASTER_KEY", "")
         )
         self.base_url = (
-            base_url
-            or os.environ.get("OPENAI_BASE_URL", "")
-            or "https://api.openai.com/v1"
+            base_url or os.environ.get("OPENAI_BASE_URL", "") or "https://api.openai.com/v1"
         ).rstrip("/")
         self.model = model or os.environ.get("LLM_MODEL", "un-qwen3.6-plus")
 
@@ -107,7 +105,12 @@ class LLMClient:
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError, httpx.HTTPStatusError):
+        except (
+            httpx.ConnectError,
+            httpx.TimeoutException,
+            httpx.RemoteProtocolError,
+            httpx.HTTPStatusError,
+        ):
             logger.warning("LLM call failed, returning None")
             return None
 
@@ -128,10 +131,12 @@ class LLMClient:
         if instruction:
             system += f" {instruction}"
 
-        return self.chat([
-            {"role": "system", "content": system},
-            {"role": "user", "content": text},
-        ])
+        return self.chat(
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": text},
+            ]
+        )
 
     def extract_facts(self, text: str) -> list[str] | None:
         """Extract key facts from text as a list of strings.
@@ -253,9 +258,9 @@ class LLMClient:
                     "content": (
                         "You are a named entity extraction engine. Extract all named "
                         "entities from the text. Return ONLY valid JSON, no markdown. "
-                        "Schema: {\"entities\": [{\"name\": \"...\", \"entity_type\": "
-                        "\"person|company|org|product|location\", \"aliases\": [...], "
-                        "\"description\": \"...\"}]}"
+                        'Schema: {"entities": [{"name": "...", "entity_type": '
+                        '"person|company|org|product|location", "aliases": [...], '
+                        '"description": "..."}]}'
                     ),
                 },
                 {"role": "user", "content": text},

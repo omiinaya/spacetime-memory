@@ -41,7 +41,8 @@ def honcho(host: str, port: int, stdb_session: dict) -> Honcho:
 
     # Register identity and create workspace so store_memory's ACL passes
     reg = Client(
-        host=host, port=port,
+        host=host,
+        port=port,
         database=stdb_session["database"],
     )
     try:
@@ -56,7 +57,8 @@ def honcho(host: str, port: int, stdb_session: dict) -> Honcho:
 
     h = Honcho(
         workspace_id=ws_id,
-        stdb_host=host, stdb_port=port,
+        stdb_host=host,
+        stdb_port=port,
         stdb_database=stdb_session["database"],
         api_key=identity_token or None,
     )
@@ -343,7 +345,7 @@ class TestHonchoSessionAdvanced:
         """Session get/set metadata."""
         sid = _uid("session")
         s = honcho.session(sid)
-        if hasattr(s, 'get_metadata'):
+        if hasattr(s, "get_metadata"):
             md = s.get_metadata()
             assert md is not None
 
@@ -369,6 +371,7 @@ class TestHonchoSessionAdvanced:
     def test_session_set_configuration(self, honcho: Honcho) -> None:
         """Session.set_configuration does not raise."""
         from spacetime_memory.sdks.honcho import SessionConfiguration
+
         sid = _uid("session")
         s = honcho.session(sid)
         s.set_configuration(SessionConfiguration())
@@ -396,6 +399,7 @@ class TestHonchoSessionAdvanced:
 # Model unit tests (no DB required)
 # ---------------------------------------------------------------------------
 
+
 class TestModels:
     """Tests for model classes: Conclusion, Message, SyncPage, etc."""
 
@@ -403,6 +407,7 @@ class TestModels:
         """Conclusion.__init__ with all args."""
         import datetime as dt
         from spacetime_memory.sdks.honcho import Conclusion
+
         now = dt.datetime.utcnow()
         c = Conclusion(
             id="conc-1",
@@ -422,6 +427,7 @@ class TestModels:
     def test_conclusion_init_minimal(self) -> None:
         """Conclusion.__init__ with minimal args (default created_at)."""
         from spacetime_memory.sdks.honcho import Conclusion
+
         c = Conclusion(id="conc-2", content="test", observer_id="o", observed_id="s")
         assert c.id == "conc-2"
         assert c.created_at is not None
@@ -430,10 +436,15 @@ class TestModels:
         """Conclusion.from_api_response() constructs from response model."""
         import datetime as dt
         from spacetime_memory.sdks.honcho import Conclusion, ConclusionResponse
+
         now = dt.datetime.utcnow()
         resp = ConclusionResponse(
-            id="cr-1", content="api content", observer_id="o1",
-            observed_id="s1", session_id="sess-1", created_at=now,
+            id="cr-1",
+            content="api content",
+            observer_id="o1",
+            observed_id="s1",
+            session_id="sess-1",
+            created_at=now,
         )
         c = Conclusion.from_api_response(resp)
         assert c.id == "cr-1"
@@ -444,9 +455,12 @@ class TestModels:
     def test_conclusion_repr(self) -> None:
         """Conclusion.__repr__ produces readable string."""
         from spacetime_memory.sdks.honcho import Conclusion
+
         c = Conclusion(
-            id="long-id-12345", content="A" * 60,
-            observer_id="obs", observed_id="sub",
+            id="long-id-12345",
+            content="A" * 60,
+            observer_id="obs",
+            observed_id="sub",
         )
         r = repr(c)
         assert "Conclusion" in r
@@ -458,11 +472,17 @@ class TestModels:
         """Message.__init__ with all args."""
         import datetime as dt
         from spacetime_memory.sdks.honcho import Message
+
         now = dt.datetime.utcnow()
         m = Message(
-            id="msg-1", content="Hello", peer_id="p1",
-            session_id="s1", workspace_id="ws1",
-            metadata={"k": "v"}, created_at=now, token_count=42,
+            id="msg-1",
+            content="Hello",
+            peer_id="p1",
+            session_id="s1",
+            workspace_id="ws1",
+            metadata={"k": "v"},
+            created_at=now,
+            token_count=42,
         )
         assert m.id == "msg-1"
         assert m.content == "Hello"
@@ -476,6 +496,7 @@ class TestModels:
     def test_message_init_defaults(self) -> None:
         """Message.__init__ with defaults (no metadata, no created_at)."""
         from spacetime_memory.sdks.honcho import Message
+
         m = Message(id="m2", content="hi", peer_id="p", session_id="s", workspace_id="w")
         assert m.metadata == {}
         assert m.created_at is not None
@@ -485,11 +506,17 @@ class TestModels:
         """Message.from_api_response() constructs from MessageResponse."""
         import datetime as dt
         from spacetime_memory.sdks.honcho import Message, MessageResponse
+
         now = dt.datetime.utcnow()
         resp = MessageResponse(
-            id="mr-1", content="resp content", peer_id="p1",
-            session_id="s1", workspace_id="ws1",
-            metadata={"x": 1}, created_at=now, token_count=10,
+            id="mr-1",
+            content="resp content",
+            peer_id="p1",
+            session_id="s1",
+            workspace_id="ws1",
+            metadata={"x": 1},
+            created_at=now,
+            token_count=10,
         )
         m = Message.from_api_response(resp)
         assert m.id == "mr-1"
@@ -500,9 +527,14 @@ class TestModels:
         """Message.from_api_response with empty workspace_id."""
         import datetime as dt
         from spacetime_memory.sdks.honcho import Message, MessageResponse
+
         resp = MessageResponse(
-            id="mr-2", content="x", peer_id="p", session_id="s",
-            workspace_id="", created_at=dt.datetime.utcnow(),
+            id="mr-2",
+            content="x",
+            peer_id="p",
+            session_id="s",
+            workspace_id="",
+            created_at=dt.datetime.utcnow(),
         )
         m = Message.from_api_response(resp)
         assert m.workspace_id == ""
@@ -510,9 +542,13 @@ class TestModels:
     def test_message_repr(self) -> None:
         """Message.__repr__ produces readable string."""
         from spacetime_memory.sdks.honcho import Message
+
         m = Message(
-            id="long-msg-id", content="B" * 60,
-            peer_id="peer1", session_id="s1", workspace_id="w1",
+            id="long-msg-id",
+            content="B" * 60,
+            peer_id="peer1",
+            session_id="s1",
+            workspace_id="w1",
         )
         r = repr(m)
         assert "Message" in r
@@ -521,6 +557,7 @@ class TestModels:
     def test_syncpage_init_with_data(self) -> None:
         """SyncPage initialized with a data dict."""
         from spacetime_memory.sdks.honcho import SyncPage
+
         sp = SyncPage(data={"items": [1, 2, 3], "total": 3, "page": 1, "size": 10, "pages": 1})
         assert list(sp.items) == [1, 2, 3]
         assert sp.total == 3
@@ -531,6 +568,7 @@ class TestModels:
     def test_syncpage_init_with_kwargs(self) -> None:
         """SyncPage initialized with explicit kwargs (no data dict)."""
         from spacetime_memory.sdks.honcho import SyncPage
+
         sp = SyncPage(items=["a", "b"], total=2, page=1, size=10, pages=1)
         assert list(sp.items) == ["a", "b"]
         assert sp.total == 2
@@ -538,12 +576,14 @@ class TestModels:
     def test_syncpage_len(self) -> None:
         """SyncPage.__len__ delegates to items."""
         from spacetime_memory.sdks.honcho import SyncPage
+
         sp = SyncPage(items=[1, 2, 3])
         assert len(sp) == 3
 
     def test_syncpage_getitem(self) -> None:
         """SyncPage.__getitem__ delegates to items."""
         from spacetime_memory.sdks.honcho import SyncPage
+
         sp = SyncPage(items=["x", "y", "z"])
         assert sp[0] == "x"
         assert sp[2] == "z"
@@ -551,18 +591,21 @@ class TestModels:
     def test_syncpage_iter(self) -> None:
         """SyncPage.__iter__ yields items."""
         from spacetime_memory.sdks.honcho import SyncPage
+
         sp = SyncPage(items=[10, 20])
         assert list(sp) == [10, 20]
 
     def test_syncpage_has_next_page_true(self) -> None:
         """SyncPage.has_next_page() returns True when page < pages."""
         from spacetime_memory.sdks.honcho import SyncPage
+
         sp = SyncPage(items=[], page=1, pages=3)
         assert sp.has_next_page() is True
 
     def test_syncpage_has_next_page_false(self) -> None:
         """SyncPage.has_next_page() returns False when page >= pages or None."""
         from spacetime_memory.sdks.honcho import SyncPage
+
         sp1 = SyncPage(items=[], page=3, pages=3)
         assert sp1.has_next_page() is False
         sp2 = SyncPage(items=[])
@@ -571,11 +614,17 @@ class TestModels:
     def test_configuration_models(self) -> None:
         """Smoke-test configuration model instantiation."""
         from spacetime_memory.sdks.honcho import (
-            ReasoningConfiguration, PeerCardConfiguration,
-            SummaryConfiguration, DreamConfiguration,
-            WorkspaceConfiguration, PeerConfig, SessionPeerConfig,
-            MessageConfiguration, MessageCreateParams,
+            ReasoningConfiguration,
+            PeerCardConfiguration,
+            SummaryConfiguration,
+            DreamConfiguration,
+            WorkspaceConfiguration,
+            PeerConfig,
+            SessionPeerConfig,
+            MessageConfiguration,
+            MessageCreateParams,
         )
+
         rc = ReasoningConfiguration(enabled=True, custom_instructions="be nice")
         assert rc.enabled is True
         pc = PeerCardConfiguration(use=True, create=False)
@@ -600,11 +649,21 @@ class TestModels:
         """Smoke-test response model instantiation."""
         import datetime as dt
         from spacetime_memory.sdks.honcho import (
-            WorkspaceResponse, PeerResponse, SessionResponse,
-            MessageResponse, Summary, SessionSummaries, SessionContext,
-            PeerContextResponse, ConclusionResponse, ConclusionCreateParams,
-            QueueStatusResponse, SessionQueueStatus, DialecticResponse,
+            WorkspaceResponse,
+            PeerResponse,
+            SessionResponse,
+            MessageResponse,
+            Summary,
+            SessionSummaries,
+            SessionContext,
+            PeerContextResponse,
+            ConclusionResponse,
+            ConclusionCreateParams,
+            QueueStatusResponse,
+            SessionQueueStatus,
+            DialecticResponse,
         )
+
         now = dt.datetime.utcnow()
         wr = WorkspaceResponse(id="w1", created_at=now)
         assert wr.id == "w1"
@@ -612,8 +671,9 @@ class TestModels:
         assert pr.id == "p1"
         sr = SessionResponse(id="s1", is_active=True, workspace_id="w1", created_at=now)
         assert sr.is_active is True
-        mr = MessageResponse(id="m1", content="hi", peer_id="p1",
-                             session_id="s1", workspace_id="w1", created_at=now)
+        mr = MessageResponse(
+            id="m1", content="hi", peer_id="p1", session_id="s1", workspace_id="w1", created_at=now
+        )
         assert mr.content == "hi"
         sm = Summary(content="summary", message_id="m1", summary_type="short", created_at="now")
         assert sm.summary_type == "short"
@@ -623,8 +683,9 @@ class TestModels:
         assert len(sc) == 0
         pcr = PeerContextResponse(peer_id="p1", target_id="p2")
         assert pcr.peer_id == "p1"
-        cr = ConclusionResponse(id="c1", content="conc", observer_id="o1",
-                                observed_id="s1", created_at=now)
+        cr = ConclusionResponse(
+            id="c1", content="conc", observer_id="o1", observed_id="s1", created_at=now
+        )
         assert cr.content == "conc"
         ccp = ConclusionCreateParams(content="conc", session_id="s1")
         assert ccp.content == "conc"
@@ -639,6 +700,7 @@ class TestModels:
 # ---------------------------------------------------------------------------
 # Peer advanced tests (more coverage)
 # ---------------------------------------------------------------------------
+
 
 class TestPeerMore:
     """Additional Peer method coverage."""
@@ -680,6 +742,7 @@ class TestPeerMore:
     def test_peer_set_configuration(self, honcho: Honcho) -> None:
         """Peer.set_configuration() stores the config."""
         from spacetime_memory.sdks.honcho import PeerConfig
+
         pid = _uid()
         p = honcho.peer(pid)
         cfg = PeerConfig(observe_me=True)
@@ -756,6 +819,7 @@ class TestPeerMore:
 # ---------------------------------------------------------------------------
 # Session advanced tests
 # ---------------------------------------------------------------------------
+
 
 class TestSessionMore:
     """Additional Session method coverage."""
@@ -884,6 +948,7 @@ class TestSessionMore:
     def test_session_set_peer_configuration(self, honcho: Honcho) -> None:
         """Session.set_peer_configuration() stores config."""
         from spacetime_memory.sdks.honcho import SessionPeerConfig
+
         sid = _uid("session")
         pid = _uid()
         s = honcho.session(sid)
@@ -959,6 +1024,7 @@ class TestSessionMore:
 
         class FileObj:
             name = "data.csv"
+
         result = s.upload_file(FileObj(), p)
         assert isinstance(result, list)
 
@@ -972,6 +1038,7 @@ class TestSessionMore:
 
         class FileObj:
             filename = "image.png"
+
         result = s.upload_file(FileObj(), p)
         assert isinstance(result, list)
 
@@ -1002,6 +1069,7 @@ class TestSessionMore:
 # ---------------------------------------------------------------------------
 # Honcho client advanced tests
 # ---------------------------------------------------------------------------
+
 
 class TestHonchoMore:
     """Additional Honcho client method coverage."""
@@ -1064,7 +1132,7 @@ class TestHonchoMore:
         """Honcho.queue_status() returns QueueStatusResponse."""
         status = honcho.queue_status()
         assert status is not None
-        assert hasattr(status, 'total_work_units')
+        assert hasattr(status, "total_work_units")
 
     def test_honcho_schedule_dream(self, honcho: Honcho) -> None:
         """Honcho.schedule_dream() does not raise."""
@@ -1084,6 +1152,7 @@ class TestHonchoMore:
     def test_honcho_get_set_configuration(self, honcho: Honcho) -> None:
         """Honcho.get_configuration() and set_configuration()."""
         from spacetime_memory.sdks.honcho import WorkspaceConfiguration
+
         cfg = WorkspaceConfiguration()
         honcho.set_configuration(cfg)
         assert honcho.get_configuration() is not None
@@ -1096,6 +1165,7 @@ class TestHonchoMore:
 # ---------------------------------------------------------------------------
 # ConclusionScope tests
 # ---------------------------------------------------------------------------
+
 
 class TestConclusionScope:
     """Tests for ConclusionScope methods."""
@@ -1127,6 +1197,7 @@ class TestConclusionScope:
     def test_conclusions_create(self, honcho: Honcho) -> None:
         """ConclusionScope.create() stores conclusions (may fail without auth)."""
         from spacetime_memory.sdks.honcho import ConclusionCreateParams
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)
@@ -1168,6 +1239,7 @@ class TestConclusionScope:
 # ---------------------------------------------------------------------------
 # Async wrapper tests
 # ---------------------------------------------------------------------------
+
 
 class TestAsyncWrappers:
     """Tests for async (Aio) wrappers that go through asyncio.to_thread."""
@@ -1218,6 +1290,7 @@ class TestAsyncWrappers:
     async def test_peer_aio_get_set_configuration(self, honcho: Honcho) -> None:
         """PeerAio.get_configuration() and set_configuration() work."""
         from spacetime_memory.sdks.honcho import PeerConfig
+
         pid = _uid()
         p = honcho.peer(pid)
         cfg = await p.aio.get_configuration()
@@ -1363,6 +1436,7 @@ class TestAsyncWrappers:
     async def test_session_aio_get_set_configuration(self, honcho: Honcho) -> None:
         """SessionAio.get/set_configuration works."""
         from spacetime_memory.sdks.honcho import SessionConfiguration
+
         sid = _uid("session")
         s = honcho.session(sid)
         await s.aio.set_configuration(SessionConfiguration())
@@ -1402,6 +1476,7 @@ class TestAsyncWrappers:
     async def test_session_aio_set_peer_configuration(self, honcho: Honcho) -> None:
         """SessionAio.set_peer_configuration() works."""
         from spacetime_memory.sdks.honcho import SessionPeerConfig
+
         sid = _uid("session")
         pid = _uid()
         p = honcho.peer(pid)
@@ -1499,6 +1574,7 @@ class TestAsyncWrappers:
     async def test_honcho_aio_get_set_configuration(self, honcho: Honcho) -> None:
         """HonchoAio.get/set_configuration works."""
         from spacetime_memory.sdks.honcho import WorkspaceConfiguration
+
         await honcho.aio.set_configuration(WorkspaceConfiguration())
         cfg = await honcho.aio.get_configuration()
         assert cfg is not None
@@ -1538,13 +1614,12 @@ class TestAsyncWrappers:
     async def test_conclusion_scope_aio_create(self, honcho: Honcho) -> None:
         """ConclusionScopeAio.create() works (may fail without auth)."""
         from spacetime_memory.sdks.honcho import ConclusionCreateParams
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)
         try:
-            results = await scope.aio.create([
-                ConclusionCreateParams(content="aio conclusion")
-            ])
+            results = await scope.aio.create([ConclusionCreateParams(content="aio conclusion")])
             assert isinstance(results, list)
         except RuntimeError:
             pass
@@ -1563,13 +1638,14 @@ class TestAsyncWrappers:
 # Mock-based tests to cover internal success paths
 # ---------------------------------------------------------------------------
 
+
 class TestWithMocks:
     """Tests that mock client internals to cover success paths."""
 
     def test_add_messages_success_path(self, honcho: Honcho, monkeypatch) -> None:
         """Session.add_messages() success path — mock store to return ok."""
         from unittest.mock import MagicMock
-        from spacetime_memory.sdks.honcho import MessageCreateParams, Message
+
         sid = _uid("session")
         pid = _uid()
         p = honcho.peer(pid)
@@ -1587,12 +1663,15 @@ class TestWithMocks:
     def test_session_search_returns_results(self, honcho: Honcho, monkeypatch) -> None:
         """Session.search() with mocked search results."""
         from unittest.mock import MagicMock
+
         sid = _uid("session")
         s = honcho.session(sid)
 
-        mock_search = MagicMock(return_value=[
-            {"id": "mem-1", "memory_content": "test result", "metadata": {"peer_id": "p1"}}
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {"id": "mem-1", "memory_content": "test result", "metadata": {"peer_id": "p1"}}
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         results = s.search("test")
@@ -1601,13 +1680,19 @@ class TestWithMocks:
     def test_peer_search_returns_results(self, honcho: Honcho, monkeypatch) -> None:
         """Peer.search() with mocked search results."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
 
-        mock_search = MagicMock(return_value=[
-            {"id": "mem-1", "memory_content": "peer search result",
-             "metadata": {"peer_id": pid}}
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {
+                    "id": "mem-1",
+                    "memory_content": "peer search result",
+                    "metadata": {"peer_id": pid},
+                }
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         results = p.search("test")
@@ -1616,13 +1701,16 @@ class TestWithMocks:
     def test_peer_chat_with_search_results(self, honcho: Honcho, monkeypatch) -> None:
         """Peer.chat() returns string when search finds memories."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
 
-        mock_search = MagicMock(return_value=[
-            {"memory_content": "I enjoy hiking", "metadata": {"peer_id": pid}},
-            {"memory_content": "I like pizza", "metadata": {"peer_id": pid}},
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {"memory_content": "I enjoy hiking", "metadata": {"peer_id": pid}},
+                {"memory_content": "I like pizza", "metadata": {"peer_id": pid}},
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         response = p.chat("What do I like?")
@@ -1633,12 +1721,15 @@ class TestWithMocks:
     def test_peer_chat_stream_with_results(self, honcho: Honcho, monkeypatch) -> None:
         """Peer.chat_stream() yields chunks when chat returns data."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
 
-        mock_search = MagicMock(return_value=[
-            {"memory_content": "stream test data", "metadata": {"peer_id": pid}},
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {"memory_content": "stream test data", "metadata": {"peer_id": pid}},
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         gen = p.chat_stream("test")
@@ -1649,10 +1740,11 @@ class TestWithMocks:
         """Honcho.search() with mocked search results hits Message construction."""
         from unittest.mock import MagicMock
 
-        mock_search = MagicMock(return_value=[
-            {"id": "mem-1", "memory_content": "honcho search",
-             "metadata": {"peer_id": "p1"}}
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {"id": "mem-1", "memory_content": "honcho search", "metadata": {"peer_id": "p1"}}
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         results = honcho.search("test")
@@ -1661,13 +1753,15 @@ class TestWithMocks:
     def test_session_messages_returns_data(self, honcho: Honcho, monkeypatch) -> None:
         """Session.messages() with mocked search results."""
         from unittest.mock import MagicMock
+
         sid = _uid("session")
         s = honcho.session(sid)
 
-        mock_search = MagicMock(return_value=[
-            {"id": "msg-1", "memory_content": "content",
-             "metadata": {"peer_id": "p1"}}
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {"id": "msg-1", "memory_content": "content", "metadata": {"peer_id": "p1"}}
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         page = s.messages()
@@ -1676,6 +1770,7 @@ class TestWithMocks:
     def test_session_delete_fallback(self, honcho: Honcho, monkeypatch) -> None:
         """Session.delete() exercises the _call fallback path."""
         from unittest.mock import MagicMock
+
         sid = _uid("session")
         s = honcho.session(sid)
 
@@ -1701,18 +1796,24 @@ class TestWithMocks:
     def test_conclusion_scope_list_with_data(self, honcho: Honcho, monkeypatch) -> None:
         """ConclusionScope.list() with mocked search returning conclusions."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)
 
-        mock_search = MagicMock(return_value=[
-            {"id": "c1", "memory_content": "conclusion text",
-             "metadata": {
-                 "memory_type": "conclusion",
-                 "observer_id": p.id,
-                 "observed_id": p.id,
-             }}
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {
+                    "id": "c1",
+                    "memory_content": "conclusion text",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": p.id,
+                    },
+                }
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         page = scope.list()
@@ -1721,18 +1822,24 @@ class TestWithMocks:
     def test_conclusion_scope_query_with_data(self, honcho: Honcho, monkeypatch) -> None:
         """ConclusionScope.query() with mocked search returning conclusions."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)
 
-        mock_search = MagicMock(return_value=[
-            {"id": "c1", "memory_content": "queried conclusion",
-             "metadata": {
-                 "memory_type": "conclusion",
-                 "observer_id": p.id,
-                 "observed_id": p.id,
-             }}
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {
+                    "id": "c1",
+                    "memory_content": "queried conclusion",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": p.id,
+                    },
+                }
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         results = scope.query("test")
@@ -1741,18 +1848,33 @@ class TestWithMocks:
     def test_conclusion_scope_list_reverse(self, honcho: Honcho, monkeypatch) -> None:
         """ConclusionScope.list() with reverse=True."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)
 
-        mock_search = MagicMock(return_value=[
-            {"id": "c1", "memory_content": "first",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": p.id, "observed_id": p.id}},
-            {"id": "c2", "memory_content": "second",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": p.id, "observed_id": p.id}},
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {
+                    "id": "c1",
+                    "memory_content": "first",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": p.id,
+                    },
+                },
+                {
+                    "id": "c2",
+                    "memory_content": "second",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": p.id,
+                    },
+                },
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         page = scope.list(reverse=True)
@@ -1761,24 +1883,48 @@ class TestWithMocks:
     def test_conclusion_scope_list_filters(self, honcho: Honcho, monkeypatch) -> None:
         """ConclusionScope.list() exercises filter skip paths (non-matching data)."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)
 
         # Return mix: some non-conclusion, some wrong observer/observed
-        mock_search = MagicMock(return_value=[
-            {"id": "s1", "memory_content": "not a conclusion",
-             "metadata": {"memory_type": "message"}},  # skipped: wrong type
-            {"id": "c1", "memory_content": "wrong observer",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": "other", "observed_id": p.id}},  # skipped: wrong observer
-            {"id": "c2", "memory_content": "wrong observed",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": p.id, "observed_id": "other"}},  # skipped: wrong observed
-            {"id": "c3", "memory_content": "valid conclusion",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": p.id, "observed_id": p.id}},  # included
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {
+                    "id": "s1",
+                    "memory_content": "not a conclusion",
+                    "metadata": {"memory_type": "message"},
+                },  # skipped: wrong type
+                {
+                    "id": "c1",
+                    "memory_content": "wrong observer",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": "other",
+                        "observed_id": p.id,
+                    },
+                },  # skipped: wrong observer
+                {
+                    "id": "c2",
+                    "memory_content": "wrong observed",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": "other",
+                    },
+                },  # skipped: wrong observed
+                {
+                    "id": "c3",
+                    "memory_content": "valid conclusion",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": p.id,
+                    },
+                },  # included
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         page = scope.list()
@@ -1787,16 +1933,25 @@ class TestWithMocks:
     def test_conclusion_scope_list_with_session_filter(self, honcho: Honcho, monkeypatch) -> None:
         """ConclusionScope.list() with session filter skips wrong session."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)
 
-        mock_search = MagicMock(return_value=[
-            {"id": "c1", "memory_content": "wrong session",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": p.id, "observed_id": p.id,
-                          "session_id": "other-session"}},  # skipped: wrong session
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {
+                    "id": "c1",
+                    "memory_content": "wrong session",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": p.id,
+                        "session_id": "other-session",
+                    },
+                },  # skipped: wrong session
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         page = scope.list(session="target-session")
@@ -1805,23 +1960,47 @@ class TestWithMocks:
     def test_conclusion_scope_query_filters(self, honcho: Honcho, monkeypatch) -> None:
         """ConclusionScope.query() exercises filter skip paths."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)
 
-        mock_search = MagicMock(return_value=[
-            {"id": "s1", "memory_content": "plain message",
-             "metadata": {"memory_type": "message"}},  # skipped
-            {"id": "c1", "memory_content": "wrong observer",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": "other", "observed_id": p.id}},  # skipped
-            {"id": "c2", "memory_content": "wrong observed",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": p.id, "observed_id": "other"}},  # skipped
-            {"id": "c3", "memory_content": "valid query result",
-             "metadata": {"memory_type": "conclusion",
-                          "observer_id": p.id, "observed_id": p.id}},  # included
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {
+                    "id": "s1",
+                    "memory_content": "plain message",
+                    "metadata": {"memory_type": "message"},
+                },  # skipped
+                {
+                    "id": "c1",
+                    "memory_content": "wrong observer",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": "other",
+                        "observed_id": p.id,
+                    },
+                },  # skipped
+                {
+                    "id": "c2",
+                    "memory_content": "wrong observed",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": "other",
+                    },
+                },  # skipped
+                {
+                    "id": "c3",
+                    "memory_content": "valid query result",
+                    "metadata": {
+                        "memory_type": "conclusion",
+                        "observer_id": p.id,
+                        "observed_id": p.id,
+                    },
+                },  # included
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         results = scope.query("filter test")
@@ -1830,13 +2009,20 @@ class TestWithMocks:
     def test_session_get_message_with_mock(self, honcho: Honcho, monkeypatch) -> None:
         """Session.get_message() success path with mocked get_memory."""
         from unittest.mock import MagicMock
+
         sid = _uid("session")
         s = honcho.session(sid)
 
-        mock_get = MagicMock(return_value=[{
-            "id": "msg-1", "memory_content": "found message",
-            "peer_id": "p1", "metadata": {"k": "v"}
-        }])
+        mock_get = MagicMock(
+            return_value=[
+                {
+                    "id": "msg-1",
+                    "memory_content": "found message",
+                    "peer_id": "p1",
+                    "metadata": {"k": "v"},
+                }
+            ]
+        )
         monkeypatch.setattr(honcho._client, "get_memory", mock_get)
 
         result = s.get_message("msg-1")
@@ -1845,13 +2031,15 @@ class TestWithMocks:
     def test_session_update_message_with_mock(self, honcho: Honcho, monkeypatch) -> None:
         """Session.update_message() success path with mocked get_memory."""
         from unittest.mock import MagicMock
+
         sid = _uid("session")
         s = honcho.session(sid)
 
-        mock_get = MagicMock(return_value=[{
-            "id": "msg-1", "memory_content": "update me",
-            "peer_id": "p1", "metadata": {}
-        }])
+        mock_get = MagicMock(
+            return_value=[
+                {"id": "msg-1", "memory_content": "update me", "peer_id": "p1", "metadata": {}}
+            ]
+        )
         mock_update = MagicMock()
         monkeypatch.setattr(honcho._client, "get_memory", mock_get)
         monkeypatch.setattr(honcho._client, "update_memory", mock_update)
@@ -1869,7 +2057,8 @@ class TestWithMocks:
 
     def test_peer_get_card_llm_unavailable(self, honcho: Honcho, monkeypatch) -> None:
         """Peer.get_card() returns empty when LLM unavailable."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
 
@@ -1881,9 +2070,9 @@ class TestWithMocks:
             lambda: mock_llm,
         )
         # Also mock search to return something so we exercise the path
-        mock_search = MagicMock(return_value=[
-            {"memory_content": "some data", "metadata": {"peer_id": pid}}
-        ])
+        mock_search = MagicMock(
+            return_value=[{"memory_content": "some data", "metadata": {"peer_id": pid}}]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         card = p.get_card()
@@ -1892,6 +2081,7 @@ class TestWithMocks:
     def test_peer_representation_llm_unavailable(self, honcho: Honcho, monkeypatch) -> None:
         """Peer.representation() with LLM unavailable but memories exist."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
 
@@ -1903,10 +2093,12 @@ class TestWithMocks:
             lambda: mock_llm,
         )
         # Mock search to return data
-        mock_search = MagicMock(return_value=[
-            {"memory_content": "I like running", "metadata": {"peer_id": pid}},
-            {"memory_content": "I enjoy reading", "metadata": {"peer_id": pid}},
-        ])
+        mock_search = MagicMock(
+            return_value=[
+                {"memory_content": "I like running", "metadata": {"peer_id": pid}},
+                {"memory_content": "I enjoy reading", "metadata": {"peer_id": pid}},
+            ]
+        )
         monkeypatch.setattr(honcho._client, "search", mock_search)
 
         rep = p.representation()
@@ -1941,14 +2133,17 @@ class TestWithMocks:
     def test_schedule_dream_with_mock(self, honcho: Honcho, monkeypatch) -> None:
         """Honcho.schedule_dream() with mocked list_memories to hit filter path."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
 
-        mock_list = MagicMock(return_value=[
-            {"peer_id": pid, "content": "observation 1"},
-            {"peer_id": pid, "content": "observation 2"},
-            {"peer_id": "other", "content": "irrelevant"},
-        ])
+        mock_list = MagicMock(
+            return_value=[
+                {"peer_id": pid, "content": "observation 1"},
+                {"peer_id": pid, "content": "observation 2"},
+                {"peer_id": "other", "content": "irrelevant"},
+            ]
+        )
         monkeypatch.setattr(honcho._client, "list_memories", mock_list)
 
         # Mock LLM to be unavailable to avoid API calls
@@ -1967,6 +2162,7 @@ class TestWithMocks:
     def test_peer_representation_no_llm_no_memories(self, honcho: Honcho, monkeypatch) -> None:
         """Peer.representation() with LLM unavailable and no memories."""
         from unittest.mock import MagicMock
+
         pid = _uid()
         p = honcho.peer(pid)
 
@@ -1986,6 +2182,7 @@ class TestWithMocks:
     def test_session_get_message_empty_results(self, honcho: Honcho, monkeypatch) -> None:
         """Session.get_message() returns None when get_memory returns empty."""
         from unittest.mock import MagicMock
+
         sid = _uid("session")
         s = honcho.session(sid)
 
@@ -1999,6 +2196,7 @@ class TestWithMocks:
     def test_session_update_message_empty_results(self, honcho: Honcho, monkeypatch) -> None:
         """Session.update_message() returns early when get_memory returns empty."""
         from unittest.mock import MagicMock
+
         sid = _uid("session")
         s = honcho.session(sid)
 
@@ -2012,6 +2210,7 @@ class TestWithMocks:
         """ConclusionScope.create() success path — mock store to return ok."""
         from unittest.mock import MagicMock
         from spacetime_memory.sdks.honcho import ConclusionCreateParams
+
         pid = _uid()
         p = honcho.peer(pid)
         scope = p.conclusions(observer=p)

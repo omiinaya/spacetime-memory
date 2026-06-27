@@ -8,13 +8,10 @@ and provides an authenticated client.
 from __future__ import annotations
 
 import os
-import json
 import subprocess
 import sys
 import time
-import uuid
 import pytest
-from shutil import which
 from pathlib import Path
 
 from spacetime_memory import Client
@@ -94,7 +91,10 @@ class TestMemoryCRUD:
 
     def test_store_with_tier(self, stdb_client, ws):
         result = stdb_client.store(
-            workspace_id=ws, content="critical memory", peer_id="bot", tier="L0",
+            workspace_id=ws,
+            content="critical memory",
+            peer_id="bot",
+            tier="L0",
         )
         assert result["status"] == "ok"
 
@@ -148,13 +148,14 @@ class TestSemanticSearch:
         time.sleep(0.5)
 
         results = stdb_client.search(
-            workspace_id=ws, query="food pizza toppings", limit=10, semantic=True,
+            workspace_id=ws,
+            query="food pizza toppings",
+            limit=10,
+            semantic=True,
         )
         assert isinstance(results, list)
         assert len(results) >= 1
-        pizza_result = next(
-            (m for m in results if "pizza" in m.get("content", "")), None
-        )
+        pizza_result = next((m for m in results if "pizza" in m.get("content", "")), None)
         assert pizza_result is not None, (
             f"Expected 'pizza' memory in semantic search results: {results}"
         )
@@ -178,13 +179,14 @@ class TestSemanticSearch:
         time.sleep(0.3)
 
         results = stdb_client.search(
-            workspace_id=ws, query="programming language", limit=10, semantic=False,
+            workspace_id=ws,
+            query="programming language",
+            limit=10,
+            semantic=False,
         )
         assert isinstance(results, list)
         assert len(results) >= 1
-        py_result = next(
-            (m for m in results if "Python" in m.get("content", "")), None
-        )
+        py_result = next((m for m in results if "Python" in m.get("content", "")), None)
         assert py_result is not None, f"Expected Python memory in BM25 results: {results}"
 
     @pytest.mark.embedder
@@ -198,7 +200,10 @@ class TestSemanticSearch:
         time.sleep(0.3)
 
         results = stdb_client.search(
-            workspace_id=ws, query="food", limit=10, semantic=True,
+            workspace_id=ws,
+            query="food",
+            limit=10,
+            semantic=True,
         )
         assert isinstance(results, list)
         assert len(results) >= 1
@@ -208,7 +213,10 @@ class TestSemanticSearch:
         """Search on empty workspace should return empty (not error)."""
         empty_ws = _make_ws(stdb_client)
         results = stdb_client.search(
-            workspace_id=empty_ws, query="nonexistent", limit=10, semantic=True,
+            workspace_id=empty_ws,
+            query="nonexistent",
+            limit=10,
+            semantic=True,
         )
         assert isinstance(results, list)
 
@@ -260,17 +268,30 @@ class TestGraph:
     def test_create_edge(self, stdb_client, ws):
         n1 = stdb_client.create_node(ws, "ConceptA", "concept")
         n2 = stdb_client.create_node(ws, "ConceptB", "concept")
+
         # Find node IDs by label using _query
         def _node_id(label: str) -> str:
             rows = stdb_client._query(
-                "kg_node", workspace_id=ws,
-                filter_dict={"label": label}, columns=["id"],
+                "kg_node",
+                workspace_id=ws,
+                filter_dict={"label": label},
+                columns=["id"],
             )
             return rows[0]["id"] if rows else ""
-        result = stdb_client._call("create_edge", [
-            ws, _node_id("ConceptA"), _node_id("ConceptB"), "relates_to",
-            1.0, "EXTRACTED", "{}", "",
-        ])
+
+        result = stdb_client._call(
+            "create_edge",
+            [
+                ws,
+                _node_id("ConceptA"),
+                _node_id("ConceptB"),
+                "relates_to",
+                1.0,
+                "EXTRACTED",
+                "{}",
+                "",
+            ],
+        )
         assert result["status"] == "ok"
 
 
@@ -283,15 +304,26 @@ class TestFacts:
     """Profile facts CRUD."""
 
     def test_upsert_profile(self, stdb_client, ws):
-        result = stdb_client._call("upsert_profile", [
-            "test-bot", "[]", "[]", "{}", "[]",
-        ])
+        result = stdb_client._call(
+            "upsert_profile",
+            [
+                "test-bot",
+                "[]",
+                "[]",
+                "{}",
+                "[]",
+            ],
+        )
         assert result["status"] == "ok"
 
     def test_add_fact(self, stdb_client, ws):
-        result = stdb_client._call("add_profile_fact", [
-            "test-bot", "I was created for integration testing",
-        ])
+        result = stdb_client._call(
+            "add_profile_fact",
+            [
+                "test-bot",
+                "I was created for integration testing",
+            ],
+        )
         assert result["status"] == "ok"
 
 
@@ -327,7 +359,9 @@ class TestCLI:
         ws_name = _unique("cli-ws")
         result = subprocess.run(
             [sys.executable, CLI_PATH, "workspace", "create", ws_name],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
             env=self._env(stdb_session),
         )
         assert result.returncode == 0, f"CLI failed: {result.stdout}{result.stderr}"
@@ -339,7 +373,9 @@ class TestCLI:
         env["PYTHONPATH"] = f"{sdk_path}:{env['PYTHONPATH']}"
         result = subprocess.run(
             [sys.executable, CLI_PATH, "--help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
             env=env,
         )
         assert result.returncode == 0
@@ -349,9 +385,7 @@ class TestCLI:
         ws_name = _unique("cli-mem")
         stdb_client._call("create_workspace", [ws_name, "CLI test", _unique("ws")])
         # Verify the workspace exists via _query (private table)
-        workspaces = stdb_client._query(
-            "workspace", filter_dict={"name": ws_name}
-        )
+        workspaces = stdb_client._query("workspace", filter_dict={"name": ws_name})
         assert len(workspaces) >= 1, f"Workspace '{ws_name}' not found"
         assert workspaces[0]["name"] == ws_name
 

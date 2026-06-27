@@ -30,7 +30,6 @@ Integration::
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
 
 
 class VeracityTier(str, Enum):
@@ -40,11 +39,11 @@ class VeracityTier(str, Enum):
     a single uncorroborated source at that tier is.
     """
 
-    STATED = "stated"       # Direct user statement — base 1.0
-    UNKNOWN = "unknown"     # Provenance unclear — base 0.8
-    INFERRED = "inferred"   # LLM extraction or reasoning — base 0.7
-    IMPORTED = "imported"   # External import — base 0.6
-    TOOL = "tool"           # Tool output or system-generated — base 0.5
+    STATED = "stated"  # Direct user statement — base 1.0
+    UNKNOWN = "unknown"  # Provenance unclear — base 0.8
+    INFERRED = "inferred"  # LLM extraction or reasoning — base 0.7
+    IMPORTED = "imported"  # External import — base 0.6
+    TOOL = "tool"  # Tool output or system-generated — base 0.5
 
     @property
     def base_confidence(self) -> float:
@@ -102,6 +101,7 @@ TIER_SYMBOLS = {
 
 # ── Bayesian Compounding ────────────────────────────────────────────────────
 
+
 def compound(
     tier: VeracityTier | str | None = None,
     sources: int = 1,
@@ -149,6 +149,7 @@ def confidence_multiplier(confidence: float) -> float:
 
 
 # ── Display ─────────────────────────────────────────────────────────────────
+
 
 def format_veracity(
     tier: VeracityTier | str,

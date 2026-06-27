@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import os
 import pytest
-import json
 
 from spacetime_memory import Client
 
@@ -56,11 +55,15 @@ def token() -> str:
 
 @pytest.fixture(scope="module")
 def client(stdb_session: dict) -> Client:
-    kwargs = {"host": stdb_session["host"], "port": stdb_session["port"],
-              "database": stdb_session["database"]}
+    kwargs = {
+        "host": stdb_session["host"],
+        "port": stdb_session["port"],
+        "database": stdb_session["database"],
+    }
     c = Client(**kwargs)
     # Auto-register for auth
     import secrets
+
     try:
         c._call("register", [f"lc_test_{secrets.token_hex(4)}", "LC Test", "testpass"])
     except RuntimeError:
@@ -107,10 +110,12 @@ class TestStmemMemoryStore:
 
     def test_mget_multiple(self, memory_store: StmemMemoryStore):
         """Getting multiple keys returns results in order."""
-        memory_store.mset([
-            ("multi-a", {"content": "alpha"}),
-            ("multi-b", {"content": "bravo"}),
-        ])
+        memory_store.mset(
+            [
+                ("multi-a", {"content": "alpha"}),
+                ("multi-b", {"content": "bravo"}),
+            ]
+        )
         values = memory_store.mget(["multi-a", "multi-b", "nonexistent"])
         assert len(values) == 3
         assert values[0] is not None and values[0]["content"] == "alpha"
@@ -119,10 +124,17 @@ class TestStmemMemoryStore:
 
     def test_mset_with_metadata(self, memory_store: StmemMemoryStore):
         """Setting a value with metadata stores it correctly."""
-        memory_store.mset([(
-            "test-meta",
-            {"content": "with metadata", "metadata": {"source": "test", "tags": ["a", "b"]}},
-        )])
+        memory_store.mset(
+            [
+                (
+                    "test-meta",
+                    {
+                        "content": "with metadata",
+                        "metadata": {"source": "test", "tags": ["a", "b"]},
+                    },
+                )
+            ]
+        )
         values = memory_store.mget(["test-meta"])
         assert values[0] is not None
         assert values[0]["content"] == "with metadata"
@@ -219,10 +231,7 @@ class TestStmemStore:
         store.put(("list_ns_a", "sub2"), "lk2", {"data": "test"})
         namespaces = store.list_namespaces()
         assert isinstance(namespaces, list)
-        has_test_ns = any(
-            ns and len(ns) >= 2 and ns[0] == "list_ns_a"
-            for ns in namespaces
-        )
+        has_test_ns = any(ns and len(ns) >= 2 and ns[0] == "list_ns_a" for ns in namespaces)
         # May not find exact match depending on workspace isolation
         assert isinstance(namespaces, list)
 
@@ -236,6 +245,7 @@ class TestStmemStore:
     def test_batch_get(self, store: StmemStore):
         """batch with get operations returns items."""
         from collections import namedtuple
+
         Op = namedtuple("Op", ["type", "namespace", "key"])
         ops = [
             Op(type="get", namespace=("testns", "user1"), key="prefs"),
@@ -246,9 +256,15 @@ class TestStmemStore:
     def test_batch_put(self, store: StmemStore):
         """batch with put operations stores items."""
         from collections import namedtuple
+
         Op = namedtuple("Op", ["type", "namespace", "key", "value"])
         ops = [
-            Op(type="put", namespace=("batch_put_ns",), key="bp1", value={"content": "batch put value"}),
+            Op(
+                type="put",
+                namespace=("batch_put_ns",),
+                key="bp1",
+                value={"content": "batch put value"},
+            ),
         ]
         results = store.batch(ops)
         assert isinstance(results, list)
@@ -367,6 +383,7 @@ class TestStmemStoreAdvanced:
     def test_batch_search(self, store: StmemStore):
         """batch with search operations."""
         from collections import namedtuple
+
         Op = namedtuple("Op", ["type", "namespace_prefix", "query", "limit"])
         ops = [
             Op(type="search", namespace_prefix=("batch_search_ns",), query="test", limit=5),
@@ -377,6 +394,7 @@ class TestStmemStoreAdvanced:
     def test_batch_list_namespaces(self, store: StmemStore):
         """batch with list_namespaces operations."""
         from collections import namedtuple
+
         Op = namedtuple("Op", ["type", "match_conditions", "max_depth"])
         ops = [
             Op(type="list_namespaces", match_conditions=None, max_depth=None),
@@ -398,7 +416,11 @@ class TestStmemStoreAdvanced:
 
     def test_search_with_filter_dict(self, store: StmemStore):
         """search with filter dict containing metadata fields."""
-        store.put(("meta_filter_ns",), "mf1", {"content": "admin content", "role": "admin", "tags": ["important"]})
+        store.put(
+            ("meta_filter_ns",),
+            "mf1",
+            {"content": "admin content", "role": "admin", "tags": ["important"]},
+        )
         store.put(("meta_filter_ns",), "mf2", {"content": "user content", "role": "user"})
         results = store.search(("meta_filter_ns",), filter={"role": "admin"})
         assert isinstance(results, list)
@@ -418,6 +440,7 @@ class TestStmemStoreAdvanced:
     def test_batch_mixed_ops(self, store: StmemStore):
         """batch with mixed get and put ops."""
         from collections import namedtuple
+
         store.put(("mixed_batch_ns",), "mb1", {"content": "mixed batch test"})
         Op = namedtuple("Op", ["type", "namespace", "key", "value"])
         ops = [
@@ -488,8 +511,12 @@ class TestHelperFunctions:
 
     def test_memory_to_dict(self):
         """_memory_to_dict converts a memory row."""
-        row = {"content": "hello", "summary": "hi", "memory_type": "memory",
-               "entities_json": '{"role": "user"}'}
+        row = {
+            "content": "hello",
+            "summary": "hi",
+            "memory_type": "memory",
+            "entities_json": '{"role": "user"}',
+        }
         result = _memory_to_dict(row)
         assert result["content"] == "hello"
         assert result["summary"] == "hi"
@@ -507,28 +534,33 @@ class TestConfigInit:
 
     def test_memory_store_from_config(self, stdb_session):
         """StmemMemoryStore created from config dict."""
-        store = StmemMemoryStore(config={
-            "host": stdb_session["host"],
-            "port": stdb_session["port"],
-            "db": stdb_session["database"],
-        })
+        store = StmemMemoryStore(
+            config={
+                "host": stdb_session["host"],
+                "port": stdb_session["port"],
+                "db": stdb_session["database"],
+            }
+        )
         store.mset([("cfg-mm-key", {"content": "config init"})])
         values = store.mget(["cfg-mm-key"])
         assert len(values) == 1
 
     def test_stmem_store_from_config(self, stdb_session):
         """StmemStore created from config dict."""
-        store = StmemStore(config={
-            "host": stdb_session["host"],
-            "port": stdb_session["port"],
-            "db": stdb_session["database"],
-        })
+        store = StmemStore(
+            config={
+                "host": stdb_session["host"],
+                "port": stdb_session["port"],
+                "db": stdb_session["database"],
+            }
+        )
         # Register for auth
         import secrets
+
         try:
-            store._client._call("register", [
-                f"cfg_test_{secrets.token_hex(4)}", "CFG Test", "testpass"
-            ])
+            store._client._call(
+                "register", [f"cfg_test_{secrets.token_hex(4)}", "CFG Test", "testpass"]
+            )
         except RuntimeError:
             pass
         my_id = store._client._whoami()
@@ -564,6 +596,7 @@ class TestStmemStoreBatchRealOps:
     def test_batch_get_op(self, store: StmemStore):
         """batch with a real GetOp."""
         from langgraph.store.base import GetOp
+
         store.put(("real-get-ns",), "rg1", {"content": "getop test"})
         ops = [GetOp(namespace=("real-get-ns",), key="rg1")]
         results = store.batch(ops)
@@ -572,14 +605,15 @@ class TestStmemStoreBatchRealOps:
     def test_batch_put_op(self, store: StmemStore):
         """batch with a real PutOp."""
         from langgraph.store.base import PutOp
-        ops = [PutOp(namespace=("real-put-ns",), key="rp1",
-                      value={"content": "putop test"})]
+
+        ops = [PutOp(namespace=("real-put-ns",), key="rp1", value={"content": "putop test"})]
         results = store.batch(ops)
         assert len(results) == 1
 
     def test_batch_put_op_delete(self, store: StmemStore):
         """batch PutOp with value=None triggers delete."""
         from langgraph.store.base import PutOp
+
         store.put(("real-del-ns",), "rd1", {"content": "to del"})
         ops = [PutOp(namespace=("real-del-ns",), key="rd1", value=None)]
         results = store.batch(ops)
@@ -588,39 +622,57 @@ class TestStmemStoreBatchRealOps:
     def test_batch_search_op(self, store: StmemStore):
         """batch with a real SearchOp."""
         from langgraph.store.base import SearchOp
+
         store.put(("real-search-ns",), "rs1", {"content": "searchop test"})
-        ops = [SearchOp(namespace_prefix=("real-search-ns",), query="searchop",
-                        filter=None, limit=5, offset=0)]
+        ops = [
+            SearchOp(
+                namespace_prefix=("real-search-ns",),
+                query="searchop",
+                filter=None,
+                limit=5,
+                offset=0,
+            )
+        ]
         results = store.batch(ops)
         assert len(results) == 1
 
     def test_batch_list_namespaces_op(self, store: StmemStore):
         """batch with a real ListNamespacesOp (no match_conditions)."""
         from langgraph.store.base import ListNamespacesOp
-        ops = [ListNamespacesOp(match_conditions=None, max_depth=None,
-                                limit=10, offset=0)]
+
+        ops = [ListNamespacesOp(match_conditions=None, max_depth=None, limit=10, offset=0)]
         results = store.batch(ops)
         assert len(results) == 1
 
     def test_batch_list_namespaces_with_prefix_match(self, store: StmemStore):
         """batch ListNamespacesOp with prefix match condition."""
         from langgraph.store.base import ListNamespacesOp, MatchCondition
+
         store.put(("lns-prefix", "x"), "lp1", {"content": "ns test"})
-        ops = [ListNamespacesOp(
-            match_conditions=[MatchCondition(match_type="prefix", path=("lns-prefix",))],
-            max_depth=None, limit=10, offset=0,
-        )]
+        ops = [
+            ListNamespacesOp(
+                match_conditions=[MatchCondition(match_type="prefix", path=("lns-prefix",))],
+                max_depth=None,
+                limit=10,
+                offset=0,
+            )
+        ]
         results = store.batch(ops)
         assert len(results) == 1
 
     def test_batch_list_namespaces_with_suffix_match(self, store: StmemStore):
         """batch ListNamespacesOp with suffix match condition."""
         from langgraph.store.base import ListNamespacesOp, MatchCondition
+
         store.put(("x", "lns-suffix"), "ls1", {"content": "ns suffix"})
-        ops = [ListNamespacesOp(
-            match_conditions=[MatchCondition(match_type="suffix", path=("lns-suffix",))],
-            max_depth=None, limit=10, offset=0,
-        )]
+        ops = [
+            ListNamespacesOp(
+                match_conditions=[MatchCondition(match_type="suffix", path=("lns-suffix",))],
+                max_depth=None,
+                limit=10,
+                offset=0,
+            )
+        ]
         results = store.batch(ops)
         assert len(results) == 1
 
@@ -629,11 +681,14 @@ class TestStmemStoreBatchRealOps:
         store.put(("legacy-ns",), "lk1", {"content": "legacy"})
         ops = [
             {"type": "get", "namespace": ("legacy-ns",), "key": "lk1"},
-            {"type": "put", "namespace": ("legacy-put-ns",), "key": "lp1",
-             "value": {"content": "legacy put"}},
+            {
+                "type": "put",
+                "namespace": ("legacy-put-ns",),
+                "key": "lp1",
+                "value": {"content": "legacy put"},
+            },
             {"type": "delete", "namespace": ("legacy-put-ns",), "key": "lp1"},
-            {"type": "search", "namespace_prefix": ("legacy-ns",),
-             "kwargs": {"query": "legacy"}},
+            {"type": "search", "namespace_prefix": ("legacy-ns",), "kwargs": {"query": "legacy"}},
         ]
         results = store.batch(ops)
         assert len(results) == 4
@@ -653,12 +708,15 @@ class TestStmemStoreBatchRealOps:
     def test_abatch(self, store: StmemStore):
         """abatch delegates to sync batch."""
         import asyncio
+
         store.put(("abatch-ns",), "ab1", {"content": "abatch test"})
         from langgraph.store.base import GetOp
+
         ops = [GetOp(namespace=("abatch-ns",), key="ab1")]
 
         async def _run():
             return await store.abatch(ops)
+
         results = asyncio.run(_run())
         assert len(results) == 1
 
@@ -674,6 +732,7 @@ class TestStmemChatMessageHistory:
     @pytest.fixture
     def chat_hist(self, client: Client) -> StmemChatMessageHistory:
         import secrets
+
         sid = f"chat_test_{secrets.token_hex(4)}"
         return StmemChatMessageHistory(session_id=sid, client=client)
 
@@ -726,16 +785,20 @@ class TestStmemChatMessageHistory:
     def test_add_messages_and_messages(self, chat_hist):
         """Add messages using langchain_core and retrieve them."""
         from langchain_core.messages import HumanMessage, AIMessage
-        chat_hist.add_messages([
-            HumanMessage(content="Hello, AI!"),
-            AIMessage(content="Hello, human!"),
-        ])
+
+        chat_hist.add_messages(
+            [
+                HumanMessage(content="Hello, AI!"),
+                AIMessage(content="Hello, human!"),
+            ]
+        )
         msgs = chat_hist.messages
         assert len(msgs) >= 1
 
     def test_clear_after_messages(self, chat_hist):
         """Clear after storing messages."""
         from langchain_core.messages import HumanMessage
+
         chat_hist.add_messages([HumanMessage(content="Clear me")])
         chat_hist.clear()
         msgs = chat_hist.messages

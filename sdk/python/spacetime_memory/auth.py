@@ -10,7 +10,6 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 from typing import Any
@@ -40,8 +39,7 @@ def generate_token(
     """
     if pyjwt is None:
         raise ImportError(
-            "PyJWT is required for token generation. "
-            "Install with: pip install 'pyjwt[crypto]'"
+            "PyJWT is required for token generation. Install with: pip install 'pyjwt[crypto]'"
         )
 
     if identity_hex is None:

@@ -1,7 +1,5 @@
 """Tests for pattern detection (pattern_detection.py)."""
 
-import pytest
-from datetime import datetime, timezone
 from spacetime_memory.pattern_detection import (
     _tokenize,
     detect_temporal_clusters,
@@ -303,11 +301,7 @@ class TestDetectCoOccurrences:
             assert r["count"] >= 1
 
     def test_top_n_limit(self):
-        memories = [
-            {"content": f"term_{i} term_{j}"}
-            for i in range(10)
-            for j in range(i + 1, 10)
-        ]
+        memories = [{"content": f"term_{i} term_{j}"} for i in range(10) for j in range(i + 1, 10)]
         result = detect_co_occurrences(memories, top_n=5)
         assert len(result) <= 5
 
@@ -427,9 +421,7 @@ class TestDetectPatterns:
         assert result["summary"] == "no significant patterns detected"
 
     def test_single_memory_minimal_patterns(self):
-        result = detect_patterns(
-            [{"id": "m1", "content": "hello world", "created_at": 1000}]
-        )
+        result = detect_patterns([{"id": "m1", "content": "hello world", "created_at": 1000}])
         assert result["total_memories"] == 1
         # temporal_clusters: min_cluster_size=2 → empty
         assert result["temporal_clusters"] == []

@@ -133,9 +133,21 @@ class MemoryMessage:
         if self.uuid is not None:
             d["uuid"] = self.uuid
         d.update(
-            {k: v for k, v in self.__dict__.items()
-             if k not in ("role", "content", "created_at", "metadata",
-                          "role_type", "token_count", "updated_at", "uuid")}
+            {
+                k: v
+                for k, v in self.__dict__.items()
+                if k
+                not in (
+                    "role",
+                    "content",
+                    "created_at",
+                    "metadata",
+                    "role_type",
+                    "token_count",
+                    "updated_at",
+                    "uuid",
+                )
+            }
         )
         return d
 
@@ -232,11 +244,25 @@ class Session:
         if self.uuid is not None:
             d["uuid"] = self.uuid
         d.update(
-            {k: v for k, v in self.__dict__.items()
-             if k not in ("session_id", "metadata", "created_at", "updated_at",
-                          "classifications", "deleted_at", "ended_at",
-                          "fact_rating_instruction", "facts", "project_uuid",
-                          "user_id", "uuid")}
+            {
+                k: v
+                for k, v in self.__dict__.items()
+                if k
+                not in (
+                    "session_id",
+                    "metadata",
+                    "created_at",
+                    "updated_at",
+                    "classifications",
+                    "deleted_at",
+                    "ended_at",
+                    "fact_rating_instruction",
+                    "facts",
+                    "project_uuid",
+                    "user_id",
+                    "uuid",
+                )
+            }
         )
         return d
 
@@ -297,7 +323,13 @@ class Fact:
         }
         if self.rating is not None:
             d["rating"] = self.rating
-        d.update({k: v for k, v in self.__dict__.items() if k not in ("uuid", "fact", "created_at", "rating")})
+        d.update(
+            {
+                k: v
+                for k, v in self.__dict__.items()
+                if k not in ("uuid", "fact", "created_at", "rating")
+            }
+        )
         return d
 
 
@@ -499,24 +531,24 @@ class ZepClient:
         )
 
         # Get facts
-        facts_raw = self._client.list_memories(
-            workspace_id=ws_id, limit=100, memory_type="fact"
-        )
+        facts_raw = self._client.list_memories(workspace_id=ws_id, limit=100, memory_type="fact")
 
         messages_out = []
-        for m in (memories or []):
+        for m in memories or []:
             if min_rating > 0.0:
                 rating = m.get("rating", 0.0) or 0.0
                 if rating < min_rating:
                     continue
             role = m.get("peer_id", "user")
             content = m.get("content", "")
-            messages_out.append({
-                "role": role,
-                "content": content,
-                "score": m.get("strength", m.get("access_count", 1.0)),
-                "timestamp": m.get("created_at", ""),
-            })
+            messages_out.append(
+                {
+                    "role": role,
+                    "content": content,
+                    "score": m.get("strength", m.get("access_count", 1.0)),
+                    "timestamp": m.get("created_at", ""),
+                }
+            )
 
         fact_strings = [f.get("content", "") for f in (facts_raw or [])]
         relevant_facts_objs = [
@@ -558,7 +590,7 @@ class ZepClient:
             workspace_id=ws_id, limit=1000, memory_type="experience"
         )
         deleted = 0
-        for m in (memories or []):
+        for m in memories or []:
             mem_id = m.get("id", "") or m.get("entity_id", "")
             if mem_id:
                 try:
@@ -608,9 +640,7 @@ class ZepClient:
         if ws_id is None:
             return []
 
-        effective_threshold = (
-            min_score if min_score is not None else score_threshold
-        )
+        effective_threshold = min_score if min_score is not None else score_threshold
 
         mmr_lambda = 0.7 if search_type == "mmr" else 0.0
 
@@ -677,9 +707,7 @@ class ZepClient:
 
         # Read back the fact ID from the last stored fact
         memory_id = ""
-        stored = self._client.list_memories(
-            workspace_id=ws_id, limit=1, memory_type="fact"
-        )
+        stored = self._client.list_memories(workspace_id=ws_id, limit=1, memory_type="fact")
         if stored:
             memory_id = stored[0].get("id", stored[0].get("entity_id", ""))
 
@@ -711,9 +739,7 @@ class ZepClient:
         if ws_id is None:
             return []
 
-        rows = self._client.list_memories(
-            workspace_id=ws_id, limit=limit, memory_type="fact"
-        )
+        rows = self._client.list_memories(workspace_id=ws_id, limit=limit, memory_type="fact")
         return [
             Fact(
                 uuid=r.get("id", r.get("entity_id", "")),
@@ -879,7 +905,7 @@ class ZepClient:
             memory_type="experience",
         )
 
-        sliced = (memories or [])[offset:offset + effective_limit]
+        sliced = (memories or [])[offset : offset + effective_limit]
         messages_out: list[dict[str, Any]] = []
         for m in sliced:
             msg: dict[str, Any] = {
@@ -928,9 +954,7 @@ class ZepClient:
         """
         ws_id = self._resolve_session(session_id)
         if ws_id is None:
-            raise NotFoundError(
-                f"Session '{session_id}' not found"
-            )
+            raise NotFoundError(f"Session '{session_id}' not found")
 
         rows = self._client._query(
             "memory",
@@ -938,9 +962,7 @@ class ZepClient:
             filter_dict={"id": message_uuid},
         )
         if not rows:
-            raise NotFoundError(
-                f"Message '{message_uuid}' not found in session '{session_id}'"
-            )
+            raise NotFoundError(f"Message '{message_uuid}' not found in session '{session_id}'")
 
         r = rows[0]
         return {
@@ -983,9 +1005,7 @@ class ZepClient:
         """
         ws_id = self._resolve_session(session_id)
         if ws_id is None:
-            raise NotFoundError(
-                f"Session '{session_id}' not found"
-            )
+            raise NotFoundError(f"Session '{session_id}' not found")
 
         # Verify the message exists
         rows = self._client._query(
@@ -994,9 +1014,7 @@ class ZepClient:
             filter_dict={"id": message_uuid},
         )
         if not rows:
-            raise NotFoundError(
-                f"Message '{message_uuid}' not found in session '{session_id}'"
-            )
+            raise NotFoundError(f"Message '{message_uuid}' not found in session '{session_id}'")
 
         r = rows[0]
         existing_metadata: dict[str, Any] = r.get("metadata", {}) or {}
@@ -1054,14 +1072,16 @@ class ZepClient:
         if page_number is not None:
             offset = (page_number - 1) * limit
         workspaces = self._client.list_workspaces()
-        sliced = workspaces[offset:offset + limit] if workspaces else []
+        sliced = workspaces[offset : offset + limit] if workspaces else []
         sessions = []
         for ws in sliced:
-            sessions.append(Session(
-                session_id=ws.get("name", ws.get("id", "")),
-                metadata={},
-                created_at=ws.get("created_at", ""),
-            ))
+            sessions.append(
+                Session(
+                    session_id=ws.get("name", ws.get("id", "")),
+                    metadata={},
+                    created_at=ws.get("created_at", ""),
+                )
+            )
         return sessions
 
     def get_session(self, session_id: str) -> Session | None:
@@ -1158,15 +1178,17 @@ class ZepClient:
         if semantic_results:
             sessions = []
             for r in semantic_results:
-                sessions.append(Session(
-                    session_id=r.get("workspace_id", r.get("session_name", "")),
-                    metadata={
-                        "name": r.get("session_name", ""),
-                        "score": r.get("score", 0.0),
-                        "top_memory_content": r.get("top_memory_content", "")[:200],
-                        "memory_count": r.get("memory_count", 0),
-                    },
-                ))
+                sessions.append(
+                    Session(
+                        session_id=r.get("workspace_id", r.get("session_name", "")),
+                        metadata={
+                            "name": r.get("session_name", ""),
+                            "score": r.get("score", 0.0),
+                            "top_memory_content": r.get("top_memory_content", "")[:200],
+                            "memory_count": r.get("memory_count", 0),
+                        },
+                    )
+                )
             return sessions
 
         # Fallback: name/substring match (works without embedder)
@@ -1175,11 +1197,13 @@ class ZepClient:
         for ws in workspaces:
             name = ws.get("name", "")
             if query.lower() in name.lower():
-                results.append(Session(
-                    session_id=name,
-                    metadata={},
-                    created_at=ws.get("created_at", ""),
-                ))
+                results.append(
+                    Session(
+                        session_id=name,
+                        metadata={},
+                        created_at=ws.get("created_at", ""),
+                    )
+                )
             if len(results) >= limit:
                 break
         return results
@@ -1228,6 +1252,7 @@ class ZepClient:
             return None
 
         from ..llm import LLMClient
+
         llm = LLMClient()
         if not llm.available:
             return None
@@ -1237,6 +1262,7 @@ class ZepClient:
             text,
             instruction="Summarize this conversation, highlighting key topics, decisions, and action items.",
         )
+
 
 # ---------------------------------------------------------------------------
 # UserClient — Zep User management
@@ -1305,21 +1331,23 @@ class UserClient:
             RuntimeError: If the user already exists.
         """
         import uuid as _uuid
+
         uid = user_id or _uuid.uuid4().hex[:32]
         meta_json = json.dumps(metadata or {})
 
-        self._client._call("add_user", [
-            uid,
-            email or "",
-            first_name or "",
-            last_name or "",
-            meta_json,
-        ])
+        self._client._call(
+            "add_user",
+            [
+                uid,
+                email or "",
+                first_name or "",
+                last_name or "",
+                meta_json,
+            ],
+        )
 
         # Read back from the public user table
-        rows = self._client._sql(
-            f'SELECT * FROM "user" WHERE user_id = {_esc(uid)}'
-        )
+        rows = self._client._sql(f'SELECT * FROM "user" WHERE user_id = {_esc(uid)}')
         if rows:
             return self._row_to_user(rows[0])
         return {
@@ -1344,9 +1372,7 @@ class UserClient:
         """
         self._client._call("get_user", [user_id])
 
-        rows = self._client._sql(
-            f'SELECT * FROM "user" WHERE user_id = {_esc(user_id)}'
-        )
+        rows = self._client._sql(f'SELECT * FROM "user" WHERE user_id = {_esc(user_id)}')
         if not rows:
             raise NotFoundError(f"User '{user_id}' not found")
         return self._row_to_user(rows[0])
@@ -1377,17 +1403,18 @@ class UserClient:
         """
         meta_json = json.dumps(metadata) if metadata is not None else ""
 
-        self._client._call("update_user", [
-            user_id,
-            email or "",
-            first_name or "",
-            last_name or "",
-            meta_json,
-        ])
-
-        rows = self._client._sql(
-            f'SELECT * FROM "user" WHERE user_id = {_esc(user_id)}'
+        self._client._call(
+            "update_user",
+            [
+                user_id,
+                email or "",
+                first_name or "",
+                last_name or "",
+                meta_json,
+            ],
         )
+
+        rows = self._client._sql(f'SELECT * FROM "user" WHERE user_id = {_esc(user_id)}')
         if not rows:
             raise NotFoundError(f"User '{user_id}' not found after update")
         return self._row_to_user(rows[0])
@@ -1428,7 +1455,7 @@ class UserClient:
 
         rows = self._client._sql(
             f'SELECT * FROM "user" ORDER BY created_at DESC '
-            f'LIMIT {int(page_size)} OFFSET {int(offset)}'
+            f"LIMIT {int(page_size)} OFFSET {int(offset)}"
         )
         users = [self._row_to_user(r) for r in rows]
 
@@ -1454,8 +1481,7 @@ class UserClient:
 
         query_id = f"user_sessions:{user_id}"
         rows = self._client._sql(
-            "SELECT * FROM user_session_result WHERE "
-            f"query_id = {_esc(query_id)}"
+            f"SELECT * FROM user_session_result WHERE query_id = {_esc(query_id)}"
         )
         return [
             {
@@ -1492,6 +1518,7 @@ class UserClient:
 # ---------------------------------------------------------------------------
 # Sub-client proxies (zep-python v2.0.2 — .memory / .user pattern)
 # ---------------------------------------------------------------------------
+
 
 class _MemoryProxy:
     """Proxy for ``Zep.memory`` — wraps MemoryClient methods.
@@ -1649,9 +1676,7 @@ class _MemoryProxy:
         message_uuid: str,
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
-        return self._c.update_message_metadata(
-            session_id, message_uuid, metadata
-        )
+        return self._c.update_message_metadata(session_id, message_uuid, metadata)
 
 
 class _UserProxy:
@@ -1718,6 +1743,7 @@ class _UserProxy:
 # ---------------------------------------------------------------------------
 # Zep — zep-python v2.0.2 compatible client (replaces ZepClient)
 # ---------------------------------------------------------------------------
+
 
 class Zep(ZepClient):
     """Zep-compatible client matching ``zep_python.Zep`` (v2.0.2+).
@@ -1805,7 +1831,9 @@ class AsyncZepClient:
         summary_instruction: str | None = None,
     ) -> dict[str, Any]:
         return await asyncio.to_thread(
-            self._sync.add_memory, session_id, messages,
+            self._sync.add_memory,
+            session_id,
+            messages,
             metadata=metadata,
             fact_instruction=fact_instruction,
             summary_instruction=summary_instruction,
@@ -1853,25 +1881,17 @@ class AsyncZepClient:
         fact: str,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return await asyncio.to_thread(
-            self._sync.add_fact, session_id, fact, metadata=metadata
-        )
+        return await asyncio.to_thread(self._sync.add_fact, session_id, fact, metadata=metadata)
 
     async def list_facts(
         self,
         session_id: str,
         limit: int = 100,
     ) -> list[Fact]:
-        return await asyncio.to_thread(
-            self._sync.list_facts, session_id, limit=limit
-        )
+        return await asyncio.to_thread(self._sync.list_facts, session_id, limit=limit)
 
-    async def delete_fact(
-        self, fact_uuid: str, **kwargs: Any
-    ) -> dict[str, Any]:
-        return await asyncio.to_thread(
-            self._sync.delete_fact, fact_uuid, **kwargs
-        )
+    async def delete_fact(self, fact_uuid: str, **kwargs: Any) -> dict[str, Any]:
+        return await asyncio.to_thread(self._sync.delete_fact, fact_uuid, **kwargs)
 
     async def get_fact(self, fact_uuid: str) -> Fact:
         return await asyncio.to_thread(self._sync.get_fact, fact_uuid)
@@ -1917,9 +1937,7 @@ class AsyncZepClient:
         session_id: str,
         message_uuid: str,
     ) -> dict[str, Any]:
-        return await asyncio.to_thread(
-            self._sync.get_session_message, session_id, message_uuid
-        )
+        return await asyncio.to_thread(self._sync.get_session_message, session_id, message_uuid)
 
     async def update_message_metadata(
         self,
@@ -1965,9 +1983,7 @@ class AsyncZepClient:
         session_id: str,
         metadata: dict[str, Any] | None = None,
     ) -> Session:
-        return await asyncio.to_thread(
-            self._sync.add_session, session_id, metadata=metadata
-        )
+        return await asyncio.to_thread(self._sync.add_session, session_id, metadata=metadata)
 
     async def update_session(
         self,
@@ -1976,7 +1992,8 @@ class AsyncZepClient:
         fact_rating_instruction: str | None = None,
     ) -> Session:
         return await asyncio.to_thread(
-            self._sync.update_session, session_id,
+            self._sync.update_session,
+            session_id,
             metadata=metadata,
             fact_rating_instruction=fact_rating_instruction,
         )
@@ -1986,9 +2003,7 @@ class AsyncZepClient:
         query: str,
         limit: int = 10,
     ) -> list[Session]:
-        return await asyncio.to_thread(
-            self._sync.search_sessions, query, limit=limit
-        )
+        return await asyncio.to_thread(self._sync.search_sessions, query, limit=limit)
 
     async def close(self) -> None:
         return await asyncio.to_thread(self._sync.close)
@@ -2010,6 +2025,7 @@ class AsyncZepClient:
 # ---------------------------------------------------------------------------
 # Async sub-client proxies (async mirror of .memory / .user)
 # ---------------------------------------------------------------------------
+
 
 class _AsyncMemoryProxy:
     """Async proxy for ``AsyncZep.memory``."""
@@ -2153,9 +2169,7 @@ class _AsyncMemoryProxy:
         message_uuid: str,
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
-        return await self._c.update_message_metadata(
-            session_id, message_uuid, metadata
-        )
+        return await self._c.update_message_metadata(session_id, message_uuid, metadata)
 
 
 class _AsyncUserProxy:
@@ -2226,6 +2240,7 @@ class _AsyncUserProxy:
 # AsyncZep — async client with .memory / .user (zep-python v2.0.2+)
 # ---------------------------------------------------------------------------
 
+
 class AsyncZep(AsyncZepClient):
     """Async Zep-compatible client with ``.memory`` and ``.user`` sub-clients.
 
@@ -2267,6 +2282,7 @@ Message = MemoryMessage
 # ---------------------------------------------------------------------------
 # Stub type exports (zep-python v2.0.2 surface area)
 # ---------------------------------------------------------------------------
+
 
 class Summary:
     """Stub for ``zep_python.types.Summary``.
@@ -2353,6 +2369,7 @@ class SuccessResponse:
 # ---------------------------------------------------------------------------
 # Fact-rating instruction stubs (zep-python v2.0.2)
 # ---------------------------------------------------------------------------
+
 
 class FactRatingExamples:
     """Stub for ``zep_python.types.FactRatingExamples``.

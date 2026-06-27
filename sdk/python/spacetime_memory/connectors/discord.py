@@ -1,8 +1,9 @@
-import json
 import re
 from typing import Any
 import httpx
 from .base import Connector, Event
+
+
 class DiscordConnector(Connector):
     """Poll a Discord channel for recent messages via Discord REST API.
 
@@ -47,7 +48,9 @@ class DiscordConnector(Connector):
     # ------------------------------------------------------------------
 
     def _resolve_emoji(
-        self, content: str, guild_id: str | None = None,
+        self,
+        content: str,
+        guild_id: str | None = None,
     ) -> str:
         """Decode ``:name:`` custom emoji mentions in message content.
 
@@ -56,7 +59,6 @@ class DiscordConnector(Connector):
         ``<:name:id>`` format are already valid and left as-is.
         Unresolvable shortcodes are left unchanged.
         """
-        import re
 
         def replace_emoji(match: re.Match) -> str:
             name = match.group(1)
@@ -76,7 +78,9 @@ class DiscordConnector(Connector):
     # ------------------------------------------------------------------
 
     def _fetch_channel_info(
-        self, client: httpx.Client, channel_id: str,
+        self,
+        client: httpx.Client,
+        channel_id: str,
     ) -> dict | None:
         """Fetch channel info from Discord API.
 
@@ -91,23 +95,14 @@ class DiscordConnector(Connector):
         try:
             resp = client.get(url, headers=headers, timeout=15)
         except httpx.RequestError as e:
-            print(
-                f"  [Discord HTTP error] channel info"
-                f" {channel_id}: {e}"
-            )
+            print(f"  [Discord HTTP error] channel info {channel_id}: {e}")
             return None
 
         if resp.status_code == 404:
-            print(
-                f"  [Discord] Unknown channel {channel_id} —"
-                f" removing from active list"
-            )
+            print(f"  [Discord] Unknown channel {channel_id} — removing from active list")
             return None
         if resp.status_code == 403:
-            print(
-                f"  [Discord] Forbidden on channel {channel_id} —"
-                f" check bot permissions"
-            )
+            print(f"  [Discord] Forbidden on channel {channel_id} — check bot permissions")
             return None
         if resp.status_code == 200:
             return resp.json()
@@ -131,7 +126,8 @@ class DiscordConnector(Connector):
                 # ── Thread support ───────────────────────────────────
                 if self.include_threads:
                     channel_info = self._fetch_channel_info(
-                        client, channel_id,
+                        client,
+                        channel_id,
                     )
                     if channel_info is None:
                         # 404 or error — remove from active list
@@ -153,18 +149,23 @@ class DiscordConnector(Connector):
                                 f" fetching parent messages"
                             )
                             parent_msgs = self._fetch_messages(
-                                client, parent_id, headers,
+                                client,
+                                parent_id,
+                                headers,
                             )
                             for msg in parent_msgs:
                                 ev = self._msg_to_event(
-                                    msg, channel_id,
+                                    msg,
+                                    channel_id,
                                 )
                                 if ev:
                                     events.append(ev)
 
                 # Fetch messages for this channel with pagination
                 messages = self._fetch_messages(
-                    client, channel_id, headers,
+                    client,
+                    channel_id,
+                    headers,
                 )
                 for msg in messages:
                     ev = self._msg_to_event(msg, channel_id)
@@ -189,10 +190,7 @@ class DiscordConnector(Connector):
         ``before`` parameter (Discord returns newest-first).
         Returns up to 10 pages (1000 messages max).
         """
-        url = (
-            f"{self.BASE_URL}"
-            f"/channels/{channel_id}/messages"
-        )
+        url = f"{self.BASE_URL}/channels/{channel_id}/messages"
         params: dict[str, Any] = {"limit": 100}
         all_messages: list[dict] = []
         pages = 0
@@ -200,48 +198,37 @@ class DiscordConnector(Connector):
         while pages < 10:
             try:
                 resp = client.get(
-                    url, headers=headers, params=params, timeout=30,
+                    url,
+                    headers=headers,
+                    params=params,
+                    timeout=30,
                 )
             except httpx.RequestError as e:
-                print(
-                    f"  [Discord HTTP error] channel={channel_id}:"
-                    f" {e}"
-                )
+                print(f"  [Discord HTTP error] channel={channel_id}: {e}")
                 break
 
             # Handle rate limiting
             if resp.status_code == 429:
                 retry_after = resp.json().get(
-                    "retry_after", 5.0,
+                    "retry_after",
+                    5.0,
                 )
-                print(
-                    f"  [Discord] Rate limited on"
-                    f" {channel_id}, retry after {retry_after}s"
-                )
+                print(f"  [Discord] Rate limited on {channel_id}, retry after {retry_after}s")
                 break
 
             if resp.status_code == 403:
-                print(
-                    f"  [Discord] Forbidden on channel"
-                    f" {channel_id} — check bot permissions"
-                )
+                print(f"  [Discord] Forbidden on channel {channel_id} — check bot permissions")
                 break
 
             # Handle 404 gracefully — remove channel from active list
             if resp.status_code == 404:
-                print(
-                    f"  [Discord] Unknown channel {channel_id} —"
-                    f" removing from active list"
-                )
+                print(f"  [Discord] Unknown channel {channel_id} — removing from active list")
                 if channel_id in self.channel_ids:
                     self.channel_ids.remove(channel_id)
                 break
 
             if resp.status_code != 200:
-                print(
-                    f"  [Discord] Unexpected status"
-                    f" {resp.status_code} on {channel_id}"
-                )
+                print(f"  [Discord] Unexpected status {resp.status_code} on {channel_id}")
                 break
 
             messages = resp.json()
@@ -261,7 +248,9 @@ class DiscordConnector(Connector):
         return all_messages
 
     def _msg_to_event(
-        self, msg: dict, channel_id: str,
+        self,
+        msg: dict,
+        channel_id: str,
     ) -> Event | None:
         """Convert a Discord message dict to an ``Event``."""
         msg_id = msg.get("id", "")
@@ -282,11 +271,7 @@ class DiscordConnector(Connector):
 
         # ── Attachment capture ────────────────────────────────────
         attachments = msg.get("attachments", [])
-        attachment_urls = [
-            att.get("url", "")
-            for att in attachments
-            if att.get("url")
-        ]
+        attachment_urls = [att.get("url", "") for att in attachments if att.get("url")]
 
         metadata: dict[str, Any] = {
             "source": "discord",
@@ -317,5 +302,3 @@ class DiscordConnector(Connector):
 
 
 # ── Notion Connector ─────────────────────────────────────────────────
-
-

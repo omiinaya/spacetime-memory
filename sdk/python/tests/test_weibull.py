@@ -5,7 +5,6 @@ parameter variations, and error handling.
 """
 
 import math
-import time
 from unittest.mock import patch
 
 import pytest
@@ -189,7 +188,7 @@ class TestWeibullWeight:
             (1.0, math.exp(-((1.0 / 604800.0) ** 0.5))),
             (86400.0, math.exp(-((86400.0 / 604800.0) ** 0.5))),
             (604800.0, math.exp(-1.0)),
-            (3_024_000.0, math.exp(-(5.0 ** 0.5))),
+            (3_024_000.0, math.exp(-(5.0**0.5))),
         ]
         for age, expected in test_cases:
             result = weibull_weight(age)
@@ -249,9 +248,9 @@ class TestApplyTemporalBoost:
         """Results are sorted by boosted score descending."""
         mock_time.time.return_value = 1_700_000_000.0
         results = [
-            {"score": 5.0, "created_at": 1_700_000_000.0 - 1},      # 1 sec old
+            {"score": 5.0, "created_at": 1_700_000_000.0 - 1},  # 1 sec old
             {"score": 20.0, "created_at": 1_700_000_000.0 - 86400},  # 1 day old
-            {"score": 10.0, "created_at": 1_700_000_000.0 - 3600},   # 1 hour old
+            {"score": 10.0, "created_at": 1_700_000_000.0 - 3600},  # 1 hour old
         ]
         result = apply_temporal_boost(results)
 

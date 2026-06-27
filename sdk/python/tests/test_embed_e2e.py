@@ -28,6 +28,7 @@ def _embedder_url_reachable(url: str, timeout: float = 3.0) -> bool:
     """Check whether the embedding endpoint is reachable."""
     import socket
     from urllib.parse import urlparse
+
     parsed = urlparse(url)
     host = parsed.hostname or "localhost"
     port = parsed.port or 443
@@ -57,8 +58,7 @@ class TestEmbedderE2E:
         base_url = os.environ.get("OPENAI_BASE_URL", "http://localhost:4000/v1")
         if not _embedder_url_reachable(base_url):
             pytest.skip(
-                f"Embedding endpoint {base_url} not reachable. "
-                "Make sure the proxy is running."
+                f"Embedding endpoint {base_url} not reachable. Make sure the proxy is running."
             )
 
     @pytest.fixture
@@ -77,21 +77,15 @@ class TestEmbedderE2E:
         result = embed_client._embed("hello world")
         assert isinstance(result, list), f"Expected list, got {type(result)}"
         assert len(result) > 0, "Embedding vector should not be empty"
-        assert len(result) == 1024, (
-            f"bge-m3 embeddings should be 1024-dim, got {len(result)}"
-        )
-        assert all(isinstance(v, float) for v in result), (
-            "All elements should be floats"
-        )
+        assert len(result) == 1024, f"bge-m3 embeddings should be 1024-dim, got {len(result)}"
+        assert all(isinstance(v, float) for v in result), "All elements should be floats"
         # Verify it's not all zeros (proxy should return real embeddings)
         non_zero = sum(1 for v in result if abs(v) > 1e-10)
         assert non_zero > 10, (
             f"Expected real (non-zero) embedding values, got only {non_zero} non-zero out of {len(result)}"
         )
 
-    def test_embed_different_texts_produce_different_vectors(
-        self, embed_client: Client
-    ):
+    def test_embed_different_texts_produce_different_vectors(self, embed_client: Client):
         """Different inputs produce different embeddings."""
         v1 = embed_client._embed("quantum computing")
         v2 = embed_client._embed("baking cookies")
@@ -102,9 +96,7 @@ class TestEmbedderE2E:
         result = embed_client._embed("")
         # The proxy/NIM rejects empty strings, client catches and returns []
         assert isinstance(result, list)
-        assert len(result) == 0, (
-            "Empty string should return [] since APIs reject it"
-        )
+        assert len(result) == 0, "Empty string should return [] since APIs reject it"
 
     def test_embed_batch_returns_correct_count(self, embed_client: Client):
         """_embed_batch() returns the correct number of vectors."""
@@ -117,12 +109,8 @@ class TestEmbedderE2E:
         assert isinstance(results, list), f"Expected list, got {type(results)}"
         assert len(results) == 3, f"Expected 3 vectors, got {len(results)}"
         for i, vec in enumerate(results):
-            assert len(vec) == 1024, (
-                f"Vector {i} should be 1024-dim, got {len(vec)}"
-            )
-            assert all(isinstance(v, float) for v in vec), (
-                f"Vector {i} elements should be floats"
-            )
+            assert len(vec) == 1024, f"Vector {i} should be 1024-dim, got {len(vec)}"
+            assert all(isinstance(v, float) for v in vec), f"Vector {i} elements should be floats"
 
     def test_embed_batch_single_item(self, embed_client: Client):
         """_embed_batch() with a single text returns one vector."""
@@ -138,14 +126,13 @@ class TestEmbedderE2E:
     def test_embed_unicode_text(self, embed_client: Client):
         """Non-ASCII text should embed correctly (bge-m3 is multilingual)."""
         texts = [
-            "你好世界",           # Chinese
-            "こんにちは世界",      # Japanese
-            "Привет мир",         # Russian
-            "Hallo welt",         # German
+            "你好世界",  # Chinese
+            "こんにちは世界",  # Japanese
+            "Привет мир",  # Russian
+            "Hallo welt",  # German
         ]
         for text in texts:
             result = embed_client._embed(text)
             assert len(result) == 1024, (
-                f"Unicode text '{text}' should produce 1024-dim vector, "
-                f"got {len(result)}"
+                f"Unicode text '{text}' should produce 1024-dim vector, got {len(result)}"
             )

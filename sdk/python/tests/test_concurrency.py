@@ -14,10 +14,7 @@ Run:
 """
 
 import concurrent.futures
-import os
 import random
-import secrets
-import threading
 import time
 import uuid
 
@@ -62,7 +59,7 @@ def _concurrent_store(client: Client, ws_id: str, idx: int, results: list):
 
 def test_concurrent_writes(stdb_client: Client):
     """50 threads store memories concurrently — all must succeed.
-    
+
     KNOWN STDB ISSUE: Under concurrent store load (~50 threads), the WASM
     module occasionally crashes with "The instance encountered a fatal error."
     We accept up to 2 failures (~4%) from this known STDB concurrency limitation.
@@ -73,17 +70,16 @@ def test_concurrent_writes(stdb_client: Client):
     results: list = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as pool:
-        futures = [
-            pool.submit(_concurrent_store, c, ws_id, i, results)
-            for i in range(n_threads)
-        ]
+        futures = [pool.submit(_concurrent_store, c, ws_id, i, results) for i in range(n_threads)]
         concurrent.futures.wait(futures)
 
     successes = [r for r in results if r[1]]
     failures = [r for r in results if not r[1]]
     stdb_fatal_count = sum(1 for f in failures if "fatal error" in str(f[2]).lower())
 
-    print(f"\n  Concurrent writes: {len(successes)}/{n_threads} succeeded ({stdb_fatal_count} STDB crashes)")
+    print(
+        f"\n  Concurrent writes: {len(successes)}/{n_threads} succeeded ({stdb_fatal_count} STDB crashes)"
+    )
     if failures:
         for f in failures:
             print(f"    FAIL idx={f[0]}: {str(f[2])[:120]}")
@@ -96,7 +92,9 @@ def test_concurrent_writes(stdb_client: Client):
     # Verify all memories are retrievable via SQL (public query_result)
     all_memories = c._query("memory", ws_id)
     stored_count = len(all_memories)
-    assert stored_count >= len(successes), f"Expected ≥{len(successes)} memories, found {stored_count}"
+    assert stored_count >= len(successes), (
+        f"Expected ≥{len(successes)} memories, found {stored_count}"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -128,7 +126,7 @@ def _concurrent_search(client: Client, ws_id: str, idx: int, results: list):
 
 def test_concurrent_reads(stdb_client: Client):
     """Seed 100 docs, then 20 threads search concurrently (keyword, safe).
-    
+
     KNOWN STDB ISSUE: Under concurrent search load (~20 threads), the WASM
     module occasionally crashes with "The instance encountered a fatal error."
     This happens in ~5% of runs and is a real STDB concurrency limitation.
@@ -152,17 +150,16 @@ def test_concurrent_reads(stdb_client: Client):
     results: list = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
-        futures = [
-            pool.submit(_concurrent_search, c, ws_id, i, results)
-            for i in range(n_threads)
-        ]
+        futures = [pool.submit(_concurrent_search, c, ws_id, i, results) for i in range(n_threads)]
         concurrent.futures.wait(futures)
 
     successes = [r for r in results if r[1]]
     failures = [r for r in results if not r[1]]
     stdb_fatal_count = sum(1 for f in failures if "fatal error" in str(f[2]).lower())
 
-    print(f"\n  Concurrent reads: {len(successes)}/{n_threads} succeeded ({stdb_fatal_count} STDB crashes)")
+    print(
+        f"\n  Concurrent reads: {len(successes)}/{n_threads} succeeded ({stdb_fatal_count} STDB crashes)"
+    )
     if failures:
         for f in failures:
             print(f"    FAIL idx={f[0]}: {f[2][:120]}")
@@ -171,7 +168,7 @@ def test_concurrent_reads(stdb_client: Client):
     non_fatal_failures = [f for f in failures if "fatal error" not in str(f[2]).lower()]
     assert non_fatal_failures == [], f"{len(non_fatal_failures)} non-fatal read failures"
     assert stdb_fatal_count <= 2, f"STDB fatal errors exceed known limit: {stdb_fatal_count}/20"
-    
+
     for s in successes:
         assert s[2] > 0, f"Search idx={s[0]} returned 0 results"
 
@@ -203,16 +200,15 @@ def test_mixed_read_write(stdb_client: Client):
     ws_id = random_workspace(c, "mixed-rw")
 
     for i in range(30):
-        c.store(workspace_id=ws_id, content=f"Pre-seed {i}: baseline content", memory_type="world_fact")
+        c.store(
+            workspace_id=ws_id, content=f"Pre-seed {i}: baseline content", memory_type="world_fact"
+        )
 
     n_threads = 20
     results: list = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
-        futures = [
-            pool.submit(_mixed_worker, c, ws_id, i, results)
-            for i in range(n_threads)
-        ]
+        futures = [pool.submit(_mixed_worker, c, ws_id, i, results) for i in range(n_threads)]
         concurrent.futures.wait(futures)
 
     successes = [r for r in results if r[2]]
@@ -221,7 +217,9 @@ def test_mixed_read_write(stdb_client: Client):
     stores = [r for r in successes if r[1] == "store"]
     searches = [r for r in successes if r[1] == "search"]
 
-    print(f"\n  Mixed R/W: {len(successes)}/{n_threads} succeeded ({len(stores)} stores, {len(searches)} searches)")
+    print(
+        f"\n  Mixed R/W: {len(successes)}/{n_threads} succeeded ({len(stores)} stores, {len(searches)} searches)"
+    )
     if failures:
         for f in failures:
             print(f"    FAIL idx={f[0]} ({f[1]}): {f[3]}")
@@ -229,7 +227,9 @@ def test_mixed_read_write(stdb_client: Client):
     assert failures == [], f"{len(failures)} mixed R/W failures"
 
     total = c._query("memory", ws_id)
-    assert len(total) >= 30 + len(stores), f"Memory count {len(total)} < expected {30 + len(stores)}"
+    assert len(total) >= 30 + len(stores), (
+        f"Memory count {len(total)} < expected {30 + len(stores)}"
+    )
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -239,7 +239,7 @@ def test_mixed_read_write(stdb_client: Client):
 
 def test_race_create_workspace(stdb_client: Client):
     """5 threads try to create same-named workspaces — STDB allows duplicates.
-    
+
     This is a LEGITIMATE FINDING: STDB doesn't enforce unique workspace names.
     Each create_workspace generates a unique UUID even with the same name.
     """
@@ -293,7 +293,15 @@ def _throughput_store(client: Client, ws_id: str, batch_start: int, batch_size: 
             fail += 1
             errors.append(f"{type(exc).__name__}: {str(exc)[:120]}")
     elapsed = time.time() - t0
-    results.append({"ok": ok, "fail": fail, "elapsed": elapsed, "rate": ok / elapsed if elapsed > 0 else 0, "_errors": errors})
+    results.append(
+        {
+            "ok": ok,
+            "fail": fail,
+            "elapsed": elapsed,
+            "rate": ok / elapsed if elapsed > 0 else 0,
+            "_errors": errors,
+        }
+    )
 
 
 def test_throughput(stdb_client: Client):
@@ -317,7 +325,9 @@ def test_throughput(stdb_client: Client):
     total_fail = sum(r["fail"] for r in results)
     overall_rate = total_ok / total_elapsed if total_elapsed > 0 else 0
 
-    print(f"\n  Throughput: {total_ok}/{n_workers * batch_size} stored in {total_elapsed:.1f}s ({overall_rate:.1f} writes/s)")
+    print(
+        f"\n  Throughput: {total_ok}/{n_workers * batch_size} stored in {total_elapsed:.1f}s ({overall_rate:.1f} writes/s)"
+    )
 
     assert total_fail == 0, (
         f"{total_fail} write failures: "
@@ -348,7 +358,9 @@ def _isolated_worker(client: Client, ws_id: str, prefix: str, count: int, result
         res = client.search(ws_id, query=f"{prefix} document", limit=10, semantic=False)
         results.append({"workspace": ws_id, "count": len(res), "success": True, "prefix": prefix})
     except Exception as exc:
-        results.append({"workspace": ws_id, "count": 0, "success": False, "error": str(exc), "prefix": prefix})
+        results.append(
+            {"workspace": ws_id, "count": 0, "success": False, "error": str(exc), "prefix": prefix}
+        )
 
 
 def test_workspace_isolation(stdb_client: Client):
@@ -382,11 +394,15 @@ def test_workspace_isolation(stdb_client: Client):
 
     assert all(r["success"] for r in results), "Isolation worker failed"
     for r in results:
-        assert r["count"] > 0, f"Worker {r.get('prefix', '?')}: search returned 0 — indexing delay or isolation break"
+        assert r["count"] > 0, (
+            f"Worker {r.get('prefix', '?')}: search returned 0 — indexing delay or isolation break"
+        )
 
     for i, ws_id in enumerate(workspaces):
         all_in_ws = c._query("memory", ws_id)
-        assert len(all_in_ws) >= docs_per_worker, f"Worker {i}: expected ≥{docs_per_worker}, got {len(all_in_ws)}"
+        assert len(all_in_ws) >= docs_per_worker, (
+            f"Worker {i}: expected ≥{docs_per_worker}, got {len(all_in_ws)}"
+        )
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -397,8 +413,14 @@ def test_workspace_isolation(stdb_client: Client):
 def _error_worker(client: Client, idx: int, results: list):
     """Worker: deliberately trigger various error paths."""
     scenarios = [
-        ("store_empty_ws", lambda: client.store(workspace_id="", content="test", memory_type="experience")),
-        ("search_bogus_query", lambda: client.search("nonexistent-ws-id", query="", limit=5, semantic=False)),
+        (
+            "store_empty_ws",
+            lambda: client.store(workspace_id="", content="test", memory_type="experience"),
+        ),
+        (
+            "search_bogus_query",
+            lambda: client.search("nonexistent-ws-id", query="", limit=5, semantic=False),
+        ),
         ("invalid_reducer", lambda: client._call("nonexistent_reducer_xyz", [])),
     ]
     name, fn = scenarios[idx % len(scenarios)]
@@ -417,10 +439,7 @@ def test_concurrent_errors(stdb_client: Client):
     results: list = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
-        futures = [
-            pool.submit(_error_worker, c, i, results)
-            for i in range(n_threads)
-        ]
+        futures = [pool.submit(_error_worker, c, i, results) for i in range(n_threads)]
         concurrent.futures.wait(futures)
 
     print(f"\n  Error resilience ({n_threads} threads):")

@@ -1,8 +1,7 @@
 """
 Unit tests for _parse_rerank_json() — all 6 fallback strategies.
 """
-import json
-import re
+
 import pytest
 from spacetime_memory.client import _parse_rerank_json
 

@@ -1,8 +1,9 @@
-import json
 import time
 from typing import Any
 import httpx
 from .base import Connector, Event
+
+
 class GitHubConnector(Connector):
     """Poll GitHub API for public events from a user.
 
@@ -33,9 +34,7 @@ class GitHubConnector(Connector):
         self.username = username
         self.workspace_id = workspace_id
         self.peer_id = peer_id
-        self._seen: set[str] = set(
-            self._cursor.get("seen_ids", [])
-        )
+        self._seen: set[str] = set(self._cursor.get("seen_ids", []))
 
     def poll(self) -> list[Event]:
         """Fetch user events from the GitHub API and return new Events."""
@@ -44,9 +43,7 @@ class GitHubConnector(Connector):
             "Accept": "application/vnd.github+json",
             "User-Agent": "spacetime-memory-connector",
         }
-        url: str | None = (
-            f"https://api.github.com/users/{self.username}/events"
-        )
+        url: str | None = f"https://api.github.com/users/{self.username}/events"
 
         events: list[Event] = []
         fetched = 0
@@ -55,51 +52,51 @@ class GitHubConnector(Connector):
             while url and fetched < 30:
                 try:
                     resp = self._retry_client_call(
-                        client, "get", url,
-                        headers=headers, timeout=30,
+                        client,
+                        "get",
+                        url,
+                        headers=headers,
+                        timeout=30,
                     )
                 except httpx.RequestError as e:
                     self._log.error(
-                        "HTTP error after retries: %s", e,
+                        "HTTP error after retries: %s",
+                        e,
                     )
                     break
 
                 # ── Rate-limit handling ─────────────────────────────
                 if resp.status_code == 403:
-                    remaining = resp.headers.get(
-                        "X-RateLimit-Remaining", ""
-                    )
+                    remaining = resp.headers.get("X-RateLimit-Remaining", "")
                     if remaining == "0":
-                        reset_epoch = resp.headers.get(
-                            "X-RateLimit-Reset", "0"
-                        )
+                        reset_epoch = resp.headers.get("X-RateLimit-Reset", "0")
                         try:
-                            sleep_secs = max(
-                                0, int(reset_epoch) - int(time.time())
-                            )
+                            sleep_secs = max(0, int(reset_epoch) - int(time.time()))
                         except (ValueError, OSError):
                             sleep_secs = 60
                         self._log.warning(
-                            "GitHub rate limit exhausted — "
-                            "sleeping %d s until reset (epoch %s)",
+                            "GitHub rate limit exhausted — sleeping %d s until reset (epoch %s)",
                             sleep_secs,
                             reset_epoch,
                         )
                         time.sleep(sleep_secs)
                         continue  # retry after reset
                     self._log.error(
-                        "Rate limited or forbidden on %s", url,
+                        "Rate limited or forbidden on %s",
+                        url,
                     )
                     break
                 if resp.status_code == 404:
                     self._log.error(
-                        "User '%s' not found", self.username,
+                        "User '%s' not found",
+                        self.username,
                     )
                     break
                 if resp.status_code != 200:
                     self._log.error(
                         "Unexpected status %s on %s",
-                        resp.status_code, url,
+                        resp.status_code,
+                        url,
                     )
                     break
 
@@ -115,32 +112,34 @@ class GitHubConnector(Connector):
                     fetched += 1
 
                     event_type: str = item.get("type", "UnknownEvent")
-                    repo_name: str = (
-                        item.get("repo", {}).get("name", "unknown")
-                    )
-                    actor: str = (
-                        item.get("actor", {}).get("login", self.username)
-                    )
+                    repo_name: str = item.get("repo", {}).get("name", "unknown")
+                    actor: str = item.get("actor", {}).get("login", self.username)
                     created_at: str = item.get("created_at", "")
                     payload: dict[str, Any] = item.get("payload", {})
 
                     content = self._format_event(
-                        event_type, actor, repo_name, payload, created_at,
+                        event_type,
+                        actor,
+                        repo_name,
+                        payload,
+                        created_at,
                     )
                     summary = self._summarize_event(event_type, repo_name)
 
-                    events.append(Event(
-                        content=content,
-                        workspace_id=self.workspace_id,
-                        summary=summary,
-                        memory_type="experience",
-                        peer_id=self.peer_id,
-                        metadata={
-                            "source": "github",
-                            "event_type": event_type,
-                            "repo": repo_name,
-                        },
-                    ))
+                    events.append(
+                        Event(
+                            content=content,
+                            workspace_id=self.workspace_id,
+                            summary=summary,
+                            memory_type="experience",
+                            peer_id=self.peer_id,
+                            metadata={
+                                "source": "github",
+                                "event_type": event_type,
+                                "repo": repo_name,
+                            },
+                        )
+                    )
 
                 # Follow pagination via Link header
                 link_header = resp.headers.get("Link", "")
@@ -219,10 +218,7 @@ class GitHubConnector(Connector):
         elif event_type == "ForkEvent":
             forkee = payload.get("forkee", {})
             fork_name = forkee.get("full_name", "unknown")
-            return (
-                f"{actor} forked {repo} to {fork_name}\n"
-                f"Date: {created_at}"
-            )
+            return f"{actor} forked {repo} to {fork_name}\nDate: {created_at}"
 
         elif event_type == "PullRequestEvent":
             action = payload.get("action", "opened")
@@ -241,16 +237,10 @@ class GitHubConnector(Connector):
             action = payload.get("action", "created")
             issue = payload.get("issue", {})
             number = issue.get("number", "")
-            return (
-                f"{actor} {action} comment on issue #{number} in {repo}\n"
-                f"Date: {created_at}"
-            )
+            return f"{actor} {action} comment on issue #{number} in {repo}\nDate: {created_at}"
 
         else:
-            return (
-                f"{actor} triggered {event_type} in {repo}\n"
-                f"Date: {created_at}"
-            )
+            return f"{actor} triggered {event_type} in {repo}\nDate: {created_at}"
 
     @staticmethod
     def _summarize_event(event_type: str, repo: str) -> str:
@@ -268,5 +258,3 @@ class GitHubConnector(Connector):
 
 
 # ── Twitter/X Connector ─────────────────────────────────────────────
-
-

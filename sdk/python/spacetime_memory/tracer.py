@@ -27,7 +27,6 @@ Environment variables:
 from __future__ import annotations
 
 import os
-import time
 import logging
 from contextlib import contextmanager
 from functools import wraps
@@ -110,20 +109,14 @@ class Tracer:
         sampling_ratio: float | None = None,
     ) -> None:
         self._service_name = (
-            service_name
-            or os.environ.get("OTEL_SERVICE_NAME")
-            or "spacetime-memory"
+            service_name or os.environ.get("OTEL_SERVICE_NAME") or "spacetime-memory"
         )
         self._otlp_endpoint = otlp_endpoint or os.environ.get(
             "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
         )
         enabled_env = os.environ.get("OTEL_ENABLED", "true").lower()
-        self._enabled = (
-            enabled if enabled is not None else enabled_env not in ("false", "0", "no")
-        )
-        self._sampling_ratio = sampling_ratio or float(
-            os.environ.get("OTEL_SAMPLING_RATIO", "1.0")
-        )
+        self._enabled = enabled if enabled is not None else enabled_env not in ("false", "0", "no")
+        self._sampling_ratio = sampling_ratio or float(os.environ.get("OTEL_SAMPLING_RATIO", "1.0"))
         self._tracer = None
         self._provider = None
         self._setup_done = False
@@ -162,10 +155,12 @@ class Tracer:
             ParentBasedTraceIdRatio,
         )
 
-        resource = Resource.create({
-            "service.name": self._service_name,
-            "service.version": self._get_version(),
-        })
+        resource = Resource.create(
+            {
+                "service.name": self._service_name,
+                "service.version": self._get_version(),
+            }
+        )
 
         sampler = ParentBasedTraceIdRatio(self._sampling_ratio)
 
@@ -190,6 +185,7 @@ class Tracer:
             _collector_reachable = False
             try:
                 import httpx as _httpx
+
                 _probe = _httpx.get(
                     self._otlp_endpoint.rstrip("/v1") + "/",
                     timeout=2.0,
@@ -262,9 +258,7 @@ class Tracer:
         tracer = self._tracer or trace.get_tracer(self._service_name)
         kind = kind or trace.SpanKind.INTERNAL
 
-        with tracer.start_as_current_span(
-            name, kind=kind, attributes=attributes or {}
-        ) as span:
+        with tracer.start_as_current_span(name, kind=kind, attributes=attributes or {}) as span:
             yield span
 
     def instrument_method(
@@ -295,7 +289,7 @@ class Tracer:
             with self.start_span(span_name, attributes=attributes):
                 try:
                     return method(*args, **kwargs)
-                except Exception as exc:
+                except Exception:
                     # Span will be marked as error automatically
                     raise
 

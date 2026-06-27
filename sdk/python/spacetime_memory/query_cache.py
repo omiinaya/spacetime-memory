@@ -10,7 +10,6 @@ Integrated into Client.search() via query_cache parameter.
 """
 
 import hashlib
-import json
 import threading
 import time
 from collections import OrderedDict

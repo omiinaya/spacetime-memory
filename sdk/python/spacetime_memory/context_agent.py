@@ -69,14 +69,19 @@ class ContextAgent:
           - llm_answer: (if LLM available) synthesised answer
         """
         # 1. Generate the context pack
-        self._client._call("generate_context_pack", [
-            workspace_id, query, token_budget, "", previous_pack_id,
-        ])
+        self._client._call(
+            "generate_context_pack",
+            [
+                workspace_id,
+                query,
+                token_budget,
+                "",
+                previous_pack_id,
+            ],
+        )
 
         # 2. Read the pack
-        packs = self._client._query(
-            "context_pack", workspace_id=workspace_id
-        )
+        packs = self._client._query("context_pack", workspace_id=workspace_id)
         # Take most recent (server returns unsorted)
         packs.sort(key=lambda p: p.get("created_at", 0), reverse=True)
         packs = packs[:1]
@@ -84,7 +89,6 @@ class ContextAgent:
             return {"error": "No context pack generated"}
 
         pack = packs[0]
-        pack_id = pack.get("id", "")
 
         # 3. Read entries from the pack's serialized JSON
         try:
@@ -104,6 +108,7 @@ class ContextAgent:
         # Apply AAAK compression to entry content if requested
         if aaak:
             from .aaak import aaak_compress
+
             for entry in entries:
                 content = entry.get("content", "")
                 if content:
@@ -164,6 +169,7 @@ class ContextAgent:
 
         try:
             import httpx
+
             resp = httpx.post(
                 f"{base_url}/chat/completions",
                 headers={
@@ -204,9 +210,16 @@ class ContextAgent:
           - pack: the context_pack row
         """
         # Run context pipeline (same as ask())
-        self._client._call("generate_context_pack", [
-            workspace_id, query, token_budget, "", "",
-        ])
+        self._client._call(
+            "generate_context_pack",
+            [
+                workspace_id,
+                query,
+                token_budget,
+                "",
+                "",
+            ],
+        )
         packs = self._client._query("context_pack", workspace_id=workspace_id)
         packs.sort(key=lambda p: p.get("created_at", 0), reverse=True)
         packs = packs[:1]
@@ -228,6 +241,7 @@ class ContextAgent:
         # Apply AAAK compression to entry content if requested
         if aaak:
             from .aaak import aaak_compress
+
             for entry in entries:
                 content = entry.get("content", "")
                 if content:
@@ -283,6 +297,7 @@ class ContextAgent:
 
         try:
             import httpx
+
             resp = httpx.post(
                 f"{base_url}/chat/completions",
                 headers={
@@ -293,12 +308,15 @@ class ContextAgent:
                     "model": model,
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": (
-                            f"## Query\n{query}\n\n"
-                            f"## Context\n{context_text}\n\n"
-                            "Synthesize an answer and identify what's missing. "
-                            "Return JSON only."
-                        )},
+                        {
+                            "role": "user",
+                            "content": (
+                                f"## Query\n{query}\n\n"
+                                f"## Context\n{context_text}\n\n"
+                                "Synthesize an answer and identify what's missing. "
+                                "Return JSON only."
+                            ),
+                        },
                     ],
                     "temperature": 0.3,
                     "max_tokens": 2048,
@@ -310,6 +328,7 @@ class ContextAgent:
             data = resp.json()
             content = data["choices"][0]["message"]["content"]
             import json as _json
+
             return _json.loads(content)
         except Exception as exc:
             logger.warning("LLM gap analysis call failed: %s", exc)
@@ -322,6 +341,7 @@ class ContextAgent:
     ) -> str | None:
         """Fallback to a local GGUF model when no cloud API key is available."""
         from .local_llm import LocalLLM
+
         llm = LocalLLM.auto()
         if not llm.available:
             return None

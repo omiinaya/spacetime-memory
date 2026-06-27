@@ -1,6 +1,5 @@
 """Tests for AAAK compression (aaak.py)."""
 
-import pytest
 from unittest.mock import patch, mock_open
 
 from spacetime_memory.aaak import (
@@ -14,9 +13,6 @@ from spacetime_memory.aaak import (
     aaak_decompress,
     aaak_ratio,
     CATEGORIES,
-    PHRASES,
-    STRUCTURAL,
-    TRAILING,
 )
 
 # ── _is_already_compressed ──────────────────────────────────────────────────
@@ -520,7 +516,7 @@ class TestAAAKEdgeCases:
         mock_path = MagicMock()
         mock_path.exists.return_value = False
 
-        with patch('spacetime_memory.aaak._RULES_PATH', mock_path):
+        with patch("spacetime_memory.aaak._RULES_PATH", mock_path):
             rules = _load_rules()
             # Should get fallback rules with expected structure
             assert "categories" in rules
@@ -544,7 +540,7 @@ class TestAAAKEdgeCases:
         mock_path = MagicMock()
         mock_path.exists.return_value = True
 
-        with patch('spacetime_memory.aaak._RULES_PATH', mock_path):
+        with patch("spacetime_memory.aaak._RULES_PATH", mock_path):
             with patch("builtins.open", mock_open(read_data=json.dumps(custom_rules))):
                 rules = _load_rules()
                 assert rules["categories"]["CUSTOM"] == "CST"

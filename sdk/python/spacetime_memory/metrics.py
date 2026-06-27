@@ -28,6 +28,7 @@ from typing import Any, Callable
 @dataclass
 class EndpointStats:
     """Latency and error statistics for a single endpoint/reducer."""
+
     count: int = 0
     errors: int = 0
     total_latency_ms: float = 0.0
@@ -72,6 +73,7 @@ class EndpointStats:
 @dataclass
 class MemoryStats:
     """Memory statistics per workspace or globally."""
+
     total: int = 0
     by_type: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     by_tier: dict[str, int] = field(default_factory=lambda: defaultdict(int))
@@ -114,7 +116,10 @@ class MetricsCollector:
     # ------------------------------------------------------------------
 
     def record(
-        self, endpoint: str, fn: Callable[[], Any], is_error: bool | None = None,
+        self,
+        endpoint: str,
+        fn: Callable[[], Any],
+        is_error: bool | None = None,
     ) -> Any:
         """Call *fn* while recording latency and error status for *endpoint*.
 
@@ -127,7 +132,7 @@ class MetricsCollector:
             latency = (time.monotonic() - start) * 1000
             self._endpoints[endpoint].record(latency, is_error=False)
             return result
-        except Exception as exc:
+        except Exception:
             latency = (time.monotonic() - start) * 1000
             self._endpoints[endpoint].record(latency, is_error=True)
             raise
@@ -141,7 +146,8 @@ class MetricsCollector:
         self._embedder_errors += 1
 
     def record_memory_stats(
-        self, total: int,
+        self,
+        total: int,
         by_type: dict[str, int] | None = None,
         by_tier: dict[str, int] | None = None,
     ) -> None:
@@ -186,10 +192,7 @@ class MetricsCollector:
             "uptime_seconds": round(uptime, 1),
             "uptime_human": self._format_duration(uptime),
             "last_reset": round(time.monotonic() - self._last_reset, 1),
-            "endpoints": {
-                name: stats.to_dict()
-                for name, stats in sorted(self._endpoints.items())
-            },
+            "endpoints": {name: stats.to_dict() for name, stats in sorted(self._endpoints.items())},
             "total_calls": sum(s.count for s in self._endpoints.values()),
             "total_errors": sum(s.errors for s in self._endpoints.values()),
             "overall_error_rate_pct": self._overall_error_rate(),
@@ -208,11 +211,15 @@ class MetricsCollector:
 
         lines.append("# HELP spacetime_memory_total_calls Total reducer/SQL calls")
         lines.append("# TYPE spacetime_memory_total_calls counter")
-        lines.append(f"spacetime_memory_total_calls {sum(s.count for s in self._endpoints.values())}")
+        lines.append(
+            f"spacetime_memory_total_calls {sum(s.count for s in self._endpoints.values())}"
+        )
 
         lines.append("# HELP spacetime_memory_total_errors Total failed calls")
         lines.append("# TYPE spacetime_memory_total_errors counter")
-        lines.append(f"spacetime_memory_total_errors {sum(s.errors for s in self._endpoints.values())}")
+        lines.append(
+            f"spacetime_memory_total_errors {sum(s.errors for s in self._endpoints.values())}"
+        )
 
         lines.append("# HELP spacetime_memory_embedder_errors Embedder error count")
         lines.append("# TYPE spacetime_memory_embedder_errors counter")
@@ -234,8 +241,12 @@ class MetricsCollector:
         for name, stats in sorted(self._endpoints.items()):
             sanitized = name.replace("-", "_").replace(" ", "_").replace(":", "_")
             lines.append(f'spacetime_memory_endpoint_calls{{endpoint="{sanitized}"}} {stats.count}')
-            lines.append(f'spacetime_memory_endpoint_errors{{endpoint="{sanitized}"}} {stats.errors}')
-            lines.append(f'spacetime_memory_endpoint_latency_ms{{endpoint="{sanitized}",quantile="avg"}} {stats.avg_latency_ms}')
+            lines.append(
+                f'spacetime_memory_endpoint_errors{{endpoint="{sanitized}"}} {stats.errors}'
+            )
+            lines.append(
+                f'spacetime_memory_endpoint_latency_ms{{endpoint="{sanitized}",quantile="avg"}} {stats.avg_latency_ms}'
+            )
 
         return "\n".join(lines) + "\n"
 

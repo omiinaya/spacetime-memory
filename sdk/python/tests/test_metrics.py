@@ -140,6 +140,7 @@ class TestMetricsCollector:
 
     def test_uptime(self) -> None:
         import time
+
         mc = MetricsCollector()
         time.sleep(0.01)
         assert mc.uptime_seconds() > 0.005

@@ -116,6 +116,7 @@ class StmemMemoryStore:
         # to avoid stale workspace conflicts from other identities.
         caller_tag = _caller_tag(self._client)
         import uuid as _uid
+
         unique = _uid.uuid4().hex[:8]
         ws_name = f"lcmem-{caller_tag}-{unique}"
         try:
@@ -151,24 +152,34 @@ class StmemMemoryStore:
         for key in keys:
             try:
                 rows = self._client._query(
-                    "memory", workspace_id=ws_id,
+                    "memory",
+                    workspace_id=ws_id,
                     filter_dict={"source_session_id": key, "is_active": "true"},
-                    columns=["id", "content", "summary", "memory_type",
-                             "entities_json", "created_at", "updated_at"]
+                    columns=[
+                        "id",
+                        "content",
+                        "summary",
+                        "memory_type",
+                        "entities_json",
+                        "created_at",
+                        "updated_at",
+                    ],
                 )
             except RuntimeError:
                 rows = []
             if rows:
                 row = rows[0]
-                results.append({
-                    "id": row.get("id", ""),
-                    "content": row.get("content", ""),
-                    "summary": row.get("summary", ""),
-                    "memory_type": row.get("memory_type", ""),
-                    "metadata": _json_parse(row.get("entities_json", "{}")),
-                    "created_at": row.get("created_at", 0),
-                    "updated_at": row.get("updated_at", 0),
-                })
+                results.append(
+                    {
+                        "id": row.get("id", ""),
+                        "content": row.get("content", ""),
+                        "summary": row.get("summary", ""),
+                        "memory_type": row.get("memory_type", ""),
+                        "metadata": _json_parse(row.get("entities_json", "{}")),
+                        "created_at": row.get("created_at", 0),
+                        "updated_at": row.get("updated_at", 0),
+                    }
+                )
             else:
                 results.append(None)
         return results
@@ -197,7 +208,9 @@ class StmemMemoryStore:
                     workspace_id=ws_id,
                     content=content,
                     memory_type=memory_type,
-                    entities_json=json.dumps(metadata) if isinstance(metadata, dict) else json.dumps(metadata),
+                    entities_json=json.dumps(metadata)
+                    if isinstance(metadata, dict)
+                    else json.dumps(metadata),
                     source_session_id=key,
                 )
             except RuntimeError:
@@ -228,9 +241,10 @@ class StmemMemoryStore:
         ws_id = self._ws()
         try:
             rows = self._client._query(
-                "memory", workspace_id=ws_id,
+                "memory",
+                workspace_id=ws_id,
                 filter_dict={"is_active": "true"},
-                columns=["id", "content"]
+                columns=["id", "content"],
             )
         except RuntimeError:
             return
@@ -394,8 +408,7 @@ class StmemStore(BaseStore):
         ws_id = self._resolve_workspace(ws_name)
 
         rows = self._client._query(
-            "memory", workspace_id=ws_id,
-            filter_dict={"source_session_id": key}
+            "memory", workspace_id=ws_id, filter_dict={"source_session_id": key}
         )
         if not rows:
             return None
@@ -471,9 +484,7 @@ class StmemStore(BaseStore):
         ws_name = self._ns_to_ws(namespace)
         ws_id = self._resolve_workspace(ws_name)
         rows = self._client._query(
-            "memory", workspace_id=ws_id,
-            filter_dict={"source_session_id": key},
-            columns=["id"]
+            "memory", workspace_id=ws_id, filter_dict={"source_session_id": key}, columns=["id"]
         )
         if rows:
             try:
@@ -537,8 +548,7 @@ class StmemStore(BaseStore):
         if not all_rows:
             try:
                 rows = self._client._query(
-                    "memory", workspace_id=ws_id,
-                    filter_dict={"is_active": "true"}
+                    "memory", workspace_id=ws_id, filter_dict={"is_active": "true"}
                 )
             except RuntimeError:
                 rows = []
@@ -547,16 +557,16 @@ class StmemStore(BaseStore):
             if query:
                 q = query.lower()
                 rows = [
-                    r for r in rows
-                    if q in r.get("content", "").lower()
-                    or q in r.get("summary", "").lower()
+                    r
+                    for r in rows
+                    if q in r.get("content", "").lower() or q in r.get("summary", "").lower()
                 ]
             if filter:
                 rows = _apply_filter(rows, filter)
             all_rows = rows
 
         # Apply offset and limit
-        all_rows = all_rows[offset:offset + limit]
+        all_rows = all_rows[offset : offset + limit]
         return [
             SearchItem(
                 namespace=namespace_prefix,
@@ -627,7 +637,7 @@ class StmemStore(BaseStore):
                     namespaces.append(ns)
 
         namespaces.sort(key=lambda x: ("/".join(x),))
-        return namespaces[offset:offset + limit]
+        return namespaces[offset : offset + limit]
 
     # -------------------------------------------------------------------
     # Batch operations (matching LangGraph BaseStore)
@@ -649,7 +659,9 @@ class StmemStore(BaseStore):
         results: list[Any] = []
         for op in ops:
             if isinstance(op, GetOp):
-                results.append(self.get(op.namespace, op.key, refresh_ttl=getattr(op, 'refresh_ttl', None)))
+                results.append(
+                    self.get(op.namespace, op.key, refresh_ttl=getattr(op, "refresh_ttl", None))
+                )
             elif isinstance(op, PutOp):
                 if op.value is None:
                     self.delete(op.namespace, op.key)
@@ -657,13 +669,15 @@ class StmemStore(BaseStore):
                     self.put(op.namespace, op.key, op.value, index=op.index)
                 results.append(None)
             elif isinstance(op, SearchOp):
-                results.append(self.search(
-                    op.namespace_prefix,
-                    query=op.query,
-                    filter=op.filter,
-                    limit=op.limit,
-                    offset=op.offset,
-                ))
+                results.append(
+                    self.search(
+                        op.namespace_prefix,
+                        query=op.query,
+                        filter=op.filter,
+                        limit=op.limit,
+                        offset=op.offset,
+                    )
+                )
             elif isinstance(op, ListNamespacesOp):
                 prefix = None
                 suffix = None
@@ -673,13 +687,15 @@ class StmemStore(BaseStore):
                             prefix = m.path
                         elif m.match_type == "suffix":
                             suffix = m.path
-                results.append(self.list_namespaces(
-                    prefix=prefix,
-                    suffix=suffix,
-                    max_depth=op.max_depth,
-                    limit=op.limit,
-                    offset=op.offset,
-                ))
+                results.append(
+                    self.list_namespaces(
+                        prefix=prefix,
+                        suffix=suffix,
+                        max_depth=op.max_depth,
+                        limit=op.limit,
+                        offset=op.offset,
+                    )
+                )
             else:
                 # Legacy: ops with a "type" field (namedtuple or dict)
                 if isinstance(op, dict):
@@ -695,7 +711,9 @@ class StmemStore(BaseStore):
                 elif op_type == "put":
                     ns = tuple(op["namespace"] if isinstance(op, dict) else op.namespace)
                     key = op.get("key", "") if isinstance(op, dict) else getattr(op, "key", "")
-                    value = op.get("value", {}) if isinstance(op, dict) else getattr(op, "value", {})
+                    value = (
+                        op.get("value", {}) if isinstance(op, dict) else getattr(op, "value", {})
+                    )
                     self.put(ns, key, value)
                     results.append(None)
                 elif op_type == "delete":
@@ -704,7 +722,11 @@ class StmemStore(BaseStore):
                     self.delete(ns, key)
                     results.append(None)
                 elif op_type == "search":
-                    ns = tuple(op["namespace_prefix"] if isinstance(op, dict) else getattr(op, "namespace_prefix", ()))
+                    ns = tuple(
+                        op["namespace_prefix"]
+                        if isinstance(op, dict)
+                        else getattr(op, "namespace_prefix", ())
+                    )
                     kw = op.get("kwargs", {}) if isinstance(op, dict) else getattr(op, "kwargs", {})
                     results.append(self.search(ns, **kw))
                 else:
@@ -735,9 +757,7 @@ def _memory_to_dict(row: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _apply_filter(
-    rows: list[dict[str, Any]], filter: dict[str, Any]
-) -> list[dict[str, Any]]:
+def _apply_filter(rows: list[dict[str, Any]], filter: dict[str, Any]) -> list[dict[str, Any]]:
     """Client-side metadata filter."""
     if not filter:
         return rows
@@ -769,6 +789,7 @@ def _caller_tag(client: Client) -> str:
 def _hash_hex(val: str) -> str:
     """SHA-256 hex digest."""
     import hashlib
+
     return hashlib.sha256(val.encode()).hexdigest()
 
 
@@ -779,6 +800,7 @@ def _to_dt(micros: int) -> str:
     try:
         ts = micros / 1_000_000
         from datetime import datetime, timezone
+
         return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
     except (OSError, ValueError, OverflowError):
         return ""
@@ -932,10 +954,14 @@ class StmemChatMessageHistory:
 
         try:
             rows = self._client._query(
-                "memory", workspace_id=ws_id,
-                filter_dict={"source_session_id": self.session_id,
-                             "memory_type": "chat_message", "is_active": "true"},
-                columns=["id", "content", "memory_type", "entities_json", "created_at"]
+                "memory",
+                workspace_id=ws_id,
+                filter_dict={
+                    "source_session_id": self.session_id,
+                    "memory_type": "chat_message",
+                    "is_active": "true",
+                },
+                columns=["id", "content", "memory_type", "entities_json", "created_at"],
             )
             rows.sort(key=lambda r: r.get("created_at", 0))
         except RuntimeError:
@@ -989,12 +1015,14 @@ class StmemChatMessageHistory:
             ws_id = self._resolve_workspace()
             # Fetch matching memories and filter client-side (LIKE not in reducer)
             dedup_rows = self._client._query(
-                "memory", workspace_id=ws_id,
+                "memory",
+                workspace_id=ws_id,
                 filter_dict={"source_session_id": self.session_id, "memory_type": "chat_message"},
-                columns=["id", "content"]
+                columns=["id", "content"],
             )
             dedup_rows = [
-                r for r in dedup_rows
+                r
+                for r in dedup_rows
                 if f'"type": "{msg_type}"' in r.get("content", "")
                 and f'"content": "{msg_content[:50]}' in r.get("content", "")
             ]
@@ -1042,10 +1070,14 @@ class StmemChatMessageHistory:
         ws_id = self._resolve_workspace()
         try:
             rows = self._client._query(
-                "memory", workspace_id=ws_id,
-                filter_dict={"source_session_id": self.session_id,
-                             "memory_type": "chat_message", "is_active": "true"},
-                columns=["id"]
+                "memory",
+                workspace_id=ws_id,
+                filter_dict={
+                    "source_session_id": self.session_id,
+                    "memory_type": "chat_message",
+                    "is_active": "true",
+                },
+                columns=["id"],
             )
         except RuntimeError:
             rows = []
@@ -1073,10 +1105,14 @@ class StmemChatMessageHistory:
         ws_id = self._resolve_workspace()
         try:
             all_rows = self._client._query(
-                "memory", workspace_id=ws_id,
-                filter_dict={"source_session_id": self.session_id,
-                             "memory_type": "chat_message", "is_active": "true"},
-                columns=["id"]
+                "memory",
+                workspace_id=ws_id,
+                filter_dict={
+                    "source_session_id": self.session_id,
+                    "memory_type": "chat_message",
+                    "is_active": "true",
+                },
+                columns=["id"],
             )
             rows = [{"cnt": len(all_rows)}]
             if rows:
@@ -1099,11 +1135,23 @@ except ImportError:
     class Item(namedtuple("Item", ["value", "key", "namespace", "created_at", "updated_at"])):  # type: ignore[no-redef]
         """Minimal stub for ``langgraph.store.base.Item``."""
 
-    class SearchItem(namedtuple("SearchItem", [  # type: ignore[no-redef]
-        "namespace", "key", "value", "created_at", "updated_at", "score"
-    ])):
+    class SearchItem(
+        namedtuple(
+            "SearchItem",
+            [  # type: ignore[no-redef]
+                "namespace",
+                "key",
+                "value",
+                "created_at",
+                "updated_at",
+                "score",
+            ],
+        )
+    ):
         """Minimal stub for ``langgraph.store.base.SearchItem``."""
+
         __slots__ = ()  # type: ignore[assignment]
+
         # Provide a default of None for score
         def __new__(cls, namespace, key, value, created_at, updated_at, score=None):
             return super().__new__(cls, namespace, key, value, created_at, updated_at, score)

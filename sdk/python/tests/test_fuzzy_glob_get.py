@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 @pytest.fixture
 def mock_client():
     """Client with mocked HTTP layer."""
-    from unittest.mock import MagicMock
     from spacetime_memory import Client
 
     c = Client.__new__(Client)
@@ -52,8 +51,7 @@ class TestFuzzyGet:
         mock_client._query.return_value = [
             {"id": "m1", "content": "completely different topic"},
         ]
-        result = mock_client.fuzzy_get("ws-1", "oauth authentication",
-                                       threshold=0.6)
+        result = mock_client.fuzzy_get("ws-1", "oauth authentication", threshold=0.6)
         assert result is None
 
     def test_empty_workspace(self, mock_client):
@@ -68,8 +66,7 @@ class TestFuzzyGet:
             {"id": "m1", "content": "...", "summary": "auth module setup"},
             {"id": "m2", "content": "...", "summary": "pizza baking tips"},
         ]
-        result = mock_client.fuzzy_get("ws-1", "auth module setup",
-                                       field="summary")
+        result = mock_client.fuzzy_get("ws-1", "auth module setup", field="summary")
         assert result is not None
         assert result["id"] == "m1"
 

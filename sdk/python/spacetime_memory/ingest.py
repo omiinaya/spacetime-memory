@@ -16,10 +16,7 @@ Usage::
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import time
 from pathlib import Path
 from typing import Any
 
@@ -196,15 +193,26 @@ class CodebaseIngester:
 
     # Directories to skip
     SKIP_DIRS: set[str] = {
-        ".git", "__pycache__", "node_modules", "target",
-        "venv", ".venv", ".env", "dist", "build", ".next",
+        ".git",
+        "__pycache__",
+        "node_modules",
+        "target",
+        "venv",
+        ".venv",
+        ".env",
+        "dist",
+        "build",
+        ".next",
     }
 
     def __init__(self, client: Any):
         self.client = client
         self._parsers: dict[str, _LangConfig] = {}
         self._stats: dict[str, int] = {
-            "files": 0, "defs": 0, "edges": 0, "errors": 0,
+            "files": 0,
+            "defs": 0,
+            "edges": 0,
+            "errors": 0,
         }
 
     def _parser(self, lang: str) -> _LangConfig | None:
@@ -263,8 +271,11 @@ class CodebaseIngester:
 
             try:
                 self._process_file(
-                    fpath, root, workspace_id,
-                    file_nodes, def_nodes,
+                    fpath,
+                    root,
+                    workspace_id,
+                    file_nodes,
+                    def_nodes,
                 )
                 processed += 1
             except Exception as e:
@@ -315,7 +326,9 @@ class CodebaseIngester:
         file_label = rel_str
         try:
             self.client.create_node(
-                workspace_id, file_label, "code",
+                workspace_id,
+                file_label,
+                "code",
                 summary=f"{lang_name} file: {rel_str}",
             )
         except RuntimeError:
@@ -324,8 +337,13 @@ class CodebaseIngester:
         file_nodes[fpath] = file_id or ""
 
         self._extract_defs(
-            cfg, tree, source, rel_str, workspace_id,
-            file_id or "", def_nodes,
+            cfg,
+            tree,
+            source,
+            rel_str,
+            workspace_id,
+            file_id or "",
+            def_nodes,
         )
         self._stats["files"] += 1
         if self._stats["files"] % 50 == 0:
@@ -355,7 +373,7 @@ class CodebaseIngester:
                 name_node = caps.get("name")
                 if name_node is None:
                     continue
-                name = source[name_node.start_byte:name_node.end_byte]
+                name = source[name_node.start_byte : name_node.end_byte]
 
                 if match_key == "defs":
                     type_label = "code"
@@ -371,40 +389,49 @@ class CodebaseIngester:
                     def_label = f"{rel_str}:{name}"
                     try:
                         self.client.create_node(
-                            workspace_id, def_label, type_label,
+                            workspace_id,
+                            def_label,
+                            type_label,
                             summary=f"{type_label} {name} in {rel_str}",
                         )
                     except RuntimeError:
-                        logger.warning(
-                            "Failed to create def node for %s", def_label, exc_info=True
-                        )
+                        logger.warning("Failed to create def node for %s", def_label, exc_info=True)
 
                     def_id = self._resolve_node(workspace_id, def_label)
                     if file_node_id and def_id:
                         try:
                             self.client.create_edge(
-                                workspace_id, file_node_id, def_id,
-                                "contains", weight=1.0,
+                                workspace_id,
+                                file_node_id,
+                                def_id,
+                                "contains",
+                                weight=1.0,
                             )
                             self._stats["edges"] += 1
                         except RuntimeError:
                             logger.warning(
                                 "Failed to create contains edge: %s -> %s",
-                                file_node_id, def_id, exc_info=True,
+                                file_node_id,
+                                def_id,
+                                exc_info=True,
                             )
 
-                    defs.append({
-                        "id": def_id or def_label,
-                        "name": name,
-                        "file": rel_str,
-                    })
+                    defs.append(
+                        {
+                            "id": def_id or def_label,
+                            "name": name,
+                            "file": rel_str,
+                        }
+                    )
                     self._stats["defs"] += 1
 
                 elif match_key == "calls":
-                    defs.append({
-                        "call": name,
-                        "file": rel_str,
-                    })
+                    defs.append(
+                        {
+                            "call": name,
+                            "file": rel_str,
+                        }
+                    )
 
         def_nodes.setdefault(rel_str, []).extend(defs)
 
@@ -427,14 +454,19 @@ class CodebaseIngester:
                             if src_id and tgt_id and src_id != tgt_id:
                                 try:
                                     self.client.create_edge(
-                                        workspace_id, src_id, tgt_id,
-                                        "calls", weight=1.0,
+                                        workspace_id,
+                                        src_id,
+                                        tgt_id,
+                                        "calls",
+                                        weight=1.0,
                                     )
                                     self._stats["edges"] += 1
                                 except RuntimeError:
                                     logger.warning(
                                         "Failed to create call edge: %s -> %s",
-                                        src_id, tgt_id, exc_info=True,
+                                        src_id,
+                                        tgt_id,
+                                        exc_info=True,
                                     )
                             break
 

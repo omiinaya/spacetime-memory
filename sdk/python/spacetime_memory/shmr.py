@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -31,12 +31,8 @@ from spacetime_memory.client import Client
 
 SHMR_BATCH_SIZE = int(os.environ.get("MNEMOSYNE_SHMR_BATCH_SIZE", "50"))
 SHMR_MAX_ITERATIONS = int(os.environ.get("MNEMOSYNE_SHMR_MAX_ITERATIONS", "3"))
-SHMR_SIMILARITY_THRESHOLD = float(
-    os.environ.get("MNEMOSYNE_SHMR_SIMILARITY_THRESHOLD", "0.70")
-)
-SHMR_HARMONY_THRESHOLD = float(
-    os.environ.get("MNEMOSYNE_SHMR_HARMONY_THRESHOLD", "0.60")
-)
+SHMR_SIMILARITY_THRESHOLD = float(os.environ.get("MNEMOSYNE_SHMR_SIMILARITY_THRESHOLD", "0.70"))
+SHMR_HARMONY_THRESHOLD = float(os.environ.get("MNEMOSYNE_SHMR_HARMONY_THRESHOLD", "0.60"))
 SHMR_MODEL = os.environ.get("MNEMOSYNE_SHMR_MODEL", "")
 SHMR_MIN_CLUSTER_SIZE = int(os.environ.get("MNEMOSYNE_SHMR_MIN_CLUSTER_SIZE", "2"))
 SHMR_TEMPERATURE = float(os.environ.get("MNEMOSYNE_SHMR_TEMPERATURE", "0.2"))
@@ -153,10 +149,7 @@ def _format_cluster_for_llm(cluster: list[dict[str, Any]]) -> str:
         content = item.get("content", "")[:200]
         mem_type = item.get("memory_type", "memory")
         trust = item.get("trust_score", 0.5)
-        ts = item.get("created_at", 0)
-        lines.append(
-            f"[{i}] ({mem_type}, trust={trust:.2f}) {content}"
-        )
+        lines.append(f"[{i}] ({mem_type}, trust={trust:.2f}) {content}")
     return "\n".join(lines)
 
 
@@ -217,12 +210,10 @@ def _compute_harmony_score(
             cluster_embs.append(np.array(emb, dtype=np.float32))
     if not cluster_embs:
         return 0.0
-    centroid = np.mean(cluster_embs, axis=0)
 
     # Score each belief against centroid
     belief_scores = []
     for belief in beliefs:
-        text = f"{belief.get('predicate', '')} {belief.get('object', '')}"
         # Use a simple hash-based score since we don't have an embedder
         # in this context. Fall back to confidence-weighted default.
         belief_scores.append(belief.get("confidence", 0.5) * 0.7)
@@ -306,7 +297,7 @@ def shmr_resonate(
         prompt = HARMONY_PROMPT + "\n\n" + _format_cluster_for_llm(cluster)
 
         if dry_run:
-            print(f"    [DRY] Cluster {i+1}/{len(clusters)}: {len(cluster)} memories")
+            print(f"    [DRY] Cluster {i + 1}/{len(clusters)}: {len(cluster)} memories")
             result.beliefs_generated += 3  # estimate
             continue
 
@@ -339,16 +330,19 @@ def shmr_resonate(
 
         # Store via reducer
         try:
-            client._call("store_harmonic_beliefs", [
-                workspace_id,
-                "",  # peer_id auto-resolved
-                json.dumps(beliefs),
-                cluster_id,
-                i,  # iteration
-            ])
+            client._call(
+                "store_harmonic_beliefs",
+                [
+                    workspace_id,
+                    "",  # peer_id auto-resolved
+                    json.dumps(beliefs),
+                    cluster_id,
+                    i,  # iteration
+                ],
+            )
             dampens = sum(1 for b in beliefs if b.get("action") == "dampen")
             print(
-                f"    [OK] Cluster {i+1}/{len(clusters)}: "
+                f"    [OK] Cluster {i + 1}/{len(clusters)}: "
                 f"{len(beliefs)} beliefs ({dampens} dampened, harmony={harmony:.2f})"
             )
             result.beliefs_generated += len(beliefs)
@@ -366,15 +360,18 @@ def shmr_resonate(
     # 5. Log resonance session
     if not dry_run and result.clusters_found > 0:
         try:
-            client._call("log_resonance_session", [
-                workspace_id,
-                "",
-                result.clusters_found,
-                result.beliefs_generated,
-                result.contradictions_resolved,
-                result.harmony_score_avg,
-                result.duration_ms,
-            ])
+            client._call(
+                "log_resonance_session",
+                [
+                    workspace_id,
+                    "",
+                    result.clusters_found,
+                    result.beliefs_generated,
+                    result.contradictions_resolved,
+                    result.harmony_score_avg,
+                    result.duration_ms,
+                ],
+            )
         except RuntimeError:
             pass
 

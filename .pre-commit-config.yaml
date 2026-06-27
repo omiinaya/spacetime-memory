@@ -1,0 +1,84 @@
+# ── Spacetime Memory — Pre-Commit Hooks ─────────────────────────────────
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+#
+# Install:  pip install pre-commit && pre-commit install
+# Run all:  pre-commit run --all-files
+# Update:   pre-commit autoupdate
+# -----------------------------------------------------------------------
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.4
+    hooks:
+      # Python SDK lint — auto-fixable rules (unused imports, unused vars)
+      - id: ruff
+        name: ruff-lint-sdk
+        alias: ruff-lint-sdk
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^sdk/python/spacetime_memory/
+        types_or: [python, pyi]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.4
+    hooks:
+      # Python SDK format
+      - id: ruff-format
+        name: ruff-format-sdk
+        alias: ruff-format-sdk
+        files: ^sdk/python/spacetime_memory/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.4
+    hooks:
+      # Tests lint
+      - id: ruff
+        name: ruff-lint-tests
+        alias: ruff-lint-tests
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^sdk/python/tests/
+        types_or: [python, pyi]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.4
+    hooks:
+      # Tests format
+      - id: ruff-format
+        name: ruff-format-tests
+        alias: ruff-format-tests
+        files: ^sdk/python/tests/
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # General file hygiene
+      - id: trailing-whitespace
+        name: trim-trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+        name: ensure-files-end-with-newline
+      - id: check-yaml
+        name: check-yaml-syntax
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        name: check-for-large-files
+        args: [--maxkb=1024]
+      - id: check-json
+        name: check-json-syntax
+      - id: check-toml
+        name: check-toml-syntax
+      - id: mixed-line-ending
+        name: normalize-line-endings
+        args: [--fix=lf]
+      - id: detect-private-key
+        name: detect-private-keys
+      - id: check-merge-conflict
+        name: check-merge-conflicts
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.44.0
+    hooks:
+      - id: markdownlint
+        name: markdown-lint
+        args: [--disable=MD013, --disable=MD033, --disable=MD041]
+        files: \.md$

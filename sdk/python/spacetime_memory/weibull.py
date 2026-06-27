@@ -24,7 +24,7 @@ def weibull_weight(
     age_seconds: float,
     k: float = 0.5,
     lam: float = 604800.0,  # 7 days
-    floor: float = 0.05,    # 5% minimum — never zero out
+    floor: float = 0.05,  # 5% minimum — never zero out
 ) -> float:
     """Compute Weibull survival weight for a given age.
 
@@ -75,7 +75,7 @@ def apply_temporal_boost(
         ts = r.get(timestamp_field, 0)
         # Handle microsecond timestamps (STDB convention)
         if ts > 1_000_000_000_000:  # > year 33658 — definitely microseconds
-            age = (now - ts / 1_000_000)
+            age = now - ts / 1_000_000
         else:
             age = now - ts
 

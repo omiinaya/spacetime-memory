@@ -67,10 +67,7 @@ def token() -> str:
         from spacetime_memory.auth import generate_token
     except ImportError:
         return ""
-    key_path = (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "data" / "id_ecdsa_pkcs8.pem"
-    )
+    key_path = Path(__file__).resolve().parent.parent.parent.parent / "data" / "id_ecdsa_pkcs8.pem"
     if not key_path.exists():
         return ""
     return generate_token(str(key_path))
@@ -88,8 +85,11 @@ def hindsight(stdb_client: Client, stdb_session: dict) -> Hindsight:
     )
     # Auto-register for auth
     import secrets
+
     try:
-        h._client._call("register", [f"hs_test_{secrets.token_hex(4)}", "Hindsight Test", "testpass"])
+        h._client._call(
+            "register", [f"hs_test_{secrets.token_hex(4)}", "Hindsight Test", "testpass"]
+        )
     except RuntimeError:
         pass
     my_id = h._client._whoami()
@@ -171,9 +171,7 @@ class TestHindsightCore:
     def test_retain_files(self, hindsight: Hindsight) -> None:
         """Retain file content, verify success."""
         bid = _bid()
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("This is test file content for Hindsight adapter.")
             f.flush()
             tmp_path = f.name
@@ -216,8 +214,11 @@ class TestHindsightCore:
         ) as h:
             # Register for auth so retain/recall work
             import secrets
+
             try:
-                h._client._call("register", [f"hs_cm_{secrets.token_hex(4)}", "CM Test", "testpass"])
+                h._client._call(
+                    "register", [f"hs_cm_{secrets.token_hex(4)}", "CM Test", "testpass"]
+                )
             except RuntimeError:
                 pass
             my_id = h._client._whoami()
@@ -431,10 +432,9 @@ class TestHindsightCore:
     def test_files_shell(self, hindsight: Hindsight) -> None:
         """files.upload() delegates to retain_files."""
         import tempfile
+
         bid = _bid()
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Files shell upload test content.")
             f.flush()
             tmp_path = f.name
@@ -453,9 +453,12 @@ class TestHindsightCore:
     def test_aretain_async(self, hindsight: Hindsight) -> None:
         """aretain async method works (via _run_async)."""
         import asyncio
+
         bid = _bid()
+
         async def _test():
             return await hindsight.aretain(bank_id=bid, content="Async retain test")
+
         result = asyncio.run(_test())
         assert isinstance(result, RetainResponse)
         assert result.success is True
@@ -505,6 +508,7 @@ class TestCoverageGaps:
     def test_aclose(self, hindsight: Hindsight) -> None:
         """aclose sets _closed = True (line 480)."""
         import asyncio
+
         assert hindsight._closed is False
         asyncio.run(hindsight.aclose())
         assert hindsight._closed is True
@@ -516,6 +520,7 @@ class TestCoverageGaps:
     def test_sync_wrapper_from_async_context_raises(self, hindsight: Hindsight) -> None:
         """Calling sync wrapper from inside running event loop raises RuntimeError (line 245)."""
         import asyncio
+
         bid = _bid()
 
         async def _call_sync_from_async():
@@ -548,14 +553,17 @@ class TestCoverageGaps:
         """aretain with datetime timestamp (line 651)."""
         import asyncio
         import datetime
+
         bid = _bid("hs-ts")
         ts = datetime.datetime(2024, 1, 15, 10, 30, 0)
+
         async def _test():
             return await hindsight.aretain(
                 bank_id=bid,
                 content="Timestamped memory",
                 timestamp=ts,
             )
+
         result = asyncio.run(_test())
         assert isinstance(result, RetainResponse)
         assert result.success is True
@@ -568,12 +576,16 @@ class TestCoverageGaps:
     def test_aretain_store_error_returns_failure(self, hindsight: Hindsight) -> None:
         """When store raises RuntimeError, aretain returns RetainResponse(success=False) (lines 662-663)."""
         import asyncio
+
         bid = _bid("hs-err")
 
         async def _test():
             # Mock store to raise RuntimeError
-            with mock.patch.object(hindsight._client, "store", side_effect=RuntimeError("store failed")):
+            with mock.patch.object(
+                hindsight._client, "store", side_effect=RuntimeError("store failed")
+            ):
                 return await hindsight.aretain(bank_id=bid, content="error test")
+
         result = asyncio.run(_test())
         assert isinstance(result, RetainResponse)
         assert result.success is False
@@ -587,11 +599,14 @@ class TestCoverageGaps:
     def test_aretain_batch_closed_raises(self, hindsight: Hindsight) -> None:
         """aretain_batch raises RuntimeError when client is closed (line 679)."""
         import asyncio
+
         bid = _bid("hs-closed-batch")
         hindsight.close()
+
         async def _test():
             with pytest.raises(RuntimeError, match="closed"):
                 await hindsight.aretain_batch(bank_id=bid, items=[{"content": "test"}])
+
         asyncio.run(_test())
 
     # ------------------------------------------------------------------
@@ -601,14 +616,18 @@ class TestCoverageGaps:
     def test_aretain_batch_store_error(self, hindsight: Hindsight) -> None:
         """aretain_batch handles store RuntimeError gracefully (lines 693-694)."""
         import asyncio
+
         bid = _bid("hs-batch-err")
 
         async def _test():
-            with mock.patch.object(hindsight._client, "store", side_effect=RuntimeError("store fail")):
+            with mock.patch.object(
+                hindsight._client, "store", side_effect=RuntimeError("store fail")
+            ):
                 return await hindsight.aretain_batch(
                     bank_id=bid,
                     items=[{"content": "item1"}, {"content": "item2"}],
                 )
+
         result = asyncio.run(_test())
         assert isinstance(result, RetainResponse)
         assert result.success is True
@@ -621,11 +640,14 @@ class TestCoverageGaps:
     def test_arecall_closed_raises(self, hindsight: Hindsight) -> None:
         """arecall raises RuntimeError when closed (line 723)."""
         import asyncio
+
         bid = _bid("hs-closed-recall")
         hindsight.close()
+
         async def _test():
             with pytest.raises(RuntimeError, match="closed"):
                 await hindsight.arecall(bank_id=bid, query="test")
+
         asyncio.run(_test())
 
     # ------------------------------------------------------------------
@@ -635,11 +657,15 @@ class TestCoverageGaps:
     def test_arecall_search_error(self, hindsight: Hindsight) -> None:
         """arecall handles search RuntimeError gracefully (lines 732-734)."""
         import asyncio
+
         bid = _bid("hs-recall-err")
 
         async def _test():
-            with mock.patch.object(hindsight._client, "search", side_effect=RuntimeError("search fail")):
+            with mock.patch.object(
+                hindsight._client, "search", side_effect=RuntimeError("search fail")
+            ):
                 return await hindsight.arecall(bank_id=bid, query="test")
+
         result = asyncio.run(_test())
         assert isinstance(result, RecallResponse)
         assert result.results == []
@@ -651,11 +677,14 @@ class TestCoverageGaps:
     def test_areflect_closed_raises(self, hindsight: Hindsight) -> None:
         """areflect raises RuntimeError when closed (line 774)."""
         import asyncio
+
         bid = _bid("hs-closed-reflect")
         hindsight.close()
+
         async def _test():
             with pytest.raises(RuntimeError, match="closed"):
                 await hindsight.areflect(bank_id=bid, query="test")
+
         asyncio.run(_test())
 
     # ------------------------------------------------------------------
@@ -665,12 +694,16 @@ class TestCoverageGaps:
     def test_areflect_search_error(self, hindsight: Hindsight) -> None:
         """areflect handles search failure (lines 781-783)."""
         import asyncio
+
         bid = _bid("hs-reflect-err")
 
         async def _test():
             # Make store work (for creating bank) but search fail
-            with mock.patch.object(hindsight._client, "search", side_effect=RuntimeError("search fail")):
+            with mock.patch.object(
+                hindsight._client, "search", side_effect=RuntimeError("search fail")
+            ):
                 return await hindsight.areflect(bank_id=bid, query="test")
+
         result = asyncio.run(_test())
         assert isinstance(result, ReflectResponse)
         assert result.text  # should have fallback text
@@ -682,6 +715,7 @@ class TestCoverageGaps:
     def test_areflect_insight_success(self, hindsight: Hindsight) -> None:
         """areflect when create_insight returns a valid response (line 801)."""
         import asyncio
+
         bid = _bid("hs-insight")
 
         async def _test():
@@ -690,8 +724,15 @@ class TestCoverageGaps:
                 {"id": "1", "memory_content": "Alice likes pizza", "entity_type": "experience"},
             ]
             with mock.patch.object(hindsight._client, "search", return_value=mock_memories):
-                with mock.patch.object(hindsight._client, "_call", return_value={"insight": "Alice enjoys Italian food"}):
-                    return await hindsight.areflect(bank_id=bid, query="What does Alice like?", include_facts=True)
+                with mock.patch.object(
+                    hindsight._client,
+                    "_call",
+                    return_value={"insight": "Alice enjoys Italian food"},
+                ):
+                    return await hindsight.areflect(
+                        bank_id=bid, query="What does Alice like?", include_facts=True
+                    )
+
         result = asyncio.run(_test())
         assert isinstance(result, ReflectResponse)
         assert "Alice" in result.text
@@ -707,11 +748,14 @@ class TestCoverageGaps:
     def test_alist_memories_closed_raises(self, hindsight: Hindsight) -> None:
         """alist_memories raises RuntimeError when closed (line 858)."""
         import asyncio
+
         bid = _bid("hs-closed-list")
         hindsight.close()
+
         async def _test():
             with pytest.raises(RuntimeError, match="closed"):
                 await hindsight.alist_memories(bank_id=bid)
+
         asyncio.run(_test())
 
     # ------------------------------------------------------------------
@@ -721,11 +765,15 @@ class TestCoverageGaps:
     def test_alist_memories_search_error(self, hindsight: Hindsight) -> None:
         """alist_memories handles search error (lines 866-868)."""
         import asyncio
+
         bid = _bid("hs-list-err")
 
         async def _test():
-            with mock.patch.object(hindsight._client, "search", side_effect=RuntimeError("search fail")):
+            with mock.patch.object(
+                hindsight._client, "search", side_effect=RuntimeError("search fail")
+            ):
                 return await hindsight.alist_memories(bank_id=bid)
+
         result = asyncio.run(_test())
         assert isinstance(result, ListMemoryUnitsResponse)
         assert result.items == []
@@ -738,11 +786,14 @@ class TestCoverageGaps:
     def test_adelete_bank_closed_raises(self, hindsight: Hindsight) -> None:
         """adelete_bank raises RuntimeError when closed (line 899)."""
         import asyncio
+
         bid = _bid("hs-closed-del")
         hindsight.close()
+
         async def _test():
             with pytest.raises(RuntimeError, match="closed"):
                 await hindsight.adelete_bank(bank_id=bid)
+
         asyncio.run(_test())
 
     # ------------------------------------------------------------------
@@ -752,11 +803,14 @@ class TestCoverageGaps:
     def test_acreate_bank_closed_raises(self, hindsight: Hindsight) -> None:
         """acreate_bank raises RuntimeError when closed (line 939)."""
         import asyncio
+
         bid = _bid("hs-closed-create-bank")
         hindsight.close()
+
         async def _test():
             with pytest.raises(RuntimeError, match="closed"):
                 await hindsight.acreate_bank(name=bid)
+
         asyncio.run(_test())
 
     # ------------------------------------------------------------------
@@ -769,6 +823,7 @@ class TestCoverageGaps:
 
         async def _test():
             return await hindsight.acreate_bank(name=None, description="default name test")
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateBankResponse)
         assert result.name == "default"
@@ -781,6 +836,7 @@ class TestCoverageGaps:
     def test_acreate_bank_llm_unavailable_fallback(self, hindsight: Hindsight) -> None:
         """When LLM is not available, falls back to default config (lines 990-994)."""
         import asyncio
+
         bid = _bid("hs-bank-no-llm")
 
         async def _test():
@@ -790,6 +846,7 @@ class TestCoverageGaps:
                 mock_llm.available = False
                 mock_get_llm.return_value = mock_llm
                 return await hindsight.acreate_bank(name=bid, description="test bank")
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateBankResponse)
         assert result.name == bid
@@ -799,6 +856,7 @@ class TestCoverageGaps:
     def test_acreate_bank_llm_returns_valid_json(self, hindsight: Hindsight) -> None:
         """When LLM returns valid JSON config, it's merged (lines 984-986)."""
         import asyncio
+
         bid = _bid("hs-bank-json")
 
         async def _test():
@@ -808,6 +866,7 @@ class TestCoverageGaps:
                 mock_llm.chat.return_value = '{"disposition": {"skepticism": 2, "literalism": 3, "empathy": 4}, "mission": "custom mission"}'
                 mock_get_llm.return_value = mock_llm
                 return await hindsight.acreate_bank(name=bid)
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateBankResponse)
         assert result.config.get("mission") == "custom mission"
@@ -816,6 +875,7 @@ class TestCoverageGaps:
     def test_acreate_bank_llm_returns_bad_json(self, hindsight: Hindsight) -> None:
         """When LLM returns invalid JSON, stored as _llm_raw (line 988)."""
         import asyncio
+
         bid = _bid("hs-bank-bad-json")
 
         async def _test():
@@ -825,6 +885,7 @@ class TestCoverageGaps:
                 mock_llm.chat.return_value = "not valid json!!!"
                 mock_get_llm.return_value = mock_llm
                 return await hindsight.acreate_bank(name=bid)
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateBankResponse)
         assert result.config.get("_llm_raw") == "not valid json!!!"
@@ -832,6 +893,7 @@ class TestCoverageGaps:
     def test_acreate_bank_llm_raises_runtime_error(self, hindsight: Hindsight) -> None:
         """When LLM.chat raises RuntimeError, falls back to default (lines 995-997)."""
         import asyncio
+
         bid = _bid("hs-bank-llm-err")
 
         async def _test():
@@ -841,6 +903,7 @@ class TestCoverageGaps:
                 mock_llm.chat.side_effect = RuntimeError("LLM crash")
                 mock_get_llm.return_value = mock_llm
                 return await hindsight.acreate_bank(name=bid)
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateBankResponse)
         assert result.success is True
@@ -854,13 +917,16 @@ class TestCoverageGaps:
     def test_retain_files_store_error(self, hindsight: Hindsight) -> None:
         """retain_files handles store RuntimeError gracefully (lines 548-549)."""
         import tempfile
+
         bid = _bid("hs-files-err")
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Error test content")
             f.flush()
             tmp_path = f.name
         try:
-            with mock.patch.object(hindsight._client, "store", side_effect=RuntimeError("store fail")):
+            with mock.patch.object(
+                hindsight._client, "store", side_effect=RuntimeError("store fail")
+            ):
                 result = hindsight.retain_files(bank_id=bid, files=[tmp_path])
             assert isinstance(result, FileRetainResponse)
             assert isinstance(result.operation_ids, list)
@@ -876,11 +942,14 @@ class TestCoverageGaps:
     def test_acreate_mental_model_closed_raises(self, hindsight: Hindsight) -> None:
         """acreate_mental_model raises RuntimeError when closed (line 1050)."""
         import asyncio
+
         bid = _bid("hs-closed-mm")
         hindsight.close()
+
         async def _test():
             with pytest.raises(RuntimeError, match="closed"):
                 await hindsight.acreate_mental_model(bank_id=bid, name="Test")
+
         asyncio.run(_test())
 
     # ------------------------------------------------------------------
@@ -890,11 +959,15 @@ class TestCoverageGaps:
     def test_acreate_mental_model_search_error(self, hindsight: Hindsight) -> None:
         """acreate_mental_model handles search error (lines 1061-1062)."""
         import asyncio
+
         bid = _bid("hs-mm-err")
 
         async def _test():
-            with mock.patch.object(hindsight._client, "search", side_effect=RuntimeError("search fail")):
+            with mock.patch.object(
+                hindsight._client, "search", side_effect=RuntimeError("search fail")
+            ):
                 return await hindsight.acreate_mental_model(bank_id=bid, name="Test Model")
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateMentalModelResponse)
         assert result.name == "Test Model"
@@ -906,6 +979,7 @@ class TestCoverageGaps:
     def test_acreate_mental_model_llm_unavailable_fallback(self, hindsight: Hindsight) -> None:
         """When LLM unavailable, joins memory contents (lines 1089-1094)."""
         import asyncio
+
         bid = _bid("hs-mm-no-llm")
 
         async def _test():
@@ -918,7 +992,10 @@ class TestCoverageGaps:
                     mock_llm = mock.MagicMock()
                     mock_llm.available = False
                     mock_get_llm.return_value = mock_llm
-                    return await hindsight.acreate_mental_model(bank_id=bid, name="Test Model", query="memory")
+                    return await hindsight.acreate_mental_model(
+                        bank_id=bid, name="Test Model", query="memory"
+                    )
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateMentalModelResponse)
         # Content should be from memory join fallback
@@ -927,6 +1004,7 @@ class TestCoverageGaps:
     def test_acreate_mental_model_llm_raises_with_memories(self, hindsight: Hindsight) -> None:
         """When LLM raises RuntimeError but memories exist, fallback (lines 1096-1099)."""
         import asyncio
+
         bid = _bid("hs-mm-llm-err")
 
         async def _test():
@@ -939,7 +1017,10 @@ class TestCoverageGaps:
                     mock_llm.available = True
                     mock_llm.chat.side_effect = RuntimeError("LLM fail")
                     mock_get_llm.return_value = mock_llm
-                    return await hindsight.acreate_mental_model(bank_id=bid, name="Test Model", query="fallback")
+                    return await hindsight.acreate_mental_model(
+                        bank_id=bid, name="Test Model", query="fallback"
+                    )
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateMentalModelResponse)
         assert "Fallback A" in result.content
@@ -951,6 +1032,7 @@ class TestCoverageGaps:
     def test_acreate_mental_model_store_error(self, hindsight: Hindsight) -> None:
         """acreate_mental_model handles store error (lines 1117-1119)."""
         import asyncio
+
         bid = _bid("hs-mm-store-err")
 
         async def _test():
@@ -959,8 +1041,13 @@ class TestCoverageGaps:
                 {"id": "1", "memory_content": "Store test", "entity_type": "test"},
             ]
             with mock.patch.object(hindsight._client, "search", return_value=mock_memories):
-                with mock.patch.object(hindsight._client, "store", side_effect=RuntimeError("store fail")):
-                    return await hindsight.acreate_mental_model(bank_id=bid, name="Store Err Model", query="store")
+                with mock.patch.object(
+                    hindsight._client, "store", side_effect=RuntimeError("store fail")
+                ):
+                    return await hindsight.acreate_mental_model(
+                        bank_id=bid, name="Store Err Model", query="store"
+                    )
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateMentalModelResponse)
         assert result.name == "Store Err Model"
@@ -972,11 +1059,14 @@ class TestCoverageGaps:
     def test_acreate_directive_closed_raises(self, hindsight: Hindsight) -> None:
         """acreate_directive raises RuntimeError when closed (line 1166)."""
         import asyncio
+
         bid = _bid("hs-closed-dir")
         hindsight.close()
+
         async def _test():
             with pytest.raises(RuntimeError, match="closed"):
                 await hindsight.acreate_directive(bank_id=bid, name="Test", prompt="Be helpful")
+
         asyncio.run(_test())
 
     # ------------------------------------------------------------------
@@ -986,11 +1076,17 @@ class TestCoverageGaps:
     def test_acreate_directive_store_error(self, hindsight: Hindsight) -> None:
         """acreate_directive handles store error (lines 1179-1181)."""
         import asyncio
+
         bid = _bid("hs-dir-err")
 
         async def _test():
-            with mock.patch.object(hindsight._client, "store", side_effect=RuntimeError("store fail")):
-                return await hindsight.acreate_directive(bank_id=bid, name="Err Dir", prompt="Be nice")
+            with mock.patch.object(
+                hindsight._client, "store", side_effect=RuntimeError("store fail")
+            ):
+                return await hindsight.acreate_directive(
+                    bank_id=bid, name="Err Dir", prompt="Be nice"
+                )
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateDirectiveResponse)
         assert result.name == "Err Dir"
@@ -1002,8 +1098,10 @@ class TestCoverageGaps:
 
     def test_run_async_direct(self) -> None:
         """Verify _run_async works directly without event loop."""
+
         async def _coro():
             return 42
+
         result = _run_async(_coro())
         assert result == 42
 
@@ -1014,6 +1112,7 @@ class TestCoverageGaps:
     def test_retain_files_with_metadata(self, hindsight: Hindsight) -> None:
         """retain_files with custom files_metadata list."""
         import tempfile
+
         bid = _bid("hs-files-meta")
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Metadata test content")
@@ -1023,7 +1122,9 @@ class TestCoverageGaps:
             result = hindsight.retain_files(
                 bank_id=bid,
                 files=[tmp_path],
-                files_metadata=[{"document_id": "custom-doc", "context": "Custom metadata context"}],
+                files_metadata=[
+                    {"document_id": "custom-doc", "context": "Custom metadata context"}
+                ],
             )
             assert isinstance(result, FileRetainResponse)
             assert len(result.operation_ids) == 1
@@ -1034,7 +1135,9 @@ class TestCoverageGaps:
     # _ensure_bank finds pre-existing workspace server-side (lines 458-459)
     # ------------------------------------------------------------------
 
-    def test_ensure_bank_finds_existing_workspace(self, hindsight: Hindsight, stdb_client: Client, stdb_session: dict) -> None:
+    def test_ensure_bank_finds_existing_workspace(
+        self, hindsight: Hindsight, stdb_client: Client, stdb_session: dict
+    ) -> None:
         """_ensure_bank finds workspace via list_workspaces when not in cache (lines 458-459)."""
         import secrets
 
@@ -1053,7 +1156,9 @@ class TestCoverageGaps:
         )
         # Register so _ensure_bank can list workspaces
         try:
-            h2._client._call("register", [f"hs_existws_{secrets.token_hex(4)}", "ExistWS Test", "testpass"])
+            h2._client._call(
+                "register", [f"hs_existws_{secrets.token_hex(4)}", "ExistWS Test", "testpass"]
+            )
         except RuntimeError:
             pass
         my_id = h2._client._whoami()
@@ -1080,6 +1185,7 @@ class TestCoverageGaps:
 
         async def _test():
             return await hindsight.acreate_bank(name="", description="empty name test")
+
         result = asyncio.run(_test())
         assert isinstance(result, CreateBankResponse)
         assert result.name == "default"

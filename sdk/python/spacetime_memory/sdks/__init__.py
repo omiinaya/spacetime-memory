@@ -31,7 +31,6 @@ from .zep import (
     AsyncZep,
     AsyncZepClient,
     MemoryMessage,
-    Message,
     Memory,
     MemorySearchResult,
     Session as ZepSession,
@@ -108,4 +107,3 @@ __all__ = [
     "SessionFactRatingExamples",
     "SessionFactRatingInstruction",
 ]
-

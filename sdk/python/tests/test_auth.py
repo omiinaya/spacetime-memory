@@ -42,10 +42,11 @@ class TestGenerateToken:
         mock_jwt = Mock()
         mock_jwt.encode.return_value = "fake.jwt.token"
 
-        with patch("spacetime_memory.auth.pyjwt", mock_jwt), \
-             patch("pathlib.Path.read_text", return_value="--PRIVATE KEY--"), \
-             patch("spacetime_memory.auth._generate_identity",
-                   return_value="c200" + "a" * 62):
+        with (
+            patch("spacetime_memory.auth.pyjwt", mock_jwt),
+            patch("pathlib.Path.read_text", return_value="--PRIVATE KEY--"),
+            patch("spacetime_memory.auth._generate_identity", return_value="c200" + "a" * 62),
+        ):
             token = generate_token("/fake/key.pem", identity_hex="c200b" * 13 + "bb")
 
             assert token == "fake.jwt.token"
@@ -69,10 +70,13 @@ class TestGenerateToken:
         mock_jwt = Mock()
         mock_jwt.encode.return_value = "auto.token"
 
-        with patch("spacetime_memory.auth.pyjwt", mock_jwt), \
-             patch("pathlib.Path.read_text", return_value="key-data"), \
-             patch("spacetime_memory.auth._generate_identity",
-                   return_value="c200" + "c" * 62) as mock_gen:
+        with (
+            patch("spacetime_memory.auth.pyjwt", mock_jwt),
+            patch("pathlib.Path.read_text", return_value="key-data"),
+            patch(
+                "spacetime_memory.auth._generate_identity", return_value="c200" + "c" * 62
+            ) as mock_gen,
+        ):
             token = generate_token("/fake/key.pem")
 
             mock_gen.assert_called_once()
@@ -85,12 +89,12 @@ class TestGenerateToken:
         mock_jwt = Mock()
         mock_jwt.encode.return_value = "str-path.token"
 
-        with patch("spacetime_memory.auth.pyjwt", mock_jwt), \
-             patch("pathlib.Path.read_text", return_value="pem-data"), \
-             patch("spacetime_memory.auth._generate_identity",
-                   return_value="c200" + "d" * 62):
-            token = generate_token("just/a/string/path.pem",
-                                   identity_hex="c200" + "e" * 62)
+        with (
+            patch("spacetime_memory.auth.pyjwt", mock_jwt),
+            patch("pathlib.Path.read_text", return_value="pem-data"),
+            patch("spacetime_memory.auth._generate_identity", return_value="c200" + "d" * 62),
+        ):
+            token = generate_token("just/a/string/path.pem", identity_hex="c200" + "e" * 62)
             assert token == "str-path.token"
 
     def test_token_payload_structure(self):
@@ -101,8 +105,10 @@ class TestGenerateToken:
         mock_jwt.encode.return_value = "payload.token"
         ident = "c200" + "f" * 62
 
-        with patch("spacetime_memory.auth.pyjwt", mock_jwt), \
-             patch("pathlib.Path.read_text", return_value="key-material"):
+        with (
+            patch("spacetime_memory.auth.pyjwt", mock_jwt),
+            patch("pathlib.Path.read_text", return_value="key-material"),
+        ):
             generate_token("/k.pem", identity_hex=ident, expires_in=42)
 
             args, kwargs = mock_jwt.encode.call_args
@@ -140,7 +146,8 @@ print("OK")
 """
         result = subprocess.run(
             [sys.executable, "-c", code],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
             cwd="/home/user/spacetime-memory/sdk/python",
         )
         assert "OK" in result.stdout, f"Failed: {result.stderr}"

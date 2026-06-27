@@ -1,8 +1,9 @@
-import json
 import time
 from typing import Any
 import httpx
 from .base import Connector, Event
+
+
 class NotionConnector(Connector):
     """Poll a Notion database for new or updated pages via Notion API.
 
@@ -54,10 +55,7 @@ class NotionConnector(Connector):
             "Content-Type": "application/json",
             "User-Agent": "spacetime-memory-connector/1.0",
         }
-        url = (
-            f"{self.BASE_URL}"
-            f"/databases/{self.database_id}/query"
-        )
+        url = f"{self.BASE_URL}/databases/{self.database_id}/query"
         payload: dict[str, Any] = {"page_size": 100}
 
         with httpx.Client() as client:
@@ -76,28 +74,17 @@ class NotionConnector(Connector):
 
                 # ── Rate-limit handling with Retry-After ──────────
                 if resp.status_code == 429:
-                    retry_after = int(
-                        resp.headers.get("Retry-After", 5)
-                    )
-                    print(
-                        f"  [Notion] Rate limited, waiting"
-                        f" {retry_after}s ..."
-                    )
+                    retry_after = int(resp.headers.get("Retry-After", 5))
+                    print(f"  [Notion] Rate limited, waiting {retry_after}s ...")
                     time.sleep(retry_after)
                     continue  # retry the same page
 
                 if resp.status_code == 401:
-                    print(
-                        "  [Notion] Unauthorised — check"
-                        " integration token"
-                    )
+                    print("  [Notion] Unauthorised — check integration token")
                     break
 
                 if resp.status_code != 200:
-                    print(
-                        f"  [Notion] Unexpected status"
-                        f" {resp.status_code}"
-                    )
+                    print(f"  [Notion] Unexpected status {resp.status_code}")
                     break
 
                 data = resp.json()
@@ -127,10 +114,12 @@ class NotionConnector(Connector):
                         "database_id": self.database_id,
                         "url": page.get("url", ""),
                         "created_time": page.get(
-                            "created_time", "",
+                            "created_time",
+                            "",
                         ),
                         "last_edited_time": page.get(
-                            "last_edited_time", "",
+                            "last_edited_time",
+                            "",
                         ),
                     }
                     # Merge property summary (avoids overwriting
@@ -139,14 +128,16 @@ class NotionConnector(Connector):
                         if k not in metadata:
                             metadata[k] = v
 
-                    events.append(Event(
-                        content=content,
-                        workspace_id=self.workspace_id,
-                        summary=title_text[:200],
-                        memory_type="experience",
-                        peer_id=self.peer_id,
-                        metadata=metadata,
-                    ))
+                    events.append(
+                        Event(
+                            content=content,
+                            workspace_id=self.workspace_id,
+                            summary=title_text[:200],
+                            memory_type="experience",
+                            peer_id=self.peer_id,
+                            metadata=metadata,
+                        )
+                    )
 
                 # ── Pagination ────────────────────────────────────
                 next_cursor = data.get("next_cursor")
@@ -171,15 +162,11 @@ class NotionConnector(Connector):
             if prop_type == "title":
                 parts = prop.get("title", [])
                 if parts:
-                    return "".join(
-                        p.get("plain_text", "") for p in parts
-                    )
+                    return "".join(p.get("plain_text", "") for p in parts)
             if prop_type == "rich_text":
                 parts = prop.get("rich_text", [])
                 if parts:
-                    return "".join(
-                        p.get("plain_text", "") for p in parts
-                    )
+                    return "".join(p.get("plain_text", "") for p in parts)
         return "Untitled"
 
     @staticmethod
@@ -206,7 +193,8 @@ class NotionConnector(Connector):
 
     @staticmethod
     def _get_prop_value(
-        prop_type: str, prop: dict,
+        prop_type: str,
+        prop: dict,
     ) -> Any:
         """Get the display value for a Notion property by its type.
 
@@ -217,17 +205,13 @@ class NotionConnector(Connector):
             parts = prop.get("title", [])
             if not parts:
                 return None
-            return "".join(
-                p.get("plain_text", "") for p in parts
-            )
+            return "".join(p.get("plain_text", "") for p in parts)
 
         if prop_type == "rich_text":
             parts = prop.get("rich_text", [])
             if not parts:
                 return None
-            return "".join(
-                p.get("plain_text", "") for p in parts
-            )
+            return "".join(p.get("plain_text", "") for p in parts)
 
         # ── Selects ───────────────────────────────────────────────
         if prop_type == "select":
@@ -240,9 +224,7 @@ class NotionConnector(Connector):
             mselects = prop.get("multi_select", [])
             if not mselects:
                 return None
-            return ", ".join(
-                m.get("name", "") for m in mselects
-            )
+            return ", ".join(m.get("name", "") for m in mselects)
 
         if prop_type == "status":
             status = prop.get("status")
@@ -316,7 +298,8 @@ class NotionConnector(Connector):
                 for item in arr:
                     item_type = item.get("type", "")
                     val = NotionConnector._get_prop_value(
-                        item_type, item,
+                        item_type,
+                        item,
                     )
                     if val is not None:
                         display.append(str(val))
@@ -336,9 +319,7 @@ class NotionConnector(Connector):
             people = prop.get("people", [])
             if not people:
                 return None
-            return ", ".join(
-                p.get("name", p.get("id", "?")) for p in people
-            )
+            return ", ".join(p.get("name", p.get("id", "?")) for p in people)
 
         # ── Files ─────────────────────────────────────────────────
         if prop_type == "files":
@@ -385,5 +366,3 @@ class NotionConnector(Connector):
 
 
 # ── Org-mode Parser ──────────────────────────────────────────────────
-
-

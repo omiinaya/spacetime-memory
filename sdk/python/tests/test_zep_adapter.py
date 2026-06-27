@@ -15,7 +15,6 @@ from pathlib import Path
 import time
 import pytest
 
-from spacetime_memory import Client
 
 pytestmark = [
     pytest.mark.integration,
@@ -75,10 +74,7 @@ def token() -> str:
         from spacetime_memory.auth import generate_token
     except ImportError:
         return ""
-    key_path = (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "data" / "id_ecdsa_pkcs8.pem"
-    )
+    key_path = Path(__file__).resolve().parent.parent.parent.parent / "data" / "id_ecdsa_pkcs8.pem"
     if not key_path.exists():
         return ""
     return generate_token(str(key_path))
@@ -93,8 +89,11 @@ def zep(host: str, port: int, stdb_session: dict):
     )
     # Auto-register for auth
     import secrets
+
     try:
-        client._client._call("register", [f"zep_test_{secrets.token_hex(4)}", "Zep Test", "testpass"])
+        client._client._call(
+            "register", [f"zep_test_{secrets.token_hex(4)}", "Zep Test", "testpass"]
+        )
     except RuntimeError:
         pass
     yield client
@@ -112,6 +111,7 @@ def _register_client(client: "ZepClient", tag: str = "test") -> None:
     Works with ZepClient, Zep, AsyncZepClient, and AsyncZep.
     """
     import secrets
+
     # Resolve the underlying Client instance
     if hasattr(client, "_sync"):
         inner = client._sync
@@ -276,10 +276,7 @@ class TestZepClient:
     def test_get_memory_limit(self, zep: ZepClient) -> None:
         """get_memory respects the limit parameter."""
         sid = _sid()
-        many_msgs = [
-            {"role": "user", "content": f"Test message {i}"}
-            for i in range(5)
-        ]
+        many_msgs = [{"role": "user", "content": f"Test message {i}"} for i in range(5)]
         zep.add_memory(
             session_id=sid,
             messages=many_msgs,
@@ -321,6 +318,7 @@ class TestZepClient:
     def test_get_session_nonexistent(self, zep: ZepClient) -> None:
         """get_session on nonexistent raises NotFoundError."""
         import pytest
+
         with pytest.raises(NotFoundError):
             zep.get_session(_sid("zep-test-no-such-session"))
 
@@ -518,10 +516,7 @@ class TestZepClient:
         sid = _sid("zep-test-session-msgs")
         zep.add_memory(
             session_id=sid,
-            messages=[
-                {"role": "user", "content": f"Msg {i}"}
-                for i in range(3)
-            ],
+            messages=[{"role": "user", "content": f"Msg {i}"} for i in range(3)],
         )
         result = zep.get_session_messages(session_id=sid, limit=2)
         assert "messages" in result
@@ -564,7 +559,8 @@ class TestZepClient:
         msg_id = add_result["message_ids"][0] if add_result["message_ids"] else None
         if msg_id:
             result = zep.update_message_metadata(
-                session_id=sid, message_uuid=msg_id,
+                session_id=sid,
+                message_uuid=msg_id,
                 metadata={"pinned": True, "tags": ["important"]},
             )
             assert result["metadata"]["pinned"] is True
@@ -702,10 +698,7 @@ class TestZepClient:
         sid = _sid("zep-test-cursor")
         zep.add_memory(
             session_id=sid,
-            messages=[
-                {"role": "user", "content": f"Cursor msg {i}"}
-                for i in range(4)
-            ],
+            messages=[{"role": "user", "content": f"Cursor msg {i}"} for i in range(4)],
         )
         result = zep.get_session_messages(session_id=sid, limit=3, cursor=0)
         assert "messages" in result
@@ -740,6 +733,7 @@ class TestZepClient:
 # ==========================================================================
 # Data model to_dict() tests (no DB needed)
 # ==========================================================================
+
 
 class TestMemoryMessageToDict:
     """Cover MemoryMessage.to_dict() with various field combinations."""
@@ -978,6 +972,7 @@ class TestFactToDict:
 # Stub type tests (no DB needed)
 # ==========================================================================
 
+
 class TestStubTypes:
     """Cover all stub types from zep.py."""
 
@@ -1063,6 +1058,7 @@ class TestStubTypes:
 # Zep v2.0.2 sub-client proxy tests (need DB)
 # ==========================================================================
 
+
 class TestZepV2:
     """Tests for the Zep v2.0.2 client with .memory and .user sub-proxies."""
 
@@ -1102,7 +1098,9 @@ class TestZepV2:
         _register_client(client, "v2")
         try:
             sid = _sid("zep-v2-search")
-            client.memory.add(session_id=sid, messages=[{"role": "user", "content": "Proxy search test"}])
+            client.memory.add(
+                session_id=sid, messages=[{"role": "user", "content": "Proxy search test"}]
+            )
             results = client.memory.search(session_id=sid, query="proxy", limit=5)
             assert isinstance(results, list)
         finally:
@@ -1179,7 +1177,9 @@ class TestZepV2:
         _register_client(client, "v2")
         try:
             sid = _sid("zep-v2-msg")
-            add_result = client.memory.add(session_id=sid, messages=[{"role": "user", "content": "Msg level"}])
+            add_result = client.memory.add(
+                session_id=sid, messages=[{"role": "user", "content": "Msg level"}]
+            )
             msg_id = add_result["message_ids"][0] if add_result["message_ids"] else None
 
             msgs = client.memory.get_session_messages(session_id=sid, limit=5)
@@ -1260,6 +1260,7 @@ class TestZepV2:
 # AsyncZepClient tests (need DB + asyncio)
 # ==========================================================================
 
+
 class TestAsyncZepClient:
     """Tests for AsyncZepClient async wrapper."""
 
@@ -1309,7 +1310,9 @@ class TestAsyncZepClient:
         _register_client(client, "async")
         try:
             sid = _sid("async-search")
-            await client.add_memory(session_id=sid, messages=[{"role": "user", "content": "Async search"}])
+            await client.add_memory(
+                session_id=sid, messages=[{"role": "user", "content": "Async search"}]
+            )
             results = await client.search_memory(session_id=sid, query="Async", limit=5)
             assert isinstance(results, list)
         finally:
@@ -1344,11 +1347,14 @@ class TestAsyncZepClient:
         _register_client(client, "async")
         try:
             sid = _sid("async-update")
-            add_result = await client.add_memory(session_id=sid, messages=[{"role": "user", "content": "Old"}])
+            add_result = await client.add_memory(
+                session_id=sid, messages=[{"role": "user", "content": "Old"}]
+            )
             memory_id = add_result["message_ids"][0] if add_result["message_ids"] else None
             if memory_id:
                 result = await client.update_memory(
-                    session_id=sid, memory_id=memory_id,
+                    session_id=sid,
+                    memory_id=memory_id,
                     messages=[{"role": "user", "content": "New"}],
                 )
                 assert result["status"] == "ok"
@@ -1362,7 +1368,9 @@ class TestAsyncZepClient:
         _register_client(client, "async")
         try:
             sid = _sid("async-sess-msg")
-            add_result = await client.add_memory(session_id=sid, messages=[{"role": "user", "content": "Msg"}])
+            add_result = await client.add_memory(
+                session_id=sid, messages=[{"role": "user", "content": "Msg"}]
+            )
             msg_id = add_result["message_ids"][0] if add_result["message_ids"] else None
 
             msgs = await client.get_session_messages(session_id=sid, limit=5)
@@ -1419,7 +1427,9 @@ class TestAsyncZepClient:
     @pytest.mark.asyncio
     async def test_async_context_manager(self, host: str, port: int, stdb_session: dict) -> None:
         """AsyncZepClient as async context manager."""
-        async with AsyncZepClient(host=host, port=port, config={"db": stdb_session["database"]}) as client:
+        async with AsyncZepClient(
+            host=host, port=port, config={"db": stdb_session["database"]}
+        ) as client:
             _register_client(client, "async_ctx")
             sid = _sid("async-ctx")
             result = await client.add_memory(
@@ -1433,13 +1443,16 @@ class TestAsyncZepClient:
 # AsyncZep tests (v2.0.2 async with .memory/.user proxies)
 # ==========================================================================
 
+
 class TestAsyncZepV2:
     """Tests for AsyncZep with .memory and .user proxies."""
 
     @pytest.mark.asyncio
     async def test_init(self, host: str, port: int, stdb_session: dict) -> None:
         """AsyncZep init creates proxies."""
-        async with AsyncZep(host=host, port=port, config={"db": stdb_session["database"]}) as client:
+        async with AsyncZep(
+            host=host, port=port, config={"db": stdb_session["database"]}
+        ) as client:
             _register_client(client, "async_zep")
             assert client.memory is not None
             assert client.user is not None
@@ -1447,12 +1460,16 @@ class TestAsyncZepV2:
     @pytest.mark.asyncio
     async def test_memory_proxy(self, host: str, port: int, stdb_session: dict) -> None:
         """AsyncZep.memory proxy delegates correctly."""
-        async with AsyncZep(host=host, port=port, config={"db": stdb_session["database"]}) as client:
+        async with AsyncZep(
+            host=host, port=port, config={"db": stdb_session["database"]}
+        ) as client:
             _register_client(client, "async_zep")
             sid = _sid("async-zep-mem")
 
             # add and get
-            result = await client.memory.add(session_id=sid, messages=[{"role": "user", "content": "AsyncZep mem"}])
+            result = await client.memory.add(
+                session_id=sid, messages=[{"role": "user", "content": "AsyncZep mem"}]
+            )
             assert result["status"] == "ok"
 
             mem = await client.memory.get(session_id=sid)
@@ -1485,14 +1502,18 @@ class TestAsyncZepV2:
             assert isinstance(search_res, list)
 
             # message-level ops
-            add2 = await client.memory.add(session_id=sid, messages=[{"role": "user", "content": "Msg level"}])
+            add2 = await client.memory.add(
+                session_id=sid, messages=[{"role": "user", "content": "Msg level"}]
+            )
             mid = add2["message_ids"][0] if add2["message_ids"] else None
             if mid:
                 msgs = await client.memory.get_session_messages(session_id=sid, limit=5)
                 assert "messages" in msgs
                 msg = await client.memory.get_session_message(session_id=sid, message_uuid=mid)
                 assert "content" in msg
-                await client.memory.update_message_metadata(session_id=sid, message_uuid=mid, metadata={"k": "v"})
+                await client.memory.update_message_metadata(
+                    session_id=sid, message_uuid=mid, metadata={"k": "v"}
+                )
 
             # delete
             await client.memory.delete(session_id=sid)
@@ -1501,7 +1522,9 @@ class TestAsyncZepV2:
     @pytest.mark.asyncio
     async def test_user_proxy(self, host: str, port: int, stdb_session: dict) -> None:
         """AsyncZep.user proxy delegates correctly."""
-        async with AsyncZep(host=host, port=port, config={"db": stdb_session["database"]}) as client:
+        async with AsyncZep(
+            host=host, port=port, config={"db": stdb_session["database"]}
+        ) as client:
             _register_client(client, "async_zep")
             uid = _sid("async-zep-user")
             user = await client.user.add(user_id=uid, email="az@test.com", first_name="AZ")
@@ -1514,6 +1537,7 @@ class TestAsyncZepV2:
 # ==========================================================================
 # Unit tests for error paths and edge cases (mocking, no DB needed)
 # ==========================================================================
+
 
 class TestImportFallbacks:
     """Test that the fallback stubs load correctly when zep_python is absent."""
@@ -1530,8 +1554,9 @@ class TestImportFallbacks:
         from unittest.mock import patch
 
         # Block ALL zep_python modules
-        blocked = {k: None for k in list(sys.modules)
-                   if k == "zep_python" or k.startswith("zep_python.")}
+        blocked = {
+            k: None for k in list(sys.modules) if k == "zep_python" or k.startswith("zep_python.")
+        }
         # Also block any sub-imports that haven't been loaded yet
         import_error = ImportError("No module named 'zep_python'")
 
@@ -1543,6 +1568,7 @@ class TestImportFallbacks:
                 return None
 
         import spacetime_memory.sdks.zep as zep_mod
+
         with patch.dict(sys.modules, blocked, clear=False):
             with patch.object(sys, "meta_path", [BlockedLoader] + sys.meta_path):
                 importlib.reload(zep_mod)
@@ -1562,7 +1588,8 @@ class TestNowIso:
 
     def test_now_iso_format(self, zep: ZepClient) -> None:
         """_now_iso returns valid ISO-8601 timestamp."""
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         ts = zep._now_iso()
         # Should parse as valid datetime
         parsed = datetime.fromisoformat(ts)
@@ -1688,6 +1715,7 @@ class TestUpdateMessageMetadataErrors:
     def test_runtime_error_swallowed(self, zep: ZepClient) -> None:
         """update_message_metadata swallows RuntimeError from _client.update_memory."""
         from unittest.mock import patch
+
         sid = _sid("zep-test-meta-runtime")
         add_result = zep.add_memory(
             session_id=sid,
@@ -1712,6 +1740,7 @@ class TestDeleteMemoryErrorHandlers:
     def test_value_error_re_raised(self, zep: ZepClient) -> None:
         """ValueError from _client.delete_memory is re-raised."""
         from unittest.mock import patch
+
         sid = _sid("zep-test-delmem-valueerror")
         zep.add_memory(
             session_id=sid,
@@ -1725,6 +1754,7 @@ class TestDeleteMemoryErrorHandlers:
     def test_runtime_error_swallowed(self, zep: ZepClient) -> None:
         """RuntimeError from _client.delete_memory is swallowed, deletions continue."""
         from unittest.mock import patch
+
         sid = _sid("zep-test-delmem-runtime")
         zep.add_memory(
             session_id=sid,
@@ -1812,9 +1842,13 @@ class TestSummarizeMemoryErrors:
         from unittest.mock import patch
 
         # Messages that are dicts but with no content
-        with patch.object(zep, "get_memory", return_value={
-            "messages": [{"role": "user", "content": ""}, {"role": "assistant", "content": ""}]
-        }):
+        with patch.object(
+            zep,
+            "get_memory",
+            return_value={
+                "messages": [{"role": "user", "content": ""}, {"role": "assistant", "content": ""}]
+            },
+        ):
             result = zep.summarize_memory(session_id=_sid("zep-test-sum-no-text"))
             assert result is None
 
@@ -1843,9 +1877,11 @@ class TestSummarizeMemoryErrors:
         """summarize_memory returns None when LLMClient is not available."""
         from unittest.mock import patch, MagicMock
 
-        with patch.object(zep, "get_memory", return_value={
-            "messages": [{"role": "user", "content": "Some content"}]
-        }):
+        with patch.object(
+            zep,
+            "get_memory",
+            return_value={"messages": [{"role": "user", "content": "Some content"}]},
+        ):
             with patch("spacetime_memory.llm.LLMClient") as mock_llm_class:
                 mock_llm = MagicMock()
                 mock_llm.available = False
@@ -1858,11 +1894,13 @@ class TestSummarizeMemoryErrors:
         """summarize_memory handles dict messages using message_type fallback."""
         from unittest.mock import patch, MagicMock
 
-        with patch.object(zep, "get_memory", return_value={
-            "messages": [
-                {"message_type": "user", "message": "Content from message_type"}
-            ]
-        }):
+        with patch.object(
+            zep,
+            "get_memory",
+            return_value={
+                "messages": [{"message_type": "user", "message": "Content from message_type"}]
+            },
+        ):
             with patch("spacetime_memory.llm.LLMClient") as mock_llm_class:
                 mock_llm = MagicMock()
                 mock_llm.available = True

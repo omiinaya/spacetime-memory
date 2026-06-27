@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-import time
 from pathlib import Path
 from unittest.mock import Mock, MagicMock, patch
 
@@ -38,10 +37,15 @@ from spacetime_memory import Client
 # Pytest marker registration
 # ---------------------------------------------------------------------------
 
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "unit: tests that mock HTTP (no SpacetimeDB needed)")
-    config.addinivalue_line("markers", "integration: tests that need a running SpacetimeDB standalone")
-    config.addinivalue_line("markers", "embedder: tests that also need the proxy embedder (set OPENAI_API_KEY)")
+    config.addinivalue_line(
+        "markers", "integration: tests that need a running SpacetimeDB standalone"
+    )
+    config.addinivalue_line(
+        "markers", "embedder: tests that also need the proxy embedder (set OPENAI_API_KEY)"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -58,7 +62,6 @@ def pytest_collection_modifyitems(config, items):
         if list(item.iter_markers()):
             continue
 
-        path = str(item.fspath)
         # Convention: test files whose names end in _integration or
         # test files that import mock fixtures get unit marker.
         # We let the per-file markers handle this — bare tests
@@ -161,6 +164,7 @@ def mock_client():
 def _running_stdb() -> bool:
     """Check whether a SpacetimeDB standalone is listening on localhost:3001."""
     import socket
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.settimeout(1)
@@ -191,13 +195,11 @@ def _publish_module(delete_data: str = "on-conflict") -> str:
         )
 
     wasm_path = (
-        module_dir / "target" / "wasm32-unknown-unknown" / "release"
-        / "spacetime_memory.opt.wasm"
+        module_dir / "target" / "wasm32-unknown-unknown" / "release" / "spacetime_memory.opt.wasm"
     )
     if not wasm_path.exists():
         wasm_path = (
-            module_dir / "target" / "wasm32-unknown-unknown" / "release"
-            / "spacetime_memory.wasm"
+            module_dir / "target" / "wasm32-unknown-unknown" / "release" / "spacetime_memory.wasm"
         )
     if not wasm_path.exists():
         raise RuntimeError(f"WASM module not found at {wasm_path}. Build first.")
@@ -259,8 +261,10 @@ def stdb_session() -> dict:
     """
     force = os.environ.get("SPACETIMEDB_HOST", "")
     if not force and not _running_stdb():
-        pytest.skip("SpacetimeDB standalone not running on localhost:3001. "
-                     "Set SPACETIMEDB_HOST to force-enable integration tests.")
+        pytest.skip(
+            "SpacetimeDB standalone not running on localhost:3001. "
+            "Set SPACETIMEDB_HOST to force-enable integration tests."
+        )
 
     # Always publish the module with --delete-data=always so each test run
     # starts with a clean database.  The WASM build is fast (0.1s when the
@@ -290,6 +294,7 @@ def _admin_token(stdb_session) -> str:
     )
 
     import os
+
     suffix = os.urandom(4).hex()
     uname = f"admin_test_{suffix}"
     try:
@@ -336,6 +341,7 @@ def _generate_test_token() -> str:
         return ""
     try:
         from spacetime_memory.auth import generate_token
+
         return generate_token(str(key_path))
     except ImportError:
         return ""
@@ -420,5 +426,6 @@ def mocked_cli_runner(monkeypatch, cli_mock_client):
     Returns (runner, mock_client) tuple.
     """
     from click.testing import CliRunner
+
     monkeypatch.setattr("cli.stmem._sdk_client", lambda **kw: cli_mock_client)
     return CliRunner(), cli_mock_client

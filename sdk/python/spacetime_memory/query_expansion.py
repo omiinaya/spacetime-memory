@@ -36,15 +36,9 @@ def expand_query(
 
     Returns the expanded query string, or the original query on failure.
     """
-    endpoint = endpoint or os.getenv(
-        "LLM_RERANK_ENDPOINT", "http://localhost:4000/v1"
-    )
+    endpoint = endpoint or os.getenv("LLM_RERANK_ENDPOINT", "http://localhost:4000/v1")
     model = model or os.getenv("LLM_RERANK_MODEL", "gpt-4o-mini")
-    api_key = (
-        api_key
-        or os.getenv("LLM_RERANK_API_KEY")
-        or os.getenv("OPENAI_API_KEY", "")
-    )
+    api_key = api_key or os.getenv("LLM_RERANK_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 
     try:
         resp = httpx.post(

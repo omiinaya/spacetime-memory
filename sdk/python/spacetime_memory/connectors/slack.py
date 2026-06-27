@@ -1,7 +1,8 @@
-import json
 from typing import Any
 import httpx
 from .base import Connector, Event
+
+
 class SlackConnector(Connector):
     """Poll a Slack workspace for recent messages via Slack Web API.
 
@@ -106,17 +107,11 @@ class SlackConnector(Connector):
 
             if resp.status_code == 429:
                 retry_after = int(resp.headers.get("Retry-After", 5))
-                print(
-                    f"  [Slack] Rate limited during pagination,"
-                    f" retry after {retry_after}s"
-                )
+                print(f"  [Slack] Rate limited during pagination, retry after {retry_after}s")
                 break
 
             if resp.status_code != 200:
-                print(
-                    f"  [Slack] Unexpected status {resp.status_code}"
-                    f" during pagination"
-                )
+                print(f"  [Slack] Unexpected status {resp.status_code} during pagination")
                 break
 
             data = resp.json()
@@ -124,10 +119,7 @@ class SlackConnector(Connector):
                 error = data.get("error", "unknown")
                 # Handle not_in_channel gracefully
                 if error == "not_in_channel":
-                    print(
-                        f"  [Slack] Bot not in channel"
-                        f" {params.get('channel', '?')} — skipping"
-                    )
+                    print(f"  [Slack] Bot not in channel {params.get('channel', '?')} — skipping")
                     return all_items
                 print(f"  [Slack] API error during pagination: {error}")
                 break
@@ -158,9 +150,7 @@ class SlackConnector(Connector):
 
         with httpx.Client() as client:
             for channel_id in self.channel_ids:
-                channel_name = self._get_channel_name(
-                    client, channel_id
-                )
+                channel_name = self._get_channel_name(client, channel_id)
                 self._channel_names[channel_id] = channel_name
 
                 # Fetch all messages with full pagination
@@ -184,9 +174,7 @@ class SlackConnector(Connector):
                     if subtype in ("channel_join", "channel_leave"):
                         continue
 
-                    channel_name = self._channel_names.get(
-                        channel_id, channel_id
-                    )
+                    channel_name = self._channel_names.get(channel_id, channel_id)
 
                     metadata: dict[str, Any] = {
                         "source": "slack",
@@ -202,7 +190,9 @@ class SlackConnector(Connector):
                     if self.include_threads and thread_ts:
                         metadata["thread_ts"] = thread_ts
                         replies = self._fetch_thread_replies(
-                            client, channel_id, thread_ts,
+                            client,
+                            channel_id,
+                            thread_ts,
                         )
                         for reply in replies:
                             reply_ts = reply.get("ts", "")
@@ -211,32 +201,36 @@ class SlackConnector(Connector):
                             self._seen.add(reply_ts)
                             reply_text = reply.get("text", "")
                             reply_user = reply.get("user", "")
-                            events.append(Event(
-                                content=reply_text,
-                                workspace_id=self.workspace_id,
-                                summary=reply_text[:200],
-                                memory_type="experience",
-                                peer_id=self.peer_id,
-                                metadata={
-                                    "source": "slack",
-                                    "channel": channel_name,
-                                    "channel_id": channel_id,
-                                    "ts": reply_ts,
-                                    "user": reply_user,
-                                    "subtype": reply.get("subtype", ""),
-                                    "thread_ts": thread_ts,
-                                    "is_thread_reply": True,
-                                },
-                            ))
+                            events.append(
+                                Event(
+                                    content=reply_text,
+                                    workspace_id=self.workspace_id,
+                                    summary=reply_text[:200],
+                                    memory_type="experience",
+                                    peer_id=self.peer_id,
+                                    metadata={
+                                        "source": "slack",
+                                        "channel": channel_name,
+                                        "channel_id": channel_id,
+                                        "ts": reply_ts,
+                                        "user": reply_user,
+                                        "subtype": reply.get("subtype", ""),
+                                        "thread_ts": thread_ts,
+                                        "is_thread_reply": True,
+                                    },
+                                )
+                            )
 
-                    events.append(Event(
-                        content=text,
-                        workspace_id=self.workspace_id,
-                        summary=text[:200],
-                        memory_type="experience",
-                        peer_id=self.peer_id,
-                        metadata=metadata,
-                    ))
+                    events.append(
+                        Event(
+                            content=text,
+                            workspace_id=self.workspace_id,
+                            summary=text[:200],
+                            memory_type="experience",
+                            peer_id=self.peer_id,
+                            metadata=metadata,
+                        )
+                    )
 
         return events
 
@@ -260,7 +254,9 @@ class SlackConnector(Connector):
     # ------------------------------------------------------------------
 
     def _get_channel_name(
-        self, client: httpx.Client, channel_id: str,
+        self,
+        client: httpx.Client,
+        channel_id: str,
     ) -> str:
         """Look up the human-friendly name for a channel."""
         try:
@@ -283,5 +279,3 @@ class SlackConnector(Connector):
 
 
 # ── Discord Connector ────────────────────────────────────────────────
-
-

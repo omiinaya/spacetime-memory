@@ -23,7 +23,6 @@ Usage::
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
 from typing import Dict, List
@@ -44,20 +43,42 @@ def _load_rules() -> dict:
 
 _FALLBACK_RULES = {
     "categories": {
-        "PREFERENCE": "PREF", "TRAIT": "TRAIT", "STATUS": "STAT",
-        "INSTRUCTION": "INST", "PROJECT": "PROJ", "LOCATION": "LOC",
-        "FAMILY": "FAM", "OCCUPATION": "OCC", "DECISION": "DEC",
-        "EVENT": "EVT", "TOOL": "TOOL", "FACT": "FACT", "OPINION": "OPN",
+        "PREFERENCE": "PREF",
+        "TRAIT": "TRAIT",
+        "STATUS": "STAT",
+        "INSTRUCTION": "INST",
+        "PROJECT": "PROJ",
+        "LOCATION": "LOC",
+        "FAMILY": "FAM",
+        "OCCUPATION": "OCC",
+        "DECISION": "DEC",
+        "EVENT": "EVT",
+        "TOOL": "TOOL",
+        "FACT": "FACT",
+        "OPINION": "OPN",
     },
     "phrase_table": {
-        "User asked ": "ASK ", "User wants ": "WANT ", "User prefers ": "PREF ",
-        "User likes ": "LIKE ", "User dislikes ": "DISLIKE ",
-        "User is ": "IS ", "User has ": "HAS ", "User built ": "BUILT ",
-        "User asked for ": "ASK ", "User requested ": "REQ ",
-        "Full-stack developer": "FSDEV", "Software Developer": "SDEV",
-        "AI Systems Engineer": "AIENG", "real-time": "RT", "Real-time": "RT",
-        "bilingual": "bi", "Bilingual": "bi", "self-hosted": "selfhost",
-        "automation": "auto", "transcription": "transc", "translation": "transl",
+        "User asked ": "ASK ",
+        "User wants ": "WANT ",
+        "User prefers ": "PREF ",
+        "User likes ": "LIKE ",
+        "User dislikes ": "DISLIKE ",
+        "User is ": "IS ",
+        "User has ": "HAS ",
+        "User built ": "BUILT ",
+        "User asked for ": "ASK ",
+        "User requested ": "REQ ",
+        "Full-stack developer": "FSDEV",
+        "Software Developer": "SDEV",
+        "AI Systems Engineer": "AIENG",
+        "real-time": "RT",
+        "Real-time": "RT",
+        "bilingual": "bi",
+        "Bilingual": "bi",
+        "self-hosted": "selfhost",
+        "automation": "auto",
+        "transcription": "transc",
+        "translation": "transl",
     },
     "structural": [
         {"match": " - ", "replace": " | "},
@@ -109,6 +130,7 @@ _STRUCTURAL_PATTERNS = [(re.escape(s["match"]), s["replace"]) for s in STRUCTURA
 
 # ── Skip Detection ──────────────────────────────────────────────────────────
 
+
 def _is_already_compressed(text: str) -> bool:
     """Check if text already appears AAAK-compressed.
 
@@ -118,12 +140,12 @@ def _is_already_compressed(text: str) -> bool:
     if "|" not in text:
         return False
     # Count non-pipe tokens
-    parts = [p for p in text.split("|") if p.strip()]
     words = text.replace("|", " ").split()
     return len(words) <= 5  # Slightly relaxed from 3 for partial compressions
 
 
 # ── Pipeline Steps ──────────────────────────────────────────────────────────
+
 
 def _apply_categories(text: str) -> str:
     """Replace CATEGORY: prefix with CATEGORY abbreviation + pipe.
@@ -134,10 +156,10 @@ def _apply_categories(text: str) -> str:
     for full, abbr in CATEGORIES.items():
         prefix = full + ": "
         if text.startswith(prefix):
-            return abbr + "|" + text[len(prefix):]
+            return abbr + "|" + text[len(prefix) :]
         prefix_nl = "\n" + full + ": "
         if text.startswith(prefix_nl):
-            return "\n" + abbr + "|" + text[len(prefix_nl):]
+            return "\n" + abbr + "|" + text[len(prefix_nl) :]
     return text
 
 
@@ -158,8 +180,8 @@ def _apply_structural(text: str) -> str:
 
 def _compact_parens(text: str) -> str:
     """Remove spaces inside parentheses. ``( foo bar )`` → ``(foo bar)``"""
-    text = re.sub(r'\(\s+', '(', text)
-    text = re.sub(r'\s+\)', ')', text)
+    text = re.sub(r"\(\s+", "(", text)
+    text = re.sub(r"\s+\)", ")", text)
     return text
 
 
@@ -167,13 +189,14 @@ def _apply_trailing(text: str) -> str:
     """Replace terminal phrases with symbols."""
     for phrase, replacement in sorted(TRAILING.items(), key=lambda x: len(x[0]), reverse=True):
         if text.endswith(" " + phrase):
-            text = text[:-(len(phrase) + 1)] + " " + replacement
+            text = text[: -(len(phrase) + 1)] + " " + replacement
         elif text.rstrip() == phrase:
-            text = text.rstrip()[:-(len(phrase))] + replacement
+            text = text.rstrip()[: -(len(phrase))] + replacement
     return text
 
 
 # ── Public API ──────────────────────────────────────────────────────────────
+
 
 def aaak_compress(text: str) -> str:
     """Compress text using the AAAK shorthand dialect.
@@ -225,7 +248,7 @@ def aaak_decompress(text: str) -> str:
     for abbr, full in REV_CATEGORIES.items():
         prefix = abbr + "|"
         if result.startswith(prefix):
-            result = full + ": " + result[len(prefix):]
+            result = full + ": " + result[len(prefix) :]
             break
     for abbr, full in sorted(REV_PHRASES.items(), key=lambda x: len(x[0]), reverse=True):
         if abbr in result:

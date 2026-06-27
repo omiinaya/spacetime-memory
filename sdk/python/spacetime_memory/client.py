@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +39,7 @@ except ImportError:
 
     def _tracing_span(name: str, **attrs: Any) -> Any:
         from contextlib import nullcontext
+
         return nullcontext()
 
     _TRACER = None
@@ -137,12 +138,11 @@ def configure_logging(
     if json_format:
         formatter: logging.Formatter = JSONFormatter()
     else:
-        formatter = logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+
 
 # ---------------------------------------------------------------------------
 # Client
@@ -194,13 +194,8 @@ class Client:
         # Bypass HTTP proxy for localhost — the system http_proxy
         # routes through isp.decodo.com which blocks STDB reducer calls.
         os.environ.setdefault("no_proxy", "localhost,127.0.0.1,127.0.0.1,.local")
-        self.embedder_url = (
-            embedder_url
-            or os.environ.get("EMBEDDER_URL", "http://localhost:9090")
-        )
-        self.tantivy_url = os.environ.get(
-            "TANTIVY_URL", "http://localhost:9091"
-        )
+        self.embedder_url = embedder_url or os.environ.get("EMBEDDER_URL", "http://localhost:9090")
+        self.tantivy_url = os.environ.get("TANTIVY_URL", "http://localhost:9091")
         self.verbose = verbose
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
         self.max_retries = int(os.environ.get("STMEM_MAX_RETRIES", "3"))
@@ -274,8 +269,10 @@ class Client:
         self._circuit_open_until = 0.0
         logger.info(
             "Failed over to %s:%s (host #%d/%d)",
-            self.host, self.port,
-            self._current_host_index + 1, len(self._hosts),
+            self.host,
+            self.port,
+            self._current_host_index + 1,
+            len(self._hosts),
         )
         return True
 
@@ -288,17 +285,18 @@ class Client:
             headers["Authorization"] = f"Bearer {auth_token}"
         return headers
 
-    def _emit_event(
-        self, event_type: str, data: dict[str, Any], workspace_id: str = ""
-    ) -> None:
+    def _emit_event(self, event_type: str, data: dict[str, Any], workspace_id: str = "") -> None:
         """Emit a memory lifecycle event to the configured event bus."""
         if self.event_bus is not None:
             from .streaming import MemoryEvent
-            self.event_bus.emit(MemoryEvent(
-                event_type=event_type,
-                data=data,
-                workspace_id=workspace_id,
-            ))
+
+            self.event_bus.emit(
+                MemoryEvent(
+                    event_type=event_type,
+                    data=data,
+                    workspace_id=workspace_id,
+                )
+            )
 
     def _ensure_identity(self) -> None:
         """Establish a consistent identity with SpacetimeDB.
@@ -334,7 +332,9 @@ class Client:
             except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError):
                 logger.info(
                     "Identity handshake failed for %s (host #%d/%d), trying next...",
-                    hostport, host_idx + 1, len(self._hosts),
+                    hostport,
+                    host_idx + 1,
+                    len(self._hosts),
                 )
                 continue
         # All hosts failed — proceed without identity
@@ -397,9 +397,7 @@ class Client:
     # HTTP helpers
     # -----------------------------------------------------------------------
 
-    def _request_with_retry(
-        self, method: str, url: str, **kwargs: Any
-    ) -> httpx.Response:
+    def _request_with_retry(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         """Make an HTTP request with retry on connection/timeout errors.
 
         Retries up to ``self.max_retries`` times with exponential backoff + jitter.
@@ -449,10 +447,13 @@ class Client:
             except httpx.RemoteProtocolError as e:
                 last_exc = e
             if attempt < self.max_retries:
-                delay = 0.5 * (2 ** attempt) * (1 + _random.random())
+                delay = 0.5 * (2**attempt) * (1 + _random.random())
                 logger.warning(
                     "Request failed (attempt %d/%d): %s. Retrying in %.1fs...",
-                    attempt + 1, self.max_retries + 1, last_exc, delay,
+                    attempt + 1,
+                    self.max_retries + 1,
+                    last_exc,
+                    delay,
                 )
                 _time.sleep(delay)
 
@@ -460,7 +461,10 @@ class Client:
         if self._try_failover():
             logger.info(
                 "Failover to %s:%s — re-trying %s %s",
-                self.host, self.port, method, url,
+                self.host,
+                self.port,
+                method,
+                url,
             )
             # Rebuild URL for the new host by replacing the host:port portion
             new_url = re.sub(
@@ -476,7 +480,8 @@ class Client:
             self._circuit_open_until = _time.time() + self._circuit_breaker_reset_secs
             logger.warning(
                 "Circuit breaker opened for %.0fs after %d consecutive failures",
-                self._circuit_breaker_reset_secs, self._consecutive_failures,
+                self._circuit_breaker_reset_secs,
+                self._consecutive_failures,
             )
         raise RuntimeError(
             f"Request failed after {self.max_retries + 1} attempts: {last_exc}"
@@ -484,7 +489,7 @@ class Client:
 
     def _sql(self, query: str) -> list[dict[str, Any]]:
         """Run a SELECT query against the SpacetimeDB SQL API.
-        
+
         DEPRECATED for content tables — use _query() instead. Content tables
         are now private and SQL queries against them will fail. This method
         remains for public result tables (hybrid_result, etc.).
@@ -496,7 +501,10 @@ class Client:
 
             def _do_sql() -> httpx.Response:
                 return self._request_with_retry(
-                    "POST", self.sql_url, content=query, headers=headers,
+                    "POST",
+                    self.sql_url,
+                    content=query,
+                    headers=headers,
                 )
 
             if self._metrics is not None:
@@ -507,9 +515,7 @@ class Client:
             if resp.status_code >= 400:
                 error_text = resp.text[:500]
                 if self.verbose:
-                    raise RuntimeError(
-                        f"SQL error (HTTP {resp.status_code}): {error_text}"
-                    )
+                    raise RuntimeError(f"SQL error (HTTP {resp.status_code}): {error_text}")
                 friendly = self._map_sql_error(error_text)
                 raise RuntimeError(friendly)
             return _parse_sql_response(resp.text)
@@ -533,14 +539,20 @@ class Client:
         filter_json = json.dumps(filter_dict or {})
         columns_json = json.dumps(columns or [])
 
-        self._call("query_table", [
-            query_id, table, workspace_id, filter_json, columns_json,
-        ])
+        self._call(
+            "query_table",
+            [
+                query_id,
+                table,
+                workspace_id,
+                filter_json,
+                columns_json,
+            ],
+        )
 
         # Read results from the public query_result table
         rows = self._sql(
-            "SELECT table_name, row_json FROM query_result WHERE "
-            f"query_id = '{_esc(query_id)}'"
+            f"SELECT table_name, row_json FROM query_result WHERE query_id = '{_esc(query_id)}'"
         )
         results = []
         for r in rows:
@@ -574,8 +586,10 @@ class Client:
 
             def _do_call() -> httpx.Response:
                 return self._request_with_retry(
-                    "POST", f"{self.reducer_url}/{reducer}",
-                    content=json.dumps(args), headers=headers,
+                    "POST",
+                    f"{self.reducer_url}/{reducer}",
+                    content=json.dumps(args),
+                    headers=headers,
                 )
 
             if self._metrics is not None:
@@ -586,9 +600,7 @@ class Client:
             if resp.status_code >= 400:
                 error_text = resp.text[:500]
                 if self.verbose:
-                    raise RuntimeError(
-                        f"Reducer error (HTTP {resp.status_code}): {error_text}"
-                    )
+                    raise RuntimeError(f"Reducer error (HTTP {resp.status_code}): {error_text}")
                 friendly = self._map_reducer_error(error_text)
                 raise RuntimeError(friendly)
 
@@ -600,7 +612,7 @@ class Client:
 
         return {"status": "ok"}
 
-    _DEFAULT_EMBEDDER_URL = 'http://localhost:9090'
+    _DEFAULT_EMBEDDER_URL = "http://localhost:9090"
 
     def _embed(self, text: str) -> list[float]:
         """Get an embedding vector via the configured embedding API.
@@ -619,10 +631,9 @@ class Client:
                 logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
                 return []
             try:
-                base_url = os.environ.get(
-                    "OPENAI_BASE_URL",
-                    "https://api.openai.com/v1"
-                ).rstrip("/")
+                base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip(
+                    "/"
+                )
                 resp = self._http.post(
                     f"{base_url}/embeddings",
                     headers={
@@ -670,10 +681,9 @@ class Client:
                 logger.warning("OPENAI_API_KEY not set, cannot use OpenAI embedder fallback")
                 return []
             try:
-                base_url = os.environ.get(
-                    "OPENAI_BASE_URL",
-                    "https://api.openai.com/v1"
-                ).rstrip("/")
+                base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip(
+                    "/"
+                )
                 resp = self._http.post(
                     f"{base_url}/embeddings",
                     headers={
@@ -774,6 +784,7 @@ class Client:
         Hits the database info endpoint and reports latency.
         """
         import time
+
         start = time.monotonic()
         try:
             resp = self._http.get(
@@ -814,12 +825,15 @@ class Client:
     # Workspace
     # -----------------------------------------------------------------------
 
-    def create_workspace(self, name: str, description: str = "", id: str | None = None) -> dict[str, Any]:
+    def create_workspace(
+        self, name: str, description: str = "", id: str | None = None
+    ) -> dict[str, Any]:
         """Create a new workspace. Returns reducer status plus the workspace id.
         If *id* is omitted, generates a UUID client-side matching the reducer's
         UUID v4 format so callers can discover it immediately via list_workspaces.
         """
         import uuid
+
         ws_id = id if id else uuid.uuid4().hex[:32]
         self._call("create_workspace", [name, description, ws_id])
         return {"status": "ok", "id": ws_id}
@@ -892,6 +906,7 @@ class Client:
         # Compute Bayesian confidence from veracity tier if provided
         if veracity_tier and veracity_tier != "unknown":
             from .veracity import compound, VeracityTier
+
             try:
                 tier_enum = VeracityTier(veracity_tier)
                 confidence = compound(tier=tier_enum, sources=max(1, veracity_sources))
@@ -910,31 +925,45 @@ class Client:
 
         # ── Reducer call: store_memory ──
         with _tracing_span("store.call", workspace_id=workspace_id, memory_type=memory_type):
-            result = self._call("store_memory", [
-                workspace_id, peer_id, observer_id,
-                memory_type, content, summary, entities_json,
-                confidence, source_session_id, source_message_id,
-            ])
+            result = self._call(
+                "store_memory",
+                [
+                    workspace_id,
+                    peer_id,
+                    observer_id,
+                    memory_type,
+                    content,
+                    summary,
+                    entities_json,
+                    confidence,
+                    source_session_id,
+                    source_message_id,
+                ],
+            )
         # ── Invalidate query cache for this workspace ──
         if self._query_cache is not None:
             self._query_cache.invalidate(workspace_id=workspace_id)
 
         # ── Emit memory.created event ──
-        self._emit_event("memory.created", {
-            "content": content[:200],
-            "summary": summary,
-            "memory_type": memory_type,
-            "workspace_id": workspace_id,
-        }, workspace_id=workspace_id)
+        self._emit_event(
+            "memory.created",
+            {
+                "content": content[:200],
+                "summary": summary,
+                "memory_type": memory_type,
+                "workspace_id": workspace_id,
+            },
+            workspace_id=workspace_id,
+        )
 
         # If the embedder is reachable, index embeddings in the sidecar
         emb = self._embed(content)
         if emb:
             # Resolve the memory ID by content match — more reliable than
             # peer_id query which can return a different concurrent store.
-            mems = self._query("memory", workspace_id=workspace_id,
-                              filter_dict={},
-                              columns=["id", "content"])
+            mems = self._query(
+                "memory", workspace_id=workspace_id, filter_dict={}, columns=["id", "content"]
+            )
             memory_id = ""
             for m in reversed(mems):
                 if m.get("content", "") == content:
@@ -943,18 +972,31 @@ class Client:
             if memory_id:
                 # Compute and cache MIB binary vector (32x compression)
                 from .binary_vectors import binarize
+
                 try:
                     self._binary_cache[memory_id] = binarize(emb)
                 except (ValueError, Exception):
                     pass  # Binary compression best-effort, non-critical
-                self._call("index_entity", [
-                    workspace_id, "memory", memory_id,
-                    content, json.dumps(emb),
-                ])
+                self._call(
+                    "index_entity",
+                    [
+                        workspace_id,
+                        "memory",
+                        memory_id,
+                        content,
+                        json.dumps(emb),
+                    ],
+                )
                 # Populate BM25 inverted index (legacy STDB term_index)
-                self._call("index_terms", [
-                    workspace_id, "memory", memory_id, content,
-                ])
+                self._call(
+                    "index_terms",
+                    [
+                        workspace_id,
+                        "memory",
+                        memory_id,
+                        content,
+                    ],
+                )
 
                 # Index into Tantivy BM25 sidecar (real Okapi BM25)
                 self._tantivy_index(workspace_id, memory_id, content, "memory")
@@ -963,9 +1005,12 @@ class Client:
                 self._extract_and_store_entities(workspace_id, memory_id, content)
 
         if tier and tier in ("L0", "L1", "L2"):
-            mems = self._query("memory", workspace_id=workspace_id,
-                              filter_dict={"peer_id": peer_id},
-                              columns=["id"])
+            mems = self._query(
+                "memory",
+                workspace_id=workspace_id,
+                filter_dict={"peer_id": peer_id},
+                columns=["id"],
+            )
             if mems:
                 self._call("update_memory_tier", [mems[-1]["id"], tier])
 
@@ -997,19 +1042,29 @@ class Client:
                 description = ent.get("description", name)
 
                 try:
-                    self._call("create_entity_link", [
-                        workspace_id, name, etype,
-                        json.dumps(aliases[:10] if aliases else []),
-                        description,
-                    ])
+                    self._call(
+                        "create_entity_link",
+                        [
+                            workspace_id,
+                            name,
+                            etype,
+                            json.dumps(aliases[:10] if aliases else []),
+                            description,
+                        ],
+                    )
                 except RuntimeError:
                     pass
 
                 # Link entity to the source memory
                 try:
-                    self._call("link_entity_to_memory", [
-                        name, memory_id, etype,
-                    ])
+                    self._call(
+                        "link_entity_to_memory",
+                        [
+                            name,
+                            memory_id,
+                            etype,
+                        ],
+                    )
                 except RuntimeError:
                     pass
         else:
@@ -1055,18 +1110,20 @@ class Client:
             if not content:
                 continue
             contents.append(content)
-            clean_items.append({
-                "workspace_id": workspace_id,
-                "peer_id": item.get("peer_id", ""),
-                "observer_id": item.get("observer_id", ""),
-                "memory_type": item.get("memory_type", "experience"),
-                "content": content,
-                "summary": item.get("summary", content[:200]),
-                "entities_json": item.get("entities_json", "[]"),
-                "confidence": item.get("confidence", 0.8),
-                "source_session_id": item.get("source_session_id", ""),
-                "source_message_id": item.get("source_message_id", ""),
-            })
+            clean_items.append(
+                {
+                    "workspace_id": workspace_id,
+                    "peer_id": item.get("peer_id", ""),
+                    "observer_id": item.get("observer_id", ""),
+                    "memory_type": item.get("memory_type", "experience"),
+                    "content": content,
+                    "summary": item.get("summary", content[:200]),
+                    "entities_json": item.get("entities_json", "[]"),
+                    "confidence": item.get("confidence", 0.8),
+                    "source_session_id": item.get("source_session_id", ""),
+                    "source_message_id": item.get("source_message_id", ""),
+                }
+            )
 
         if not clean_items:
             return []
@@ -1074,6 +1131,7 @@ class Client:
         # Batch-embed
         try:
             import json
+
             resp = self._http.post(
                 f"{self.embedder_url}/embed",
                 content=json.dumps({"texts": contents}),
@@ -1091,31 +1149,52 @@ class Client:
 
         # Call batch reducer — pass items as JSON string
         import json as _j
-        with _tracing_span("store_batch.call", workspace_id=workspace_id, batch_size=len(clean_items)):
+
+        with _tracing_span(
+            "store_batch.call", workspace_id=workspace_id, batch_size=len(clean_items)
+        ):
             self._call("store_memory_batch", [_j.dumps(clean_items)])
 
         # Index each item with its embedding
         for i, item in enumerate(clean_items):
             emb = emb_list[i] if i < len(emb_list) else None
             if emb:
-                mems = self._query("memory", workspace_id=workspace_id,
-                                  filter_dict={"content": item['content'][:100]},
-                                  columns=["id"])
+                mems = self._query(
+                    "memory",
+                    workspace_id=workspace_id,
+                    filter_dict={"content": item["content"][:100]},
+                    columns=["id"],
+                )
                 if mems:
                     # Take most recent (server returns unsorted; sort client-side)
                     mems.sort(key=lambda m: m.get("created_at", 0), reverse=True)
                     import json as _json
-                    self._call("index_entity", [
-                        workspace_id, "memory", mems[0]["id"],
-                        item["content"], _json.dumps(emb),
-                    ])
+
+                    self._call(
+                        "index_entity",
+                        [
+                            workspace_id,
+                            "memory",
+                            mems[0]["id"],
+                            item["content"],
+                            _json.dumps(emb),
+                        ],
+                    )
                     # Populate BM25 inverted index
-                    self._call("index_terms", [
-                        workspace_id, "memory", mems[0]["id"], item["content"],
-                    ])
+                    self._call(
+                        "index_terms",
+                        [
+                            workspace_id,
+                            "memory",
+                            mems[0]["id"],
+                            item["content"],
+                        ],
+                    )
                     # Entity extraction
                     self._extract_and_store_entities(
-                        workspace_id, mems[0]["id"], item["content"],
+                        workspace_id,
+                        mems[0]["id"],
+                        item["content"],
                     )
 
         return [{"status": "ok"} for _ in clean_items]
@@ -1131,7 +1210,10 @@ class Client:
     ) -> list[dict[str, Any]]:
         """Min-max normalize per strategy, weighted-sum fuse, dedup by entity_id."""
         best_per_strat: dict[str, dict[str, float]] = {
-            "semantic": {}, "keyword": {}, "graph": {}, "temporal": {},
+            "semantic": {},
+            "keyword": {},
+            "graph": {},
+            "temporal": {},
             "binary": {},
         }
         best_row: dict[str, dict] = {}
@@ -1186,9 +1268,12 @@ class Client:
         node_map = {}
         note_map = {}
         for mid in mem_ids:
-            mems = self._query("memory", filter_dict={"id": mid},
-                               workspace_id=workspace_id,
-                               columns=["id", "content", "confidence"])
+            mems = self._query(
+                "memory",
+                filter_dict={"id": mid},
+                workspace_id=workspace_id,
+                columns=["id", "content", "confidence"],
+            )
             if mems:
                 mem_map[mid] = mems[0].get("content", "")
                 mem_confidences[mid] = mems[0].get("confidence", 0.8)
@@ -1197,8 +1282,7 @@ class Client:
             if nodes:
                 node_map[nid] = nodes[0].get("label", "")
         for nid in note_ids:
-            notes = self._query("note", filter_dict={"id": nid},
-                                columns=["id", "title", "content"])
+            notes = self._query("note", filter_dict={"id": nid}, columns=["id", "title", "content"])
             if notes:
                 note = notes[0]
                 note_map[nid] = note.get("title", "") + "\n\n" + note.get("content", "")
@@ -1218,6 +1302,7 @@ class Client:
             r["score"] = r.get("fused_score", r.get("score", 0.0))
             if eid in mem_confidences:
                 from .veracity import confidence_multiplier
+
                 mult = confidence_multiplier(mem_confidences[eid])
                 r["score"] = r["score"] * mult
                 r["veracity_multiplier"] = mult
@@ -1266,12 +1351,57 @@ class Client:
 
         if query:
             _STOPWORDS = {
-                "a", "an", "the", "is", "are", "was", "were", "be", "been",
-                "who", "what", "where", "when", "why", "how", "which", "do",
-                "does", "did", "has", "have", "had", "can", "will", "would",
-                "tell", "me", "about", "of", "in", "on", "at", "to", "for",
-                "with", "and", "or", "not", "we", "our", "us", "i", "you",
-                "they", "it", "its", "s", "that", "this", "there", "from",
+                "a",
+                "an",
+                "the",
+                "is",
+                "are",
+                "was",
+                "were",
+                "be",
+                "been",
+                "who",
+                "what",
+                "where",
+                "when",
+                "why",
+                "how",
+                "which",
+                "do",
+                "does",
+                "did",
+                "has",
+                "have",
+                "had",
+                "can",
+                "will",
+                "would",
+                "tell",
+                "me",
+                "about",
+                "of",
+                "in",
+                "on",
+                "at",
+                "to",
+                "for",
+                "with",
+                "and",
+                "or",
+                "not",
+                "we",
+                "our",
+                "us",
+                "i",
+                "you",
+                "they",
+                "it",
+                "its",
+                "s",
+                "that",
+                "this",
+                "there",
+                "from",
             }
             keywords = [
                 w.lower().rstrip("?,.:;!\"'")
@@ -1281,18 +1411,18 @@ class Client:
             ]
             if keywords:
                 rows = [
-                    r for r in rows
+                    r
+                    for r in rows
                     if any(
-                        kw in r.get("content", "").lower()
-                        or kw in r.get("summary", "").lower()
+                        kw in r.get("content", "").lower() or kw in r.get("summary", "").lower()
                         for kw in keywords
                     )
                 ]
                 note_rows = [
-                    nr for nr in note_rows
+                    nr
+                    for nr in note_rows
                     if any(
-                        kw in nr.get("content", "").lower()
-                        or kw in nr.get("title", "").lower()
+                        kw in nr.get("content", "").lower() or kw in nr.get("title", "").lower()
                         for kw in keywords
                     )
                 ]
@@ -1317,15 +1447,21 @@ class Client:
             r["fused_score"] = 1.0 - (idx / max_idx)
         # Add content snippets for callers that only need a preview
         for r in results:
-            content_text = r.get("content", "") or r.get("memory_content", "") or r.get("summary", "")
+            content_text = (
+                r.get("content", "") or r.get("memory_content", "") or r.get("summary", "")
+            )
             r["snippet"] = _make_snippet(content_text)
         # Apply entity-aware boosting with entity_link alias support
         if query:
             results = self._boost_with_entity_signal(query, results, workspace_id)
-        self._emit_event("search.performed", {
-            "query": query,
-            "result_count": len(results),
-        }, workspace_id=workspace_id)
+        self._emit_event(
+            "search.performed",
+            {
+                "query": query,
+                "result_count": len(results),
+            },
+            workspace_id=workspace_id,
+        )
         # ── Date range filter (before/after) ──
         if before is not None or after is not None:
             filtered = []
@@ -1461,10 +1597,12 @@ class Client:
                     break
 
             if matched:
-                matching_entities.append({
-                    "canonical": entity_name,
-                    "aliases": [a.lower().strip() for a in alias_list if a],
-                })
+                matching_entities.append(
+                    {
+                        "canonical": entity_name,
+                        "aliases": [a.lower().strip() for a in alias_list if a],
+                    }
+                )
 
         if not matching_entities:
             return rows
@@ -1478,11 +1616,7 @@ class Client:
 
         # Boost each result that references any of the matched entities
         for row in rows:
-            content = (
-                row.get("memory_content")
-                or row.get("content")
-                or ""
-            ).lower()
+            content = (row.get("memory_content") or row.get("content") or "").lower()
             if not content:
                 continue
 
@@ -1572,9 +1706,7 @@ class Client:
             # ── Query cache check ──
             cache_key: str | None = None
             if self._query_cache is not None:
-                cache_key = self._query_cache.make_key(
-                    workspace_id, query, limit, "semantic"
-                )
+                cache_key = self._query_cache.make_key(workspace_id, query, limit, "semantic")
                 cached = self._query_cache.get(cache_key)
                 if cached is not None:
                     return cached
@@ -1599,13 +1731,15 @@ class Client:
                 # when embedding through the proxy, fall back to embedder_url.
                 health_url = self.embedder_url
                 import os as _os
+
                 base = _os.environ.get("OPENAI_BASE_URL", "").rstrip("/")
                 if base and _os.environ.get("OPENAI_API_KEY"):
                     # Proxy health check: strip /v1 to get the root
                     health_url = base.replace("/v1", "") if "/v1" in base else base
                 try:
                     health = self._http.get(
-                        f"{health_url}/health", timeout=2.0,
+                        f"{health_url}/health",
+                        timeout=2.0,
                     )
                     embedder_down = health.status_code >= 400
                 except (httpx.ConnectError, httpx.TimeoutException):
@@ -1635,12 +1769,20 @@ class Client:
                 query_length=len(search_query),
                 fetch_limit=fetch_limit,
             ):
-                self._call("hybrid_search", [
-                    workspace_id, search_query, emb_json,
-                    memory_type, tier, fetch_limit, strategies,
-                    polyphonic,
-                    mmr_lambda,
-                ])
+                self._call(
+                    "hybrid_search",
+                    [
+                        workspace_id,
+                        search_query,
+                        emb_json,
+                        memory_type,
+                        tier,
+                        fetch_limit,
+                        strategies,
+                        polyphonic,
+                        mmr_lambda,
+                    ],
+                )
             qhash = _query_hash(search_query)
             rows = self._sql(
                 "SELECT * FROM hybrid_result "
@@ -1669,21 +1811,26 @@ class Client:
             # Convert Tantivy hits to the same shape as STDB hybrid_result rows
             tantivy_rows: list[dict[str, Any]] = []
             for th in tantivy_hits:
-                tantivy_rows.append({
-                    "entity_id": th.get("entity_id", ""),
-                    "entity_type": th.get("entity_type", "memory"),
-                    "content": th.get("content", ""),
-                    "score": float(th.get("score", 0.0)),
-                    "strategy": "keyword",
-                    "workspace_id": workspace_id,
-                })
+                tantivy_rows.append(
+                    {
+                        "entity_id": th.get("entity_id", ""),
+                        "entity_type": th.get("entity_type", "memory"),
+                        "content": th.get("content", ""),
+                        "score": float(th.get("score", 0.0)),
+                        "strategy": "keyword",
+                        "workspace_id": workspace_id,
+                    }
+                )
 
             # Compute min/max per strategy — but only on a capped subset.
             # Over-fetching dumps hundreds of low-score keyword matches
             # (0.125 per single-word hit) that collapse the min-max range.
             per_strat: dict[str, list[dict]] = {
                 "keyword": [],  # Tantivy rows go here
-                "semantic": [], "graph": [], "temporal": [], "binary": [],
+                "semantic": [],
+                "graph": [],
+                "temporal": [],
+                "binary": [],
             }
 
             # Sort Tantivy rows by score desc, take top fusion_limit
@@ -1695,19 +1842,22 @@ class Client:
             query_emb = self._embed(search_query)
             if query_emb and self._binary_cache:
                 from .binary_vectors import binarize, hamming_similarity
+
                 try:
                     query_binary = binarize(query_emb)
                     binary_rows: list[dict[str, Any]] = []
                     for eid, cached_binary in self._binary_cache.items():
                         sim = hamming_similarity(query_binary, cached_binary)
                         if sim > 0.5:  # Only include meaningful matches
-                            binary_rows.append({
-                                "entity_id": eid,
-                                "entity_type": "memory",
-                                "score": sim,
-                                "strategy": "binary",
-                                "workspace_id": workspace_id,
-                            })
+                            binary_rows.append(
+                                {
+                                    "entity_id": eid,
+                                    "entity_type": "memory",
+                                    "score": sim,
+                                    "strategy": "binary",
+                                    "workspace_id": workspace_id,
+                                }
+                            )
                     binary_rows.sort(key=lambda r: r["score"], reverse=True)
                     per_strat["binary"] = binary_rows[:fusion_limit]
                 except (ValueError, Exception):
@@ -1730,8 +1880,12 @@ class Client:
 
             # ── Weighted min-max fusion + dedup ──
             rows = self._fuse_and_deduplicate(
-                rows, tantivy_rows, per_strat,
-                strat_min, strat_max, STRATEGY_WEIGHTS,
+                rows,
+                tantivy_rows,
+                per_strat,
+                strat_min,
+                strat_max,
+                STRATEGY_WEIGHTS,
             )
 
             # ── Look up content and apply veracity weighting ──
@@ -1761,6 +1915,7 @@ class Client:
             if cross_encoder:
                 try:
                     from .cross_encoder import cross_encoder_rerank
+
                     rows = cross_encoder_rerank(query, rows, top_k=len(rows))
                 except (FileNotFoundError, ImportError, ValueError) as ce_err:
                     logger.warning(
@@ -1770,7 +1925,8 @@ class Client:
                     )
             if rerank:
                 rows = llm_rerank(
-                    query, rows,
+                    query,
+                    rows,
                     endpoint=rerank_endpoint,
                     model=rerank_model,
                     api_key=rerank_api_key,
@@ -1779,9 +1935,11 @@ class Client:
             # ── MMR diversity reranking ──
             if mmr_lambda > 0:
                 from .mmr import mmr_rerank
+
                 rows = mmr_rerank(rows, lambda_param=mmr_lambda)
             # ── Weibull temporal boost ──
             from .weibull import apply_temporal_boost
+
             rows = apply_temporal_boost(rows)
             results = rows[:limit]
             # ── Plugin dispatch: on_search ──
@@ -1791,15 +1949,20 @@ class Client:
             if self._query_cache is not None and cache_key is not None:
                 self._query_cache.set(cache_key, results, workspace_id=workspace_id)
             # ── Emit search.performed event ──
-            self._emit_event("search.performed", {
-                "query": query,
-                "result_count": len(results),
-            }, workspace_id=workspace_id)
+            self._emit_event(
+                "search.performed",
+                {
+                    "query": query,
+                    "result_count": len(results),
+                },
+                workspace_id=workspace_id,
+            )
             return results
 
         # Non-semantic (keyword) fallback
-        rows = self._keyword_fallback(workspace_id, query, memory_type, tier, limit,
-                                      before=before, after=after)
+        rows = self._keyword_fallback(
+            workspace_id, query, memory_type, tier, limit, before=before, after=after
+        )
         if entity_types is not None and entity_types:
             rows = [r for r in rows if r.get("entity_type") in entity_types]
         return rows
@@ -1858,14 +2021,12 @@ class Client:
             return []
 
         import json as _json
+
         emb_json = _json.dumps(emb)
         self._call("search_sessions_semantic", [emb_json, limit])
 
         qhash = f"sessions:{limit}"
-        rows = self._sql(
-            "SELECT * FROM session_search_result "
-            f"WHERE query_hash = '{_esc(qhash)}'"
-        )
+        rows = self._sql(f"SELECT * FROM session_search_result WHERE query_hash = '{_esc(qhash)}'")
         rows.sort(key=lambda r: r.get("score", 0.0), reverse=True)
         return rows[:limit]
 
@@ -1920,7 +2081,9 @@ class Client:
             text = r.get(field, "")
             if not text:
                 continue
-            ratio = SequenceMatcher(None, name.lower(), text.lower()).ratio()  # isjunk=None: treat all chars equally
+            ratio = SequenceMatcher(
+                None, name.lower(), text.lower()
+            ).ratio()  # isjunk=None: treat all chars equally
             if ratio > best_ratio:
                 best_ratio = ratio
                 best = r
@@ -1980,9 +2143,7 @@ class Client:
         # ── Look up workspace_id for cache invalidation ──
         ws_id: str | None = None
         if self._query_cache is not None:
-            rows = self._sql(
-                f"SELECT workspace_id FROM memory WHERE id = '{_esc(memory_id)}'"
-            )
+            rows = self._sql(f"SELECT workspace_id FROM memory WHERE id = '{_esc(memory_id)}'")
             if rows:
                 ws_id = str(rows[0].get("workspace_id", ""))
 
@@ -1992,9 +2153,13 @@ class Client:
             if self._query_cache is not None and ws_id:
                 self._query_cache.invalidate(workspace_id=ws_id)
             # ── Emit memory.deleted event ──
-            self._emit_event("memory.deleted", {
-                "memory_id": memory_id,
-            }, workspace_id=ws_id or "")
+            self._emit_event(
+                "memory.deleted",
+                {
+                    "memory_id": memory_id,
+                },
+                workspace_id=ws_id or "",
+            )
             return result
         except RuntimeError as e:
             if "not found" in str(e).lower():
@@ -2011,7 +2176,9 @@ class Client:
 
     def get_context_chain(self, memory_id: str) -> dict[str, Any]:
         """Return the context chain for a memory: workspace context + memory context."""
-        mems = self._query("memory", filter_dict={"id": memory_id}, columns=["id", "workspace_id", "context"])
+        mems = self._query(
+            "memory", filter_dict={"id": memory_id}, columns=["id", "workspace_id", "context"]
+        )
         if not mems:
             return {"workspace_context": "", "memory_context": ""}
         ws_id = mems[0].get("workspace_id", "")
@@ -2032,9 +2199,7 @@ class Client:
         """Reinforce a memory (bump access_count + strength)."""
         return self._call("reinforce_memory", [memory_id])
 
-    def rate_memory(
-        self, memory_id: str, rating: str, peer_id: str
-    ) -> dict[str, Any]:
+    def rate_memory(self, memory_id: str, rating: str, peer_id: str) -> dict[str, Any]:
         """Rate a memory to adjust its trust score.
 
         Args:
@@ -2045,7 +2210,9 @@ class Client:
         """
         return self._call("rate_memory", [memory_id, rating, peer_id])
 
-    def escalate_memories(self, workspace_id: str, l2_to_l1: int = 5, l1_to_l0: int = 20) -> dict[str, Any]:
+    def escalate_memories(
+        self, workspace_id: str, l2_to_l1: int = 5, l1_to_l0: int = 20
+    ) -> dict[str, Any]:
         """Batch-escalate memory tiers based on access_count thresholds.
 
         Args:
@@ -2066,18 +2233,16 @@ class Client:
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         return rows[:limit]
 
-    def get_user_memories(
-        self, user_scope: str, workspace_id: str
-    ) -> list[dict[str, Any]]:
+    def get_user_memories(self, user_scope: str, workspace_id: str) -> list[dict[str, Any]]:
         """Get all memories scoped to a specific user within a workspace.
-        
+
         Calls the ``get_user_memories`` reducer which populates the
         ``user_memory_result`` table, then reads from it.
-        
+
         Args:
             user_scope: The user identity hash to filter by.
             workspace_id: The workspace to search in.
-        
+
         Returns:
             List of memory records scoped to the given user.
         """
@@ -2097,31 +2262,32 @@ class Client:
         """Get children of a directory."""
         self._call("get_children", [directory_id, True])
         return self._sql(
-            "SELECT * FROM directory_result WHERE "
-            f"query_hash = '{_esc(directory_id)}'"
+            f"SELECT * FROM directory_result WHERE query_hash = '{_esc(directory_id)}'"
         )
 
     def traverse_directory(self, workspace_id: str, root_directory_id: str) -> list[dict[str, Any]]:
         """Recursive BFS traversal of directory tree."""
         self._call("traverse_recursive", [workspace_id, root_directory_id])
         return self._sql(
-            "SELECT * FROM directory_result WHERE "
-            f"query_hash = '{_esc(root_directory_id)}'"
+            f"SELECT * FROM directory_result WHERE query_hash = '{_esc(root_directory_id)}'"
         )
 
     def get_directory(self, workspace_id: str, path_or_id: str) -> list[dict[str, Any]]:
         """Get a directory by ID or path."""
         self._call("get_directory", [workspace_id, path_or_id])
         return self._sql(
-            "SELECT * FROM directory_result WHERE "
-            f"workspace_id = '{_esc(workspace_id)}'"
+            f"SELECT * FROM directory_result WHERE workspace_id = '{_esc(workspace_id)}'"
         )
 
-    def create_directory(self, workspace_id: str, name: str, path: str, parent_id: str = "", description: str = "") -> dict[str, Any]:
+    def create_directory(
+        self, workspace_id: str, name: str, path: str, parent_id: str = "", description: str = ""
+    ) -> dict[str, Any]:
         """Create a directory in the context directory tree."""
         return self._call("create_directory", [workspace_id, name, path, parent_id, description])
 
-    def link_memory_to_directory(self, directory_id: str, memory_id: str, workspace_id: str) -> dict[str, Any]:
+    def link_memory_to_directory(
+        self, directory_id: str, memory_id: str, workspace_id: str
+    ) -> dict[str, Any]:
         """Link a memory to a directory."""
         return self._call("link_memory_to_directory", [directory_id, memory_id, workspace_id])
 
@@ -2133,7 +2299,9 @@ class Client:
     # Batch update & history (Mem0 parity)
     # -----------------------------------------------------------------------
 
-    def batch_update_memories(self, workspace_id: str, memory_ids: list[str], updates: dict[str, Any]) -> dict[str, Any]:
+    def batch_update_memories(
+        self, workspace_id: str, memory_ids: list[str], updates: dict[str, Any]
+    ) -> dict[str, Any]:
         """Batch update multiple memories. Mem0 parity.
         updates can contain: content, summary, confidence, tier, is_active
 
@@ -2185,21 +2353,24 @@ class Client:
 
         result: list[dict[str, Any]] = []
         for rev in revisions:
-            result.append({
-                "version": rev.get("version", 0),
-                "previous_content": rev.get("previous_content", ""),
-                "previous_summary": rev.get("previous_summary", ""),
-                "previous_confidence": rev.get("previous_confidence", 1.0),
-                "content": rev.get("new_content", ""),
-                "summary": rev.get("new_summary", ""),
-                "confidence": rev.get("new_confidence", 1.0),
-                "changed_at": rev.get("changed_at", 0),
-                "changed_by": rev.get("changed_by", ""),
-            })
+            result.append(
+                {
+                    "version": rev.get("version", 0),
+                    "previous_content": rev.get("previous_content", ""),
+                    "previous_summary": rev.get("previous_summary", ""),
+                    "previous_confidence": rev.get("previous_confidence", 1.0),
+                    "content": rev.get("new_content", ""),
+                    "summary": rev.get("new_summary", ""),
+                    "confidence": rev.get("new_confidence", 1.0),
+                    "changed_at": rev.get("changed_at", 0),
+                    "changed_by": rev.get("changed_by", ""),
+                }
+            )
 
         # Append the current state as the latest version
         rows = self._query(
-            "memory", filter_dict={"id": memory_id},
+            "memory",
+            filter_dict={"id": memory_id},
             columns=["content", "summary", "version", "updated_at", "confidence"],
         )
         if rows:
@@ -2207,17 +2378,19 @@ class Client:
             current_version = r.get("version", 1)
             # Only append if we don't already have this version
             if not result or result[-1].get("version") != current_version:
-                result.append({
-                    "version": current_version,
-                    "previous_content": "",
-                    "previous_summary": "",
-                    "previous_confidence": 0.0,
-                    "content": r.get("content", ""),
-                    "summary": r.get("summary", ""),
-                    "confidence": r.get("confidence", 1.0),
-                    "changed_at": r.get("updated_at", 0),
-                    "changed_by": "",
-                })
+                result.append(
+                    {
+                        "version": current_version,
+                        "previous_content": "",
+                        "previous_summary": "",
+                        "previous_confidence": 0.0,
+                        "content": r.get("content", ""),
+                        "summary": r.get("summary", ""),
+                        "confidence": r.get("confidence", 1.0),
+                        "changed_at": r.get("updated_at", 0),
+                        "changed_by": "",
+                    }
+                )
 
         return result
 
@@ -2241,19 +2414,22 @@ class Client:
 
         result: list[dict[str, Any]] = []
         for rev in revisions:
-            result.append({
-                "version": rev.get("version", 0),
-                "previous_title": rev.get("previous_title", ""),
-                "previous_content": rev.get("previous_content", ""),
-                "title": rev.get("new_title", ""),
-                "content": rev.get("new_content", ""),
-                "changed_at": rev.get("changed_at", 0),
-                "changed_by": rev.get("changed_by", ""),
-            })
+            result.append(
+                {
+                    "version": rev.get("version", 0),
+                    "previous_title": rev.get("previous_title", ""),
+                    "previous_content": rev.get("previous_content", ""),
+                    "title": rev.get("new_title", ""),
+                    "content": rev.get("new_content", ""),
+                    "changed_at": rev.get("changed_at", 0),
+                    "changed_by": rev.get("changed_by", ""),
+                }
+            )
 
         # Append the current state as the latest version
         rows = self._query(
-            "note", filter_dict={"id": note_id},
+            "note",
+            filter_dict={"id": note_id},
             columns=["title", "content", "version", "updated_at"],
         )
         if rows:
@@ -2261,15 +2437,17 @@ class Client:
             current_version = r.get("version", 1)
             # Only append if we don't already have this version
             if not result or result[-1].get("version") != current_version:
-                result.append({
-                    "version": current_version,
-                    "previous_title": "",
-                    "previous_content": "",
-                    "title": r.get("title", ""),
-                    "content": r.get("content", ""),
-                    "changed_at": r.get("updated_at", 0),
-                    "changed_by": "",
-                })
+                result.append(
+                    {
+                        "version": current_version,
+                        "previous_title": "",
+                        "previous_content": "",
+                        "title": r.get("title", ""),
+                        "content": r.get("content", ""),
+                        "changed_at": r.get("updated_at", 0),
+                        "changed_by": "",
+                    }
+                )
 
         return result
 
@@ -2303,13 +2481,23 @@ class Client:
             raise ValueError(f"Unknown decay model '{model}'. Use 'linear' or 'weibull'.")
 
         if model == "linear":
-            return self._call("apply_reputation_decay", [
-                workspace_id, decay_rate, max_days,
-            ])
+            return self._call(
+                "apply_reputation_decay",
+                [
+                    workspace_id,
+                    decay_rate,
+                    max_days,
+                ],
+            )
         else:
-            return self._call("apply_weibull_decay", [
-                workspace_id, weibull_shape, weibull_scale,
-            ])
+            return self._call(
+                "apply_weibull_decay",
+                [
+                    workspace_id,
+                    weibull_shape,
+                    weibull_scale,
+                ],
+            )
 
     def get_decay_config(self, workspace_id: str) -> dict[str, Any] | None:
         """Get the current decay configuration for a workspace.
@@ -2337,13 +2525,17 @@ class Client:
             limit: Max recommendations (default 20).
             min_urgency: Minimum urgency threshold 0.0–1.0 (default 0.3).
         """
-        self._call("recommend_memories", [
-            workspace_id, limit, min_urgency,
-        ])
+        self._call(
+            "recommend_memories",
+            [
+                workspace_id,
+                limit,
+                min_urgency,
+            ],
+        )
         # Public result table — queryable via SQL directly
         return self._sql(
-            "SELECT * FROM memory_recommendation WHERE "
-            f"workspace_id = '{_esc(workspace_id)}'"
+            f"SELECT * FROM memory_recommendation WHERE workspace_id = '{_esc(workspace_id)}'"
         )
 
     def get_peer_reputation(self, peer_id: str) -> dict[str, Any] | None:
@@ -2385,11 +2577,20 @@ class Client:
             metadata: Optional metadata dict (serialized to JSON).
         """
         import json
+
         meta_json = json.dumps(metadata or {})
-        return self._call("create_document", [
-            workspace_id, title, content, content_type,
-            file_path, source_url, meta_json,
-        ])
+        return self._call(
+            "create_document",
+            [
+                workspace_id,
+                title,
+                content,
+                content_type,
+                file_path,
+                source_url,
+                meta_json,
+            ],
+        )
 
     def get_document(self, doc_id: str) -> dict[str, Any] | None:
         """Get a document by ID."""
@@ -2400,13 +2601,11 @@ class Client:
 
     def list_documents(self, workspace_id: str) -> list[dict[str, Any]]:
         """List all documents in a workspace."""
-        return self._query("document",
-                          filter_dict={"workspace_id": workspace_id})
+        return self._query("document", filter_dict={"workspace_id": workspace_id})
 
     def get_document_chunks(self, doc_id: str) -> list[dict[str, Any]]:
         """Get all chunks for a document, ordered by chunk_index."""
-        rows = self._query("doc_chunk",
-                          filter_dict={"document_id": doc_id})
+        rows = self._query("doc_chunk", filter_dict={"document_id": doc_id})
         rows.sort(key=lambda r: r.get("chunk_index", 0))
         return rows
 
@@ -2428,14 +2627,16 @@ class Client:
 
         Returns nodes sorted by bridge score (higher = more integrative).
         """
-        self._call("detect_bridge_nodes", [
-            workspace_id, limit, min_communities,
-        ])
-        # Public result table — queryable via SQL directly
-        return self._sql(
-            "SELECT * FROM bridge_result WHERE "
-            f"workspace_id = '{_esc(workspace_id)}'"
+        self._call(
+            "detect_bridge_nodes",
+            [
+                workspace_id,
+                limit,
+                min_communities,
+            ],
         )
+        # Public result table — queryable via SQL directly
+        return self._sql(f"SELECT * FROM bridge_result WHERE workspace_id = '{_esc(workspace_id)}'")
 
     def compute_kg_stats(self, workspace_id: str) -> dict[str, Any] | None:
         """Compute knowledge graph statistics for a workspace.
@@ -2446,8 +2647,7 @@ class Client:
         self._call("compute_kg_stats", [workspace_id])
         # Public result table — queryable via SQL directly
         rows = self._sql(
-            "SELECT * FROM kg_stats_result WHERE "
-            f"workspace_id = '{_esc(workspace_id)}'"
+            f"SELECT * FROM kg_stats_result WHERE workspace_id = '{_esc(workspace_id)}'"
         )
         if rows:
             return rows[0]
@@ -2457,18 +2657,25 @@ class Client:
     # Search with metadata/location filters (Honcho parity)
     # -----------------------------------------------------------------------
 
-    def search_with_filters(self, workspace_id: str, query: str = "",
-                             memory_type: str = "",
-                             tier: str = "",
-                             metadata_filter: str = "",
-                             location_filter: str = "",
-                             limit: int = 20) -> list[dict[str, Any]]:
+    def search_with_filters(
+        self,
+        workspace_id: str,
+        query: str = "",
+        memory_type: str = "",
+        tier: str = "",
+        metadata_filter: str = "",
+        location_filter: str = "",
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
         """Search with metadata and location filters. Honcho parity."""
         # For metadata/location filters, we do a keyword search first then filter in Python
         rows = self.search(workspace_id, query, memory_type, tier, limit, semantic=True)
         if metadata_filter:
             import json
-            mf = json.loads(metadata_filter) if isinstance(metadata_filter, str) else metadata_filter
+
+            mf = (
+                json.loads(metadata_filter) if isinstance(metadata_filter, str) else metadata_filter
+            )
             filtered = []
             for r in rows:
                 meta_str = r.get("metadata_json", "{}")
@@ -2482,7 +2689,11 @@ class Client:
             rows = filtered[:limit]
         if location_filter:
             loc = location_filter.lower()
-            rows = [r for r in rows if loc in r.get("content", "").lower() or loc in r.get("summary", "").lower()][:limit]
+            rows = [
+                r
+                for r in rows
+                if loc in r.get("content", "").lower() or loc in r.get("summary", "").lower()
+            ][:limit]
         return rows
 
     # -----------------------------------------------------------------------
@@ -2508,21 +2719,34 @@ class Client:
             metadata_json: Optional JSON metadata string.
             source_memory_id: Optional memory record ID that supports this node.
         """
-        result = self._call("create_node", [
-            workspace_id, label, node_type, summary, metadata_json,
-            source_memory_id,
-        ])
+        result = self._call(
+            "create_node",
+            [
+                workspace_id,
+                label,
+                node_type,
+                summary,
+                metadata_json,
+                source_memory_id,
+            ],
+        )
         content = f"{label}: {summary}" if summary else label
         emb = self._embed(content)
         if emb:
-            nodes = self._query("kg_node", workspace_id=workspace_id,
-                               filter_dict={"label": label},
-                               columns=["id"])
+            nodes = self._query(
+                "kg_node", workspace_id=workspace_id, filter_dict={"label": label}, columns=["id"]
+            )
             if nodes:
-                self._call("index_entity", [
-                    workspace_id, "node", nodes[-1]["id"],
-                    content, json.dumps(emb),
-                ])
+                self._call(
+                    "index_entity",
+                    [
+                        workspace_id,
+                        "node",
+                        nodes[-1]["id"],
+                        content,
+                        json.dumps(emb),
+                    ],
+                )
         return result
 
     def update_node(
@@ -2544,10 +2768,17 @@ class Client:
             metadata_json: Updated JSON metadata string.
             source_memory_id: Optional source memory ID.
         """
-        return self._call("update_node", [
-            node_id, label, node_type, summary, metadata_json,
-            source_memory_id,
-        ])
+        return self._call(
+            "update_node",
+            [
+                node_id,
+                label,
+                node_type,
+                summary,
+                metadata_json,
+                source_memory_id,
+            ],
+        )
 
     def create_edge(
         self,
@@ -2572,11 +2803,19 @@ class Client:
             metadata_json: Optional JSON metadata string.
             source_memory_id: Optional memory record ID that supports this edge.
         """
-        return self._call("create_edge", [
-            workspace_id, source_node_id, target_node_id,
-            relation, weight, confidence, metadata_json,
-            source_memory_id,
-        ])
+        return self._call(
+            "create_edge",
+            [
+                workspace_id,
+                source_node_id,
+                target_node_id,
+                relation,
+                weight,
+                confidence,
+                metadata_json,
+                source_memory_id,
+            ],
+        )
 
     def add_node_citation(
         self,
@@ -2593,9 +2832,15 @@ class Client:
             memory_id: The memory record that supports this node.
             description: Optional description of the citation relationship.
         """
-        return self._call("add_node_citation", [
-            workspace_id, node_id, memory_id, description,
-        ])
+        return self._call(
+            "add_node_citation",
+            [
+                workspace_id,
+                node_id,
+                memory_id,
+                description,
+            ],
+        )
 
     def add_edge_citation(
         self,
@@ -2612,9 +2857,15 @@ class Client:
             memory_id: The memory record that supports this edge.
             description: Optional description of the citation relationship.
         """
-        return self._call("add_edge_citation", [
-            workspace_id, edge_id, memory_id, description,
-        ])
+        return self._call(
+            "add_edge_citation",
+            [
+                workspace_id,
+                edge_id,
+                memory_id,
+                description,
+            ],
+        )
 
     def get_citations(
         self,
@@ -2632,10 +2883,14 @@ class Client:
         Returns:
             List of citation records with source_memory_id, description, and timestamp.
         """
-        self._call("get_citations", [
-            workspace_id, entity_id, entity_type,
-        ])
-        result_key = "citation_result"
+        self._call(
+            "get_citations",
+            [
+                workspace_id,
+                entity_id,
+                entity_type,
+            ],
+        )
         rows = self._sql(
             "SELECT * FROM citation_result WHERE "
             f"entity_id = '{_esc(entity_id)}' "
@@ -2643,28 +2898,28 @@ class Client:
         )
         return rows
 
-    def query_graph(
-        self, workspace_id: str, query: str = ""
-    ) -> list[dict[str, Any]]:
+    def query_graph(self, workspace_id: str, query: str = "") -> list[dict[str, Any]]:
         """Search KG nodes by label within a workspace."""
         rows = self._query("kg_node", workspace_id=workspace_id)
         if query:
             # Client-side filter (SpacetimeDB doesn't support LIKE)
             q = query.lower()
             rows = [
-                r for r in rows
-                if q in r.get("label", "").lower()
-                or q in r.get("summary", "").lower()
+                r
+                for r in rows
+                if q in r.get("label", "").lower() or q in r.get("summary", "").lower()
             ]
         return rows
 
     def get_neighbors(self, node_id: str, workspace_id: str = "") -> list[dict[str, Any]]:
         """Get edges connected to a node within an optional workspace."""
         # Query both directions since _query doesn't support OR
-        edges_src = self._query("kg_edge", workspace_id=workspace_id,
-                                filter_dict={"source_node_id": node_id})
-        edges_tgt = self._query("kg_edge", workspace_id=workspace_id,
-                                filter_dict={"target_node_id": node_id})
+        edges_src = self._query(
+            "kg_edge", workspace_id=workspace_id, filter_dict={"source_node_id": node_id}
+        )
+        edges_tgt = self._query(
+            "kg_edge", workspace_id=workspace_id, filter_dict={"target_node_id": node_id}
+        )
         seen = set()
         edges = []
         for e in edges_src + edges_tgt:
@@ -2679,8 +2934,12 @@ class Client:
         node_ids.discard("")
         label_map = {}
         for nid in node_ids:
-            rows = self._query("kg_node", workspace_id=workspace_id,
-                               filter_dict={"id": nid}, columns=["id", "label"])
+            rows = self._query(
+                "kg_node",
+                workspace_id=workspace_id,
+                filter_dict={"id": nid},
+                columns=["id", "label"],
+            )
             if rows:
                 label_map[nid] = rows[0].get("label", "")
 
@@ -2795,9 +3054,16 @@ class Client:
             preferences: JSON-encoded object of key-value preferences.
             tags: JSON-encoded list of tag strings.
         """
-        return self._call("upsert_profile", [
-            peer_id, static_facts, dynamic_context, preferences, tags,
-        ])
+        return self._call(
+            "upsert_profile",
+            [
+                peer_id,
+                static_facts,
+                dynamic_context,
+                preferences,
+                tags,
+            ],
+        )
 
     def add_profile_fact(self, peer_id: str, fact: str) -> dict[str, Any]:
         """Add a fact to a peer's profile (appended to static_facts_json array)."""
@@ -2825,13 +3091,16 @@ class Client:
                 profiles.append(p)
         return profiles
 
-    def search_profiles(self, workspace_id: str, query: str, limit: int = 20) -> list[dict[str, Any]]:
+    def search_profiles(
+        self, workspace_id: str, query: str, limit: int = 20
+    ) -> list[dict[str, Any]]:
         """Search profiles by static_facts or dynamic_context (client-side filter)."""
         profiles = self.list_profiles(workspace_id)
         if query:
             q = query.lower()
             profiles = [
-                r for r in profiles
+                r
+                for r in profiles
                 if q in r.get("static_facts_json", "").lower()
                 or q in r.get("dynamic_context_json", "").lower()
             ]
@@ -2860,7 +3129,9 @@ class Client:
             "nodes": nodes,
         }
 
-    def compute_pagerank(self, workspace_id: str, damping: float = 0.85, max_iterations: int = 100) -> dict[str, Any]:
+    def compute_pagerank(
+        self, workspace_id: str, damping: float = 0.85, max_iterations: int = 100
+    ) -> dict[str, Any]:
         """Compute PageRank centrality for all nodes in a workspace.
 
         Args:
@@ -2918,9 +3189,16 @@ class Client:
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()
         request_id = secrets.token_hex(16)
 
-        self._call("create_api_key", [
-            workspace_id, name, permissions, key_hash, request_id,
-        ])
+        self._call(
+            "create_api_key",
+            [
+                workspace_id,
+                name,
+                permissions,
+                key_hash,
+                request_id,
+            ],
+        )
 
         # Fetch the just-created key from the public result table
         rows = self._sql(
@@ -3011,16 +3289,25 @@ class Client:
             emb = self._embed(content[:1024])
             if emb:
                 embedding_json = json.dumps(emb)
-        result = self._call("create_note", [
-            workspace_id, title, content, note_date, embedding_json,
-        ])
+        result = self._call(
+            "create_note",
+            [
+                workspace_id,
+                title,
+                content,
+                note_date,
+                embedding_json,
+            ],
+        )
 
         # Index the note into search_index so hybrid search finds it
         if result.get("status") == "ok" and content.strip():
             try:
                 # Resolve the note ID by content match (same pattern as store_memory)
                 notes = self._query(
-                    "note", workspace_id=workspace_id, filter_dict={},
+                    "note",
+                    workspace_id=workspace_id,
+                    filter_dict={},
                     columns=["id", "content", "title"],
                 )
                 note_id = ""
@@ -3030,14 +3317,26 @@ class Client:
                         break
                 if note_id:
                     index_emb = embedding_json if embedding_json != "[]" else "[]"
-                    self._call("index_entity", [
-                        workspace_id, "note", note_id,
-                        content, index_emb,
-                    ])
+                    self._call(
+                        "index_entity",
+                        [
+                            workspace_id,
+                            "note",
+                            note_id,
+                            content,
+                            index_emb,
+                        ],
+                    )
                     # Populate BM25 inverted index
-                    self._call("index_terms", [
-                        workspace_id, "note", note_id, content,
-                    ])
+                    self._call(
+                        "index_terms",
+                        [
+                            workspace_id,
+                            "note",
+                            note_id,
+                            content,
+                        ],
+                    )
                     # Index into Tantivy BM25 sidecar
                     self._tantivy_index(workspace_id, note_id, content, "note")
             except RuntimeError:
@@ -3064,7 +3363,8 @@ class Client:
             try:
                 # Resolve workspace_id from the note record
                 note_records = self._query(
-                    "note", filter_dict={"id": note_id},
+                    "note",
+                    filter_dict={"id": note_id},
                     columns=["id", "workspace_id", "content"],
                 )
                 wid = note_records[0]["workspace_id"] if note_records else "default"
@@ -3138,7 +3438,9 @@ class Client:
         Results are in graph_traversal_result table, keyed by query_id."""
         self._call("graph_bfs", [workspace_id, start_node_id, max_depth])
 
-    def shortest_path(self, workspace_id: str, source_id: str, target_id: str, max_hops: int = 6) -> None:
+    def shortest_path(
+        self, workspace_id: str, source_id: str, target_id: str, max_hops: int = 6
+    ) -> None:
         """Shortest path between two nodes.
         Results in shortest_path_result table, ordered by step_order."""
         self._call("shortest_path", [workspace_id, source_id, target_id, max_hops])
@@ -3156,7 +3458,9 @@ class Client:
         """Create a new guided tour."""
         self._call("create_tour", [workspace_id, title, description])
 
-    def add_tour_stop(self, tour_id: str, node_id: str, heading: str, description: str = "") -> None:
+    def add_tour_stop(
+        self, tour_id: str, node_id: str, heading: str, description: str = ""
+    ) -> None:
         """Add a stop to a tour."""
         self._call("add_tour_stop", [tour_id, node_id, heading, description])
 
@@ -3176,9 +3480,16 @@ class Client:
         description: str = "",
     ) -> None:
         """Create a canonical entity link for Mem0-style entity resolution."""
-        self._call("create_entity_link", [
-            workspace_id, canonical_name, "[]", entity_type, description,
-        ])
+        self._call(
+            "create_entity_link",
+            [
+                workspace_id,
+                canonical_name,
+                "[]",
+                entity_type,
+                description,
+            ],
+        )
 
     def add_alias(self, entity_link_id: str, alias: str) -> None:
         """Add an alias to an existing entity link."""
@@ -3439,9 +3750,11 @@ def _make_snippet(text: str, max_chars: int = 200) -> str:
         truncated = truncated[:last_space]
     return truncated.rstrip() + "..."
 
+
 # ---------------------------------------------------------------------------
 # LLM Reranking (QMD parity)
 # ---------------------------------------------------------------------------
+
 
 def _parse_rerank_json(content: str) -> list[dict]:
     """Parse LLM reranker JSON output with 6 fallback strategies.
@@ -3466,7 +3779,7 @@ def _parse_rerank_json(content: str) -> list[dict]:
 
     # Strategy 2: Find JSON array boundaries
     if not parse_ok:
-        m = re.search(r'\[.*\]', content, re.DOTALL)
+        m = re.search(r"\[.*\]", content, re.DOTALL)
         if m:
             try:
                 scores = json.loads(m.group())
@@ -3490,8 +3803,8 @@ def _parse_rerank_json(content: str) -> list[dict]:
     # Strategy 4: Aggressive salvage — strip trailing commas, fix unquoted keys
     if not parse_ok:
         cleaned = content
-        cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)
-        m = re.search(r'\[.*\]', cleaned, re.DOTALL)
+        cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
+        m = re.search(r"\[.*\]", cleaned, re.DOTALL)
         if m:
             try:
                 scores = json.loads(m.group())
@@ -3514,7 +3827,7 @@ def _parse_rerank_json(content: str) -> list[dict]:
 
     # Strategy 5: Dict wrapper — LLM returned {"scores": [...]} or similar
     if not parse_ok:
-        m = re.search(r'\{.*\}', content, re.DOTALL)
+        m = re.search(r"\{.*\}", content, re.DOTALL)
         if m:
             try:
                 obj = json.loads(m.group())
@@ -3532,7 +3845,7 @@ def _parse_rerank_json(content: str) -> list[dict]:
 
     # Strategy 6: Line-by-line extraction — one JSON object per line
     if not parse_ok and content.strip():
-        lines = [l.strip() for l in content.split("\n") if l.strip().startswith("{")]
+        lines = [line.strip() for line in content.split("\n") if line.strip().startswith("{")]
         if lines:
             extracted = []
             for line in lines:
@@ -3600,22 +3913,20 @@ def llm_rerank(
         return results
 
     # Resolve config
-    endpoint = endpoint or os.getenv(
-        "LLM_RERANK_ENDPOINT", "http://localhost:4000/v1"
-    )
+    endpoint = endpoint or os.getenv("LLM_RERANK_ENDPOINT", "http://localhost:4000/v1")
     model = model or os.getenv("LLM_RERANK_MODEL", "ds-deepseek-v4-flash")
     api_key = api_key or os.getenv("LLM_RERANK_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 
     # Build candidate list
     candidates_text = "\n".join(
-        f"[{i}] {r.get('content', '')[:500]}"
-        for i, r in enumerate(results[:top_k])
+        f"[{i}] {r.get('content', '')[:500]}" for i, r in enumerate(results[:top_k])
     )
     prompt = _RERANK_PROMPT.format(query=query, candidates=candidates_text)
 
     try:
         # Retry with backoff for rate limits
         import time as _time
+
         resp = None
         for attempt in range(3):
             try:
@@ -3634,18 +3945,22 @@ def llm_rerank(
                 )
             except (httpx.ConnectError, httpx.TimeoutException):
                 if attempt < 2:
-                    _time.sleep(2 ** attempt)
+                    _time.sleep(2**attempt)
                     continue
                 raise
             if resp.status_code == 429:
-                wait = 2 ** attempt
-                logger.warning("LLM rerank rate-limited, retrying in %ds (attempt %d/3)", wait, attempt + 1)
+                wait = 2**attempt
+                logger.warning(
+                    "LLM rerank rate-limited, retrying in %ds (attempt %d/3)", wait, attempt + 1
+                )
                 _time.sleep(wait)
                 continue
             resp.raise_for_status()
             break
         else:
-            raise httpx.HTTPStatusError("429 rate limit after 3 retries", request=resp.request, response=resp)
+            raise httpx.HTTPStatusError(
+                "429 rate limit after 3 retries", request=resp.request, response=resp
+            )
         data = resp.json()
         msg = data["choices"][0]["message"]
         content = (msg.get("content") or "").strip()
@@ -3686,7 +4001,12 @@ def llm_rerank(
             reverse=True,
         )
 
-    except (json.JSONDecodeError, httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as exc:
+    except (
+        json.JSONDecodeError,
+        httpx.HTTPStatusError,
+        httpx.ConnectError,
+        httpx.TimeoutException,
+    ) as exc:
         logger.warning("LLM rerank failed, returning original results: %s", exc)
 
     return results

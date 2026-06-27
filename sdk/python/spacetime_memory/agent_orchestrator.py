@@ -118,9 +118,10 @@ class AgentOrchestrator:
 
         # Discover the session we just created via SQL
         rows = self._client._query(
-            "session", workspace_id=self._workspace_id,
+            "session",
+            workspace_id=self._workspace_id,
             filter_dict={"name": session_name},
-            columns=["id"]
+            columns=["id"],
         )
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         rows = rows[:1]
@@ -187,8 +188,7 @@ class AgentOrchestrator:
             if result and result.get("status") == "ok":
                 # Try to find the stored memory
                 mems = self._client._query(
-                    "memory", workspace_id=self._workspace_id,
-                    columns=["id"]
+                    "memory", workspace_id=self._workspace_id, columns=["id"]
                 )
                 mems.sort(key=lambda m: m.get("created_at", 0), reverse=True)
                 mems = mems[:1]
@@ -228,9 +228,7 @@ class AgentOrchestrator:
             The step ID.
         """
         if not any([thought, action, observation]):
-            raise ValueError(
-                "At least one of thought, action, or observation is required"
-            )
+            raise ValueError("At least one of thought, action, or observation is required")
 
         # Build the step content
         parts = []
@@ -268,8 +266,7 @@ class AgentOrchestrator:
         # Discover the step ID
         step_id = ""
         rows = self._client._query(
-            "agent_step", filter_dict={"session_id": session_id},
-            columns=["id"]
+            "agent_step", filter_dict={"session_id": session_id}, columns=["id"]
         )
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         rows = rows[:1]
@@ -318,8 +315,9 @@ class AgentOrchestrator:
 
         call_step_id = ""
         rows = self._client._query(
-            "agent_step", filter_dict={"session_id": session_id, "step_type": "tool_call"},
-            columns=["id"]
+            "agent_step",
+            filter_dict={"session_id": session_id, "step_type": "tool_call"},
+            columns=["id"],
         )
         rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
         rows = rows[:1]
@@ -329,9 +327,7 @@ class AgentOrchestrator:
         # Record result if provided
         if result is not None and call_step_id:
             result_str = json.dumps(result) if not isinstance(result, str) else result
-            result_content = json.dumps(
-                {"name": tool, "result": result_str}
-            )
+            result_content = json.dumps({"name": tool, "result": result_str})
             self._client._call(
                 "add_agent_step",
                 [
@@ -418,9 +414,7 @@ class AgentOrchestrator:
                         }
                     )
             except RuntimeError:
-                logger.warning(
-                    "Failed to get session steps for %s", session_id, exc_info=True
-                )
+                logger.warning("Failed to get session steps for %s", session_id, exc_info=True)
 
         # Sort by score descending, then by position
         context.sort(key=lambda c: c.get("score", 0.0), reverse=True)
@@ -457,7 +451,9 @@ class AgentOrchestrator:
             except RuntimeError:
                 logger.warning(
                     "Failed to share session %s with peer %s",
-                    session_id, pid, exc_info=True,
+                    session_id,
+                    pid,
+                    exc_info=True,
                 )
                 failed.append(pid)
 

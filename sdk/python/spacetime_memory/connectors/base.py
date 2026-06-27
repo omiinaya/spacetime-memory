@@ -14,7 +14,6 @@ Built-in connectors:
 
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 import os
@@ -22,7 +21,6 @@ import random
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -31,6 +29,7 @@ import httpx
 # ── Connector base ──────────────────────────────────────────────────
 
 # ── Connector base ──────────────────────────────────────────────────
+
 
 class Connector(ABC):
     """Base class for all spacetime-memory connectors.
@@ -67,13 +66,9 @@ class Connector(ABC):
         self._last_status: str = "ok"
 
         # ── Persistent cursor store ────────────────────────────────
-        self._cursor_dir = cursor_dir or os.path.expanduser(
-            "~/.spacetime-memory/connectors"
-        )
+        self._cursor_dir = cursor_dir or os.path.expanduser("~/.spacetime-memory/connectors")
         os.makedirs(self._cursor_dir, exist_ok=True)
-        self._cursor_file = os.path.join(
-            self._cursor_dir, f"{type(self).__name__}_cursor.json"
-        )
+        self._cursor_file = os.path.join(self._cursor_dir, f"{type(self).__name__}_cursor.json")
         self._cursor: dict[str, Any] = {}
         self._load_cursor()
 
@@ -160,13 +155,9 @@ class Connector(ABC):
                 return resp
             except httpx.RequestError as e:
                 if attempt < max_retries - 1:
-                    delay = (
-                        base_delay * (2**attempt)
-                        + random.uniform(0, 0.1)
-                    )
+                    delay = base_delay * (2**attempt) + random.uniform(0, 0.1)
                     self._log.warning(
-                        "%s %s failed (attempt %d/%d): %s. "
-                        "Retrying in %.2fs …",
+                        "%s %s failed (attempt %d/%d): %s. Retrying in %.2fs …",
                         method.upper(),
                         url,
                         attempt + 1,
@@ -277,8 +268,6 @@ class Connector(ABC):
 
 
 @dataclass
-
-
 class Event:
     """A single event from a connector."""
 
@@ -294,9 +283,8 @@ class Event:
 # ── RSS Feed Connector ──────────────────────────────────────────────
 
 
-
-
 # ── Connector registry ──────────────────────────────────────────────
+
 
 class ConnectorRegistry:
     """A registry for managing multiple connectors.
@@ -350,9 +338,8 @@ class ConnectorRegistry:
 # ── Slack Connector ──────────────────────────────────────────────────
 
 
-
-
 # ── Connector daemon ────────────────────────────────────────────────
+
 
 class ConnectorDaemon:
     """Background daemon that loads connector configs from the database
@@ -375,38 +362,66 @@ class ConnectorDaemon:
         rows = self.client._query(
             "connector_config",
             filter_dict={"is_active": "true"},
-            columns=["id", "name", "connector_type", "config_json", "workspace_id", "schedule_secs"]
+            columns=[
+                "id",
+                "name",
+                "connector_type",
+                "config_json",
+                "workspace_id",
+                "schedule_secs",
+            ],
         )
         return rows
 
     def _build_connector(self, cfg):
         """Build a Connector instance from a config row."""
         import json
+
         conn_type = cfg["connector_type"]
         params = json.loads(cfg.get("config_json", "{}"))
         ws = cfg["workspace_id"]
 
         if conn_type == "rss":
             from . import RssFeedConnector
+
             return RssFeedConnector(feed_url=params.get("feed_url", ""), workspace_id=ws)
         elif conn_type == "github":
             from . import GitHubConnector
-            return GitHubConnector(token=params.get("token", ""), username=params.get("username", ""), workspace_id=ws)
+
+            return GitHubConnector(
+                token=params.get("token", ""), username=params.get("username", ""), workspace_id=ws
+            )
         elif conn_type == "twitter":
             from . import TwitterConnector
-            return TwitterConnector(bearer_token=params.get("bearer_token", ""), user_id=params.get("user_id", ""), workspace_id=ws)
+
+            return TwitterConnector(
+                bearer_token=params.get("bearer_token", ""),
+                user_id=params.get("user_id", ""),
+                workspace_id=ws,
+            )
         elif conn_type == "slack":
             from . import SlackConnector
-            return SlackConnector(token=params.get("token", ""), channel_ids=params.get("channel_ids", []), workspace_id=ws)
+
+            return SlackConnector(
+                token=params.get("token", ""),
+                channel_ids=params.get("channel_ids", []),
+                workspace_id=ws,
+            )
         elif conn_type == "discord":
             from . import DiscordConnector
-            return DiscordConnector(token=params.get("token", ""), channel_ids=params.get("channel_ids", []), workspace_id=ws)
+
+            return DiscordConnector(
+                token=params.get("token", ""),
+                channel_ids=params.get("channel_ids", []),
+                workspace_id=ws,
+            )
         else:
             raise ValueError(f"Unknown connector type: {conn_type}")
 
     def start(self):
         """Run the daemon loop. Blocks until KeyboardInterrupt."""
         import logging
+
         logger = logging.getLogger(__name__)
         self._running = True
         logger.info("Connector daemon starting...")
@@ -426,7 +441,12 @@ class ConnectorDaemon:
                     if cid not in self._runners:
                         try:
                             conn = self._build_connector(cfg)
-                            logger.info("Starting connector %s (%s, %ss interval)", cfg["name"], cfg["connector_type"], cfg["schedule_secs"])
+                            logger.info(
+                                "Starting connector %s (%s, %ss interval)",
+                                cfg["name"],
+                                cfg["connector_type"],
+                                cfg["schedule_secs"],
+                            )
                             self._runners[cid] = conn
                         except Exception as e:
                             logger.error("Failed to build connector %s: %s", cid, e)
@@ -451,9 +471,9 @@ class ConnectorDaemon:
                 if not self._running:
                     break
                 import time
+
                 time.sleep(1)
 
     def stop(self):
         """Gracefully stop the daemon."""
         self._running = False
-

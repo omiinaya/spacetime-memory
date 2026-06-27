@@ -1,7 +1,6 @@
 """Unit tests for Compounder — compound knowledge operations."""
 
-import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 
 class TestCompounderStoreAnswer:
@@ -9,6 +8,7 @@ class TestCompounderStoreAnswer:
 
     def test_empty_answer_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         cp = Compounder(client)
         result = cp.store_answer(query="q", answer="")
@@ -16,6 +16,7 @@ class TestCompounderStoreAnswer:
 
     def test_creates_note_with_generated_title(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1", "title": "What is X?"}
         cp = Compounder(client)
@@ -29,6 +30,7 @@ class TestCompounderStoreAnswer:
 
     def test_uses_explicit_title(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "n1"}
         cp = Compounder(client)
@@ -37,6 +39,7 @@ class TestCompounderStoreAnswer:
 
     def test_extracts_entities_and_creates_nodes(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
 
@@ -52,7 +55,9 @@ class TestCompounderStoreAnswer:
         ]
 
         cp = Compounder(client, llm=mock_llm)
-        result = cp.store_answer(query="Who are Alice and Bob?", answer="Alice and Bob are colleagues.")
+        result = cp.store_answer(
+            query="Who are Alice and Bob?", answer="Alice and Bob are colleagues."
+        )
 
         assert client.create_node.call_count == 2
         assert len(result["entities"]) == 2
@@ -61,6 +66,7 @@ class TestCompounderStoreAnswer:
 
     def test_entity_extraction_failure_graceful(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
 
@@ -74,6 +80,7 @@ class TestCompounderStoreAnswer:
 
     def test_entity_creation_error_skipped(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         mock_llm = MagicMock()
@@ -88,6 +95,7 @@ class TestCompounderStoreAnswer:
 
     def test_links_to_source_memories(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         mock_llm = MagicMock()
@@ -95,13 +103,15 @@ class TestCompounderStoreAnswer:
 
         cp = Compounder(client, llm=mock_llm)
         result = cp.store_answer(
-            query="q", answer="ans",
+            query="q",
+            answer="ans",
             source_memory_ids=["mem_1", "mem_2"],
         )
         assert client._call.call_count == 2  # Two link calls
 
     def test_updates_workspace_index(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         client._query.return_value = []  # No existing index
@@ -113,14 +123,12 @@ class TestCompounderStoreAnswer:
         cp.store_answer(query="q", answer="ans.", workspace_id="ws1")
 
         # Should create an index note since none exists
-        idx_calls = [
-            c for c in client.create_note.call_args_list
-            if c[1].get("title") == "_index"
-        ]
+        idx_calls = [c for c in client.create_note.call_args_list if c[1].get("title") == "_index"]
         assert len(idx_calls) >= 1
 
     def test_appends_to_existing_index(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         client._query.return_value = [
@@ -135,18 +143,19 @@ class TestCompounderStoreAnswer:
         cp.store_answer(query="q", answer="ans.", workspace_id="ws1")
 
         # Should update existing index (append)
-        idx_calls = [
-            c for c in client.update_note.call_args_list
-            if c[1].get("title") == "_index"
-        ]
+        idx_calls = [c for c in client.update_note.call_args_list if c[1].get("title") == "_index"]
         assert len(idx_calls) >= 1
         new_content = idx_calls[0][1]["content"]
         assert "Old" in new_content
 
     def test_long_query_uses_first_answer_line(self):
         from spacetime_memory.compounder import Compounder
+
         cp = Compounder(MagicMock())
-        long_query = "What is the fundamental nature of consciousness in the context of modern neuroscience and philosophy of mind?" * 3
+        long_query = (
+            "What is the fundamental nature of consciousness in the context of modern neuroscience and philosophy of mind?"
+            * 3
+        )
         title = cp._generate_title(long_query, "First line of answer.\nSecond line.")
         assert len(title) <= 80
         assert "First" in title
@@ -157,12 +166,14 @@ class TestFindNearDuplicates:
 
     def test_empty_content_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         cp = Compounder(MagicMock())
         assert cp.find_near_duplicates("") == []
         assert cp.find_near_duplicates("   ") == []
 
     def test_calls_search_with_content(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.search.return_value = []
         cp = Compounder(client)
@@ -178,6 +189,7 @@ class TestFindNearDuplicates:
 
     def test_filters_by_threshold(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.search.return_value = [
             {"entity_id": "m1", "content": "similar A", "score": 0.95, "entity_type": "memory"},
@@ -192,6 +204,7 @@ class TestFindNearDuplicates:
 
     def test_all_below_threshold_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.search.return_value = [
             {"entity_id": "m1", "content": "vaguely related", "score": 0.45},
@@ -201,6 +214,7 @@ class TestFindNearDuplicates:
 
     def test_zero_threshold_returns_all(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.search.return_value = [
             {"entity_id": "m1", "score": 0.1},
@@ -212,6 +226,7 @@ class TestFindNearDuplicates:
 
     def test_custom_limit_passed_to_search(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.search.return_value = []
         cp = Compounder(client)
@@ -225,10 +240,16 @@ class TestStoreAnswerSkipDuplicates:
 
     def test_skip_duplicates_true_finds_and_returns_early(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         # Simulate finding a near-duplicate
         client.search.return_value = [
-            {"entity_id": "existing_note_1", "content": "Similar content", "score": 0.95, "entity_type": "note"},
+            {
+                "entity_id": "existing_note_1",
+                "content": "Similar content",
+                "score": 0.95,
+                "entity_type": "note",
+            },
         ]
         cp = Compounder(client)
         result = cp.store_answer(
@@ -245,6 +266,7 @@ class TestStoreAnswerSkipDuplicates:
 
     def test_skip_duplicates_false_creates_note_normally(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1", "title": "What is X?"}
         client.search.return_value = [
@@ -262,6 +284,7 @@ class TestStoreAnswerSkipDuplicates:
 
     def test_skip_duplicates_no_match_creates_note(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         # No near-duplicate found
@@ -277,6 +300,7 @@ class TestStoreAnswerSkipDuplicates:
 
     def test_skip_duplicates_custom_threshold(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         # Scores below custom threshold of 0.97
         client.search.return_value = [
@@ -284,7 +308,8 @@ class TestStoreAnswerSkipDuplicates:
         ]
         cp = Compounder(client)
         result = cp.store_answer(
-            query="Q", answer="A",
+            query="Q",
+            answer="A",
             skip_duplicates=True,
             duplicate_threshold=0.97,
         )
@@ -298,12 +323,14 @@ class TestCompounderStoreAnswers:
 
     def test_empty_pairs_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         cp = Compounder(MagicMock())
         results = cp.store_answers([])
         assert results == []
 
     def test_stores_multiple_answers(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         client._query.return_value = []  # no existing index
@@ -312,10 +339,13 @@ class TestCompounderStoreAnswers:
         mock_llm.extract_entities_llm.return_value = None
 
         cp = Compounder(client, llm=mock_llm)
-        results = cp.store_answers([
-            ("What is RLHF?", "RLHF stands for Reinforcement Learning from Human Feedback."),
-            ("What is GPT?", "GPT is a generative pre-trained transformer."),
-        ], workspace_id="ws1")
+        results = cp.store_answers(
+            [
+                ("What is RLHF?", "RLHF stands for Reinforcement Learning from Human Feedback."),
+                ("What is GPT?", "GPT is a generative pre-trained transformer."),
+            ],
+            workspace_id="ws1",
+        )
 
         assert len(results) == 2
         assert results[0]["note"] == {"id": "note_1"}
@@ -323,28 +353,38 @@ class TestCompounderStoreAnswers:
 
     def test_handles_single_error_gracefully(self):
         from spacetime_memory.compounder import Compounder
+
         cp = Compounder(MagicMock())
         # Mock store_answer on the instance to raise on second call
         original = cp.store_answer
         call_count = 0
 
-        def mock_store(query, answer, workspace_id="default",
-                       source_memory_ids=None, title=None, embed=True,
-                       skip_duplicates=True, duplicate_threshold=0.92):
+        def mock_store(
+            query,
+            answer,
+            workspace_id="default",
+            source_memory_ids=None,
+            title=None,
+            embed=True,
+            skip_duplicates=True,
+            duplicate_threshold=0.92,
+        ):
             nonlocal call_count
             call_count += 1
             if call_count == 2:
                 raise RuntimeError("Simulated failure")
-            return {"note": {"id": f"note_{call_count}"},
-                    "entities": [], "links": []}
+            return {"note": {"id": f"note_{call_count}"}, "entities": [], "links": []}
 
         cp.store_answer = mock_store
 
-        results = cp.store_answers([
-            ("Q1", "A1"),
-            ("Q2", "A2"),
-            ("Q3", "A3"),
-        ], workspace_id="ws1")
+        results = cp.store_answers(
+            [
+                ("Q1", "A1"),
+                ("Q2", "A2"),
+                ("Q3", "A3"),
+            ],
+            workspace_id="ws1",
+        )
 
         assert len(results) == 3
         # First should have succeeded
@@ -360,6 +400,7 @@ class TestCompounderCrossLink:
 
     def test_no_memories_returns_zero(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = []
         cp = Compounder(client)
@@ -368,6 +409,7 @@ class TestCompounderCrossLink:
 
     def test_short_content_skipped(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = [
             {"id": "m1", "content": "hi", "created_at": 100},
@@ -382,6 +424,7 @@ class TestCompounderSuggestConnections:
 
     def test_no_nodes_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [[], []]  # no edges, no nodes
         cp = Compounder(client)
@@ -390,6 +433,7 @@ class TestCompounderSuggestConnections:
 
     def test_finds_common_neighbour_suggestions(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         # Nodes: A, B, C, D  (all connected to hub H, but A↔B not directly connected)
         client._query.side_effect = [
@@ -416,6 +460,7 @@ class TestCompounderSuggestConnections:
 
     def test_skips_already_connected_pairs(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             # edges — A↔B already connected
@@ -439,12 +484,14 @@ class TestCompounderInternal:
 
     def test_generate_title_short_query(self):
         from spacetime_memory.compounder import Compounder
+
         cp = Compounder(MagicMock())
         title = cp._generate_title("What is RLHF?", "RLHF is a method.")
         assert title == "What is RLHF"
 
     def test_format_answer_page_structure(self):
         from spacetime_memory.compounder import Compounder
+
         cp = Compounder(MagicMock())
         page = cp._format_answer_page("Q?", "A.", source_ids=["m1"])
         assert "## Question" in page
@@ -454,12 +501,14 @@ class TestCompounderInternal:
 
     def test_format_answer_page_no_sources(self):
         from spacetime_memory.compounder import Compounder
+
         cp = Compounder(MagicMock())
         page = cp._format_answer_page("Q?", "A.")
         assert "## Sources" not in page
 
     def test_already_linked_checks_both_directions(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = [
             {"source_node_id": "A", "target_node_id": "B"},
@@ -471,6 +520,7 @@ class TestCompounderInternal:
 
     def test_node_label_lookup(self):
         from spacetime_memory.compounder import Compounder
+
         cp = Compounder(MagicMock())
         nodes = [
             {"id": "n1", "label": "Alice"},
@@ -485,17 +535,18 @@ class TestLogActivity:
 
     def test_creates_log_note_when_none_exists(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = []  # No existing log
         cp = Compounder(client)
         cp._log_activity("ws1", "test", "detail")
         # Should create a _log note
-        create_calls = [c for c in client.create_note.call_args_list
-                        if c[1].get("title") == "_log"]
+        create_calls = [c for c in client.create_note.call_args_list if c[1].get("title") == "_log"]
         assert len(create_calls) == 1
 
     def test_appends_to_existing_log(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = [
             {"id": "log_1", "content": "# Log\n\n## [old] prior | entry\n"}
@@ -510,24 +561,31 @@ class TestLintWorkspace:
 
     def test_orphan_detection(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         # _log_activity also calls _query — provide extra entries
         client._query.side_effect = [
-            [{"id": "C", "label": "Orphan", "node_type": "concept"}],  # nodes (from _find_orphan_nodes)
+            [
+                {"id": "C", "label": "Orphan", "node_type": "concept"}
+            ],  # nodes (from _find_orphan_nodes)
             [{"source_node_id": "A", "target_node_id": "B"}],  # edges (from _find_orphan_nodes)
             [],  # _log_activity: query for existing _log note
         ]
         cp = Compounder(client)
-        result = cp.lint_workspace("ws1", check_orphans=True,
-                                    check_missing_crossrefs=False,
-                                    check_contradictions=False,
-                                    check_note_orphans=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_orphans=True,
+            check_missing_crossrefs=False,
+            check_contradictions=False,
+            check_note_orphans=False,
+        )
         assert len(result["orphans"]) == 1
         assert result["orphans"][0]["label"] == "Orphan"
         assert result["summary"]["orphan_count"] == 1
 
     def test_no_orphans_when_all_connected(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [{"id": "A", "label": "A"}],  # nodes
@@ -535,14 +593,18 @@ class TestLintWorkspace:
             [],  # _log_activity
         ]
         cp = Compounder(client)
-        result = cp.lint_workspace("ws1", check_orphans=True,
-                                    check_missing_crossrefs=False,
-                                    check_contradictions=False,
-                                    check_note_orphans=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_orphans=True,
+            check_missing_crossrefs=False,
+            check_contradictions=False,
+            check_note_orphans=False,
+        )
         assert result["summary"]["orphan_count"] == 0
 
     def test_missing_crossrefs(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [{"id": "n1", "label": "ImportantConcept"}],  # kg_node
@@ -552,53 +614,69 @@ class TestLintWorkspace:
             [],  # _log_activity
         ]
         cp = Compounder(client)
-        result = cp.lint_workspace("ws1", check_orphans=False,
-                                    check_missing_crossrefs=True,
-                                    check_contradictions=False,
-                                    check_note_orphans=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_orphans=False,
+            check_missing_crossrefs=True,
+            check_contradictions=False,
+            check_note_orphans=False,
+        )
         assert len(result["missing_crossrefs"]) >= 1
         assert result["summary"]["missing_crossref_count"] >= 1
 
     def test_contradiction_detection_requires_llm(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         cp = Compounder(client)  # LLM not configured (default)
-        result = cp.lint_workspace("ws1", check_contradictions=True,
-                                    check_note_orphans=False)
+        result = cp.lint_workspace("ws1", check_contradictions=True, check_note_orphans=False)
         assert result["contradictions"] == []
 
     def test_contradiction_with_llm(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         mock_llm = MagicMock()
         mock_llm.available = True
-        mock_llm.chat.return_value = '{"is_contradiction": true, "explanation": "They say opposite things"}'
+        mock_llm.chat.return_value = (
+            '{"is_contradiction": true, "explanation": "They say opposite things"}'
+        )
         client._query.return_value = [
             {"id": "m1", "content": "The sky is blue.", "created_at": 100},
             {"id": "m2", "content": "The sky is green.", "created_at": 200},
         ]
         cp = Compounder(client, llm=mock_llm)
-        result = cp.lint_workspace("ws1", check_contradictions=True,
-                                    check_orphans=False, check_missing_crossrefs=False,
-                                    check_note_orphans=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_contradictions=True,
+            check_orphans=False,
+            check_missing_crossrefs=False,
+            check_note_orphans=False,
+        )
         assert len(result["contradictions"]) == 1
         assert result["contradictions"][0]["explanation"] == "They say opposite things"
 
     def test_note_orphan_detection(self):
         """Notes with no KG label mentions and no edges are flagged."""
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
-            [{"id": "n1", "title": "Lonely Note", "content": "Just some text with no entities."}],  # notes
+            [
+                {"id": "n1", "title": "Lonely Note", "content": "Just some text with no entities."}
+            ],  # notes
             [{"id": "kg1", "label": "AI"}],  # kg_nodes
             [],  # edges — no connections
             [],  # _log_activity
         ]
         cp = Compounder(client)
-        result = cp.lint_workspace("ws1", check_note_orphans=True,
-                                    check_orphans=False,
-                                    check_missing_crossrefs=False,
-                                    check_contradictions=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_note_orphans=True,
+            check_orphans=False,
+            check_missing_crossrefs=False,
+            check_contradictions=False,
+        )
         assert len(result["note_orphans"]) == 1
         assert result["note_orphans"][0]["title"] == "Lonely Note"
         assert result["summary"]["note_orphan_count"] == 1
@@ -606,23 +684,30 @@ class TestLintWorkspace:
     def test_note_not_orphan_when_content_mentions_entity(self):
         """Note that mentions a KG label is not an orphan."""
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
-            [{"id": "n1", "title": "About AI", "content": "AI is transforming everything."}],  # notes
+            [
+                {"id": "n1", "title": "About AI", "content": "AI is transforming everything."}
+            ],  # notes
             [{"id": "kg1", "label": "AI"}],  # kg_nodes
             [],  # edges
             [],  # _log_activity
         ]
         cp = Compounder(client)
-        result = cp.lint_workspace("ws1", check_note_orphans=True,
-                                    check_orphans=False,
-                                    check_missing_crossrefs=False,
-                                    check_contradictions=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_note_orphans=True,
+            check_orphans=False,
+            check_missing_crossrefs=False,
+            check_contradictions=False,
+        )
         assert result["summary"]["note_orphan_count"] == 0
 
     def test_note_not_orphan_when_connected_via_edge(self):
         """Note whose ID appears in an edge is not an orphan."""
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [{"id": "note_42", "title": "Connected", "content": "Some text."}],  # notes
@@ -631,36 +716,47 @@ class TestLintWorkspace:
             [],  # _log_activity
         ]
         cp = Compounder(client)
-        result = cp.lint_workspace("ws1", check_note_orphans=True,
-                                    check_orphans=False,
-                                    check_missing_crossrefs=False,
-                                    check_contradictions=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_note_orphans=True,
+            check_orphans=False,
+            check_missing_crossrefs=False,
+            check_contradictions=False,
+        )
         assert result["summary"]["note_orphan_count"] == 0
 
     def test_no_note_orphans_with_empty_notes(self):
         """No notes should yield no orphans."""
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [],  # notes — empty
             [],  # _log_activity
         ]
         cp = Compounder(client)
-        result = cp.lint_workspace("ws1", check_note_orphans=True,
-                                    check_orphans=False,
-                                    check_missing_crossrefs=False,
-                                    check_contradictions=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_note_orphans=True,
+            check_orphans=False,
+            check_missing_crossrefs=False,
+            check_contradictions=False,
+        )
         assert result["summary"]["note_orphan_count"] == 0
 
     def test_note_orphans_disabled_via_flag(self):
         """When check_note_orphans=False, no note orphan check runs."""
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         cp = Compounder(client)
-        result = cp.lint_workspace("ws1", check_note_orphans=False,
-                                    check_orphans=False,
-                                    check_missing_crossrefs=False,
-                                    check_contradictions=False)
+        result = cp.lint_workspace(
+            "ws1",
+            check_note_orphans=False,
+            check_orphans=False,
+            check_missing_crossrefs=False,
+            check_contradictions=False,
+        )
         assert result["summary"]["note_orphan_count"] == 0
         # _query should only be called for _log_activity
         assert client._query.call_count == 1
@@ -671,6 +767,7 @@ class TestRippleUpdate:
 
     def test_skips_when_llm_unavailable(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         mock_llm = MagicMock()
         mock_llm.available = False
@@ -680,6 +777,7 @@ class TestRippleUpdate:
 
     def test_skips_when_no_node_found(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         mock_llm = MagicMock()
         mock_llm.available = True
@@ -691,18 +789,21 @@ class TestRippleUpdate:
 
     def test_uses_llm_to_merge_existing_summary(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         mock_llm = MagicMock()
         mock_llm.available = True
         mock_llm.summarize.return_value = "Updated summary with new info integrated."
         client._query.return_value = [
-            {"id": "node_1", "label": "Alice", "summary": "Original summary",
-             "node_type": "person"},
+            {
+                "id": "node_1",
+                "label": "Alice",
+                "summary": "Original summary",
+                "node_type": "person",
+            },
         ]
         cp = Compounder(client, llm=mock_llm)
-        cp._ripple_update_entity("ws1", "Alice",
-                                  "Alice published a new paper on RL.",
-                                  "note_1")
+        cp._ripple_update_entity("ws1", "Alice", "Alice published a new paper on RL.", "note_1")
         # Should call update_node reducer
         client._call.assert_called_once()
         args = client._call.call_args
@@ -715,6 +816,7 @@ class TestIngestSource:
 
     def test_empty_text_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         cp = Compounder(client)
         result = cp.ingest_source(source_text="", source_title="Test")
@@ -723,6 +825,7 @@ class TestIngestSource:
 
     def test_creates_summary_note(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         cp = Compounder(client)
@@ -738,6 +841,7 @@ class TestIngestSource:
 
     def test_uses_llm_summary_when_available(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         mock_llm = MagicMock()
@@ -756,6 +860,7 @@ class TestIngestSource:
 
     def test_extracts_entities_when_llm_available(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         client.create_node.side_effect = [
@@ -781,6 +886,7 @@ class TestIngestSource:
 
     def test_links_entities_to_source_note(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         client.create_node.return_value = {"id": "node_1"}
@@ -801,6 +907,7 @@ class TestIngestSource:
 
     def test_checks_contradictions_on_ingest(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         client.search.return_value = [
@@ -811,10 +918,7 @@ class TestIngestSource:
         mock_llm.available = True
         mock_llm.summarize.return_value = "Summary text."
         mock_llm.extract_entities_llm.return_value = None
-        mock_llm.chat.return_value = (
-            '{"is_contradiction": true, '
-            '"explanation": "Colors differ."}'
-        )
+        mock_llm.chat.return_value = '{"is_contradiction": true, "explanation": "Colors differ."}'
 
         cp = Compounder(client, llm=mock_llm)
         result = cp.ingest_source(
@@ -826,6 +930,7 @@ class TestIngestSource:
 
     def test_no_contradictions_when_llm_unavailable(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         cp = Compounder(client)  # Default LLM — not available
@@ -837,6 +942,7 @@ class TestIngestSource:
 
     def test_updates_index_and_log(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         client._query.return_value = []  # No existing index/log
@@ -846,8 +952,7 @@ class TestIngestSource:
             source_title="Log Test",
         )
         # Should create index note
-        idx_calls = [c for c in client.create_note.call_args_list
-                     if c[1].get("title") == "_index"]
+        idx_calls = [c for c in client.create_note.call_args_list if c[1].get("title") == "_index"]
         assert len(idx_calls) >= 1
 
 
@@ -856,6 +961,7 @@ class TestProactiveContradiction:
 
     def test_returns_empty_when_llm_unavailable(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         cp = Compounder(client)
         result = cp._check_contradictions_on_ingest("ws1", "new content", "n1")
@@ -863,6 +969,7 @@ class TestProactiveContradiction:
 
     def test_returns_empty_when_no_similar_memories(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.search.return_value = []
         mock_llm = MagicMock()
@@ -874,15 +981,14 @@ class TestProactiveContradiction:
 
     def test_detects_contradiction(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.search.return_value = [
             {"entity_id": "mem_1", "content": "The sky is blue."},
         ]
         mock_llm = MagicMock()
         mock_llm.available = True
-        mock_llm.chat.return_value = (
-            '{"is_contradiction": true, "explanation": "Opposite claims"}'
-        )
+        mock_llm.chat.return_value = '{"is_contradiction": true, "explanation": "Opposite claims"}'
 
         cp = Compounder(client, llm=mock_llm)
         result = cp._check_contradictions_on_ingest("ws1", "The sky is red.", "src_1")
@@ -893,15 +999,14 @@ class TestProactiveContradiction:
 
     def test_skips_non_contradictory(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.search.return_value = [
             {"entity_id": "mem_1", "content": "Water is wet."},
         ]
         mock_llm = MagicMock()
         mock_llm.available = True
-        mock_llm.chat.return_value = (
-            '{"is_contradiction": false, "explanation": "Consistent"}'
-        )
+        mock_llm.chat.return_value = '{"is_contradiction": false, "explanation": "Consistent"}'
 
         cp = Compounder(client, llm=mock_llm)
         result = cp._check_contradictions_on_ingest("ws1", "Water is liquid.", "src_1")
@@ -913,6 +1018,7 @@ class TestEntityPage:
 
     def test_creates_note_and_node(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = []  # No existing node
         client.create_node.return_value = {"id": "node_1", "label": "Alice"}
@@ -934,6 +1040,7 @@ class TestEntityPage:
 
     def test_reuses_existing_node(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = [
             {"id": "node_1", "label": "Alice"},
@@ -947,6 +1054,7 @@ class TestEntityPage:
 
     def test_includes_yaml_frontmatter(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = []
         client.create_node.return_value = {"id": "n1"}
@@ -965,6 +1073,7 @@ class TestEntityPage:
 
     def test_creates_edge_between_note_and_node(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = []
         client.create_node.return_value = {"id": "node_1"}
@@ -984,6 +1093,7 @@ class TestConceptPage:
 
     def test_creates_concept_note_with_definition(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
         client.create_node.return_value = {"id": "node_1"}
@@ -1001,6 +1111,7 @@ class TestConceptPage:
 
     def test_includes_related_concepts(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "n1"}
         client.create_node.return_value = {"id": "node_1"}
@@ -1021,6 +1132,7 @@ class TestComparisonPage:
 
     def test_creates_comparison_table(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "note_1"}
 
@@ -1041,6 +1153,7 @@ class TestComparisonPage:
 
     def test_empty_items_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         cp = Compounder(client)
         result = cp.create_comparison_page(title="Empty", items=[])
@@ -1048,6 +1161,7 @@ class TestComparisonPage:
 
     def test_single_item_still_creates_table(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client.create_note.return_value = {"id": "n1"}
 
@@ -1064,6 +1178,7 @@ class TestExportWorkspace:
 
     def test_empty_workspace_returns_zero(self, tmp_path):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = []
         cp = Compounder(client)
@@ -1075,14 +1190,25 @@ class TestExportWorkspace:
 
     def test_exports_notes_as_markdown(self, tmp_path):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         # _query for notes, then edges, then _log_activity
         client._query.side_effect = [
             [
-                {"id": "n1", "title": "Test Note", "content": "Hello world.",
-                 "created_at": "2026-06-25", "updated_at": "2026-06-25"},
-                {"id": "n2", "title": "Another Note", "content": "More text.",
-                 "created_at": "2026-06-24", "updated_at": "2026-06-24"},
+                {
+                    "id": "n1",
+                    "title": "Test Note",
+                    "content": "Hello world.",
+                    "created_at": "2026-06-25",
+                    "updated_at": "2026-06-25",
+                },
+                {
+                    "id": "n2",
+                    "title": "Another Note",
+                    "content": "More text.",
+                    "created_at": "2026-06-24",
+                    "updated_at": "2026-06-24",
+                },
             ],
             [],  # edges (no backlinks)
         ]
@@ -1098,11 +1224,17 @@ class TestExportWorkspace:
 
     def test_exports_yaml_frontmatter(self, tmp_path):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [
-                {"id": "n1", "title": "My Page", "content": "Content here.",
-                 "created_at": "2026-06-25", "updated_at": ""},
+                {
+                    "id": "n1",
+                    "title": "My Page",
+                    "content": "Content here.",
+                    "created_at": "2026-06-25",
+                    "updated_at": "",
+                },
             ],
             [],  # edges
         ]
@@ -1120,13 +1252,24 @@ class TestExportWorkspace:
 
     def test_skips_system_notes_by_default(self, tmp_path):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [
-                {"id": "n1", "title": "_index", "content": "Index",
-                 "created_at": "", "updated_at": ""},
-                {"id": "n2", "title": "Real Note", "content": "Real",
-                 "created_at": "", "updated_at": ""},
+                {
+                    "id": "n1",
+                    "title": "_index",
+                    "content": "Index",
+                    "created_at": "",
+                    "updated_at": "",
+                },
+                {
+                    "id": "n2",
+                    "title": "Real Note",
+                    "content": "Real",
+                    "created_at": "",
+                    "updated_at": "",
+                },
             ],
             [],  # edges
         ]
@@ -1140,13 +1283,24 @@ class TestExportWorkspace:
 
     def test_includes_system_notes_when_requested(self, tmp_path):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [
-                {"id": "n1", "title": "_log", "content": "Log entry",
-                 "created_at": "", "updated_at": ""},
-                {"id": "n2", "title": "Real Note", "content": "Real",
-                 "created_at": "", "updated_at": ""},
+                {
+                    "id": "n1",
+                    "title": "_log",
+                    "content": "Log entry",
+                    "created_at": "",
+                    "updated_at": "",
+                },
+                {
+                    "id": "n2",
+                    "title": "Real Note",
+                    "content": "Real",
+                    "created_at": "",
+                    "updated_at": "",
+                },
             ],
             [],  # edges
         ]
@@ -1161,16 +1315,20 @@ class TestExportWorkspace:
 
     def test_export_kg_nodes(self, tmp_path):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         # First call: notes, Second call: edges, Third call: nodes
         client._query.side_effect = [
             [],  # notes
             [],  # edges
             [
-                {"id": "kg1", "label": "Alice", "node_type": "person",
-                 "summary": "A researcher."},
-                {"id": "kg2", "label": "RLHF", "node_type": "concept",
-                 "summary": "A training method."},
+                {"id": "kg1", "label": "Alice", "node_type": "person", "summary": "A researcher."},
+                {
+                    "id": "kg2",
+                    "label": "RLHF",
+                    "node_type": "concept",
+                    "summary": "A training method.",
+                },
             ],
         ]
         cp = Compounder(client)
@@ -1185,11 +1343,17 @@ class TestExportWorkspace:
 
     def test_sanitizes_filenames(self, tmp_path):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [
-                {"id": "n1", "title": "Special: chars/here?",
-                 "content": "test", "created_at": "", "updated_at": ""},
+                {
+                    "id": "n1",
+                    "title": "Special: chars/here?",
+                    "content": "test",
+                    "created_at": "",
+                    "updated_at": "",
+                },
             ],
             [],
         ]
@@ -1211,6 +1375,7 @@ class TestGenerateOverview:
 
     def test_empty_workspace_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = []
         cp = Compounder(client)
@@ -1219,15 +1384,20 @@ class TestGenerateOverview:
 
     def test_creates_overview_note(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [
-                {"id": "n1", "title": "Test Note", "content": "Some content",
-                 "created_at": "", "updated_at": ""},
+                {
+                    "id": "n1",
+                    "title": "Test Note",
+                    "content": "Some content",
+                    "created_at": "",
+                    "updated_at": "",
+                },
             ],
             [
-                {"id": "kg1", "label": "Alice", "node_type": "person",
-                 "summary": "A researcher."},
+                {"id": "kg1", "label": "Alice", "node_type": "person", "summary": "A researcher."},
             ],
             [],  # edges
             [],  # _log_activity: query for existing _log
@@ -1248,21 +1418,29 @@ class TestGenerateOverview:
 
     def test_includes_entity_tables(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [
-                {"id": "n1", "title": "Source: Article", "content": "type: article",
-                 "created_at": "", "updated_at": ""},
+                {
+                    "id": "n1",
+                    "title": "Source: Article",
+                    "content": "type: article",
+                    "created_at": "",
+                    "updated_at": "",
+                },
             ],
             [
-                {"id": "kg1", "label": "Alice", "node_type": "person",
-                 "summary": "A researcher in AI."},
-                {"id": "kg2", "label": "Bob", "node_type": "person",
-                 "summary": "A developer."},
+                {
+                    "id": "kg1",
+                    "label": "Alice",
+                    "node_type": "person",
+                    "summary": "A researcher in AI.",
+                },
+                {"id": "kg2", "label": "Bob", "node_type": "person", "summary": "A developer."},
             ],
             [
-                {"source_node_id": "kg1", "target_node_id": "kg2",
-                 "relation_type": "collaborates"},
+                {"source_node_id": "kg1", "target_node_id": "kg2", "relation_type": "collaborates"},
             ],
             [],  # _log_activity: query for existing _log
         ]
@@ -1281,12 +1459,12 @@ class TestGenerateOverview:
 
     def test_detects_orphan_nodes(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.side_effect = [
             [],  # notes
             [
-                {"id": "kg1", "label": "OrphanNode", "node_type": "concept",
-                 "summary": "Alone."},
+                {"id": "kg1", "label": "OrphanNode", "node_type": "concept", "summary": "Alone."},
             ],
             [],  # no edges → orphan
             [],  # _log_activity: query for existing _log
@@ -1306,22 +1484,29 @@ class TestCompounderSearchEntities:
 
     def test_search_by_label(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = [
-            {"id": "n1", "label": "RLHF", "node_type": "concept",
-             "summary": "Reinforcement learning from human feedback."},
+            {
+                "id": "n1",
+                "label": "RLHF",
+                "node_type": "concept",
+                "summary": "Reinforcement learning from human feedback.",
+            },
         ]
         cp = Compounder(client)
         results = cp.search_entities(workspace_id="ws1", label="RLHF")
         assert len(results) == 1
         assert results[0]["label"] == "RLHF"
         client._query.assert_called_once_with(
-            "kg_node", workspace_id="ws1",
+            "kg_node",
+            workspace_id="ws1",
             filter_dict={"label": "RLHF"},
         )
 
     def test_search_by_node_type(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = [
             {"id": "n1", "label": "Alice", "node_type": "person"},
@@ -1334,6 +1519,7 @@ class TestCompounderSearchEntities:
 
     def test_search_no_filters_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         cp = Compounder(client)
         results = cp.search_entities(workspace_id="ws1")
@@ -1342,13 +1528,16 @@ class TestCompounderSearchEntities:
 
     def test_search_label_and_type(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = [
             {"id": "n1", "label": "RLHF", "node_type": "concept"},
         ]
         cp = Compounder(client)
         results = cp.search_entities(
-            workspace_id="ws1", label="RLHF", node_type="concept",
+            workspace_id="ws1",
+            label="RLHF",
+            node_type="concept",
         )
         assert len(results) == 1
         # Both filters should be in the filter_dict
@@ -1358,6 +1547,7 @@ class TestCompounderSearchEntities:
 
     def test_search_semantic_filters_node_results(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         # Mock search to return mixed results
         client.search.return_value = [
@@ -1365,6 +1555,7 @@ class TestCompounderSearchEntities:
             {"entity_id": "mem_1", "entity_type": "memory", "score": 0.72},
             {"entity_id": "node_2", "entity_type": "node", "score": 0.65},
         ]
+
         # Mock _query to return kg_node records
         def _query_side_effect(table, **kwargs):
             if table == "kg_node" and kwargs.get("workspace_id") == "ws1":
@@ -1374,11 +1565,13 @@ class TestCompounderSearchEntities:
                     {"id": "node_3", "label": "CNN", "node_type": "concept"},
                 ]
             return []
+
         client._query.side_effect = _query_side_effect
 
         cp = Compounder(client)
         results = cp.search_entities(
-            workspace_id="ws1", semantic_query="neural networks",
+            workspace_id="ws1",
+            semantic_query="neural networks",
         )
         # Should only return node entities, not memory entities
         assert len(results) == 2
@@ -1389,6 +1582,7 @@ class TestCompounderSearchEntities:
 
     def test_search_combined_filters_and_semantic(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         # _query for filter_dict
         client._query.side_effect = [
@@ -1422,8 +1616,12 @@ class TestCompounderSearchEntities:
 class TestCompounderEntityPageUpdate:
     """Tests for Compounder.update_entity_page()."""
 
-    def _make_client(self, node_data: dict, note_data: list[dict] | None = None,
-                     index_data: list[dict] | None = None):
+    def _make_client(
+        self,
+        node_data: dict,
+        note_data: list[dict] | None = None,
+        index_data: list[dict] | None = None,
+    ):
         """Helper to build a mock client with predictable _query side effects."""
         client = MagicMock()
         # _query is called: 1) find node, 2) find note, 3) find _index, 4+) log
@@ -1437,12 +1635,25 @@ class TestCompounderEntityPageUpdate:
 
     def test_updates_node_and_note(self):
         from spacetime_memory.compounder import Compounder
+
         client = self._make_client(
-            node_data=[{"id": "node_1", "label": "RLHF", "node_type": "concept",
-                        "summary": "Old description", "metadata_json": "{}",
-                        "source_memory_id": ""}],
-            note_data=[{"id": "note_1", "title": "RLHF",
-                        "content": "---\ntype: concept\n---\n\n## Overview\n\nOld description\n\n---\n*Entity page: RLHF*"}],
+            node_data=[
+                {
+                    "id": "node_1",
+                    "label": "RLHF",
+                    "node_type": "concept",
+                    "summary": "Old description",
+                    "metadata_json": "{}",
+                    "source_memory_id": "",
+                }
+            ],
+            note_data=[
+                {
+                    "id": "note_1",
+                    "title": "RLHF",
+                    "content": "---\ntype: concept\n---\n\n## Overview\n\nOld description\n\n---\n*Entity page: RLHF*",
+                }
+            ],
         )
         client.update_node.return_value = {"id": "node_1"}
         client.update_note.return_value = {"id": "note_1", "title": "RLHF"}
@@ -1472,6 +1683,7 @@ class TestCompounderEntityPageUpdate:
 
     def test_not_found_returns_empty(self):
         from spacetime_memory.compounder import Compounder
+
         client = MagicMock()
         client._query.return_value = []  # No nodes found
 
@@ -1488,9 +1700,18 @@ class TestCompounderEntityPageUpdate:
 
     def test_no_note_skips_note_update(self):
         from spacetime_memory.compounder import Compounder
+
         client = self._make_client(
-            node_data=[{"id": "node_1", "label": "RLHF", "node_type": "concept",
-                        "summary": "Old", "metadata_json": "{}", "source_memory_id": ""}],
+            node_data=[
+                {
+                    "id": "node_1",
+                    "label": "RLHF",
+                    "node_type": "concept",
+                    "summary": "Old",
+                    "metadata_json": "{}",
+                    "source_memory_id": "",
+                }
+            ],
             note_data=None,  # No note found
         )
 
@@ -1509,12 +1730,25 @@ class TestCompounderEntityPageUpdate:
 
     def test_partial_update_keeps_unchanged_fields(self):
         from spacetime_memory.compounder import Compounder
+
         client = self._make_client(
-            node_data=[{"id": "node_1", "label": "Alice", "node_type": "person",
-                        "summary": "A researcher.", "metadata_json": '{"age": 30}',
-                        "source_memory_id": "mem_123"}],
-            note_data=[{"id": "note_1", "title": "Alice",
-                        "content": "---\ntype: person\n---\n\n## Overview\n\nA researcher.\n\n---\n*Entity page: Alice*"}],
+            node_data=[
+                {
+                    "id": "node_1",
+                    "label": "Alice",
+                    "node_type": "person",
+                    "summary": "A researcher.",
+                    "metadata_json": '{"age": 30}',
+                    "source_memory_id": "mem_123",
+                }
+            ],
+            note_data=[
+                {
+                    "id": "note_1",
+                    "title": "Alice",
+                    "content": "---\ntype: person\n---\n\n## Overview\n\nA researcher.\n\n---\n*Entity page: Alice*",
+                }
+            ],
         )
 
         cp = Compounder(client)
@@ -1539,11 +1773,25 @@ class TestCompounderEntityPageUpdate:
 
     def test_preserves_existing_tags_from_frontmatter(self):
         from spacetime_memory.compounder import Compounder
+
         client = self._make_client(
-            node_data=[{"id": "node_1", "label": "RLHF", "node_type": "concept",
-                        "summary": "Old", "metadata_json": "{}", "source_memory_id": ""}],
-            note_data=[{"id": "note_1", "title": "RLHF",
-                        "content": "---\ntype: concept\ntags: [ml, reinforcement, alignment]\nsources: []\n---\n\n## Overview\n\nOld\n\n---\n*Entity page: RLHF*"}],
+            node_data=[
+                {
+                    "id": "node_1",
+                    "label": "RLHF",
+                    "node_type": "concept",
+                    "summary": "Old",
+                    "metadata_json": "{}",
+                    "source_memory_id": "",
+                }
+            ],
+            note_data=[
+                {
+                    "id": "note_1",
+                    "title": "RLHF",
+                    "content": "---\ntype: concept\ntags: [ml, reinforcement, alignment]\nsources: []\n---\n\n## Overview\n\nOld\n\n---\n*Entity page: RLHF*",
+                }
+            ],
         )
 
         cp = Compounder(client)
@@ -1558,4 +1806,3 @@ class TestCompounderEntityPageUpdate:
         content = client.update_note.call_args[1]["content"]
         assert "tags: [ml, reinforcement, alignment]" in content
         assert "Updated description." in content
-

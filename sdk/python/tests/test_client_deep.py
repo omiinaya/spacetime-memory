@@ -147,8 +147,10 @@ class TestKeywordFallback:
         _store_mem(stdb_client, ws_id, "The unique zebra crossed the rainbow bridge")
 
         results = stdb_client.search(
-            workspace_id=ws_id, query="zebra rainbow",
-            limit=10, semantic=False,
+            workspace_id=ws_id,
+            query="zebra rainbow",
+            limit=10,
+            semantic=False,
         )
         assert isinstance(results, list)
         found = any("zebra" in r.get("content", "") for r in results)
@@ -158,8 +160,10 @@ class TestKeywordFallback:
         """Keyword search on empty workspace returns empty list."""
         empty_ws = _make_ws(stdb_client)
         results = stdb_client.search(
-            workspace_id=empty_ws, query="nothing",
-            limit=10, semantic=False,
+            workspace_id=empty_ws,
+            query="nothing",
+            limit=10,
+            semantic=False,
         )
         assert isinstance(results, list)
         assert len(results) == 0
@@ -229,6 +233,7 @@ class TestStoreBatch:
         # still call the reducer and index without embeddings.
         # Connection errors are expected when no embedder is running.
         import httpx
+
         try:
             results = stdb_client.store_batch(ws_id, items)
             assert isinstance(results, list)
@@ -391,13 +396,15 @@ class TestGraphDeep:
         """Get citations for a KG entity."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "CitationNode", "concept")
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "CitationNode"})
+        nodes = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "CitationNode"}
+        )
         if nodes:
             node_id = nodes[0]["id"]
             try:
                 stdb_client.add_node_citation(
-                    ws_id, node_id,
+                    ws_id,
+                    node_id,
                     "Test citation for graph entity",
                     "test-mem-001",
                 )
@@ -436,8 +443,9 @@ class TestGraphDeep:
         """Get a KG node by ID."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "GetNodeTest", "concept")
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "GetNodeTest"})
+        nodes = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "GetNodeTest"}
+        )
         if nodes:
             node_id = nodes[0]["id"]
             result = stdb_client.get_node(node_id)
@@ -474,18 +482,29 @@ class TestGraphDeep:
         stdb_client.create_node(ws_id, "NeighborA", "concept")
         stdb_client.create_node(ws_id, "NeighborB", "concept")
 
-        nodes_a = stdb_client._query("kg_node", workspace_id=ws_id,
-                                     filter_dict={"label": "NeighborA"})
-        nodes_b = stdb_client._query("kg_node", workspace_id=ws_id,
-                                     filter_dict={"label": "NeighborB"})
+        nodes_a = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "NeighborA"}
+        )
+        nodes_b = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "NeighborB"}
+        )
         if nodes_a and nodes_b:
             nid_a = nodes_a[0]["id"]
             nid_b = nodes_b[0]["id"]
             try:
-                stdb_client._call("create_edge", [
-                    ws_id, nid_a, nid_b, "relates_to",
-                    1.0, "EXTRACTED", "{}", "",
-                ])
+                stdb_client._call(
+                    "create_edge",
+                    [
+                        ws_id,
+                        nid_a,
+                        nid_b,
+                        "relates_to",
+                        1.0,
+                        "EXTRACTED",
+                        "{}",
+                        "",
+                    ],
+                )
             except RuntimeError:
                 pass
 
@@ -545,12 +564,14 @@ class TestGraphDeep:
         """Add a citation to a KG node."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "CiteNode", "concept")
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "CiteNode"})
+        nodes = stdb_client._query("kg_node", workspace_id=ws_id, filter_dict={"label": "CiteNode"})
         if nodes:
             node_id = nodes[0]["id"]
             result = stdb_client.add_node_citation(
-                ws_id, node_id, "Node citation description", "src-mem-1",
+                ws_id,
+                node_id,
+                "Node citation description",
+                "src-mem-1",
             )
             assert result["status"] == "ok"
 
@@ -559,16 +580,27 @@ class TestGraphDeep:
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "EdgeCiteSrc", "concept")
         stdb_client.create_node(ws_id, "EdgeCiteTgt", "concept")
-        nodes_src = stdb_client._query("kg_node", workspace_id=ws_id,
-                                       filter_dict={"label": "EdgeCiteSrc"})
-        nodes_tgt = stdb_client._query("kg_node", workspace_id=ws_id,
-                                       filter_dict={"label": "EdgeCiteTgt"})
+        nodes_src = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "EdgeCiteSrc"}
+        )
+        nodes_tgt = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "EdgeCiteTgt"}
+        )
         if nodes_src and nodes_tgt:
             try:
-                stdb_client._call("create_edge", [
-                    ws_id, nodes_src[0]["id"], nodes_tgt[0]["id"],
-                    "cites", 1.0, "EXTRACTED", "{}", "",
-                ])
+                stdb_client._call(
+                    "create_edge",
+                    [
+                        ws_id,
+                        nodes_src[0]["id"],
+                        nodes_tgt[0]["id"],
+                        "cites",
+                        1.0,
+                        "EXTRACTED",
+                        "{}",
+                        "",
+                    ],
+                )
             except RuntimeError:
                 pass
             edges = stdb_client._query("kg_edge", workspace_id=ws_id)
@@ -576,7 +608,10 @@ class TestGraphDeep:
                 edge_id = edges[0]["id"]
                 try:
                     result = stdb_client.add_edge_citation(
-                        ws_id, edge_id, "Edge citation", "src-mem-2",
+                        ws_id,
+                        edge_id,
+                        "Edge citation",
+                        "src-mem-2",
                     )
                     assert result["status"] == "ok"
                 except RuntimeError as e:
@@ -596,8 +631,9 @@ class TestGraphTraversal:
         """BFS traversal from a start node."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "BFS_Start", "concept")
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "BFS_Start"})
+        nodes = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "BFS_Start"}
+        )
         if nodes:
             node_id = nodes[0]["id"]
             try:
@@ -612,10 +648,12 @@ class TestGraphTraversal:
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "SP_Source", "concept")
         stdb_client.create_node(ws_id, "SP_Target", "concept")
-        nodes_src = stdb_client._query("kg_node", workspace_id=ws_id,
-                                       filter_dict={"label": "SP_Source"})
-        nodes_tgt = stdb_client._query("kg_node", workspace_id=ws_id,
-                                       filter_dict={"label": "SP_Target"})
+        nodes_src = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "SP_Source"}
+        )
+        nodes_tgt = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "SP_Target"}
+        )
         if nodes_src and nodes_tgt:
             src_id = nodes_src[0]["id"]
             tgt_id = nodes_tgt[0]["id"]
@@ -630,8 +668,9 @@ class TestGraphTraversal:
         """Get neighbors via reducer."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "NeighborRed", "concept")
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "NeighborRed"})
+        nodes = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "NeighborRed"}
+        )
         if nodes:
             node_id = nodes[0]["id"]
             try:
@@ -771,7 +810,9 @@ class TestEntityLinking:
     def test_create_entity_link(self, stdb_client):
         """Create a canonical entity link."""
         ws_id = _make_ws(stdb_client)
-        stdb_client.create_entity_link(ws_id, "EntityCanonical", "person", "A canonical entity for testing.")
+        stdb_client.create_entity_link(
+            ws_id, "EntityCanonical", "person", "A canonical entity for testing."
+        )
         # No error means success
 
     def test_add_alias(self, stdb_client):
@@ -796,7 +837,9 @@ class TestEntityLinking:
     def test_resolve_entity(self, stdb_client):
         """Resolve an entity name in a workspace."""
         ws_id = _make_ws(stdb_client)
-        stdb_client.create_entity_link(ws_id, "ResolvedEntity", "organization", "An entity to resolve.")
+        stdb_client.create_entity_link(
+            ws_id, "ResolvedEntity", "organization", "An entity to resolve."
+        )
         stdb_client.resolve_entity(ws_id, "ResolvedEntity")
 
 
@@ -825,7 +868,7 @@ class TestBackupRestore:
         _store_mem(stdb_client, ws_id, "backup default path test")
 
         import tempfile
-        import os as _os
+
         with tempfile.TemporaryDirectory() as tmpdir:
             monkeypatch.chdir(tmpdir)
             result = stdb_client.backup()
@@ -963,7 +1006,7 @@ class TestContextPacks:
 
 class TestProfilesDeep:
     """upsert_profile, get_profile, list_profiles, search_profiles,
-       get_profile_context, add_dynamic_context."""
+    get_profile_context, add_dynamic_context."""
 
     def test_upsert_profile(self, stdb_client):
         """Upsert a peer profile."""
@@ -1023,7 +1066,9 @@ class TestSessionsDeep:
             except RuntimeError:
                 pass
             try:
-                stdb_client._call("send_message", [sid, "deep-peer", "Session message test", "text", "{}"])
+                stdb_client._call(
+                    "send_message", [sid, "deep-peer", "Session message test", "text", "{}"]
+                )
             except RuntimeError:
                 pass
 
@@ -1039,7 +1084,9 @@ class TestSessionsDeep:
         if sessions:
             sid = sessions[0]["id"]
             try:
-                stdb_client._call("send_message", [sid, "msg-peer", "Hello from deep test", "text", "{}"])
+                stdb_client._call(
+                    "send_message", [sid, "msg-peer", "Hello from deep test", "text", "{}"]
+                )
             except RuntimeError:
                 pass
             messages = stdb_client.get_session_messages(sid)
@@ -1060,7 +1107,8 @@ class TestSearchWithFilters:
         _store_mem(stdb_client, ws_id, "filtered search test alpha", "filt-bot")
 
         results = stdb_client.search_with_filters(
-            workspace_id=ws_id, query="filtered search",
+            workspace_id=ws_id,
+            query="filtered search",
             memory_type="experience",
         )
         assert isinstance(results, list)
@@ -1142,7 +1190,7 @@ class TestDecay:
 
 class TestDirectories:
     """create_directory, link_memory_to_directory, list_directory,
-       traverse_directory, get_directory, unlink_memory_from_directory."""
+    traverse_directory, get_directory, unlink_memory_from_directory."""
 
     def test_create_directory(self, stdb_client):
         """Create a directory."""
@@ -1218,7 +1266,7 @@ class TestDirectories:
 
 class TestDocuments:
     """create_document, get_document, list_documents, get_document_chunks,
-       delete_document."""
+    delete_document."""
 
     def test_create_document(self, stdb_client):
         """Create a document."""
@@ -1252,7 +1300,8 @@ class TestDocuments:
         """Get document chunks."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_document(
-            ws_id, title="Chunk Doc",
+            ws_id,
+            title="Chunk Doc",
             content="Chunk one.\nChunk two.\nChunk three.",
         )
         docs = stdb_client.list_documents(ws_id)
@@ -1424,8 +1473,9 @@ class TestTourOps:
         """Add a stop to a tour — exercises the reducer call."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "TourStopNode", "concept")
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "TourStopNode"})
+        nodes = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "TourStopNode"}
+        )
 
         # Call add_tour_stop directly — may fail if tour doesn't exist,
         # but exercises the _call path regardless
@@ -1481,6 +1531,7 @@ class TestDeltaSync:
         assert ds is not None
         # Check the instance is of the right type
         from spacetime_memory.delta_sync import DeltaSync
+
         assert isinstance(ds, DeltaSync)
 
 
@@ -1502,7 +1553,7 @@ class TestStoreBatchDeep:
                 "memory_type": "experience",
                 "confidence": 0.9,
                 "summary": "Alpha summary",
-                "entities_json": '[]',
+                "entities_json": "[]",
             },
             {
                 "content": "Batch deep beta world fact",
@@ -1519,6 +1570,7 @@ class TestStoreBatchDeep:
             },
         ]
         import httpx
+
         try:
             results = stdb_client.store_batch(ws_id, items)
             assert isinstance(results, list)
@@ -1538,6 +1590,7 @@ class TestStoreBatchDeep:
             {"content": "", "peer_id": "empty-bot"},
         ]
         import httpx
+
         try:
             results = stdb_client.store_batch(ws_id, items)
             assert isinstance(results, list)
@@ -1559,6 +1612,7 @@ class TestParseRerankJson:
 
     def _get_fn(self):
         from spacetime_memory.client import _parse_rerank_json
+
         return _parse_rerank_json
 
     def test_valid_json_array(self):
@@ -1572,7 +1626,9 @@ class TestParseRerankJson:
     def test_array_in_text(self):
         """Strategy 2: find JSON array boundaries in surrounding text."""
         fn = self._get_fn()
-        content = 'Here are the results:\n[{"index": 1, "score": 7.0, "reason": "good"}]\nThat is all.'
+        content = (
+            'Here are the results:\n[{"index": 1, "score": 7.0, "reason": "good"}]\nThat is all.'
+        )
         result = fn(content)
         assert len(result) == 1
         assert result[0]["index"] == 1
@@ -1610,7 +1666,7 @@ class TestParseRerankJson:
         # dict-with-score regex. This content has no "score" key to
         # ensure strategy 6 is reached.
         content = (
-            'Here are results:\n'
+            "Here are results:\n"
             '{"index": 5, "value": 4.2, "reason": "low"}\n'
             '{"index": 6, "value": 3.0, "reason": "lower"}'
         )
@@ -1653,6 +1709,7 @@ class TestParseSqlResponse:
 
     def _get_fn(self):
         from spacetime_memory.client import _parse_sql_response
+
         return _parse_sql_response
 
     def test_empty_string(self):
@@ -1670,18 +1727,22 @@ class TestParseSqlResponse:
     def test_valid_response(self):
         """Valid SQL response with named columns."""
         fn = self._get_fn()
-        raw = json.dumps([{
-            "schema": {
-                "elements": [
-                    {"name": {"some": "id"}},
-                    {"name": {"some": "content"}},
-                ]
-            },
-            "rows": [
-                ["mem-1", "hello world"],
-                ["mem-2", "foo bar"],
+        raw = json.dumps(
+            [
+                {
+                    "schema": {
+                        "elements": [
+                            {"name": {"some": "id"}},
+                            {"name": {"some": "content"}},
+                        ]
+                    },
+                    "rows": [
+                        ["mem-1", "hello world"],
+                        ["mem-2", "foo bar"],
+                    ],
+                }
             ]
-        }])
+        )
         result = fn(raw)
         assert len(result) == 2
         assert result[0]["id"] == "mem-1"
@@ -1691,17 +1752,21 @@ class TestParseSqlResponse:
     def test_unnamed_columns(self):
         """Response with elements missing 'some' key → ?col? fallback (line 2791)."""
         fn = self._get_fn()
-        raw = json.dumps([{
-            "schema": {
-                "elements": [
-                    {"name": "bare_string_not_dict"},
-                    {"name": None},
-                ]
-            },
-            "rows": [
-                ["val1", "val2"],
+        raw = json.dumps(
+            [
+                {
+                    "schema": {
+                        "elements": [
+                            {"name": "bare_string_not_dict"},
+                            {"name": None},
+                        ]
+                    },
+                    "rows": [
+                        ["val1", "val2"],
+                    ],
+                }
             ]
-        }])
+        )
         result = fn(raw)
         assert len(result) == 1
         # Both columns get key "?col?" so the second value overwrites the first
@@ -1861,7 +1926,9 @@ class TestDecayDeep:
         """Set weibull decay model."""
         ws_id = _make_ws(stdb_client)
         try:
-            result = stdb_client.set_decay_model(ws_id, "weibull", weibull_shape=0.5, weibull_scale=45.0)
+            result = stdb_client.set_decay_model(
+                ws_id, "weibull", weibull_shape=0.5, weibull_scale=45.0
+            )
             assert result["status"] == "ok"
         except RuntimeError:
             pass  # Decay reducers may not exist
@@ -1935,6 +2002,7 @@ class TestPluginDispatch:
         )
         # Register and self-promote to admin
         import os
+
         suffix = os.urandom(4).hex()
         uname = f"plugin_{suffix}"
         try:
@@ -1967,8 +2035,9 @@ class TestPluginDispatch:
         assert isinstance(exported, list)
         # At least the memory we stored should be in the exported data
         contents = [r.get("content", "") for r in exported]
-        assert any("plugin backup test memory" in c for c in contents), \
+        assert any("plugin backup test memory" in c for c in contents), (
             f"Exported data didn't contain test memory: {contents[:5]}"
+        )
 
     def test_restore_dispatches_to_plugin(self, plugin_client, tmp_path):
         """restore() calls plugin_manager.dispatch_import() (lines 2701-2704)."""
@@ -2008,12 +2077,9 @@ class TestGraphTraversalDeep:
         client.create_node(ws_id, "TriB", "concept")
         client.create_node(ws_id, "TriC", "concept")
 
-        nodes_a = client._query("kg_node", workspace_id=ws_id,
-                                filter_dict={"label": "TriA"})
-        nodes_b = client._query("kg_node", workspace_id=ws_id,
-                                filter_dict={"label": "TriB"})
-        nodes_c = client._query("kg_node", workspace_id=ws_id,
-                                filter_dict={"label": "TriC"})
+        nodes_a = client._query("kg_node", workspace_id=ws_id, filter_dict={"label": "TriA"})
+        nodes_b = client._query("kg_node", workspace_id=ws_id, filter_dict={"label": "TriB"})
+        nodes_c = client._query("kg_node", workspace_id=ws_id, filter_dict={"label": "TriC"})
         if not (nodes_a and nodes_b and nodes_c):
             return None, None, None
 
@@ -2033,12 +2099,15 @@ class TestGraphTraversalDeep:
         stdb_client.create_node(ws_id, "RelFilterB", "concept")
         stdb_client.create_node(ws_id, "RelFilterC", "concept")
 
-        nodes_a = stdb_client._query("kg_node", workspace_id=ws_id,
-                                     filter_dict={"label": "RelFilterA"})
-        nodes_b = stdb_client._query("kg_node", workspace_id=ws_id,
-                                     filter_dict={"label": "RelFilterB"})
-        nodes_c = stdb_client._query("kg_node", workspace_id=ws_id,
-                                     filter_dict={"label": "RelFilterC"})
+        nodes_a = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "RelFilterA"}
+        )
+        nodes_b = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "RelFilterB"}
+        )
+        nodes_c = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "RelFilterC"}
+        )
         if not (nodes_a and nodes_b and nodes_c):
             pytest.skip("Could not create all test nodes")
 
@@ -2057,8 +2126,9 @@ class TestGraphTraversalDeep:
         # get_neighbors doesn't support relation filter in current API,
         # but we test edge properties are accessible
         relations = [e.get("relation", "") for e in all_edges]
-        assert "loves" in relations or "hates" in relations, \
+        assert "loves" in relations or "hates" in relations, (
             f"Expected loves/hates in relations: {relations}"
+        )
 
     def test_query_graph_no_matches(self, stdb_client):
         """query_graph returns empty list when no nodes match."""
@@ -2076,8 +2146,7 @@ class TestGraphTraversalDeep:
         results = stdb_client.query_graph(ws_id, "ExactMatchNode")
         assert isinstance(results, list)
         labels = [r.get("label", "") for r in results]
-        assert any("ExactMatchNode" in l for l in labels), \
-            f"ExactMatchNode not found in {labels}"
+        assert any("ExactMatchNode" in l for l in labels), f"ExactMatchNode not found in {labels}"
 
     def test_shortest_path_with_triangle(self, stdb_client):
         """shortest_path through an actual triangle graph."""
@@ -2113,8 +2182,9 @@ class TestGraphTraversalDeep:
         """get_neighbors on an isolated node returns empty or no edges."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "IsolatedNode", "concept")
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "IsolatedNode"})
+        nodes = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "IsolatedNode"}
+        )
         if nodes:
             edges = stdb_client.get_neighbors(nodes[0]["id"], ws_id)
             assert isinstance(edges, list)
@@ -2125,8 +2195,9 @@ class TestGraphTraversalDeep:
         """get_neighbors_via_reducer on an isolated node."""
         ws_id = _make_ws(stdb_client)
         stdb_client.create_node(ws_id, "IsoRedNode", "concept")
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "IsoRedNode"})
+        nodes = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "IsoRedNode"}
+        )
         if nodes:
             try:
                 stdb_client.get_neighbors_via_reducer(ws_id, nodes[0]["id"])
@@ -2154,12 +2225,14 @@ class TestGraphStatsDeep:
         nodes = stdb_client._query("kg_node", workspace_id=ws_id)
         if len(nodes) >= 3:
             try:
-                stdb_client._call("create_edge",
-                    [ws_id, nodes[0]["id"], nodes[1]["id"],
-                     "related", 1.0, "EXTRACTED", "{}", ""])
-                stdb_client._call("create_edge",
-                    [ws_id, nodes[1]["id"], nodes[2]["id"],
-                     "related", 1.0, "EXTRACTED", "{}", ""])
+                stdb_client._call(
+                    "create_edge",
+                    [ws_id, nodes[0]["id"], nodes[1]["id"], "related", 1.0, "EXTRACTED", "{}", ""],
+                )
+                stdb_client._call(
+                    "create_edge",
+                    [ws_id, nodes[1]["id"], nodes[2]["id"], "related", 1.0, "EXTRACTED", "{}", ""],
+                )
             except RuntimeError:
                 pass
 
@@ -2177,15 +2250,14 @@ class TestGraphStatsDeep:
         stdb_client.create_node(ws_id, "PRA", "concept")
         stdb_client.create_node(ws_id, "PRB", "concept")
         # Edges
-        na = stdb_client._query("kg_node", workspace_id=ws_id,
-                                filter_dict={"label": "PRA"})
-        nb = stdb_client._query("kg_node", workspace_id=ws_id,
-                                filter_dict={"label": "PRB"})
+        na = stdb_client._query("kg_node", workspace_id=ws_id, filter_dict={"label": "PRA"})
+        nb = stdb_client._query("kg_node", workspace_id=ws_id, filter_dict={"label": "PRB"})
         if na and nb:
             try:
-                stdb_client._call("create_edge",
-                    [ws_id, na[0]["id"], nb[0]["id"],
-                     "links_to", 1.0, "EXTRACTED", "{}", ""])
+                stdb_client._call(
+                    "create_edge",
+                    [ws_id, na[0]["id"], nb[0]["id"], "links_to", 1.0, "EXTRACTED", "{}", ""],
+                )
             except RuntimeError:
                 pass
 
@@ -2224,9 +2296,10 @@ class TestGraphStatsDeep:
         nodes = stdb_client._query("kg_node", workspace_id=ws_id)
         if len(nodes) >= 2:
             try:
-                stdb_client._call("create_edge",
-                    [ws_id, nodes[0]["id"], nodes[1]["id"],
-                     "bridges", 1.0, "EXTRACTED", "{}", ""])
+                stdb_client._call(
+                    "create_edge",
+                    [ws_id, nodes[0]["id"], nodes[1]["id"], "bridges", 1.0, "EXTRACTED", "{}", ""],
+                )
             except RuntimeError:
                 pass
 
@@ -2287,16 +2360,15 @@ class TestBackupRestoreDeep:
 
         # Read the backup file and check for graph tables
         import json
+
         data = json.loads(backup_path.read_text())
         tables = data.get("tables", {})
         # kg_node should exist if we created nodes
-        assert "kg_node" in tables, \
-            f"kg_node not in backup tables: {list(tables.keys())}"
+        assert "kg_node" in tables, f"kg_node not in backup tables: {list(tables.keys())}"
         # Verify our node is in the backup
         nodes = tables.get("kg_node", [])
         labels = [n.get("label", "") for n in nodes]
-        assert any("BackupNode" in l for l in labels), \
-            f"BackupNode not in backup: {labels}"
+        assert any("BackupNode" in l for l in labels), f"BackupNode not in backup: {labels}"
 
     def test_backup_includes_memory_table(self, stdb_client, tmp_path):
         """backup() includes memory table when memories exist."""
@@ -2308,10 +2380,10 @@ class TestBackupRestoreDeep:
         assert result["status"] == "ok"
 
         import json
+
         data = json.loads(backup_path.read_text())
         tables = data.get("tables", {})
-        assert "memory" in tables, \
-            f"memory not in backup tables: {list(tables.keys())}"
+        assert "memory" in tables, f"memory not in backup tables: {list(tables.keys())}"
 
     def test_restore_with_existing_data(self, stdb_client, tmp_path):
         """restore() when data already exists (may trigger duplicates)."""
@@ -2340,13 +2412,15 @@ class TestBackupRestoreDeep:
         assert result["status"] == "ok"
 
         import json
+
         data = json.loads(backup_path.read_text())
         tables = data.get("tables", {})
         # Profile table should be in backup if we upserted
         if "profile" in tables:
             peer_ids = [p.get("peer_id", "") for p in tables["profile"]]
-            assert any("backup-profile-bot" in p for p in peer_ids), \
+            assert any("backup-profile-bot" in p for p in peer_ids), (
                 f"backup-profile-bot not in profile backup: {peer_ids}"
+            )
 
     def test_backup_default_filename(self, stdb_client, tmp_path, monkeypatch):
         """backup() with no path generates a timestamped filename."""
@@ -2371,6 +2445,7 @@ class TestLLMRerank:
 
     def _get_fn(self):
         from spacetime_memory.client import llm_rerank
+
         return llm_rerank
 
     def test_llm_rerank_empty_results(self):
@@ -2406,14 +2481,18 @@ class TestLLMRerank:
         import json as _json
 
         mock_response = {
-            "choices": [{
-                "message": {
-                    "content": _json.dumps([
-                        {"index": 0, "score": 9, "reason": "highly relevant"},
-                        {"index": 1, "score": 5, "reason": "somewhat relevant"},
-                    ])
+            "choices": [
+                {
+                    "message": {
+                        "content": _json.dumps(
+                            [
+                                {"index": 0, "score": 9, "reason": "highly relevant"},
+                                {"index": 1, "score": 5, "reason": "somewhat relevant"},
+                            ]
+                        )
+                    }
                 }
-            }]
+            ]
         }
 
         results = [
@@ -2449,14 +2528,18 @@ class TestLLMRerank:
 
         # Simulate a reasoning model that puts output in reasoning_content
         mock_response = {
-            "choices": [{
-                "message": {
-                    "content": "",
-                    "reasoning_content": _json.dumps([
-                        {"index": 0, "score": 10, "reason": "perfect match"},
-                    ]),
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "reasoning_content": _json.dumps(
+                            [
+                                {"index": 0, "score": 10, "reason": "perfect match"},
+                            ]
+                        ),
+                    }
                 }
-            }]
+            ]
         }
 
         results = [{"content": "Critical security patch", "score": 0.9}]
@@ -2486,13 +2569,17 @@ class TestLLMRerank:
         import json as _json
 
         success_response = {
-            "choices": [{
-                "message": {
-                    "content": _json.dumps([
-                        {"index": 0, "score": 8, "reason": "good"},
-                    ]),
+            "choices": [
+                {
+                    "message": {
+                        "content": _json.dumps(
+                            [
+                                {"index": 0, "score": 8, "reason": "good"},
+                            ]
+                        ),
+                    }
                 }
-            }]
+            ]
         }
 
         results = [{"content": "Test content", "score": 0.5}]
@@ -2582,11 +2669,13 @@ class TestLLMRerank:
         fn = self._get_fn()
 
         mock_response = {
-            "choices": [{
-                "message": {
-                    "content": "This is not JSON at all, just garbage output with no braces",
+            "choices": [
+                {
+                    "message": {
+                        "content": "This is not JSON at all, just garbage output with no braces",
+                    }
                 }
-            }]
+            ]
         }
 
         results = [{"content": "Test content", "score": 0.5}]
@@ -2675,18 +2764,29 @@ class TestGraphNeighborsDeep:
         stdb_client.create_node(ws_id, "EdgePropSrc", "concept")
         stdb_client.create_node(ws_id, "EdgePropTgt", "concept")
 
-        nodes_src = stdb_client._query("kg_node", workspace_id=ws_id,
-                                       filter_dict={"label": "EdgePropSrc"})
-        nodes_tgt = stdb_client._query("kg_node", workspace_id=ws_id,
-                                       filter_dict={"label": "EdgePropTgt"})
+        nodes_src = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "EdgePropSrc"}
+        )
+        nodes_tgt = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "EdgePropTgt"}
+        )
         if not (nodes_src and nodes_tgt):
             pytest.skip("Could not create nodes")
 
         try:
-            stdb_client._call("create_edge", [
-                ws_id, nodes_src[0]["id"], nodes_tgt[0]["id"],
-                "is_friend_of", 0.95, "EXTRACTED", "{}", "",
-            ])
+            stdb_client._call(
+                "create_edge",
+                [
+                    ws_id,
+                    nodes_src[0]["id"],
+                    nodes_tgt[0]["id"],
+                    "is_friend_of",
+                    0.95,
+                    "EXTRACTED",
+                    "{}",
+                    "",
+                ],
+            )
         except RuntimeError:
             pytest.skip("create_edge reducer not available")
 
@@ -2695,10 +2795,12 @@ class TestGraphNeighborsDeep:
 
         edge = edges[0]
         # Check that edge has the expected fields (snake_case naming in STDB)
-        assert "source_node_id" in edge or "source_id" in edge or "node_a" in edge, \
+        assert "source_node_id" in edge or "source_id" in edge or "node_a" in edge, (
             f"Edge missing source field: {edge.keys()}"
-        assert "target_node_id" in edge or "target_id" in edge or "node_b" in edge, \
+        )
+        assert "target_node_id" in edge or "target_id" in edge or "node_b" in edge, (
             f"Edge missing target field: {edge.keys()}"
+        )
 
     def test_get_neighbors_bidirectional(self, stdb_client):
         """get_neighbors returns edges regardless of direction."""
@@ -2706,18 +2808,25 @@ class TestGraphNeighborsDeep:
         stdb_client.create_node(ws_id, "BidirA", "concept")
         stdb_client.create_node(ws_id, "BidirB", "concept")
 
-        nodes_a = stdb_client._query("kg_node", workspace_id=ws_id,
-                                     filter_dict={"label": "BidirA"})
-        nodes_b = stdb_client._query("kg_node", workspace_id=ws_id,
-                                     filter_dict={"label": "BidirB"})
+        nodes_a = stdb_client._query("kg_node", workspace_id=ws_id, filter_dict={"label": "BidirA"})
+        nodes_b = stdb_client._query("kg_node", workspace_id=ws_id, filter_dict={"label": "BidirB"})
         if not (nodes_a and nodes_b):
             pytest.skip("Could not create nodes")
 
         try:
-            stdb_client._call("create_edge", [
-                ws_id, nodes_a[0]["id"], nodes_b[0]["id"],
-                "connects", 1.0, "EXTRACTED", "{}", "",
-            ])
+            stdb_client._call(
+                "create_edge",
+                [
+                    ws_id,
+                    nodes_a[0]["id"],
+                    nodes_b[0]["id"],
+                    "connects",
+                    1.0,
+                    "EXTRACTED",
+                    "{}",
+                    "",
+                ],
+            )
         except RuntimeError:
             pytest.skip("create_edge reducer not available")
 
@@ -2728,8 +2837,9 @@ class TestGraphNeighborsDeep:
         assert isinstance(edges_a, list)
         assert isinstance(edges_b, list)
         # At least one side should see the edge
-        assert len(edges_a) >= 1 or len(edges_b) >= 1, \
+        assert len(edges_a) >= 1 or len(edges_b) >= 1, (
             f"No edges found from either side: A={len(edges_a)}, B={len(edges_b)}"
+        )
 
 
 # =====================================================================
@@ -2742,6 +2852,7 @@ class TestQueryHash:
 
     def _get_fn(self):
         from spacetime_memory.client import _query_hash
+
         return _query_hash
 
     def test_query_hash_deterministic(self):
@@ -2777,6 +2888,7 @@ class TestParseRerankJsonDeep:
 
     def _get_fn(self):
         from spacetime_memory.client import _parse_rerank_json
+
         return _parse_rerank_json
 
     def test_strategy4_dict_fallback_with_trailing_score(self):
@@ -2867,6 +2979,7 @@ class TestParseRerankJsonFinal:
 
     def _get_fn(self):
         from spacetime_memory.client import _parse_rerank_json
+
         return _parse_rerank_json
 
     def test_strategy4_error_and_strategy5_rankings_wrapper(self):
@@ -2907,9 +3020,9 @@ class TestParseRerankJsonFinal:
         """
         fn = self._get_fn()
         content = (
-            'unparseable start\n'
+            "unparseable start\n"
             '{"index": 10, "value": 5.0}\n'
-            '{not valid json at all}\n'
+            "{not valid json at all}\n"
             '{"index": 11, "rank": 4.0}'
         )
         result = fn(content)
@@ -2941,19 +3054,21 @@ class TestLLMRerankDeep:
 
     def _get_fn(self):
         from spacetime_memory.client import llm_rerank
+
         return llm_rerank
 
     def test_llm_rerank_markdown_fence_stripping(self):
         """llm_rerank strips ``` fences from content (line 3022-3023)."""
         fn = self._get_fn()
-        import json as _json
 
         mock_response = {
-            "choices": [{
-                "message": {
-                    "content": "```json\\n[{\"index\": 0, \"score\": 8, \"reason\": \"fenced\"}]\\n```",
+            "choices": [
+                {
+                    "message": {
+                        "content": '```json\\n[{"index": 0, "score": 8, "reason": "fenced"}]\\n```',
+                    }
                 }
-            }]
+            ]
         }
 
         results = [{"content": "Fenced test content", "score": 0.7}]
@@ -2965,9 +3080,13 @@ class TestLLMRerankDeep:
             mock_resp.raise_for_status = lambda: None
             mock_post.return_value = mock_resp
 
-            result = fn("test", results,
-                        endpoint="http://mock-llm:4000/v1",
-                        model="mock-model", api_key="sk-test")
+            result = fn(
+                "test",
+                results,
+                endpoint="http://mock-llm:4000/v1",
+                model="mock-model",
+                api_key="sk-test",
+            )
 
         assert len(result) == 1
         assert result[0]["rerank_reason"] == "fenced"
@@ -2988,10 +3107,14 @@ class TestLLMRerankDeep:
 
             # Should fall back gracefully (the for/else block raises
             # HTTPStatusError which is caught by the except handler)
-            result = fn("test", results,
-                        endpoint="http://mock-llm:4000/v1",
-                        model="mock-model", api_key="sk-test",
-                        timeout=1)
+            result = fn(
+                "test",
+                results,
+                endpoint="http://mock-llm:4000/v1",
+                model="mock-model",
+                api_key="sk-test",
+                timeout=1,
+            )
 
         # Should return original results (fallback behavior)
         assert len(result) == 1
@@ -3004,13 +3127,17 @@ class TestLLMRerankDeep:
 
         # LLM only returns score for index 0, not index 1
         mock_response = {
-            "choices": [{
-                "message": {
-                    "content": _json.dumps([
-                        {"index": 0, "score": 9, "reason": "ranked"},
-                    ]),
+            "choices": [
+                {
+                    "message": {
+                        "content": _json.dumps(
+                            [
+                                {"index": 0, "score": 9, "reason": "ranked"},
+                            ]
+                        ),
+                    }
                 }
-            }]
+            ]
         }
 
         results = [
@@ -3025,9 +3152,13 @@ class TestLLMRerankDeep:
             mock_resp.raise_for_status = lambda: None
             mock_post.return_value = mock_resp
 
-            result = fn("test", results,
-                        endpoint="http://mock-llm:4000/v1",
-                        model="mock-model", api_key="sk-test")
+            result = fn(
+                "test",
+                results,
+                endpoint="http://mock-llm:4000/v1",
+                model="mock-model",
+                api_key="sk-test",
+            )
 
         assert len(result) == 2
         # Unranked result should be penalized (score * 0.5 = 0.4)
@@ -3091,8 +3222,10 @@ class TestUpdateMemoryDeep:
         assert mem_id is not None
 
         result = stdb_client.update_memory(
-            mem_id, "fully updated content",
-            summary="New summary", confidence=0.99,
+            mem_id,
+            "fully updated content",
+            summary="New summary",
+            confidence=0.99,
         )
         assert result["status"] == "ok"
 
@@ -3131,7 +3264,9 @@ class TestCreateNodeDeep:
         """create_node with all optional parameters."""
         ws_id = _make_ws(stdb_client)
         result = stdb_client.create_node(
-            ws_id, "FullParamNode", "entity",
+            ws_id,
+            "FullParamNode",
+            "entity",
             summary="A fully specified node",
             metadata_json='{"source": "test"}',
             source_memory_id="",
@@ -3139,8 +3274,9 @@ class TestCreateNodeDeep:
         assert result["status"] == "ok"
 
         # Verify node was created
-        nodes = stdb_client._query("kg_node", workspace_id=ws_id,
-                                   filter_dict={"label": "FullParamNode"})
+        nodes = stdb_client._query(
+            "kg_node", workspace_id=ws_id, filter_dict={"label": "FullParamNode"}
+        )
         assert len(nodes) >= 1
         assert nodes[0]["label"] == "FullParamNode"
 
@@ -3307,9 +3443,7 @@ class TestClientUnitCoverage:
             f.write("test-jwt-token-123\n")
             token_path = f.name
         try:
-            c = Client.from_token_file(
-                token_path, host="h1", port="42", database="db1"
-            )
+            c = Client.from_token_file(token_path, host="h1", port="42", database="db1")
             assert c.token == "test-jwt-token-123"
             assert c.host == "h1"
             assert c.port == "42"
@@ -3464,8 +3598,7 @@ class TestClientUnitCoverage:
         """Line 398: _sql raises verbose RuntimeError."""
         from unittest.mock import MagicMock
 
-        client = Client(host="localhost", port="3000", database="test",
-                        verbose=True)
+        client = Client(host="localhost", port="3000", database="test", verbose=True)
         client._identity_established = True
         mock_http = MagicMock()
         client._http = mock_http
@@ -3528,8 +3661,7 @@ class TestClientUnitCoverage:
         """Line 476: _call with verbose=True raises verbose error."""
         from unittest.mock import MagicMock
 
-        client = Client(host="localhost", port="3000", database="test",
-                        verbose=True)
+        client = Client(host="localhost", port="3000", database="test", verbose=True)
         client._identity_established = True
         mock_http = MagicMock()
         client._http = mock_http
@@ -3612,11 +3744,21 @@ class TestClientUnitCoverage:
         rows = [{"entity_id": "a", "strategy": "semantic", "score": 0.9}]
         tantivy_rows = [{"entity_id": "b", "strategy": "keyword", "score": 0.8, "content": "hi"}]
         per_strat = {
-            "semantic": rows, "keyword": [], "graph": [], "temporal": [], "binary": [],
+            "semantic": rows,
+            "keyword": [],
+            "graph": [],
+            "temporal": [],
+            "binary": [],
         }
         strat_min = {"semantic": 0.9, "keyword": 0.8}
         strat_max = {"semantic": 0.9, "keyword": 0.8}
-        weights = {"semantic": 0.65, "keyword": 0.25, "graph": 0.0, "temporal": 0.05, "binary": 0.05}
+        weights = {
+            "semantic": 0.65,
+            "keyword": 0.25,
+            "graph": 0.0,
+            "temporal": 0.05,
+            "binary": 0.05,
+        }
         result = client._fuse_and_deduplicate(
             rows, tantivy_rows, per_strat, strat_min, strat_max, weights
         )
@@ -3806,7 +3948,7 @@ class TestClientUnitCoverage:
 
     def test_search_query_expansion(self):
         """Lines 1216-1219: search uses query expansion."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         client = Client(host="localhost", port="3000", database="test")
         client._query_cache = None
@@ -3820,14 +3962,17 @@ class TestClientUnitCoverage:
                             with patch.object(client, "_fuse_and_deduplicate", return_value=[]):
                                 with patch.object(client, "_enrich_content", return_value=[]):
                                     result = client.search(
-                                        "ws1", "pizza", semantic=True, limit=5,
+                                        "ws1",
+                                        "pizza",
+                                        semantic=True,
+                                        limit=5,
                                         query_expansion=True,
                                     )
                                     assert result == []
 
     def test_search_query_expansion_gibberish_fallback(self):
         """Line 1218-1219: fallback when expansion returns gibberish."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         client = Client(host="localhost", port="3000", database="test")
         client._query_cache = None
@@ -3841,7 +3986,10 @@ class TestClientUnitCoverage:
                             with patch.object(client, "_fuse_and_deduplicate", return_value=[]):
                                 with patch.object(client, "_enrich_content", return_value=[]):
                                     result = client.search(
-                                        "ws1", "pizza", semantic=True, limit=5,
+                                        "ws1",
+                                        "pizza",
+                                        semantic=True,
+                                        limit=5,
                                         query_expansion=True,
                                     )
                                     assert result == []
@@ -3937,8 +4085,12 @@ class TestClientUnitCoverage:
                 with patch.object(client, "_call", return_value={"status": "ok"}):
                     with patch.object(client, "_sql", return_value=mock_rows):
                         with patch.object(client, "_tantivy_search", return_value=[]):
-                            with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
-                                with patch.object(client, "_enrich_content", return_value=mock_rows):
+                            with patch.object(
+                                client, "_fuse_and_deduplicate", return_value=mock_rows
+                            ):
+                                with patch.object(
+                                    client, "_enrich_content", return_value=mock_rows
+                                ):
                                     result = client.search("ws1", "pizza", semantic=True, limit=5)
                                     assert result == mock_rows
                                     mock_bus.emit.assert_called_once()
@@ -3952,9 +4104,12 @@ class TestClientUnitCoverage:
         client = Client(host="localhost", port="3000", database="test")
         client._identity_established = True
         with patch.object(client, "_call", return_value={"status": "ok"}):
-            with patch.object(client, "_sql", return_value=[{"id": "a", "row_json": '{"key":"val"}'}]):
-                result = client._query("memory", workspace_id="ws1",
-                                      filter_dict={"id": "a"}, columns=["id", "content"])
+            with patch.object(
+                client, "_sql", return_value=[{"id": "a", "row_json": '{"key":"val"}'}]
+            ):
+                result = client._query(
+                    "memory", workspace_id="ws1", filter_dict={"id": "a"}, columns=["id", "content"]
+                )
                 assert len(result) == 1
                 assert result[0] == {"key": "val"}
 
@@ -3978,9 +4133,7 @@ class TestClientUnitCoverage:
         client = Client(host="localhost", port="3000", database="test")
         with patch.object(client, "_call", return_value={"status": "ok"}) as m:
             result = client.rate_memory("m1", "like", "peer1")
-            m.assert_called_once_with(
-                "rate_memory", ["m1", "like", "peer1"]
-            )
+            m.assert_called_once_with("rate_memory", ["m1", "like", "peer1"])
             assert result == {"status": "ok"}
 
     # ── fuzzy_get (lines 1514-1515) ──
@@ -4070,7 +4223,7 @@ class TestClientUnitCoverage:
 
     def test_search_with_mmr_rerank(self):
         """Line 1385-1386: search applies MMR reranking."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         client = Client(host="localhost", port="3000", database="test")
         client._identity_established = True
@@ -4084,10 +4237,17 @@ class TestClientUnitCoverage:
                 with patch.object(client, "_call", return_value={"status": "ok"}):
                     with patch.object(client, "_sql", return_value=mock_rows):
                         with patch.object(client, "_tantivy_search", return_value=[]):
-                            with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
-                                with patch.object(client, "_enrich_content", return_value=mock_rows):
+                            with patch.object(
+                                client, "_fuse_and_deduplicate", return_value=mock_rows
+                            ):
+                                with patch.object(
+                                    client, "_enrich_content", return_value=mock_rows
+                                ):
                                     result = client.search(
-                                        "ws1", "pizza", semantic=True, limit=5,
+                                        "ws1",
+                                        "pizza",
+                                        semantic=True,
+                                        limit=5,
                                         mmr_lambda=0.7,
                                     )
                                     assert result == mmr_rows
@@ -4096,7 +4256,7 @@ class TestClientUnitCoverage:
 
     def test_search_binary_vectors(self):
         """Lines 1322-1339: search uses binary vector cache when available."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         client = Client(host="localhost", port="3000", database="test")
         client._identity_established = True
@@ -4118,7 +4278,7 @@ class TestClientUnitCoverage:
 
     def test_search_binary_vectors_error_fallback(self):
         """Lines 1338-1339: binary scoring ValueError becomes best-effort."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         client = Client(host="localhost", port="3000", database="test")
         client._identity_established = True
@@ -4133,8 +4293,12 @@ class TestClientUnitCoverage:
                 with patch.object(client, "_call", return_value={"status": "ok"}):
                     with patch.object(client, "_sql", return_value=mock_rows):
                         with patch.object(client, "_tantivy_search", return_value=[]):
-                            with patch.object(client, "_fuse_and_deduplicate", return_value=mock_rows):
-                                with patch.object(client, "_enrich_content", return_value=mock_rows):
+                            with patch.object(
+                                client, "_fuse_and_deduplicate", return_value=mock_rows
+                            ):
+                                with patch.object(
+                                    client, "_enrich_content", return_value=mock_rows
+                                ):
                                     result = client.search("ws1", "pizza", semantic=True, limit=5)
                                     assert result == mock_rows
 
@@ -4311,11 +4475,21 @@ class TestClientUnitCoverage:
         rows = [{"entity_id": "a", "strategy": "semantic", "score": 0.9}]
         tantivy_rows = []
         per_strat = {
-            "semantic": rows, "keyword": [], "graph": [], "temporal": [], "binary": [],
+            "semantic": rows,
+            "keyword": [],
+            "graph": [],
+            "temporal": [],
+            "binary": [],
         }
         strat_min = {"semantic": 0.9}
         strat_max = {"semantic": 0.9}
-        weights = {"semantic": 0.65, "keyword": 0.25, "graph": 0.0, "temporal": 0.05, "binary": 0.05}
+        weights = {
+            "semantic": 0.65,
+            "keyword": 0.25,
+            "graph": 0.0,
+            "temporal": 0.05,
+            "binary": 0.05,
+        }
         rows_with_unknown = [
             {"entity_id": "a", "strategy": "semantic", "score": 0.9},
             {"entity_id": "b", "strategy": "unknown_x", "score": 0.5},
@@ -4338,9 +4512,7 @@ class TestClientUnitCoverage:
         mock_http = MagicMock()
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "data": [{"embedding": [0.1, 0.2, 0.3]}]
-        }
+        mock_resp.json.return_value = {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
         mock_http.post.return_value = mock_resp
         client._http = mock_http
 
@@ -4416,8 +4588,8 @@ class TestClientUnitCoverage:
             assert result == []
 
 
-
 # ── Coverage gap fillers: JSONFormatter, configure_logging, MemoryRecord ────
+
 
 def test_json_formatter_with_exception():
     """JSONFormatter.format() includes exception info when record has exc_info (line 86)."""
@@ -4429,9 +4601,7 @@ def test_json_formatter_with_exception():
     try:
         raise ValueError("test boom")
     except ValueError:
-        record = logging.LogRecord(
-            "test", logging.ERROR, "", 0, "test error", (), sys.exc_info()
-        )
+        record = logging.LogRecord("test", logging.ERROR, "", 0, "test error", (), sys.exc_info())
     output = formatter.format(record)
     parsed = json.loads(output)
     assert "exception" in parsed
@@ -4465,21 +4635,37 @@ def test_memory_record_from_dict():
     """MemoryRecord.from_dict() filters to known fields only (line 756)."""
     from spacetime_memory.client import Client
 
-    rec = Client.MemoryRecord.from_dict({
-        "id": "mem-1", "workspace_id": "ws-1", "peer_id": "peer-1",
-        "observer_id": "", "memory_type": "experience", "content": "hello",
-        "summary": "hi", "entities_json": "[]", "confidence": 0.9,
-        "is_active": True, "created_at": 1000, "expires_at": 2000,
-        "updated_at": 1500, "tier": "L1", "access_count": 5,
-        "strength": 0.8, "version": 1, "trust_score": 0.5,
-        "feedback_count": 0, "consolidated_to": "",
-    })
+    rec = Client.MemoryRecord.from_dict(
+        {
+            "id": "mem-1",
+            "workspace_id": "ws-1",
+            "peer_id": "peer-1",
+            "observer_id": "",
+            "memory_type": "experience",
+            "content": "hello",
+            "summary": "hi",
+            "entities_json": "[]",
+            "confidence": 0.9,
+            "is_active": True,
+            "created_at": 1000,
+            "expires_at": 2000,
+            "updated_at": 1500,
+            "tier": "L1",
+            "access_count": 5,
+            "strength": 0.8,
+            "version": 1,
+            "trust_score": 0.5,
+            "feedback_count": 0,
+            "consolidated_to": "",
+        }
+    )
     assert rec.id == "mem-1"
     assert rec.content == "hello"
     assert rec.confidence == 0.9
 
 
 # ── Embed method coverage (lines 559-597, 973-978) ──────────────────
+
 
 def _mk_embed_success(*embeddings):
     """Mock HTTP client that returns successful embedding responses."""
@@ -4491,6 +4677,7 @@ def _mk_embed_success(*embeddings):
     mock_http.post.return_value = mock_resp
     return mock_http
 
+
 def _mk_embed_error(status=500):
     """Mock HTTP client that raises HTTPStatusError."""
     mock_http = Mock(spec=httpx.Client)
@@ -4501,10 +4688,12 @@ def _mk_embed_error(status=500):
     mock_http.post.return_value = mock_resp
     return mock_http
 
+
 def _mk_embed_timeout():
     mock_http = Mock(spec=httpx.Client)
     mock_http.post.side_effect = httpx.TimeoutException("timeout")
     return mock_http
+
 
 def _mk_embed_badjson():
     mock_http = Mock(spec=httpx.Client)
@@ -4591,17 +4780,28 @@ class TestEmbedMethods:
 
 # ── Entity extraction coverage (lines 875-910) ──────────────────────
 
+
 class TestExtractEntities:
     """Mock-based tests for _extract_and_store_entities."""
 
     def test_extract_entities_with_llm(self):
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"ok": True})
+
         class ML:
             available = True
+
             def extract_entities_llm(self, content):
-                return [{"name":"Alice","entity_type":"person","aliases":["Al"],"description":"A person"}]
-        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+                return [
+                    {
+                        "name": "Alice",
+                        "entity_type": "person",
+                        "aliases": ["Al"],
+                        "description": "A person",
+                    }
+                ]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
             c._extract_and_store_entities("ws-1", "mem-1", "Alice went")
         create_calls = [a[0][0] for a in c._call.call_args_list if a[0][0] == "create_entity_link"]
         assert len(create_calls) == 1
@@ -4609,78 +4809,107 @@ class TestExtractEntities:
     def test_extract_entities_runtime_error_resilience(self):
         c = Client(host="localhost", port=3001)
         log = []
+
         def mc(r, a):
             log.append(r)
-            if r == "create_entity_link": raise RuntimeError("exists")
+            if r == "create_entity_link":
+                raise RuntimeError("exists")
             return {"ok": True}
+
         c._call = mc
+
         class ML:
             available = True
-            def extract_entities_llm(self, c): return [{"name":"Bob","entity_type":"person","aliases":[],"description":"B"}]
-        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
-            c._extract_and_store_entities("ws","mem","Bob")
+
+            def extract_entities_llm(self, c):
+                return [{"name": "Bob", "entity_type": "person", "aliases": [], "description": "B"}]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
+            c._extract_and_store_entities("ws", "mem", "Bob")
         assert "link_entity_to_memory" in log
 
     def test_extract_entities_regex_fallback(self):
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"ok": True})
+
         class ML:
             available = False
-            def extract_entities_llm(self, c): return None
-        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
-            c._extract_and_store_entities("ws","mem","content")
+
+            def extract_entities_llm(self, c):
+                return None
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
+            c._extract_and_store_entities("ws", "mem", "content")
         ec = [a[0][0] for a in c._call.call_args_list if a[0][0] == "extract_entities"]
         assert len(ec) == 1
 
     def test_extract_entities_null_llm_result(self):
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"ok": True})
+
         class ML:
             available = True
-            def extract_entities_llm(self, c): return None
-        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
-            c._extract_and_store_entities("ws","mem","content")
+
+            def extract_entities_llm(self, c):
+                return None
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
+            c._extract_and_store_entities("ws", "mem", "content")
         ec = [a[0][0] for a in c._call.call_args_list if a[0][0] == "extract_entities"]
         assert len(ec) == 1
 
     def test_extract_entities_regex_error_caught(self):
         c = Client(host="localhost", port=3001)
         c._call = Mock(side_effect=RuntimeError("nope"))
+
         class ML:
             available = False
-            def extract_entities_llm(self, c): return None
-        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
-            c._extract_and_store_entities("ws","mem","content")
+
+            def extract_entities_llm(self, c):
+                return None
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
+            c._extract_and_store_entities("ws", "mem", "content")
         # Should not raise
 
     def test_extract_entities_empty_name_skipped(self):
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"ok": True})
+
         class ML:
             available = True
+
             def extract_entities_llm(self, c):
-                return [{"name":"","entity_type":"x","aliases":[],"description":"x"}]
-        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
-            c._extract_and_store_entities("ws","mem","content")
+                return [{"name": "", "entity_type": "x", "aliases": [], "description": "x"}]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
+            c._extract_and_store_entities("ws", "mem", "content")
         create6 = [a[0][0] for a in c._call.call_args_list if a[0][0] == "create_entity_link"]
         assert len(create6) == 0
 
     def test_extract_entities_link_error_caught(self):
         c = Client(host="localhost", port=3001)
+
         def mc(r, a):
-            if r == "link_entity_to_memory": raise RuntimeError("no link")
+            if r == "link_entity_to_memory":
+                raise RuntimeError("no link")
             return {"ok": True}
+
         c._call = mc
+
         class ML:
             available = True
+
             def extract_entities_llm(self, c):
-                return [{"name":"Eve","entity_type":"person","aliases":[],"description":"E"}]
-        with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
-            c._extract_and_store_entities("ws","mem","Eve")
+                return [{"name": "Eve", "entity_type": "person", "aliases": [], "description": "E"}]
+
+        with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
+            c._extract_and_store_entities("ws", "mem", "Eve")
         # Should not raise
 
 
 # ── Store entity extraction coverage (lines 831-853) ────────────────
+
 
 class TestStoreEntityExtraction:
     """Mock tests for store() entity extraction + binary cache + indexing."""
@@ -4691,12 +4920,15 @@ class TestStoreEntityExtraction:
         c._query = Mock(return_value=[{"id": "mem-123", "content": "test"}])
         c._tantivy_index = Mock()
         c._embed = lambda t: [0.1] * 768
+
         class ML:
             available = True
+
             def extract_entities_llm(self, c):
-                return [{"name":"E","entity_type":"concept","aliases":[],"description":"E"}]
-        with patch('spacetime_memory.binary_vectors.binarize', return_value=b'\x00'*32):
-            with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+                return [{"name": "E", "entity_type": "concept", "aliases": [], "description": "E"}]
+
+        with patch("spacetime_memory.binary_vectors.binarize", return_value=b"\x00" * 32):
+            with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
                 c.store("ws", "test", summary="s", memory_type="experience", peer_id="p")
         calls = [a[0][0] for a in c._call.call_args_list if isinstance(a[0], (list, tuple))]
         assert "index_entity" in calls
@@ -4709,12 +4941,15 @@ class TestStoreEntityExtraction:
         c._query = Mock(return_value=[{"id": "mem-456", "content": "test"}])
         c._tantivy_index = Mock()
         c._embed = lambda t: [0.1] * 768
+
         class ML:
             available = True
+
             def extract_entities_llm(self, c):
-                return [{"name":"E","entity_type":"c","aliases":[],"description":"E"}]
-        with patch('spacetime_memory.binary_vectors.binarize', side_effect=ValueError("bad")):
-            with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+                return [{"name": "E", "entity_type": "c", "aliases": [], "description": "E"}]
+
+        with patch("spacetime_memory.binary_vectors.binarize", side_effect=ValueError("bad")):
+            with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
                 c.store("ws", "test", summary="s", memory_type="experience", peer_id="p")
         # Should not raise
 
@@ -4724,12 +4959,15 @@ class TestStoreEntityExtraction:
         c._query = Mock(return_value=[{"id": "mem-789", "content": "test"}])
         c._tantivy_index = Mock()
         c._embed = lambda t: [0.1] * 768
+
         class ML:
             available = True
+
             def extract_entities_llm(self, c):
-                return [{"name":"E","entity_type":"c","aliases":[],"description":"E"}]
-        with patch('spacetime_memory.binary_vectors.binarize', return_value=b'\x00'):
-            with patch('spacetime_memory.llm.LLMClient', return_value=ML()):
+                return [{"name": "E", "entity_type": "c", "aliases": [], "description": "E"}]
+
+        with patch("spacetime_memory.binary_vectors.binarize", return_value=b"\x00"):
+            with patch("spacetime_memory.llm.LLMClient", return_value=ML()):
                 c.store("ws", "test", summary="s", memory_type="experience", peer_id="p", tier="L1")
         tc = [a[0][0] for a in c._call.call_args_list if a[0][0] == "update_memory_tier"]
         assert len(tc) == 1
@@ -4745,6 +4983,7 @@ class TestStoreEntityExtraction:
 
 # ── Store batch indexing coverage (lines 973-1010) ───────────────────
 
+
 class TestStoreBatchIndexing:
     """Mock tests for store_batch embedding and indexing."""
 
@@ -4758,8 +4997,8 @@ class TestStoreBatchIndexing:
         c._query = Mock(return_value=[{"id": "b1", "content": "item1", "created_at": 1000}])
         c._extract_and_store_entities = Mock()
         items = [
-            {"content":"item1","summary":"s1","memory_type":"experience","peer_id":"p1"},
-            {"content":"item2","summary":"s2","memory_type":"experience","peer_id":"p2"},
+            {"content": "item1", "summary": "s1", "memory_type": "experience", "peer_id": "p1"},
+            {"content": "item2", "summary": "s2", "memory_type": "experience", "peer_id": "p2"},
         ]
         c.store_batch("ws", items)
         bc = [a[0][0] for a in c._call.call_args_list if a[0][0] == "store_memory_batch"]
@@ -4773,7 +5012,7 @@ class TestStoreBatchIndexing:
         c._http.post.return_value = Mock(status_code=500)
         c._query = Mock()
         c._extract_and_store_entities = Mock()
-        c.store_batch("ws", [{"content":"x","summary":"s","memory_type":"e","peer_id":"p"}])
+        c.store_batch("ws", [{"content": "x", "summary": "s", "memory_type": "e", "peer_id": "p"}])
         bc = [a[0][0] for a in c._call.call_args_list if a[0][0] == "store_memory_batch"]
         ic = [a[0][0] for a in c._call.call_args_list if a[0][0] == "index_entity"]
         assert len(bc) == 1 and len(ic) == 0
@@ -4785,9 +5024,9 @@ class TestStoreBatchIndexing:
         mock.json.return_value = {"embedding": [0.9]}
         c._http = Mock()
         c._http.post.return_value = mock
-        c._query = Mock(return_value=[{"id":"b1","content":"x1","created_at":1}])
+        c._query = Mock(return_value=[{"id": "b1", "content": "x1", "created_at": 1}])
         c._extract_and_store_entities = Mock()
-        c.store_batch("ws", [{"content":"x1","summary":"s","memory_type":"e","peer_id":"p"}])
+        c.store_batch("ws", [{"content": "x1", "summary": "s", "memory_type": "e", "peer_id": "p"}])
         ic = [a[0][0] for a in c._call.call_args_list if a[0][0] == "index_entity"]
         assert len(ic) == 1
 
@@ -4796,6 +5035,7 @@ class TestStoreBatchIndexing:
 # search_with_filters coverage (lines 1950-1968)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestSearchWithFiltersUnit:
     """Cover search_with_filters metadata and location filter paths."""
@@ -4803,11 +5043,14 @@ class TestSearchWithFiltersUnit:
     def test_metadata_filter_matching(self):
         """Metadata filter: rows with matching metadata_json get included (lines 1954-1964)."""
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c.search = Mock(return_value=[
-            {"content": "hello world", "metadata_json": '{"key": "val"}'},
-            {"content": "other", "metadata_json": '{"key": "other_val"}'},
-        ])
+        c.search = Mock(
+            return_value=[
+                {"content": "hello world", "metadata_json": '{"key": "val"}'},
+                {"content": "other", "metadata_json": '{"key": "other_val"}'},
+            ]
+        )
         result = c.search_with_filters("ws", query="test", metadata_filter='{"key": "val"}')
         assert len(result) == 1
         assert result[0]["content"] == "hello world"
@@ -4815,12 +5058,14 @@ class TestSearchWithFiltersUnit:
     def test_metadata_filter_invalid_json(self):
         """Metadata filter: invalid metadata_json gracefully falls back to {} (line 1959-1960)."""
         from unittest.mock import Mock
-        import json as _json
+
         c = Client(host="localhost", port=3001)
-        c.search = Mock(return_value=[
-            {"content": "hello world", "metadata_json": "not json"},
-            {"content": "other", "metadata_json": '{"key": "val"}'},
-        ])
+        c.search = Mock(
+            return_value=[
+                {"content": "hello world", "metadata_json": "not json"},
+                {"content": "other", "metadata_json": '{"key": "val"}'},
+            ]
+        )
         result = c.search_with_filters("ws", query="test", metadata_filter='{"key": "val"}')
         # "not json" row has empty metadata → won't match {"key":"val"}
         assert len(result) == 1
@@ -4829,21 +5074,27 @@ class TestSearchWithFiltersUnit:
     def test_metadata_filter_dict_input(self):
         """Metadata filter: dict input (not string) works directly (line 1953)."""
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c.search = Mock(return_value=[
-            {"content": "hello", "metadata_json": '{"tag": "greeting"}'},
-        ])
+        c.search = Mock(
+            return_value=[
+                {"content": "hello", "metadata_json": '{"tag": "greeting"}'},
+            ]
+        )
         result = c.search_with_filters("ws", query="test", metadata_filter={"tag": "greeting"})
         assert len(result) == 1
 
     def test_location_filter(self):
         """Location filter: case-insensitive substring match on content/summary (lines 1965-1967)."""
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c.search = Mock(return_value=[
-            {"content": "Paris is beautiful", "summary": "France"},
-            {"content": "London bridge", "summary": "UK"},
-        ])
+        c.search = Mock(
+            return_value=[
+                {"content": "Paris is beautiful", "summary": "France"},
+                {"content": "London bridge", "summary": "UK"},
+            ]
+        )
         result = c.search_with_filters("ws", query="test", location_filter="paris")
         assert len(result) == 1
         assert "Paris" in result[0]["content"]
@@ -4851,25 +5102,39 @@ class TestSearchWithFiltersUnit:
     def test_location_filter_in_summary(self):
         """Location filter matches against summary field too."""
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c.search = Mock(return_value=[
-            {"content": "Data center", "summary": "Tokyo facility"},
-        ])
+        c.search = Mock(
+            return_value=[
+                {"content": "Data center", "summary": "Tokyo facility"},
+            ]
+        )
         result = c.search_with_filters("ws", query="test", location_filter="tokyo")
         assert len(result) == 1
 
     def test_combined_filters(self):
         """Both metadata and location filters applied (lines 1951-1968)."""
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c.search = Mock(return_value=[
-            {"content": "Paris cafe", "summary": "France visit", "metadata_json": '{"tag": "food"}'},
-            {"content": "Paris museum", "summary": "France culture", "metadata_json": '{"tag": "art"}'},
-            {"content": "London pub", "summary": "UK food", "metadata_json": '{"tag": "food"}'},
-        ])
-        result = c.search_with_filters("ws", query="test",
-                                        metadata_filter='{"tag": "food"}',
-                                        location_filter="paris")
+        c.search = Mock(
+            return_value=[
+                {
+                    "content": "Paris cafe",
+                    "summary": "France visit",
+                    "metadata_json": '{"tag": "food"}',
+                },
+                {
+                    "content": "Paris museum",
+                    "summary": "France culture",
+                    "metadata_json": '{"tag": "art"}',
+                },
+                {"content": "London pub", "summary": "UK food", "metadata_json": '{"tag": "food"}'},
+            ]
+        )
+        result = c.search_with_filters(
+            "ws", query="test", metadata_filter='{"tag": "food"}', location_filter="paris"
+        )
         assert len(result) == 1
         assert "cafe" in result[0]["content"]
 
@@ -4878,12 +5143,14 @@ class TestSearchWithFiltersUnit:
 # Workspace config + Peer reputation (lines 1810-1845)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestConfigAndReputation:
     """Cover get_workspace_config and get_peer_reputation."""
 
     def test_get_decay_config_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[{"id": "ws", "decay_model": "linear"}])
         result = c.get_decay_config("ws")
@@ -4891,6 +5158,7 @@ class TestConfigAndReputation:
 
     def test_get_decay_config_not_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[])
         result = c.get_decay_config("ws")
@@ -4898,6 +5166,7 @@ class TestConfigAndReputation:
 
     def test_get_peer_reputation_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[{"id": "peer1", "reputation": 0.85}])
         result = c.get_peer_reputation("peer1")
@@ -4905,6 +5174,7 @@ class TestConfigAndReputation:
 
     def test_get_peer_reputation_not_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[])
         result = c.get_peer_reputation("peer1")
@@ -4915,12 +5185,14 @@ class TestConfigAndReputation:
 # Document operations (lines 1884-1903)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestDocumentOps:
     """Cover get_document, list_documents, get_document_chunks, delete_document."""
 
     def test_get_document_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[{"id": "doc1", "title": "Test Doc"}])
         result = c.get_document("doc1")
@@ -4928,6 +5200,7 @@ class TestDocumentOps:
 
     def test_get_document_not_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[])
         result = c.get_document("doc1")
@@ -4935,6 +5208,7 @@ class TestDocumentOps:
 
     def test_list_documents(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[{"id": "doc1"}, {"id": "doc2"}])
         result = c.list_documents("ws")
@@ -4943,17 +5217,21 @@ class TestDocumentOps:
 
     def test_get_document_chunks_sorted(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c._query = Mock(return_value=[
-            {"id": "c2", "chunk_index": 2},
-            {"id": "c1", "chunk_index": 1},
-        ])
+        c._query = Mock(
+            return_value=[
+                {"id": "c2", "chunk_index": 2},
+                {"id": "c1", "chunk_index": 1},
+            ]
+        )
         result = c.get_document_chunks("doc1")
         assert result[0]["chunk_index"] == 1
         assert result[1]["chunk_index"] == 2
 
     def test_delete_document(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         result = c.delete_document("doc1")
@@ -4965,12 +5243,14 @@ class TestDocumentOps:
 # KG stats (lines 1931-1936)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestKgStats:
     """Cover compute_kg_stats."""
 
     def test_compute_kg_stats_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._sql = Mock(return_value=[{"workspace_id": "ws", "node_count": 10}])
@@ -4980,6 +5260,7 @@ class TestKgStats:
 
     def test_compute_kg_stats_not_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._sql = Mock(return_value=[])
@@ -4991,12 +5272,14 @@ class TestKgStats:
 # Directory operations (lines 1699-1734)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestDirectoryOps:
     """Cover list_directory, traverse_directory, get_directory, link/unlink."""
 
     def test_list_directory(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._sql = Mock(return_value=[{"name": "file1"}, {"name": "dir1"}])
@@ -5006,6 +5289,7 @@ class TestDirectoryOps:
 
     def test_traverse_directory(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._sql = Mock(return_value=[{"name": "deep_file", "depth": 2}])
@@ -5015,6 +5299,7 @@ class TestDirectoryOps:
 
     def test_get_directory(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._sql = Mock(return_value=[{"name": "target_dir", "depth": 0}])
@@ -5024,6 +5309,7 @@ class TestDirectoryOps:
 
     def test_link_memory_to_directory(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         result = c.link_memory_to_directory("dir1", "mem1", "ws")
@@ -5031,6 +5317,7 @@ class TestDirectoryOps:
 
     def test_unlink_memory_from_directory(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         result = c.unlink_memory_from_directory("dir1", "mem1")
@@ -5041,14 +5328,18 @@ class TestDirectoryOps:
 # Note operations with embedding (lines 2469-2491)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestNoteEmbedOps:
     """Cover create_note and update_note with embed=True."""
 
     def test_create_note_with_embed(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c._call = Mock(side_effect=lambda name, *a: {"status": "ok"}  if name == "create_note" else [])
+        c._call = Mock(
+            side_effect=lambda name, *a: {"status": "ok"} if name == "create_note" else []
+        )
         c._embed = Mock(return_value=[0.1, 0.2, 0.3])
         result = c.create_note("ws", "Title", "Content here", embed=True)
         c._embed.assert_called_once()
@@ -5061,6 +5352,7 @@ class TestNoteEmbedOps:
     def test_create_note_embed_empty_content(self):
         """Embed empty content — _embed not called, embedding_json stays '[]'."""
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._embed = Mock()
@@ -5070,6 +5362,7 @@ class TestNoteEmbedOps:
 
     def test_update_note_with_embed(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._embed = Mock(return_value=[0.4, 0.5])
@@ -5080,6 +5373,7 @@ class TestNoteEmbedOps:
     def test_update_note_embed_returns_none(self):
         """Embed returns None — embedding_json stays '[]'."""
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._embed = Mock(return_value=[])
@@ -5091,12 +5385,14 @@ class TestNoteEmbedOps:
 # Backlinks + outgoing links (lines 2522-2534)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestNoteBacklinks:
     """Cover get_backlinks and get_outgoing_links."""
 
     def test_get_backlinks(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock()
         c._query.side_effect = [
@@ -5109,6 +5405,7 @@ class TestNoteBacklinks:
 
     def test_get_backlinks_empty_source(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock()
         c._query.side_effect = [
@@ -5120,6 +5417,7 @@ class TestNoteBacklinks:
 
     def test_get_outgoing_links(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock()
         c._query.side_effect = [
@@ -5135,12 +5433,14 @@ class TestNoteBacklinks:
 # Session listing (lines 2218-2227)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestSessionListing:
     """Cover get_peer_sessions."""
 
     def test_get_peer_sessions(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock()
         c._query.side_effect = [
@@ -5157,24 +5457,29 @@ class TestSessionListing:
 # list_profiles (lines 2277-2284)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestListProfiles:
     """Cover list_profiles."""
 
     def test_list_profiles(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[{"id": "peer1"}, {"id": "peer2"}])
-        c.get_profile = Mock(side_effect=[
-            {"id": "peer1", "static_facts": "[]"},
-            None,
-        ])
+        c.get_profile = Mock(
+            side_effect=[
+                {"id": "peer1", "static_facts": "[]"},
+                None,
+            ]
+        )
         result = c.list_profiles("ws")
         assert len(result) == 1
         assert result[0]["id"] == "peer1"
 
     def test_list_profiles_no_peers(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[])
         result = c.list_profiles("ws")
@@ -5185,15 +5490,21 @@ class TestListProfiles:
 # API key create response (lines 2390-2397)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestApiKeyCreate:
     """Cover create_api_key response parsing."""
 
     def test_create_api_key_with_key_id(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
-        c._sql = Mock(return_value=[{"api_key_id": "key-id-123", "name": "Test Key", "permissions": "[\"read\"]"}])
+        c._sql = Mock(
+            return_value=[
+                {"api_key_id": "key-id-123", "name": "Test Key", "permissions": '["read"]'}
+            ]
+        )
         result = c.create_api_key("ws", "Test Key")
         # api_key is generated internally via secrets — just verify shape
         assert result["api_key"].startswith("sk-")
@@ -5202,6 +5513,7 @@ class TestApiKeyCreate:
 
     def test_create_api_key_no_rows(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._sql = Mock(return_value=[])
@@ -5214,17 +5526,21 @@ class TestApiKeyCreate:
 # Fuzzy get empty text skip (line 1522)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestFuzzyGetEdgeCases:
     """Cover fuzzy_get empty field path."""
 
     def test_fuzzy_get_empty_text_skip(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c._query = Mock(return_value=[
-            {"content": "", "summary": "something"},
-            {"content": "pizza is good", "summary": ""},
-        ])
+        c._query = Mock(
+            return_value=[
+                {"content": "", "summary": "something"},
+                {"content": "pizza is good", "summary": ""},
+            ]
+        )
         result = c.fuzzy_get("ws", "pizza", threshold=0.5)
         assert result is not None
 
@@ -5233,22 +5549,23 @@ class TestFuzzyGetEdgeCases:
 # Memory history (line 1765)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestMemoryHistory:
     """Cover get_memory_history."""
 
     def test_get_memory_history_found(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
-        c._query = Mock(return_value=[{
-            "id": "h1", "content": "old version", "updated_at": 100
-        }])
+        c._query = Mock(return_value=[{"id": "h1", "content": "old version", "updated_at": 100}])
         result = c.get_memory_history("mem1")
         assert len(result) == 1
         assert result[0]["content"] == "old version"
 
     def test_get_memory_history_empty(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._query = Mock(return_value=[])
         result = c.get_memory_history("mem1")
@@ -5259,13 +5576,15 @@ class TestMemoryHistory:
 # Batch embed error handling (line 980)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestBatchEmbedError:
     """Cover batch embed RuntimeError path."""
 
     def test_batch_embed_error(self):
         """When embedder raises RuntimeError, emb_list stays empty and batch proceeds."""
-        from unittest.mock import Mock, MagicMock
+        from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._query = Mock(return_value=[{"id": "b1", "content": "x1", "created_at": 1}])
@@ -5285,13 +5604,14 @@ class TestBatchEmbedError:
 # create_node with embedding (lines 1998-2008)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestCreateNodeEmbed:
     """Cover create_node embedding + indexing path."""
 
     def test_create_node_with_embed_indexed(self):
         from unittest.mock import Mock
-        import json
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._embed = Mock(return_value=[0.1, 0.2])
@@ -5301,12 +5621,12 @@ class TestCreateNodeEmbed:
         # _query should have been called for kg_node
         c._query.assert_called()
         # index_entity should have been called
-        index_calls = [a for a in c._call.call_args_list
-                       if a[0][0] == "index_entity"]
+        index_calls = [a for a in c._call.call_args_list if a[0][0] == "index_entity"]
         assert len(index_calls) == 1
 
     def test_create_node_no_embed_available(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._embed = Mock(return_value=[])
@@ -5318,23 +5638,27 @@ class TestCreateNodeEmbed:
 # create_edge with source_memory_id (line 2033)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestCreateEdge:
     """Cover create_edge with source_memory_id."""
 
     def test_create_edge_with_source_memory(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
-        result = c.create_edge("ws", "src", "tgt", "related_to",
-                               source_memory_id="mem1")
+        result = c.create_edge("ws", "src", "tgt", "related_to", source_memory_id="mem1")
         args = c._call.call_args[0][1]
-        assert args[7] == "mem1"  # source_memory_id is 8th arg (after workspace_id, src, tgt, relation, weight, confidence, metadata)
+        assert (
+            args[7] == "mem1"
+        )  # source_memory_id is 8th arg (after workspace_id, src, tgt, relation, weight, confidence, metadata)
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # Reranker "not found" handling (lines 1600-1602) + fuzzy get edge
 # ═══════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.unit
 class TestRerankerErrorHandling:
@@ -5344,17 +5668,29 @@ class TestRerankerErrorHandling:
         """When RuntimeError contains 'not found', return graceful message."""
         from unittest.mock import Mock
         from spacetime_memory.client import Client
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
-        c._sql = Mock(return_value=[{"content": "sky is blue", "summary": "",
-                                      "id": "mem1", "score": 0.5, "strategy": "semantic"}])
+        c._sql = Mock(
+            return_value=[
+                {
+                    "content": "sky is blue",
+                    "summary": "",
+                    "id": "mem1",
+                    "score": 0.5,
+                    "strategy": "semantic",
+                }
+            ]
+        )
 
         # Make _call("rerank_search_results") raise "not found"
         orig_call = c._call
+
         def call_side_effect(reducer, args):
             if reducer == "rerank_search_results":
                 raise RuntimeError("Reranker not found")
             return orig_call(reducer, args)
+
         c._call = Mock(side_effect=call_side_effect)
 
         result = c.search("ws", "sky", rerank=True)
@@ -5364,6 +5700,7 @@ class TestRerankerErrorHandling:
         """When delete_memory gets RuntimeError without 'not found', re-raise (line 1602)."""
         from unittest.mock import Mock
         from spacetime_memory.client import Client
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(side_effect=RuntimeError("Database connection failed"))
         with pytest.raises(RuntimeError, match="Database connection failed"):
@@ -5374,12 +5711,14 @@ class TestRerankerErrorHandling:
 # Query cache invalidation (line 810) + get_user_memories (line 1691)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestQueryCacheInvalidation:
     """Cover query cache invalidation on store."""
 
     def test_store_invalidates_query_cache(self):
         from unittest.mock import Mock
+
         mock_cache = Mock()
         c = Client(host="localhost", port=3001, query_cache=mock_cache)
         c._call = Mock(return_value={"status": "ok"})
@@ -5389,6 +5728,7 @@ class TestQueryCacheInvalidation:
 
     def test_get_user_memories(self):
         from unittest.mock import Mock
+
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
         c._sql = Mock(return_value=[{"id": "m1", "content": "test"}])
@@ -5401,6 +5741,7 @@ class TestQueryCacheInvalidation:
 # Tantivy result conversion + health check OPENAI path (lines 1236, 1295-1303)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestTantivyAndHealthCheck:
     """Cover Tantivy keyword result conversion, embedder health check OPENAI path,
@@ -5410,21 +5751,33 @@ class TestTantivyAndHealthCheck:
         """Tantivy search + binary cache similarity (lines 1236, 1295-1303, 1328-1337)."""
         from unittest.mock import Mock
         from spacetime_memory.binary_vectors import binarize
+
         monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost:4000/v1")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
         c = Client(host="localhost", port=3001)
         emb = [0.1] * 1024
         c._embed = Mock(return_value=emb)
         c._call = Mock(return_value={"status": "ok"})
-        c._sql = Mock(return_value=[
-            {"entity_id": "e1", "entity_type": "memory", "content": "semantic hit",
-             "score": 0.9, "strategy": "semantic", "workspace_id": "ws",
-             "summary": "s", "confidence": 1.0, "created_at": 100},
-        ])
-        c._tantivy_search = Mock(return_value=[
-            {"entity_id": "e2", "entity_type": "memory", "content": "keyword hit",
-             "score": 1.5}
-        ])
+        c._sql = Mock(
+            return_value=[
+                {
+                    "entity_id": "e1",
+                    "entity_type": "memory",
+                    "content": "semantic hit",
+                    "score": 0.9,
+                    "strategy": "semantic",
+                    "workspace_id": "ws",
+                    "summary": "s",
+                    "confidence": 1.0,
+                    "created_at": 100,
+                },
+            ]
+        )
+        c._tantivy_search = Mock(
+            return_value=[
+                {"entity_id": "e2", "entity_type": "memory", "content": "keyword hit", "score": 1.5}
+            ]
+        )
         # Populate binary cache with same embedding → similarity = 1.0
         c._binary_cache = {"e3": binarize(emb)}
         mock_http = Mock()
@@ -5441,6 +5794,7 @@ class TestTantivyAndHealthCheck:
 # Restore manifest edge cases (lines 2710, 2719, 2733-2734)
 # ═══════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.unit
 class TestRestoreManifest:
     """Cover restore() edge cases: empty first row, NULL values, RuntimeError skip."""
@@ -5450,12 +5804,16 @@ class TestRestoreManifest:
         and 2733-2734 (outer except Exception skip)."""
         from unittest.mock import Mock
         import json
+
         manifest = {
             "tables": {
-                "empty_table": [],              # hits line 2708
+                "empty_table": [],  # hits line 2708
                 "none_first": [None, {"col": "x"}],  # hits line 2710
                 "valid_table": [{"col1": "val1", "col2": None}],  # hits line 2719
-                "bad_table": [{"col": "v"}, "not a dict"],  # 2nd row has no .keys() → AttributeError → hits 2733
+                "bad_table": [
+                    {"col": "v"},
+                    "not a dict",
+                ],  # 2nd row has no .keys() → AttributeError → hits 2733
             }
         }
         backup_path = tmp_path / "backup.json"

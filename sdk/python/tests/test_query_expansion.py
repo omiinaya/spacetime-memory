@@ -19,11 +19,13 @@ class TestExpandQuerySuccess:
         resp = MagicMock()
         resp.raise_for_status.return_value = None
         resp.json.return_value = {
-            "choices": [{
-                "message": {
-                    "content": content,
+            "choices": [
+                {
+                    "message": {
+                        "content": content,
+                    }
                 }
-            }]
+            ]
         }
         return resp
 
@@ -68,7 +70,9 @@ class TestExpandQuerySuccess:
         call_args = mock_post.call_args
         headers = call_args[1]["headers"]
         # No Authorization header when api_key is empty/falsy
-        assert "Authorization" not in headers or headers.get("Authorization", "").endswith("Bearer ")
+        assert "Authorization" not in headers or headers.get("Authorization", "").endswith(
+            "Bearer "
+        )
 
     def test_custom_timeout(self):
         mock_resp = self._mock_response("terms")
@@ -104,9 +108,7 @@ class TestExpandQueryContentEdgeCases:
         """When the LLM returns the same content (case-insensitive), return original."""
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": "Python Coding"}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": "Python Coding"}}]}
         with patch("httpx.post", return_value=resp):
             result = expand_query("python coding", api_key="sk-test")
         # Should NOT merge if content is same as query (case-insensitive)
@@ -116,9 +118,7 @@ class TestExpandQueryContentEdgeCases:
         """Content ≤ 5 chars is considered too short → return original query."""
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": "abc"}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": "abc"}}]}
         with patch("httpx.post", return_value=resp):
             result = expand_query("python coding", api_key="sk-test")
         # Too short (3 chars ≤ 5) → return original
@@ -128,9 +128,7 @@ class TestExpandQueryContentEdgeCases:
         """Content exactly 5 chars is still too short."""
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": "abcde"}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": "abcde"}}]}
         with patch("httpx.post", return_value=resp):
             result = expand_query("python", api_key="sk-test")
         assert result == "python"
@@ -139,9 +137,7 @@ class TestExpandQueryContentEdgeCases:
         """Content > 5 chars is accepted (and different from query)."""
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": "abcdef"}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": "abcdef"}}]}
         with patch("httpx.post", return_value=resp):
             result = expand_query("xyz", api_key="sk-test")
         assert "xyz abcdef" == result  # merged
@@ -150,9 +146,7 @@ class TestExpandQueryContentEdgeCases:
         """Empty content and no reasoning_content → return original query."""
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": ""}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": ""}}]}
         with patch("httpx.post", return_value=resp):
             result = expand_query("python coding", api_key="sk-test")
         assert result == "python coding"
@@ -161,9 +155,7 @@ class TestExpandQueryContentEdgeCases:
         """content is None and no reasoning → return original query."""
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": None}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": None}}]}
         with patch("httpx.post", return_value=resp):
             result = expand_query("test query", api_key="sk-test")
         assert result == "test query"
@@ -180,12 +172,14 @@ class TestReasoningModelFallback:
         resp = MagicMock()
         resp.raise_for_status.return_value = None
         resp.json.return_value = {
-            "choices": [{
-                "message": {
-                    "content": "",
-                    "reasoning_content": "kubernetes container orchestration deployment",
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "kubernetes container orchestration deployment",
+                    }
                 }
-            }]
+            ]
         }
         with patch("httpx.post", return_value=resp):
             result = expand_query("k8s", api_key="sk-test")
@@ -197,12 +191,14 @@ class TestReasoningModelFallback:
         resp = MagicMock()
         resp.raise_for_status.return_value = None
         resp.json.return_value = {
-            "choices": [{
-                "message": {
-                    "content": None,
-                    "reasoning_content": "distributed systems scalability",
+            "choices": [
+                {
+                    "message": {
+                        "content": None,
+                        "reasoning_content": "distributed systems scalability",
+                    }
                 }
-            }]
+            ]
         }
         with patch("httpx.post", return_value=resp):
             result = expand_query("microservices", api_key="sk-test")
@@ -218,12 +214,14 @@ class TestReasoningModelFallback:
         resp = MagicMock()
         resp.raise_for_status.return_value = None
         resp.json.return_value = {
-            "choices": [{
-                "message": {
-                    "content": "",
-                    "reasoning_content": "k8s",  # too short
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "k8s",  # too short
+                    }
                 }
-            }]
+            ]
         }
         with patch("httpx.post", return_value=resp):
             result = expand_query("kubernetes", api_key="sk-test")
@@ -235,12 +233,14 @@ class TestReasoningModelFallback:
         resp = MagicMock()
         resp.raise_for_status.return_value = None
         resp.json.return_value = {
-            "choices": [{
-                "message": {
-                    "content": "",
-                    "reasoning_content": "Python Coding",
+            "choices": [
+                {
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "Python Coding",
+                    }
                 }
-            }]
+            ]
         }
         with patch("httpx.post", return_value=resp):
             result = expand_query("python coding", api_key="sk-test")
@@ -317,19 +317,20 @@ class TestEnvVarFallback:
     def _mock_response(self, content="expanded terms here"):
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": content}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": content}}]}
         return resp
 
     def test_env_endpoint(self):
         mock_resp = self._mock_response()
         with patch("httpx.post", return_value=mock_resp) as mock_post:
-            with patch.dict("os.environ", {
-                "LLM_RERANK_ENDPOINT": "http://env-endpoint:4000/v1",
-                "LLM_RERANK_MODEL": "gpt-4o-mini",
-                "LLM_RERANK_API_KEY": "env-key",
-            }):
+            with patch.dict(
+                "os.environ",
+                {
+                    "LLM_RERANK_ENDPOINT": "http://env-endpoint:4000/v1",
+                    "LLM_RERANK_MODEL": "gpt-4o-mini",
+                    "LLM_RERANK_API_KEY": "env-key",
+                },
+            ):
                 result = expand_query("test")
         call_args = mock_post.call_args
         assert "env-endpoint:4000" in call_args[0][0]
@@ -338,11 +339,14 @@ class TestEnvVarFallback:
     def test_env_model(self):
         mock_resp = self._mock_response()
         with patch("httpx.post", return_value=mock_resp) as mock_post:
-            with patch.dict("os.environ", {
-                "LLM_RERANK_ENDPOINT": "http://localhost:4000/v1",
-                "LLM_RERANK_MODEL": "custom-model-v2",
-                "LLM_RERANK_API_KEY": "env-key",
-            }):
+            with patch.dict(
+                "os.environ",
+                {
+                    "LLM_RERANK_ENDPOINT": "http://localhost:4000/v1",
+                    "LLM_RERANK_MODEL": "custom-model-v2",
+                    "LLM_RERANK_API_KEY": "env-key",
+                },
+            ):
                 expand_query("test")
         assert mock_post.call_args[1]["json"]["model"] == "custom-model-v2"
 
@@ -350,11 +354,15 @@ class TestEnvVarFallback:
         """When LLM_RERANK_API_KEY is not set, OPENAI_API_KEY is used."""
         mock_resp = self._mock_response()
         with patch("httpx.post", return_value=mock_resp) as mock_post:
-            with patch.dict("os.environ", {
-                "LLM_RERANK_ENDPOINT": "http://localhost:4000/v1",
-                "LLM_RERANK_MODEL": "gpt-4o-mini",
-                "OPENAI_API_KEY": "openai-key",
-            }, clear=True):
+            with patch.dict(
+                "os.environ",
+                {
+                    "LLM_RERANK_ENDPOINT": "http://localhost:4000/v1",
+                    "LLM_RERANK_MODEL": "gpt-4o-mini",
+                    "OPENAI_API_KEY": "openai-key",
+                },
+                clear=True,
+            ):
                 expand_query("test")
         headers = mock_post.call_args[1]["headers"]
         assert headers["Authorization"] == "Bearer openai-key"
@@ -373,11 +381,14 @@ class TestEnvVarFallback:
         """Explicit args should take priority over env vars."""
         mock_resp = self._mock_response()
         with patch("httpx.post", return_value=mock_resp) as mock_post:
-            with patch.dict("os.environ", {
-                "LLM_RERANK_ENDPOINT": "http://env/v1",
-                "LLM_RERANK_MODEL": "env-model",
-                "LLM_RERANK_API_KEY": "env-key",
-            }):
+            with patch.dict(
+                "os.environ",
+                {
+                    "LLM_RERANK_ENDPOINT": "http://env/v1",
+                    "LLM_RERANK_MODEL": "env-model",
+                    "LLM_RERANK_API_KEY": "env-key",
+                },
+            ):
                 expand_query(
                     "test",
                     endpoint="http://explicit/v1",
@@ -399,9 +410,7 @@ class TestExpandQueryEdgeCases:
     def _mock_response(self, content="expanded output"):
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": content}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": content}}]}
         return resp
 
     def test_empty_query_string(self):
@@ -414,9 +423,7 @@ class TestExpandQueryEdgeCases:
         """Content that strips to empty but is not None/empty."""
         resp = MagicMock()
         resp.raise_for_status.return_value = None
-        resp.json.return_value = {
-            "choices": [{"message": {"content": "   "}}]
-        }
+        resp.json.return_value = {"choices": [{"message": {"content": "   "}}]}
         with patch("httpx.post", return_value=resp):
             result = expand_query("test", api_key="sk-test")
         # content.strip() is "", so content becomes "" → not content → check reasoning

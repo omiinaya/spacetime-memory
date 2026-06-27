@@ -183,9 +183,7 @@ class CrossEncoderReranker:
                 s = self._score_pair(query, content)
                 scored.append((r, s))
             except (RuntimeError, ValueError, KeyError):  # ONNX inference or tokenizer failure
-                logger.exception(
-                    "Cross-encoder scoring failed for content len=%d", len(content)
-                )
+                logger.exception("Cross-encoder scoring failed for content len=%d", len(content))
                 scored.append((r, r.get("score", 0.0)))
 
         # ── Re-rank by cross-encoder score ──

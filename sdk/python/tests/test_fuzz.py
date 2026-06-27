@@ -8,7 +8,6 @@ Requires live STDB (SPACETIMEDB_HOST=localhost).
 import pytest
 import random
 import string
-import time
 from spacetime_memory.client import Client
 
 pytestmark = [pytest.mark.integration]
@@ -24,9 +23,11 @@ MAX_STRING = 10000
 # 1. store_memory — content & summary boundaries
 # ---------------------------------------------------------------------------
 
+
 def _make_workspace(client: Client) -> str:
     """Create a unique workspace and return its ID."""
     import uuid
+
     ws_id = str(uuid.uuid4())
     client._call("create_workspace", [f"fuzz-{uuid.uuid4().hex[:6]}", "", ws_id])
     return ws_id
@@ -79,6 +80,7 @@ class TestStoreMemoryBounds:
 # 2. Malicious payloads
 # ---------------------------------------------------------------------------
 
+
 class TestMaliciousPayloads:
     """Payloads that could break serialization, SQL, or rendering."""
 
@@ -125,6 +127,7 @@ class TestMaliciousPayloads:
     def test_workspace_name_special_chars(self, stdb_client: Client):
         c = stdb_client
         import uuid
+
         ws_id = str(uuid.uuid4())
         name = "<script>alert('xss')</script>"
         result = c._call("create_workspace", [name, "", ws_id])
@@ -141,6 +144,7 @@ class TestMaliciousPayloads:
 # ---------------------------------------------------------------------------
 # 3. Rapid-fire / stress
 # ---------------------------------------------------------------------------
+
 
 class TestRapidFire:
     """Verify reducers handle bursts without corruption."""
@@ -163,6 +167,7 @@ class TestRapidFire:
     def test_rapid_workspace_creates(self, stdb_client: Client):
         c = stdb_client
         import uuid
+
         ws_ids = []
         for i in range(10):
             ws_id = str(uuid.uuid4())
@@ -193,9 +198,17 @@ class TestRapidFire:
         c = stdb_client
         ws = _make_workspace(c)
         for i in range(15):
-            result = c._call("create_node", [
-                ws, f"node-{i}", "concept", f"summary-{i}", "{}", "",
-            ])
+            result = c._call(
+                "create_node",
+                [
+                    ws,
+                    f"node-{i}",
+                    "concept",
+                    f"summary-{i}",
+                    "{}",
+                    "",
+                ],
+            )
             assert result.get("status") == "ok"
         # Verify all created
         nodes = c._query("kg_node", workspace_id=ws, filter_dict={})
@@ -206,6 +219,7 @@ class TestRapidFire:
 # ---------------------------------------------------------------------------
 # 4. Edge cases — entity extraction + indexing chains
 # ---------------------------------------------------------------------------
+
 
 class TestIndexingChains:
     """Verify store → index_entity → index_terms chains don't break."""
@@ -230,13 +244,22 @@ class TestIndexingChains:
         c = stdb_client
         ws = _make_workspace(c)
         items = [
-            {"workspace_id": ws, "content": f"batch-item-{i}", "summary": "",
-             "memory_type": "experience", "peer_id": "", "observer_id": "",
-             "entities_json": "[]", "confidence": 0.8,
-             "source_session_id": "", "source_message_id": ""}
+            {
+                "workspace_id": ws,
+                "content": f"batch-item-{i}",
+                "summary": "",
+                "memory_type": "experience",
+                "peer_id": "",
+                "observer_id": "",
+                "entities_json": "[]",
+                "confidence": 0.8,
+                "source_session_id": "",
+                "source_message_id": "",
+            }
             for i in range(30)
         ]
         import json
+
         result = c._call("store_memory_batch", [json.dumps(items)])
         assert result.get("status") == "ok"
         mems = c._query("memory", workspace_id=ws, filter_dict={})
