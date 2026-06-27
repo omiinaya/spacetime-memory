@@ -252,7 +252,7 @@ note(f"Our Mem0 uses ValueError: {our_src.count('ValueError')}x, RuntimeError: {
 # Check mem0 config shape
 from mem0.configs.base import MemoryConfig, LlmConfig, EmbedderConfig, VectorStoreConfig
 check("Mem0 config classes: MemoryConfig", True)
-check("Mem0 MemoryConfig embeds all sub-configs", 
+check("Mem0 MemoryConfig embeds all sub-configs",
      set(['vector_store', 'llm', 'embedder', 'reranker']).issubset(MemoryConfig.model_fields.keys()))
 
 
@@ -377,7 +377,7 @@ compare_signatures("Graphiti", OurGraphiti, RealGraphiti, ["add_triplet", "searc
 from graphiti_core.graphiti import AddTripletResults as RealATR
 from graphiti_core.nodes import EntityNode as RealEN
 from graphiti_core.edges import EntityEdge as RealEE
-check("Real Graphiti AddTripletResults annotates nodes/edges", 
+check("Real Graphiti AddTripletResults annotates nodes/edges",
      "nodes" in (RealATR.__annotations__ if hasattr(RealATR, "__annotations__") else {}))
 from spacetime_memory.sdks.graphiti import AddTripletResults as OurATR
 check("Our Graphiti AddTripletResults annotates nodes/edges",

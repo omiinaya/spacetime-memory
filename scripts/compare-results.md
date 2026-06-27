@@ -129,7 +129,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ reflect(self, bank_id: str, query: str, *, budget='low', context, max_tokens,
   ℹ         response_schema, tags, include_facts, include_tool_calls, ...) → ReflectResponse
   ℹ No forget() method. Also: retain_batch(), retain_files(), a* async variants
-  ℹ 
+  ℹ
   ℹ === OUR ADAPTER (hugely incompatible — different API entirely) ===
   ℹ Import: from spacetime_memory.sdks.hindsight import Hindsight
   ℹ __init__(self, config: dict | None = None, ...)
@@ -137,7 +137,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ recall(self, query: str, limit: int = 20, threshold: float = 0.0)
   ℹ reflect(self, prompt: str = '...', context=None, tags=None, max_tokens=None, response_schema=None)
   ℹ forget(self, memory_id: str)
-  ℹ 
+  ℹ
   ✓ Hindsight: no obsolete params (matching real API)
   ℹ Methods: ['aclose', 'acreate_bank', 'acreate_directive', 'acreate_mental_model', 'adelete_bank', 'alist_memories', 'arecall', 'areflect', 'aretain', 'aretain_batch', 'close', 'create_bank', 'create_directive', 'create_mental_model', 'delete_bank', 'list_memories', 'recall', 'reflect', 'retain', 'retain_batch', 'retain_files']
   ✓ Hindsight: retain/recall/reflect methods exist
@@ -171,7 +171,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ workspaces(self) → SyncPage[str]      # list workspace IDs
   ℹ delete_workspace() → None
   ℹ Also: queue_status(), schedule_dream(), .aio accessor for async
-  ℹ 
+  ℹ
   ℹ === OUR ADAPTER (now matches upstream API shape) ===
   ℹ Import: from spacetime_memory.sdks.honcho import Honcho
   ℹ Honcho(workspace_id='...', base_url=None, stdb_host=..., stdb_port=...)
@@ -180,7 +180,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
   ℹ search(query, filters, limit) → list[Message]
   ℹ Peer.message(), Peer.chat(), Peer.search()
   ℹ Session.add_peers(), Session.add_messages(), Session.context()
-  ℹ 
+  ℹ
   ℹ Methods: ['close', 'delete_workspace', 'get_configuration', 'get_metadata', 'peer', 'peers', 'queue_status', 'refresh', 'schedule_dream', 'search', 'session', 'sessions', 'set_configuration', 'set_metadata', 'workspaces']
   ✓ Honcho: peer/session/search methods exist
   ✓ Honcho: workspaces/delete_workspace exist
@@ -229,7 +229,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - reflect(self, bank_id: str, query: str, *, budget='low', context, max_tokens,
 -         response_schema, tags, include_facts, include_tool_calls, ...) → ReflectResponse
 - No forget() method. Also: retain_batch(), retain_files(), a* async variants
-- 
+-
 - === OUR ADAPTER (hugely incompatible — different API entirely) ===
 - Import: from spacetime_memory.sdks.hindsight import Hindsight
 - __init__(self, config: dict | None = None, ...)
@@ -237,7 +237,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - recall(self, query: str, limit: int = 20, threshold: float = 0.0)
 - reflect(self, prompt: str = '...', context=None, tags=None, max_tokens=None, response_schema=None)
 - forget(self, memory_id: str)
-- 
+-
 - Methods: ['aclose', 'acreate_bank', 'acreate_directive', 'acreate_mental_model', 'adelete_bank', 'alist_memories', 'arecall', 'areflect', 'aretain', 'aretain_batch', 'close', 'create_bank', 'create_directive', 'create_mental_model', 'delete_bank', 'list_memories', 'recall', 'reflect', 'retain', 'retain_batch', 'retain_files']
 - Old adapter return types (dicts) replaced with typed Pydantic models
 - No forget(), export_template(), import_template(), list_all(), stats(), reset() methods
@@ -252,7 +252,7 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - workspaces(self) → SyncPage[str]      # list workspace IDs
 - delete_workspace() → None
 - Also: queue_status(), schedule_dream(), .aio accessor for async
-- 
+-
 - === OUR ADAPTER (now matches upstream API shape) ===
 - Import: from spacetime_memory.sdks.honcho import Honcho
 - Honcho(workspace_id='...', base_url=None, stdb_host=..., stdb_port=...)
@@ -261,6 +261,6 @@ Comparison of spacetime-memory adapters vs real upstream PyPI libraries
 - search(query, filters, limit) → list[Message]
 - Peer.message(), Peer.chat(), Peer.search()
 - Session.add_peers(), Session.add_messages(), Session.context()
-- 
+-
 - Methods: ['close', 'delete_workspace', 'get_configuration', 'get_metadata', 'peer', 'peers', 'queue_status', 'refresh', 'schedule_dream', 'search', 'session', 'sessions', 'set_configuration', 'set_metadata', 'workspaces']
 - Honcho adapter now matches plastic-labs/honcho API shape

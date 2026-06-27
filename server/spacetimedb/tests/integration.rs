@@ -31,7 +31,7 @@ fn publish_module() -> String {
     let wasm_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("target/wasm32-unknown-unknown/release/spacetime_memory.wasm");
     let wasm = std::fs::read(&wasm_path).expect("WASM not built");
-    
+
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post(format!("{}/v1/database?host_type=Wasm&delete_data=always", STDB_URL))
@@ -39,7 +39,7 @@ fn publish_module() -> String {
         .body(wasm)
         .send()
         .expect("publish failed");
-    
+
     assert!(resp.status().is_success(), "publish returned {}", resp.status());
     resp.text().expect("no body").trim().to_string()
 }

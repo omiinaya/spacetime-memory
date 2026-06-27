@@ -5558,10 +5558,41 @@ class TestMemoryHistory:
         from unittest.mock import Mock
 
         c = Client(host="localhost", port=3001)
-        c._query = Mock(return_value=[{"id": "h1", "content": "old version", "updated_at": 100}])
+        # get_memory_history calls _query twice: first for memory_revision table,
+        # then for current memory state. Use side_effect to return appropriate
+        # data for each call so version dedup works correctly.
+        c._query = Mock(
+            side_effect=[
+                [
+                    {
+                        "version": 1,
+                        "memory_id": "mem1",
+                        "new_content": "old version",
+                        "new_summary": "summary",
+                        "new_confidence": 0.9,
+                        "previous_content": "",
+                        "previous_summary": "",
+                        "previous_confidence": 0.0,
+                        "changed_at": 100,
+                        "changed_by": "test",
+                    }
+                ],
+                [
+                    {
+                        "id": "mem1",
+                        "content": "old version",
+                        "summary": "summary",
+                        "version": 1,
+                        "updated_at": 100,
+                        "confidence": 0.9,
+                    }
+                ],
+            ]
+        )
         result = c.get_memory_history("mem1")
         assert len(result) == 1
         assert result[0]["content"] == "old version"
+        assert result[0]["version"] == 1
 
     def test_get_memory_history_empty(self):
         from unittest.mock import Mock
