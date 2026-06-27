@@ -12,6 +12,22 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Fix 9 stale SpacetimeDB v2.4/v2.4.1 doc references across 7 documentation files (Aug 2)
+Updated all STDB version references from v2.4/v2.4.1 to v2.6 (the actual
+dependency version since commit `d1d147f`). Fixed:
+- README.md (CLI prerequisite: v2.4+ → v2.6+)
+- plugins/hermes/README.md (durable storage: v2.4.1 → v2.6)
+- docs/development.md (prerequisite: v2.4+ → v2.6+)
+- docs/getting-started.md (prerequisite: v2.4+ → v2.6+)
+- docs/PERFORMANCE.md (benchmark context: v2.4.1 → v2.6)
+- docs/usage/self-hosted.md (runtime includes: v2.4.1 → v2.6)
+- DEPLOYMENT.md (3 refs: CLI version, download URL, Docker image v2.4.1 → v2.6)
+Files: README.md, plugins/hermes/README.md, docs/development.md,
+  docs/getting-started.md, docs/PERFORMANCE.md, docs/usage/self-hosted.md,
+  DEPLOYMENT.md
+Difficulty: Trivial
+Est: 5min
+
 ### ✅ Fix `test_get_memory_history_found` mock setup (Jun 27)
 The mock used `return_value` (single response) but `get_memory_history()` calls
 `_query()` twice — once for `memory_revision` and once for `memory` (current
@@ -122,6 +138,25 @@ Difficulty: Hard (needs live STDB)
 ||---
 
 ## Research Log
+
+### Aug 2 — Fixed 9 stale STDB v2.4 doc references; backlog remains empty
+- **Completed**: Updated 9 stale SpacetimeDB v2.4/v2.4.1 references across 7
+  documentation files (README.md, plugins/hermes/README.md, docs/development.md,
+  docs/getting-started.md, docs/PERFORMANCE.md, docs/usage/self-hosted.md,
+  DEPLOYMENT.md) to v2.6 to match the actual dependency version.
+- **Cleanup**: Added new completed item to Recently Completed (8 total, within
+  5-10 range, no purge needed).
+- **Research**:
+  - Git log (7 days): 242 commits, latest: a317935d (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
+  - opentelemetry-sdk v1.43.0 (unchanged).
+  - No new competitor features to adopt from mem0, langgraph, zep.
+  - Deeper scan found 9 stale STDB v2.4 references across 7 doc files (now fixed).
+  - No other real gaps found: all Client SDK methods have MCP wrappers; no
+    code-level TODO/FIXME markers; 3313 tests collected; pre-commit config active.
+- **Backlog**: 0 PENDING items — backlog remains empty.
+- **Commit**: TBD
 
 ### Jun 27 — Fixed test mock, added pre-commit CI step; backlog cleared
 - **Completed**: Fixed `test_get_memory_history_found` mock (side_effect for

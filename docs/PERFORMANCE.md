@@ -1,7 +1,7 @@
 # Performance Benchmarks
 
 This document provides reference latency data for Spacetime-Memory operations
-measured against a live SpacetimeDB v2.4.1 standalone with the ONNX embedder
+measured against a live SpacetimeDB v2.6 standalone with the ONNX embedder
 sidecar running on localhost:9090.
 
 ## Quick Start

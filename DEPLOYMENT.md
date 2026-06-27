@@ -88,12 +88,12 @@ Data persists in a Docker volume (`spacetime-data`) across restarts.
 - Python 3.11+
 - Rust toolchain with `wasm32-unknown-unknown` target
 - Node.js 20+
-- SpacetimeDB CLI v2.4.1
+- SpacetimeDB CLI v2.6
 
 ### 1. Install SpacetimeDB CLI
 
 ```bash
-curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.4.1/spacetime-linux-x86_64.tgz \
+curl -fsSL https://github.com/clockworklabs/SpacetimeDB/releases/download/v2.6/spacetime-linux-x86_64.tgz \
   | tar xz -C /usr/local/bin/
 spacetime version
 ```
@@ -191,7 +191,7 @@ For production, run SpacetimeDB as a dedicated service rather than inside the co
 # docker-compose.prod.yml
 services:
   spacetimedb:
-    image: clockworklabs/spacetimedb:v2.4.1
+    image: clockworklabs/spacetimedb:v2.6
     ports: ["3001:3001"]
     volumes: ["spacetime-data:/var/lib/spacetimedb"]
     command: ["start", "--listen-addr", "0.0.0.0:3001"]

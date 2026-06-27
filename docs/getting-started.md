@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Rust toolchain (`cargo`, `rustup`)
-- SpacetimeDB CLI v2.4+ (`spacetime version upgrade`)
+- SpacetimeDB CLI v2.6+ (`spacetime version upgrade`)
 - Node.js 18+ and npm
 - Python 3.10+ (for SDK/CLI/MCP)
 

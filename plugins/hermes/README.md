@@ -7,7 +7,7 @@ SpacetimeDB-backed distributed memory system with:
 - **Knowledge graphs** — entity linking, communities, god nodes
 - **Markdown notes** — wikilink backlinks, daily notes, full editor UI
 - **User profiles** — static facts + dynamic context + preferences
-- **Durable storage** — SpacetimeDB v2.4.1 with WASM reducers
+- **Durable storage** — SpacetimeDB v2.6 with WASM reducers
 
 ## Requirements
 

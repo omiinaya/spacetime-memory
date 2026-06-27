@@ -34,7 +34,7 @@ spacetime-memory/
 ## Prerequisites for Development
 
 - Rust toolchain (`cargo`, `rustup`)
-- SpacetimeDB CLI v2.4+
+- SpacetimeDB CLI v2.6+
 - Python 3.10+
 - Node.js 18+ (for frontend)
 

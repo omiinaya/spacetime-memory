@@ -53,7 +53,7 @@ The multi-stage Docker build (`Dockerfile`) consists of four stages:
 
 ### What the Runtime Includes
 
-- SpacetimeDB CLI v2.4.1 standalone binary
+- SpacetimeDB CLI v2.6 standalone binary
 - Python SDK installed as an editable package
 - Python CLI (`stmem`)
 - Rust ONNX embedder binary (all-MiniLM-L6-v2, 384d)
