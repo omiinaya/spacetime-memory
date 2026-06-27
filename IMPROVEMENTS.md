@@ -359,4 +359,4 @@ Difficulty: Hard (needs live STDB)
 - **Gaps remaining**: `update_node`, `list_memories`, and ~30 other `Client`
   methods still without MCP wrappers (low-priority admin/utility methods).
 - **Backlog**: 2 PENDING items (update_node MCP tool, list_memories MCP tool).
-- **Commit**: (pending push)
+- **Commit**: 9cada69 — 3 files (+115/-21), 68/68 MCP tests passing.
