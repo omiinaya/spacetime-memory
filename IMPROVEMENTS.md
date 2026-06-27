@@ -195,4 +195,4 @@ Difficulty: Hard (needs live STDB)
   - 7 remaining gaps identified (profile facts, community detection, bridge nodes,
     context packs, entity links) added to backlog.
 - **Backlog**: 7 PENDING items.
-- **Commit**: 5f1e9a2 — 3 files changed, +176 lines, 174/174 MCP tests passing.
+- **Commit**: 42fe775 — 3 files changed, +210 lines, 174/174 MCP tests passing.
