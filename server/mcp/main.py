@@ -435,6 +435,83 @@ def store_batch(
     return f"Stored {len(results)} memories in batch (workspace: {workspace_id})"
 
 
+@mcp.tool()
+@require_api_key
+def fuzzy_get(
+    workspace_id: str,
+    name: str,
+    field: str = "content",
+    threshold: float = 0.5,
+    limit: int = 50,
+) -> str:
+    """Find the closest-matching memory by string similarity (difflib).
+
+    Fetches up to *limit* memories from the workspace and uses
+    ``difflib.SequenceMatcher`` to find the one whose *field* value is
+    most similar to *name*.
+
+    Args:
+        workspace_id: The workspace to search.
+        name: The target name to fuzzy-match against.
+        field: Which memory field to compare (default "content").
+        threshold: Minimum similarity ratio 0.0-1.0 (default 0.5).
+        limit: Max memories to scan (default 50).
+
+    Returns:
+        JSON string with the best match if found and similarity >= threshold,
+        or a message indicating no match found.
+    """
+    import json as _json
+
+    result = get_client().fuzzy_get(
+        workspace_id=workspace_id,
+        name=name,
+        field=field,
+        threshold=threshold,
+        limit=limit,
+    )
+    if result is None:
+        return f"No memory found matching '{name}' with similarity >= {threshold} (field: {field})."
+    return _json.dumps(result, default=str)
+
+
+@mcp.tool()
+@require_api_key
+def detect_patterns(
+    workspace_id: str,
+    limit: int = 200,
+    include_clusters: bool = True,
+    include_terms: bool = True,
+    include_co_occur: bool = True,
+) -> str:
+    """Run pattern detection on a workspace's memories.
+
+    Performs temporal clustering, frequent term extraction, and
+    co-occurrence detection to surface patterns across memories.
+
+    Args:
+        workspace_id: The workspace to analyze.
+        limit: Max memories to fetch for analysis (default 200).
+        include_clusters: Run temporal clustering (default True).
+        include_terms: Run frequent term extraction (default True).
+        include_co_occur: Run co-occurrence detection (default True).
+
+    Returns:
+        JSON string with temporal_clusters, frequent_terms,
+        co_occurrences, total_memories, and summary.
+    """
+    import json as _json
+
+    result = get_client().detect_patterns(
+        workspace_id=workspace_id,
+        limit=limit,
+        include_clusters=include_clusters,
+        include_terms=include_terms,
+        include_co_occur=include_co_occur,
+    )
+    return _json.dumps(result, default=str)
+
+
 # ---------------------------------------------------------------------------
 # Note CRUD tools (LLM Wiki page management)
 # ---------------------------------------------------------------------------
@@ -551,6 +628,20 @@ def get_note_by_title(title: str) -> list[dict[str, Any]]:
         List of note records matching the title (usually one).
     """
     return get_client().get_note_by_title(title)
+
+
+@mcp.tool()
+@require_api_key
+def get_note_by_date(note_date: str) -> list[dict[str, Any]]:
+    """Find notes by ISO-8601 date string (YYYY-MM-DD).
+
+    Args:
+        note_date: The date string to search for (e.g. "2026-06-26").
+
+    Returns:
+        List of note records matching the date.
+    """
+    return get_client().get_note_by_date(note_date)
 
 
 @mcp.tool()
