@@ -2696,6 +2696,150 @@ def list_api_keys(workspace_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Decay model tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def set_decay_model(
+    workspace_id: str,
+    model: str = "linear",
+    decay_rate: float = 0.005,
+    max_days: int = 90,
+    weibull_shape: float = 0.6,
+    weibull_scale: float = 30.0,
+) -> str:
+    """Configure the decay model for a workspace.
+
+    Sets how memory relevance decays over time using either a linear
+    or Weibull model. Affects recommendation urgency scoring.
+
+    Args:
+        workspace_id: The workspace to configure.
+        model: ``"linear"`` (default) or ``"weibull"``.
+        decay_rate: For linear — fraction of trust to decay per day
+            (e.g. 0.005 = 0.5%%/day).
+        max_days: For linear — max age in days before trust hits floor.
+        weibull_shape: For Weibull — k parameter (< 1 = rapid-then-slow
+            forgetting, default 0.6).
+        weibull_scale: For Weibull — λ parameter (characteristic time
+            in days, default 30.0).
+
+    Returns:
+        Confirmation message with the configured model type.
+    """
+    result = get_client().set_decay_model(
+        workspace_id=workspace_id,
+        model=model,
+        decay_rate=decay_rate,
+        max_days=max_days,
+        weibull_shape=weibull_shape,
+        weibull_scale=weibull_scale,
+    )
+    return (
+        f"Decay model configured for workspace '{workspace_id[:16]}...':\n"
+        f"  Model: {model}\n"
+        f"  Status: {result.get('status', 'ok')}"
+    )
+
+
+@mcp.tool()
+@require_api_key
+def get_decay_config(workspace_id: str) -> str:
+    """Get the current decay configuration for a workspace.
+
+    Returns the configured decay model, parameters, and when it was
+    last updated. Returns a message indicating no config if none set.
+
+    Args:
+        workspace_id: The workspace to query.
+
+    Returns:
+        Formatted decay configuration or a message if not configured.
+    """
+    result = get_client().get_decay_config(workspace_id)
+    if result is None:
+        return f"No decay configuration set for workspace '{workspace_id[:16]}...'."
+
+    lines = [
+        f"Decay config for workspace '{workspace_id[:16]}...':",
+    ]
+    for key, value in result.items():
+        lines.append(f"  {key}: {value}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Batch operations tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def batch_update_memories(
+    workspace_id: str,
+    memory_ids_json: str,
+    updates_json: str,
+) -> str:
+    """Batch update multiple memories with the same field changes.
+
+    Performs client-side batching: loops over each memory_id and calls
+    ``update_memory`` for each, preserving fields not in *updates_json*.
+
+    Args:
+        workspace_id: The workspace containing the memories.
+        memory_ids_json: JSON array of memory IDs to update,
+            e.g. ``'[\"mem-001\", \"mem-002\"]'``.
+        updates_json: JSON object with fields to update,
+            e.g. ``'{\"summary\": \"Updated\", \"confidence\": 0.95}'``.
+            Supported fields: content, summary, confidence, tier, is_active.
+
+    Returns:
+        Confirmation message with update count and any errors.
+    """
+    import json as _json
+
+    try:
+        memory_ids = _json.loads(memory_ids_json)
+    except (json.JSONDecodeError, TypeError):
+        return (
+            "Error: memory_ids_json must be a valid JSON array of strings, "
+            "e.g. '[\"mem-001\", \"mem-002\"]'"
+        )
+    if not isinstance(memory_ids, list):
+        return "Error: memory_ids_json must be a JSON array."
+
+    try:
+        updates = _json.loads(updates_json)
+    except (json.JSONDecodeError, TypeError):
+        return (
+            "Error: updates_json must be a valid JSON object, "
+            "e.g. '{\"summary\": \"...\", \"confidence\": 0.95}'"
+        )
+    if not isinstance(updates, dict):
+        return "Error: updates_json must be a JSON object."
+
+    result = get_client().batch_update_memories(
+        workspace_id=workspace_id,
+        memory_ids=memory_ids,
+        updates=updates,
+    )
+    status = result.get("status", "ok")
+    updated = result.get("updated", 0)
+    errors = result.get("errors", [])
+    msg = (
+        f"Batch update complete (status: {status}).\n"
+        f"  Memories updated: {updated}/{len(memory_ids)}\n"
+    )
+    if errors:
+        msg += f"  Errors ({len(errors)}):\n"
+        for err in errors:
+            msg += f"    - {err}\n"
+    return msg
+
+
+# ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
 

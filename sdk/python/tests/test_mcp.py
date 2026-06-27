@@ -1745,3 +1745,196 @@ class TestGetContextChain:
         get_context_chain(memory_id="mem-xyz")
         mock_mcp_client.get_context_chain.assert_called_once_with("mem-xyz")
 
+
+# ── set_decay_model / get_decay_config (decay model tools) ──────────────
+
+
+class TestSetDecayModel:
+    """Tests for the set_decay_model MCP tool."""
+
+    def test_sets_linear_default(self, mock_mcp_client):
+        from server.mcp.main import set_decay_model
+        mock_mcp_client.set_decay_model.return_value = {"status": "ok"}
+        result = set_decay_model(
+            workspace_id="ws1",
+        )
+        assert "Decay model configured" in result
+        assert "linear" in result
+        mock_mcp_client.set_decay_model.assert_called_once_with(
+            workspace_id="ws1",
+            model="linear",
+            decay_rate=0.005,
+            max_days=90,
+            weibull_shape=0.6,
+            weibull_scale=30.0,
+        )
+
+    def test_sets_weibull(self, mock_mcp_client):
+        from server.mcp.main import set_decay_model
+        mock_mcp_client.set_decay_model.return_value = {"status": "ok"}
+        result = set_decay_model(
+            workspace_id="ws2",
+            model="weibull",
+            weibull_shape=0.8,
+            weibull_scale=45.0,
+        )
+        assert "weibull" in result
+        mock_mcp_client.set_decay_model.assert_called_once_with(
+            workspace_id="ws2",
+            model="weibull",
+            decay_rate=0.005,
+            max_days=90,
+            weibull_shape=0.8,
+            weibull_scale=45.0,
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import set_decay_model
+        mock_mcp_client.set_decay_model.return_value = {"status": "ok"}
+        set_decay_model(workspace_id="ws-abc", model="linear", decay_rate=0.01)
+        mock_mcp_client.set_decay_model.assert_called_once_with(
+            workspace_id="ws-abc",
+            model="linear",
+            decay_rate=0.01,
+            max_days=90,
+            weibull_shape=0.6,
+            weibull_scale=30.0,
+        )
+
+
+class TestGetDecayConfig:
+    """Tests for the get_decay_config MCP tool."""
+
+    def test_returns_config(self, mock_mcp_client):
+        from server.mcp.main import get_decay_config
+        mock_mcp_client.get_decay_config.return_value = {
+            "id": "ws1",
+            "model": "linear",
+            "decay_rate": 0.005,
+            "max_days": 90,
+        }
+        result = get_decay_config(workspace_id="ws1")
+        assert "Decay config" in result
+        assert "model" in result
+        assert "linear" in result
+        assert "decay_rate" in result
+        mock_mcp_client.get_decay_config.assert_called_once_with("ws1")
+
+    def test_no_config(self, mock_mcp_client):
+        from server.mcp.main import get_decay_config
+        mock_mcp_client.get_decay_config.return_value = None
+        result = get_decay_config(workspace_id="ws-none")
+        assert "No decay configuration" in result
+        mock_mcp_client.get_decay_config.assert_called_once_with("ws-none")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import get_decay_config
+        mock_mcp_client.get_decay_config.return_value = None
+        get_decay_config(workspace_id="ws-abc")
+        mock_mcp_client.get_decay_config.assert_called_once_with("ws-abc")
+
+
+# ── batch_update_memories ────────────────────────────────────────────────
+
+
+class TestBatchUpdateMemories:
+    """Tests for the batch_update_memories MCP tool."""
+
+    def test_batch_updates_success(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+        mock_mcp_client.batch_update_memories.return_value = {
+            "status": "ok",
+            "updated": 2,
+        }
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='["mem-001", "mem-002"]',
+            updates_json='{"summary": "Updated summary", "confidence": 0.95}',
+        )
+        assert "Batch update complete" in result
+        assert "ok" in result
+        assert "2/2" in result
+        mock_mcp_client.batch_update_memories.assert_called_once_with(
+            workspace_id="ws1",
+            memory_ids=["mem-001", "mem-002"],
+            updates={"summary": "Updated summary", "confidence": 0.95},
+        )
+
+    def test_batch_partial_errors(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+        mock_mcp_client.batch_update_memories.return_value = {
+            "status": "partial",
+            "updated": 1,
+            "errors": ["Memory 'mem-002' not found"],
+        }
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='["mem-001", "mem-002"]',
+            updates_json='{"confidence": 0.9}',
+        )
+        assert "partial" in result
+        assert "1/2" in result
+        assert "Memory 'mem-002' not found" in result
+        mock_mcp_client.batch_update_memories.assert_called_once_with(
+            workspace_id="ws1",
+            memory_ids=["mem-001", "mem-002"],
+            updates={"confidence": 0.9},
+        )
+
+    def test_invalid_memory_ids_json(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json="not-json",
+            updates_json='{"summary": "test"}',
+        )
+        assert "Error" in result
+        assert "valid JSON array" in result
+
+    def test_invalid_updates_json(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='["mem-001"]',
+            updates_json="not-json",
+        )
+        assert "Error" in result
+        assert "valid JSON object" in result
+
+    def test_non_array_memory_ids(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='"not-an-array"',
+            updates_json='{"summary": "test"}',
+        )
+        assert "Error" in result
+        assert "JSON array" in result
+
+    def test_non_dict_updates(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='["mem-001"]',
+            updates_json='"not-a-dict"',
+        )
+        assert "Error" in result
+        assert "JSON object" in result
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+        mock_mcp_client.batch_update_memories.return_value = {
+            "status": "ok",
+            "updated": 1,
+        }
+        batch_update_memories(
+            workspace_id="ws-abc",
+            memory_ids_json='["mem-xyz"]',
+            updates_json='{"tier": "important"}',
+        )
+        mock_mcp_client.batch_update_memories.assert_called_once_with(
+            workspace_id="ws-abc",
+            memory_ids=["mem-xyz"],
+            updates={"tier": "important"},
+        )
+
