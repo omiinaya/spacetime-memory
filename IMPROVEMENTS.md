@@ -12,6 +12,29 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Fix `test_get_memory_history_found` mock setup (Jun 27)
+The mock used `return_value` (single response) but `get_memory_history()` calls
+`_query()` twice — once for `memory_revision` and once for `memory` (current
+state). Fixed by switching to `side_effect` with proper revision + current-memory
+data including version fields, so the version-dedup logic correctly produces 1
+result. All 2020 unit tests now passing (was 1 pre-existing failure).
+Files: sdk/python/tests/test_client_deep.py
+Difficulty: Easy
+Est: 10min
+Test: 2020/2020 unit tests passing
+
+### ✅ Add GitHub Actions CI step for pre-commit hook validation (Jun 27)
+Added a CI step to the Python job that installs pre-commit and runs
+`pre-commit run --all-files`. This validates all hooks (ruff lint, ruff format,
+trailing-whitespace, EOF fixer, YAML/JSON/TOML validation, large-file check,
+private-key detection, merge-conflict detection, markdownlint) on every push/PR.
+Pre-commit auto-fixed 5 trailing-whitespace issues + 1 missing EOF newline
+across Cargo.toml, integration.rs, compare-results.md, compare-upstream.py,
+and the backup JSON file.
+Files: .github/workflows/ci.yml
+Difficulty: Easy
+Est: 5min
+
 ### ✅ Add pre-commit config for automated linting (Aug 2)
 Created `.pre-commit-config.yaml` with hooks for ruff lint, ruff format,
 trailing-whitespace, end-of-file-fixer, YAML/JSON/TOML validation,
@@ -36,7 +59,7 @@ Also ran `ruff format` on all 38 SDK modules and 56 test files.
 Files: 65 source files across sdk/python/spacetime_memory/ and tests/
 Difficulty: Medium
 Est: 25min
-Test: 749/749 unit tests passing (1 pre-existing failure: test_get_memory_history_found)
+Test: 749/749 unit tests passing (was 1 pre-existing failure: test_get_memory_history_found)
 
 ### ✅ Update MCP README with full tool catalog (Jun 27)
 The README at `server/mcp/README.md` previously documented only ~15 of ~128 MCP
@@ -72,23 +95,7 @@ Test: 190/190 MCP tests passing
 
 ## Pending
 
-### Fix `test_get_memory_history_found` mock setup
-The unit test `TestMemoryHistory::test_get_memory_history_found` expects
-`len(result) == 1` but `get_memory_history()` internally calls the reducer
-(via `_call()`) which returns a result that gets merged with the `_query()`
-result, producing 2 entries. The mock setup needs to account for the reducer
-call or the test should use a different approach.
-Files: sdk/python/tests/test_client_deep.py
-Difficulty: Easy
-Est: 10min
-
-### Add GitHub Actions CI step for pre-commit hook validation
-The pre-commit config is now committed but CI doesn't automatically
-run `pre-commit run --all-files`. Add a step to the Python CI job
-that installs pre-commit and runs it against the SDK code.
-Files: .github/workflows/ci.yml
-Difficulty: Easy
-Est: 5min
+*No pending items — backlog cleared.*
 
 ---
 
@@ -115,6 +122,22 @@ Difficulty: Hard (needs live STDB)
 ||---
 
 ## Research Log
+
+### Jun 27 — Fixed test mock, added pre-commit CI step; backlog cleared
+- **Completed**: Fixed `test_get_memory_history_found` mock (side_effect for
+  double `_query()` call). Added pre-commit CI validation step to Python job.
+- **Cleanup**: Moved both PENDING items to Recently Completed (7 total, within
+  5-10 range, no purge needed).
+- **Research**:
+  - Git log (7 days): 29 commits, latest: 21d4195e (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.43.0 — all unchanged.
+  - No new competitor features to adopt from mem0, langgraph, zep.
+  - Deeper scan: no new gaps found. Pre-commit ran successfully on CI edits
+    and auto-fixed 6 file hygiene issues.
+- **Backlog**: 0 PENDING items — backlog is empty.
+- **Commit**: 21d4195e — 7 files changed, +50/-15 lines.
 
 ### Aug 2 — Added pre-commit config + fixed 53 ruff lint issues; 2 PENDING items remaining
 - **Completed**: Created `.pre-commit-config.yaml` with ruff lint, ruff format,
