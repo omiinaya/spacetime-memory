@@ -1438,12 +1438,12 @@ def get_community(community_id: int) -> dict[str, Any]:
 @require_api_key
 def compute_pagerank(workspace_id: str, damping: float = 0.85, max_iterations: int = 100) -> str:
     """Compute PageRank centrality for all nodes in a workspace.
-    
+
     Args:
         workspace_id: The workspace to compute PageRank for.
         damping: PageRank damping factor (default: 0.85).
         max_iterations: Maximum iterations (default: 100).
-    
+
     Returns:
         Summary string with the number of nodes ranked.
     """
@@ -1461,10 +1461,10 @@ def compute_pagerank(workspace_id: str, damping: float = 0.85, max_iterations: i
 @require_api_key
 def compute_community_hierarchy(workspace_id: str) -> str:
     """Build hierarchical community dendrogram using agglomerative clustering.
-    
+
     Args:
         workspace_id: The workspace to build hierarchy for.
-    
+
     Returns:
         JSON string with hierarchy edges and clusters.
     """
@@ -1788,6 +1788,21 @@ def delete_tour(tour_id: str) -> str:
     """
     get_client().delete_tour(tour_id)
     return f"Tour {tour_id[:16]}... deleted."
+
+
+@mcp.tool()
+@require_api_key
+def delete_tour_stop(stop_id: str) -> str:
+    """Remove a single stop from a guided tour.
+
+    Args:
+        stop_id: The ID of the tour stop to remove.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().delete_tour_stop(stop_id)
+    return f"Tour stop {stop_id[:16]}... deleted."
 
 
 # ---------------------------------------------------------------------------

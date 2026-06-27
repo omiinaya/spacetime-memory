@@ -6,7 +6,7 @@ const Tabs = React.forwardRef<
   React.HTMLAttributes<HTMLDivElement> & { defaultValue?: string; value?: string; onValueChange?: (value: string) => void }
 >(({ className, defaultValue, value, onValueChange, children, ...props }, ref) => {
   const [activeTab, setActiveTab] = React.useState(value ?? defaultValue ?? '');
-  
+
   React.useEffect(() => {
     if (value !== undefined) setActiveTab(value);
   }, [value]);

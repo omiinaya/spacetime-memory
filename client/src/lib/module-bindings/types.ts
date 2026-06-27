@@ -368,4 +368,3 @@ export const Workspace = __t.object("Workspace", {
   updatedAt: __t.i64(),
 });
 export type Workspace = __Infer<typeof Workspace>;
-

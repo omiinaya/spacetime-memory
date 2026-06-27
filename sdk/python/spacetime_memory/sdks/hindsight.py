@@ -411,7 +411,6 @@ class Hindsight:
         stdb_port: int = 3001,
         stdb_database: str | None = None,
     ) -> None:
-
         import hashlib
 
         self._timeout = timeout

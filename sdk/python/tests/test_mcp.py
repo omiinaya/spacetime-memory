@@ -1723,6 +1723,27 @@ class TestDeleteTour:
         mock_mcp_client.delete_tour.assert_called_once_with("my-tour-id")
 
 
+# ── delete_tour_stop ─────────────────────────────────────────────────
+
+
+class TestDeleteTourStop:
+    """Tests for the delete_tour_stop MCP tool."""
+
+    def test_deletes_stop(self, mock_mcp_client):
+        from server.mcp.main import delete_tour_stop
+
+        result = delete_tour_stop(stop_id="stop123")
+        assert "deleted" in result
+        assert "stop123" in result
+        mock_mcp_client.delete_tour_stop.assert_called_once_with("stop123")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import delete_tour_stop
+
+        delete_tour_stop(stop_id="my-stop-id")
+        mock_mcp_client.delete_tour_stop.assert_called_once_with("my-stop-id")
+
+
 # ── resolve_entity ──────────────────────────────────────────────────
 
 

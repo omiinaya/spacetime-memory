@@ -178,6 +178,7 @@ Set these environment variables (or accept defaults):
 | `create_tour` | Create a guided tour through KG nodes | `workspace_id`, `title`, `description` |
 | `add_tour_stop` | Add a stop to an existing tour | `tour_id`, `node_id`, `heading`, `description` |
 | `delete_tour` | Delete a tour and all its stops | `tour_id` |
+| `delete_tour_stop` | Remove a single stop from a guided tour | `stop_id` |
 
 ### 💬 Sessions
 

@@ -3468,6 +3468,14 @@ class Client:
         """Delete a tour and all its stops."""
         self._call("delete_tour", [tour_id])
 
+    def delete_tour_stop(self, stop_id: str) -> None:
+        """Remove a single stop from a tour.
+
+        Args:
+            stop_id: The ID of the tour stop to remove.
+        """
+        self._call("remove_tour_stop", [stop_id])
+
     # -------------------------------------------------------------------
     # Entity Linking
     # -------------------------------------------------------------------

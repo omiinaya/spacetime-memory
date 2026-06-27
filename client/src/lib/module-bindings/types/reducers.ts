@@ -141,4 +141,3 @@ export type UpdatePeerParams = __Infer<typeof UpdatePeerReducer>;
 export type UpdateSessionSummaryParams = __Infer<typeof UpdateSessionSummaryReducer>;
 export type UpdateWorkspaceParams = __Infer<typeof UpdateWorkspaceReducer>;
 export type UpsertProfileParams = __Infer<typeof UpsertProfileReducer>;
-

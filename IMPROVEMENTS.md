@@ -111,7 +111,15 @@ Test: 190/190 MCP tests passing
 
 ## Pending
 
-*No pending items — backlog cleared.*
+### Add `delete_tour_stop` SDK method + MCP tool (Aug 2)
+The Rust backend has `remove_tour_stop` reducer (in `server/spacetimedb/src/tour.rs`)
+since the tours feature was written, but the Python SDK `client.py` and MCP server
+`main.py` never exposed it. Users can create tours, add stops, and delete full tours,
+but cannot remove individual stops. Add `delete_tour_stop(stop_id)` to the SDK and
+a corresponding `delete_tour_stop` MCP tool.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py, server/mcp/README.md
+Difficulty: Trivial
+Est: 5min
 
 ---
 
@@ -227,3 +235,22 @@ Difficulty: Hard (needs live STDB)
     missing pre-commit config (#3).
 - **Backlog**: 2 PENDING items remaining.
 - **Commit**: c100b3e — 3 files changed, +42/-48 lines.
+
+### Aug 2 — Added `delete_tour_stop` SDK method + MCP tool; 1 new PENDING item
+- **Completed**: Added `delete_tour_stop(stop_id)` method to
+  `client.py` (maps to Rust `remove_tour_stop` reducer) and corresponding
+  `delete_tour_stop` MCP tool in `main.py`. Tool added to MCP README catalog.
+- **Cleanup**: No completed items to move. 8 entries in Recently Completed
+  (within 5-10 range, no purge needed).
+- **Research**:
+  - Git log (7 days): ~244 commits, latest: c9a18cd (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
+  - opentelemetry-sdk v1.43.0 (unchanged).
+  - No new competitor features to adopt from mem0, langgraph, zep.
+  - Deeper scan found missing `delete_tour_stop` — Rust `remove_tour_stop`
+    reducer was not exposed in Python SDK or MCP server. Added as new PENDING
+    item and implemented in this tick.
+- **Backlog**: 1 PENDING item (delete_tour_stop — awaiting mark-done after
+  commit + push).
+- **Commit**: TBD — 4 files changed.
