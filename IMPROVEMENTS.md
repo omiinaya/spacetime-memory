@@ -12,16 +12,16 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add decay model MCP tools
-`set_decay_model` and `get_decay_config` are not yet available as MCP tools.
-Decay configuration is important for memory lifecycle management.
+### Add `ping` MCP tool for connectivity health check
+`ping` is not yet available as an MCP tool. A lightweight connectivity
+check is useful for agent self-diagnostics (confirming STDB is reachable).
 Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
 Difficulty: Easy
-Est: 8min
+Est: 5min
 
-### Add batch_update_memories MCP tool
-`batch_update_memories` is not yet available as an MCP tool. Allows bulk
-memory updates for admin/maintenance workflows.
+### Add `add_alias` MCP tool for entity alias management
+`add_alias` is not yet available as an MCP tool. Complements `resolve_entity`
+by allowing agents to register aliases for entity name resolution.
 Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
 Difficulty: Easy
 Est: 5min
@@ -29,6 +29,16 @@ Est: 5min
 ---
 
 ## Recently Completed
+
+### ✅ Add decay model + batch_update_memories MCP tools (Jul 27)
+Added `set_decay_model`, `get_decay_config`, and `batch_update_memories`
+MCP tools wrapping the corresponding `Client` methods. Decay model
+configuration (linear/Weibull) and bulk memory updates are now available
+via MCP for memory lifecycle management and admin workflows.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 13min
+Test: 13/13 new tests passing (146/146 total MCP tests)
 
 ### ✅ Add context chain MCP tools (Jul 27)
 Added `set_workspace_context`, `set_memory_context`, and `get_context_chain`
@@ -99,7 +109,6 @@ Est: 5min
 Test: 2/2 new tests passing (105/105 total MCP tests)
 
 
-
 ---
 
 ## Recently Completed (archive)
@@ -132,39 +141,26 @@ Difficulty: Hard (needs live STDB)
 
 ## Research Log
 
-### Jul 27 — Context chain MCP tools added; 2 PENDING items remain
-- **MCP tools audit**: Added `set_workspace_context`, `set_memory_context`,
-  and `get_context_chain` MCP tools wrapping the corresponding `Client`
-  methods. Context chain management (QMD-style workspace + memory context)
-  is now available via MCP for agent memory workflows.
+### Jul 27 — Decay model + batch_update MCP tools added; 2 new PENDING items
+- **MCP tools audit**: Added `set_decay_model`, `get_decay_config`, and
+  `batch_update_memories` MCP tools wrapping the corresponding `Client`
+  methods. Decay model configuration (linear/Weibull) and bulk memory
+  updates are now available via MCP.
+- **Full Client method audit**: Of 102 public `Client` methods, 79 now have
+  MCP wrappers. The remaining 23 are admin/utility/infrastructure methods
+  (context deltas, peers, profiles, metrics, health, maintenance). Two new
+  PENDING items added for the most immediately useful gaps:
+  `ping` (connectivity health check) and `add_alias` (entity alias management).
 - **Research**:
-  - Git log (7 days): Most recent commit before this tick: 69906ba (docs
-    update, Jul 27). This tick: 803d075 (context chain MCP tools).
+  - Git log (7 days): This tick: de57382 (decay model + batch_update MCP tools).
   - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
   - mem0ai v2.0.8 (unchanged since last check).
   - opentelemetry-sdk v1.43.0 (unchanged since last check).
   - langgraph v1.2.6 (unchanged since last check).
   - zep-python v2.0.2 (unchanged since last check).
   - No new competitor features to adopt.
-- **Backlog**: 2 PENDING items remain (2 blocked items unchanged).
-- **Commit**: 803d075 — 3 files changed, +130/-30 lines, 133/133 MCP tests passing.
-
-### Jul 27 — API key management MCP tools added; 3 PENDING items remain
-- **MCP tools audit**: Added `create_api_key`, `deactivate_api_key`, and
-  `list_api_keys` MCP tools wrapping the corresponding `Client` methods.
-  API key management (create, revoke, list) is now available via MCP for
-  admin workflows.
-- **Research**:
-  - Git log (7 days): Most recent commit before this tick: 5664783 (docs
-    update, Jul 27). This tick: 491fe40 (API key management MCP tools).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.8 (unchanged since last check).
-  - opentelemetry-sdk v1.43.0 (unchanged since last check).
-  - langgraph v1.2.6 (unchanged since last check).
-  - zep-python v2.0.2 (unchanged since last check).
-  - No new competitor features to adopt.
-- **Backlog**: 3 PENDING items remain (2 blocked items unchanged).
-- **Commit**: 491fe40 — 2 files changed, +203/-0 lines, 126/126 MCP tests passing.
+- **Backlog**: 2 new PENDING items added (2 blocked items unchanged).
+- **Commit**: de57382 — 2 files changed, +337 lines, 146/146 MCP tests passing.
 
 ### Jul 27 — All 3 remaining MCP tools added (get_directory, directory linking, backup/restore); 4 new PENDING items for remaining gaps
 - **MCP tools audit**: Added 3 PENDING MCP tools closing the last remaining
