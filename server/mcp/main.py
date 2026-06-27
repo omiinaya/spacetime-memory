@@ -393,6 +393,48 @@ def delete_memory(memory_id: str) -> dict[str, Any]:
     return get_client().delete_memory(memory_id)
 
 
+@mcp.tool()
+@require_api_key
+def store_batch(
+    items_json: str,
+    workspace_id: str = "default",
+) -> str:
+    """Store multiple memories in a single batch call.
+
+    Much faster than N sequential store() calls when the embedder is the
+    bottleneck.  Embeds all items in one batch, then sends a single reducer.
+
+    Args:
+        items_json: JSON string of a list of item dicts, each with:
+            - ``content`` (str, required)
+            - ``summary`` (str, optional)
+            - ``memory_type`` (str, default ``"experience"``)
+            - ``peer_id`` (str, optional)
+            - ``observer_id`` (str, optional)
+            - ``entities_json`` (str, optional)
+            - ``confidence`` (float, default 0.8)
+            - ``source_session_id`` (str, optional)
+            - ``source_message_id`` (str, optional)
+            Example: '[{"content": "Hello world", "memory_type": "observation"}]'
+        workspace_id: Target workspace (default: "default").
+
+    Returns:
+        Summary string with count of stored items.
+    """
+    import json as _json
+
+    try:
+        items = _json.loads(items_json)
+    except _json.JSONDecodeError as e:
+        return f"Error: invalid JSON in items_json — {e}"
+
+    if not isinstance(items, list) or not all(isinstance(i, dict) for i in items):
+        return "Error: items_json must be a JSON list of dicts, e.g. '[{\"content\": \"...\"}]'"
+
+    results = get_client().store_batch(workspace_id=workspace_id, items=items)
+    return f"Stored {len(results)} memories in batch (workspace: {workspace_id})"
+
+
 # ---------------------------------------------------------------------------
 # Note CRUD tools (LLM Wiki page management)
 # ---------------------------------------------------------------------------
