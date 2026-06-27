@@ -12,37 +12,59 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `seed_communities` MCP tool for seeding KG nodes (Jul 27)
-Add MCP tool wrapping `Client.seed_communities()`. Seeds unassigned KG nodes
-into new communities.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-
-### Add `detect_bridge_nodes` MCP tool for KG analysis (Jul 27)
-Add MCP tool wrapping `Client.detect_bridge_nodes()`. Detects bridge nodes
-that connect multiple communities in the knowledge graph.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-
-### Add context pack MCP tools (list_context_packs/entries/deltas) (Jul 27)
-Add MCP tools wrapping `Client.list_context_packs()`, `Client.list_context_entries()`,
-and `Client.list_context_deltas()`. Enables context pack introspection.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-
-### Add `create_entity_link` MCP tool for entity resolution (Jul 27)
-Add MCP tool wrapping `Client.create_entity_link()`. Enables agent-driven
-entity linking for name resolution.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
+*No pending items. All known Client SDK methods now have MCP tool wrappers.*
 
 ---
 
 ## Recently Completed
+
+### ✅ Add `list_context_deltas` MCP tool for context pack diffing (Jul 27)
+Added `list_context_deltas` MCP tool wrapping `Client.list_context_deltas()`.
+Deltas show what changed between consecutive context pack snapshots.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (190/190 total MCP tests)
+
+### ✅ Add `list_context_entries` MCP tool for context pack introspection (Jul 27)
+Added `list_context_entries` MCP tool wrapping `Client.list_context_entries()`.
+Returns all entries within a given context pack.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (190/190 total MCP tests)
+
+### ✅ Add `list_context_packs` MCP tool for context pack listing (Jul 27)
+Added `list_context_packs` MCP tool wrapping `Client.list_context_packs()`.
+Lists all context packs in a workspace for QMD-style context management.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (190/190 total MCP tests)
+
+### ✅ Add `create_entity_link` MCP tool for entity resolution (Jul 27)
+Added `create_entity_link` MCP tool wrapping `Client.create_entity_link()`.
+Enables agent-driven entity linking for name resolution.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (190/190 total MCP tests)
+
+### ✅ Add `seed_communities` MCP tool for seeding KG nodes (Jul 27)
+Added `seed_communities` MCP tool wrapping `Client.seed_communities()`.
+Seeds unassigned KG nodes into new communities.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (190/190 total MCP tests)
+
+### ✅ Add `detect_bridge_nodes` MCP tool for KG analysis (Jul 27)
+Added `detect_bridge_nodes` MCP tool wrapping `Client.detect_bridge_nodes()`.
+Detects bridge nodes that connect multiple communities in the knowledge graph.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 3/3 new tests passing (190/190 total MCP tests)
 
 ### ✅ Add `detect_communities` MCP tool for KG community detection (Jul 27)
 Added `detect_communities` MCP tool wrapping `Client.detect_communities()`.
@@ -81,35 +103,6 @@ Difficulty: Easy
 Est: 5min
 Test: 2/2 new tests passing (167/167 total MCP tests)
 
-### ✅ Add `get_peer_reputation` MCP tool for trust monitoring (Jul 27)
-Added `get_peer_reputation` MCP tool wrapping `Client.get_peer_reputation()`.
-Returns reputation stats (trust score, feedback count, positive/negative
-breakdown, last-updated) for a peer. Returns None if no feedback history.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 3/3 new tests passing (167/167 total MCP tests)
-
-### ✅ Add `list_profiles` MCP tool for profile listing (Jul 27)
-Added `list_profiles` MCP tool wrapping `Client.list_profiles()`. Lists all
-profiles in a workspace. Complements existing `search_profiles` and
-`get_profile` tools for admin browsing.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 3/3 new tests passing (159/159 total MCP tests)
-
-### ✅ Add `list_peers` MCP tool for peer discovery (Jul 27)
-Added `list_peers` MCP tool wrapping `Client.list_peers()`. Lets agents
-discover who is connected to the system — returns peer IDs, workspace
-membership, and profile metadata. Useful for admin workflows and multi-agent
-coordination.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 4/4 new tests passing (156/156 total MCP tests)
-
-
 ---
 
 ## Deferred / Blocked
@@ -136,20 +129,27 @@ Difficulty: Hard (needs live STDB)
 
 ## Research Log
 
-### Jul 27 — Added detect_communities MCP tool; 4 remaining gaps in backlog
-- **MCP tools**: Added `detect_communities` wrapping `Client.detect_communities()`.
-  Runs label-propagation community detection on the KG.
-  - Fixed return type: returns dict directly (not JSON string) for consistency
-    with other simple wrapper tools.
-  - 3 new tests (normal detection, empty workspace, None result).
-- **Cleanup**: Purged stale PENDING entries for `add_profile_fact` and
-  `get_profile_context` (already done in commit 42fe775, were duplicates).
-  Purged 3 oldest Recently Completed entries (ping, add_alias, decay model).
+### Jul 27 — Added 6 MCP tools; cleared all remaining PENDING items; backlog now empty
+- **MCP tools**: Added `seed_communities`, `detect_bridge_nodes`,
+  `create_entity_link`, `list_context_packs`, `list_context_entries`,
+  and `list_context_deltas`. All remaining Client SDK methods that lacked
+  MCP wrappers are now covered.
+  - `seed_communities`: wraps `Client.seed_communities()` — seeds unassigned
+    KG nodes into communities.
+  - `detect_bridge_nodes`: wraps `Client.detect_bridge_nodes()` — returns
+    JSON with bridge scores.
+  - `create_entity_link`: wraps `Client.create_entity_link()` — canonical
+    entity link for name resolution.
+  - `list_context_packs/entries/deltas`: wraps `Client.list_context_packs()`,
+    `Client.list_context_entries()`, `Client.list_context_deltas()` — context
+    pack introspection.
+- **Cleanup**: Purged 3 oldest Recently Completed entries (list_peers,
+  list_profiles, get_peer_reputation). Moved 4 PENDING → Recently Completed.
 - **Research**:
-  - Git log (7 days): Latest: 793702b (docs maintenance), 42fe775 (3 profile tools).
+  - Git log (7 days): Latest: 4753004 (this commit).
   - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
   - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
   - opentelemetry-sdk v1.43.0 (unchanged).
   - No new competitor features to adopt.
-- **Backlog**: 4 PENDING items.
-- **Commit**: 0b90108 — 3 files changed, +81 lines, 177/177 MCP tests passing.
+- **Backlog**: 0 PENDING items — all Client SDK methods now have MCP tool wrappers.
+- **Commit**: 4753004 — 3 files changed, +301 lines, 190/190 MCP tests passing.
