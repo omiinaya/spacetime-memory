@@ -12,14 +12,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `compute_kg_stats` MCP tool
-Add MCP tool wrapping `Client.compute_kg_stats()`. Returns KG stats: node_count,
-edge_count, community_count, orphan_nodes, avg_degree. Provides workspace health
-monitoring for the LLM Wiki workflow.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-
 ### Add `recommend_memories` MCP tool
 Add MCP tool wrapping `Client.recommend_memories()`. Recommends memories that
 need attention (urgent, decaying, low-trust) for maintenance workflow.
@@ -51,6 +43,19 @@ Est: 5min
 ---
 
 ## Recently Completed
+
+### ✅ Add `compute_kg_stats` MCP tool (Jul 6)
+Added `compute_kg_stats` MCP tool wrapping `Client.compute_kg_stats()`.
+Returns KG statistics (node_count, edge_count, community_count, orphan_nodes,
+avg_degree) for workspace health monitoring in the LLM Wiki workflow.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (92/92 total MCP tests)
+
+---
+
+### ✅ Add citation management MCP tools (Jul 6)
 
 ### ✅ Add citation management MCP tools (Jul 6)
 Added 3 MCP tools for KG citation provenance: `add_node_citation`,
@@ -149,6 +154,24 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jul 6 — `compute_kg_stats` MCP tool added; 4 new PENDING items for remaining MCP gaps
+- **MCP tools audit**: Added `compute_kg_stats` MCP tool wrapping
+  `Client.compute_kg_stats()`. Returns KG stats for health monitoring.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick: 8ffe547 (docs
+    update, citation management research log). This tick: 7bbc05b
+    (compute_kg_stats MCP tool).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps remaining**: `Client` methods still without MCP wrappers are mostly
+  admin/utility/infrastructure. Top remaining: recommend_memories,
+  search_sessions_semantic, get_user_memories, search_profiles, resolve_entity.
+- **Backlog**: 4 PENDING items (stale WASM binary still blocked by OOM).
+- **Commit**: 7bbc05b — 3 files changed, +88/-1 lines, 92/92 MCP tests passing.
 
 ### Jul 6 — Citation management MCP tools added; KG provenance gap closed
 - **MCP tools audit**: Added 3 citation MCP tools wrapping
