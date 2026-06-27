@@ -1388,3 +1388,23 @@ class TestDeleteTour:
         delete_tour(tour_id="my-tour-id")
         mock_mcp_client.delete_tour.assert_called_once_with("my-tour-id")
 
+
+# ── resolve_entity ──────────────────────────────────────────────────
+
+
+class TestResolveEntity:
+    """Tests for the resolve_entity MCP tool."""
+
+    def test_resolves_entity(self, mock_mcp_client):
+        from server.mcp.main import resolve_entity
+        result = resolve_entity(workspace_id="ws1", name="Alice")
+        assert "resolved" in result
+        assert "Alice" in result
+        assert "ws1" in result
+        mock_mcp_client.resolve_entity.assert_called_once_with("ws1", "Alice")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import resolve_entity
+        resolve_entity(workspace_id="ws-abc", name="Bob")
+        mock_mcp_client.resolve_entity.assert_called_once_with("ws-abc", "Bob")
+

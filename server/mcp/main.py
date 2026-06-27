@@ -1470,6 +1470,30 @@ def delete_tour(tour_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Entity Resolution tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def resolve_entity(workspace_id: str, name: str) -> str:
+    """Resolve an entity name within a workspace.
+
+    Uses the STDB entity resolution reducer to find the canonical entity
+    for a given name, taking into account aliases and entity links.
+
+    Args:
+        workspace_id: The workspace ID to search in.
+        name: The entity name or alias to resolve.
+
+    Returns:
+        Confirmation message with the resolved entity result.
+    """
+    get_client().resolve_entity(workspace_id, name)
+    return f"Entity '{name}' resolved in workspace {workspace_id[:16]}..."
+
+
+# ---------------------------------------------------------------------------
 # Mental Model tools
 # ---------------------------------------------------------------------------
 

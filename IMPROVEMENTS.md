@@ -12,13 +12,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `resolve_entity` MCP tool
-Missing entity resolution MCP tool. Wraps `Client.resolve_entity()`.
-Relevant to AGENTS.md workflow for entity resolution.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-
 ### Add `get_directory` MCP tool
 Missing directory getter (by id or path). `create_directory`, `traverse_directory`,
 and `list_directory` exist but `get_directory` missing.
@@ -42,6 +35,15 @@ Est: 15min
 ---
 
 ## Recently Completed
+
+### ✅ Add `resolve_entity` MCP tool (Jul 27)
+Added `resolve_entity` MCP tool wrapping `Client.resolve_entity()`. Entity
+resolution is now available via MCP for workspace-by-workspace name resolution
+with alias support.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (107/107 total MCP tests)
 
 ### ✅ Add `delete_tour` MCP tool (Jul 27)
 Added `delete_tour` MCP tool wrapping `Client.delete_tour()`. Tour CRUD is now
@@ -83,24 +85,6 @@ Difficulty: Easy
 Est: 5min
 Test: 11/11 new tests passing (103/103 total MCP tests)
 
-### ✅ Add `compute_kg_stats` MCP tool (Jul 6)
-Added `compute_kg_stats` MCP tool wrapping `Client.compute_kg_stats()`.
-Returns KG statistics (node_count, edge_count, community_count, orphan_nodes,
-avg_degree) for workspace health monitoring in the LLM Wiki workflow.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 2/2 new tests passing (92/92 total MCP tests)
-
-### ✅ Add citation management MCP tools (Jul 6)
-Added 3 MCP tools for KG citation provenance: `add_node_citation`,
-`add_edge_citation`, `get_citations`. Citations link KG nodes/edges to
-supporting source memories for provenance tracking (AGENTS.md workflow).
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 8min
-Test: 8/8 new tests passing (90/90 total MCP tests)
-
 ---
 
 ## Recently Completed (archive)
@@ -132,6 +116,24 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Research Log
+
+### Jul 27 — resolve_entity MCP tool added; 3 PENDING items remain
+- **MCP tools audit**: Added `resolve_entity` MCP tool wrapping `Client.resolve_entity()`.
+  Entity resolution is now available via MCP for workspace-by-workspace name resolution
+  with alias support.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick: 7071189 (docs update,
+    Jul 27). This tick: (pending commit).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph/claude-code — not installed.
+  - No new competitor features to adopt.
+- **Gaps remaining**: 3 `Client` public methods without MCP wrappers remain:
+  get_directory, link_memory_to_directory/unlink_memory_from_directory,
+  backup/restore. All are directory and admin/infrastructure methods.
+- **Backlog**: 3 PENDING items (2 blocked items remain).
+- **Commit**: (pending — resolve_entity MCP tool).
 
 ### Jul 27 — delete_tour MCP tool added; 4 new PENDING items for remaining gaps
 - **MCP tools audit**: Added `delete_tour` MCP tool wrapping `Client.delete_tour()`.
