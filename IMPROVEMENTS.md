@@ -18,6 +18,16 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add `search_with_filters` MCP tool (Jul 6)
+Added `search_with_filters` MCP tool wrapping `Client.search_with_filters()`.
+Provides structured metadata and location-based filtering (metadata_filter,
+location_filter as JSON strings) that the existing search_memories and
+hybrid_search tools don't expose.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 10min
+Test: 4/4 new tests passing (82/82 total MCP tests)
+
 ### ✅ Add `glob_get` MCP tool (Jul 6)
 Added `glob_get` MCP tool wrapping `Client.glob_get()`. Uses fnmatch-style
 wildcards (`*`, `?`, `[...]`) to find memories matching a pattern on any
@@ -96,6 +106,27 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jul 6 — `search_with_filters` MCP tool added; metadata/location search gap closed
+- **MCP tools audit**: Added `search_with_filters` MCP tool wrapping
+  `Client.search_with_filters()`. Provides metadata and location filtering
+  that `search_memories` and `hybrid_search` don't expose.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick was 62f827c
+    (docs update). This tick: f6f159f (search_with_filters MCP tool).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+  - Full MCP test suite: 82/82 tests passing (4 new).
+- **Gaps remaining**: `Client` methods still without MCP wrappers are mostly
+  admin/utility/infrastructure: backup/restore, API key management, peer
+  listing, directory linking, context/tour management, decay config, and
+  metrics collection. All search/retrieval/pattern methods now have MCP
+  wrappers.
+- **Backlog**: 0 PENDING items (stale WASM binary still blocked by OOM).
+- **Commit**: f6f159f — 2 files changed, +108/-0 lines, 82/82 MCP tests passing.
 
 ### Jul 6 — `glob_get` MCP tool added; all Client search/pattern methods now wrapped
 - **MCP tools audit**: Added `glob_get` MCP tool wrapping `Client.glob_get()`.
