@@ -979,6 +979,79 @@ class TestSearchProfiles:
         assert "No profiles found" in parsed["message"]
 
 
+# ── Profile context tools ───────────────────────────────────────────────
+
+
+class TestAddDynamicContext:
+    """Tests for the add_dynamic_context MCP tool."""
+
+    def test_adds_dynamic_context(self, mock_mcp_client):
+        from server.mcp.main import add_dynamic_context
+        mock_mcp_client.add_dynamic_context.return_value = {"status": "ok"}
+        result = add_dynamic_context(peer_id="peer123", context="Working on task X")
+        assert "Dynamic context added" in result
+        assert "peer123" in result
+        mock_mcp_client.add_dynamic_context.assert_called_once_with(
+            "peer123", "Working on task X",
+        )
+
+    def test_truncates_long_peer_id(self, mock_mcp_client):
+        from server.mcp.main import add_dynamic_context
+        mock_mcp_client.add_dynamic_context.return_value = {"status": "ok"}
+        long_id = "a" * 64
+        result = add_dynamic_context(peer_id=long_id, context="test")
+        assert "Dynamic context added" in result
+        assert len(result) < 100  # Should truncate the long ID
+
+
+class TestAddProfileFact:
+    """Tests for the add_profile_fact MCP tool."""
+
+    def test_adds_profile_fact(self, mock_mcp_client):
+        from server.mcp.main import add_profile_fact
+        mock_mcp_client.add_profile_fact.return_value = {"status": "ok"}
+        result = add_profile_fact(peer_id="peer456", fact="Expert in ML")
+        assert "Profile fact added" in result
+        assert "peer456" in result
+        mock_mcp_client.add_profile_fact.assert_called_once_with(
+            "peer456", "Expert in ML",
+        )
+
+    def test_empty_peer_id(self, mock_mcp_client):
+        from server.mcp.main import add_profile_fact
+        mock_mcp_client.add_profile_fact.return_value = {"status": "ok"}
+        result = add_profile_fact(peer_id="", fact="Empty peer test")
+        assert "Profile fact added" in result
+
+
+class TestGetProfileContext:
+    """Tests for the get_profile_context MCP tool."""
+
+    def test_returns_context(self, mock_mcp_client):
+        from server.mcp.main import get_profile_context
+        mock_mcp_client.get_profile_context.return_value = {
+            "peer_id": "peer789",
+            "context": "Active in workspace ws1",
+        }
+        result = get_profile_context(peer_id="peer789")
+        assert len(result) == 1
+        assert result[0]["peer_id"] == "peer789"
+        assert "context" in result[0]
+        mock_mcp_client.get_profile_context.assert_called_once_with("peer789")
+
+    def test_no_context_returns_empty_list(self, mock_mcp_client):
+        from server.mcp.main import get_profile_context
+        mock_mcp_client.get_profile_context.return_value = None
+        result = get_profile_context(peer_id="nonexistent")
+        assert result == []
+
+    def test_empty_peer_id(self, mock_mcp_client):
+        from server.mcp.main import get_profile_context
+        mock_mcp_client.get_profile_context.return_value = None
+        result = get_profile_context(peer_id="")
+        assert result == []
+
+
 # ── Workspace tools ─────────────────────────────────────────────────────
 
 

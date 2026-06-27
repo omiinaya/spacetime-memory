@@ -1088,6 +1088,68 @@ def list_profiles(workspace_id: str) -> list[dict[str, Any]]:
 
 @mcp.tool()
 @require_api_key
+def add_dynamic_context(peer_id: str, context: str) -> str:
+    """Add dynamic context to a peer's profile mid-session.
+
+    Appends context to the peer's dynamic_context_json array without
+    replacing the whole profile. Useful for agents to update their
+    running context during a session.
+
+    Args:
+        peer_id: The peer ID whose profile to update.
+        context: Context text to append (e.g. status, state, or
+            current activity).
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().add_dynamic_context(peer_id, context)
+    return f"Dynamic context added for peer {peer_id[:16]}..."
+
+
+@mcp.tool()
+@require_api_key
+def add_profile_fact(peer_id: str, fact: str) -> str:
+    """Add a fact to a peer's profile (appended to static_facts_json).
+
+    Complements the ``add_fact`` MCP tool — ``add_profile_fact`` stores
+    the fact directly on the peer's profile record rather than in the
+    separate facts table.
+
+    Args:
+        peer_id: The peer ID whose profile to update.
+        fact: Fact text to append to the profile's static facts.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().add_profile_fact(peer_id, fact)
+    return f"Profile fact added for peer {peer_id[:16]}..."
+
+
+@mcp.tool()
+@require_api_key
+def get_profile_context(peer_id: str) -> list[dict[str, Any]]:
+    """Get computed profile context for a peer.
+
+    Calls the get_profile_context reducer and returns the result.
+    Unlike ``get_profile`` which returns the raw profile record,
+    this returns the computed context data.
+
+    Args:
+        peer_id: The peer ID to get context for.
+
+    Returns:
+        List of profile context result rows, or empty list if none.
+    """
+    rows = get_client().get_profile_context(peer_id)
+    if rows:
+        return [rows]
+    return []
+
+
+@mcp.tool()
+@require_api_key
 def get_peer_reputation(peer_id: str) -> dict[str, Any] | None:
     """Get reputation stats for a peer.
 
