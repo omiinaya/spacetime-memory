@@ -1069,6 +1069,23 @@ def upsert_profile(
     )
 
 
+@mcp.tool()
+@require_api_key
+def list_profiles(workspace_id: str) -> list[dict[str, Any]]:
+    """List all profiles in a workspace.
+
+    Complements search_profiles by returning all profiles without filtering.
+    Useful for admin browsing and workspace member discovery.
+
+    Args:
+        workspace_id: Target workspace ID.
+
+    Returns:
+        List of profile records with metadata, static facts, and dynamic context.
+    """
+    return get_client().list_profiles(workspace_id)
+
+
 # ---------------------------------------------------------------------------
 # Knowledge Graph tools
 # ---------------------------------------------------------------------------

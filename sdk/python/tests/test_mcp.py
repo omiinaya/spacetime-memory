@@ -2061,3 +2061,44 @@ class TestListPeers:
         assert result[0]["profile"]["name"] == "Alice"
         assert "researcher" in result[0]["profile"]["tags"]
 
+
+# ── list_profiles ────────────────────────────────────────────────────────────
+
+
+class TestListProfiles:
+    """Tests for the list_profiles MCP tool."""
+
+    def test_lists_profiles_for_workspace(self, mock_mcp_client):
+        from server.mcp.main import list_profiles
+        mock_mcp_client.list_profiles.return_value = [
+            {"peer_id": "p1", "static_facts_json": "[]", "tags_json": "[]"},
+            {"peer_id": "p2", "static_facts_json": "[]", "tags_json": "[]"},
+        ]
+        result = list_profiles(workspace_id="ws-1")
+        assert len(result) == 2
+        assert result[0]["peer_id"] == "p1"
+        assert result[1]["peer_id"] == "p2"
+        mock_mcp_client.list_profiles.assert_called_once_with("ws-1")
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import list_profiles
+        mock_mcp_client.list_profiles.return_value = []
+        result = list_profiles(workspace_id="empty-ws")
+        assert result == []
+        mock_mcp_client.list_profiles.assert_called_once_with("empty-ws")
+
+    def test_returns_profile_details(self, mock_mcp_client):
+        from server.mcp.main import list_profiles
+        mock_mcp_client.list_profiles.return_value = [
+            {
+                "peer_id": "p-003",
+                "static_facts_json": '[{"key": "expertise", "value": "AI"}]',
+                "dynamic_context_json": '{"status": "active"}',
+                "tags_json": '["researcher"]',
+            },
+        ]
+        result = list_profiles(workspace_id="ws-2")
+        assert "AI" in result[0]["static_facts_json"]
+        assert "active" in result[0]["dynamic_context_json"]
+        assert mock_mcp_client.list_profiles.call_count == 1
+
