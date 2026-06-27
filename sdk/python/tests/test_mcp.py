@@ -527,6 +527,51 @@ class TestGetNode:
         assert result == []
 
 
+class TestUpdateNode:
+    """Tests for the update_node MCP tool."""
+
+    def test_updates_node(self, mock_mcp_client):
+        from server.mcp.main import update_node
+        mock_mcp_client.update_node.return_value = {
+            "status": "ok", "node_id": "n1",
+        }
+        result = update_node(
+            node_id="n1",
+            label="RLHF Updated",
+            node_type="concept",
+            summary="Updated summary",
+        )
+        assert result["status"] == "ok"
+        mock_mcp_client.update_node.assert_called_once_with(
+            "n1", "RLHF Updated", "concept", "Updated summary", "{}", "",
+        )
+
+    def test_updates_node_with_all_args(self, mock_mcp_client):
+        from server.mcp.main import update_node
+        mock_mcp_client.update_node.return_value = {"status": "ok"}
+        result = update_node(
+            node_id="n1",
+            label="RLHF",
+            node_type="concept",
+            summary="Summary",
+            metadata_json='{"source": "paper"}',
+            source_memory_id="mem1",
+        )
+        assert result["status"] == "ok"
+        mock_mcp_client.update_node.assert_called_once_with(
+            "n1", "RLHF", "concept", "Summary",
+            '{"source": "paper"}', "mem1",
+        )
+
+    def test_default_node_type(self, mock_mcp_client):
+        from server.mcp.main import update_node
+        mock_mcp_client.update_node.return_value = {"status": "ok"}
+        update_node(node_id="n1", label="Test")
+        mock_mcp_client.update_node.assert_called_once_with(
+            "n1", "Test", "concept", "", "{}", "",
+        )
+
+
 class TestCreateEdge:
     """Tests for the create_edge MCP tool."""
 
@@ -852,3 +897,41 @@ class TestGetNoteByDate:
         result = get_note_by_date(note_date="2099-01-01")
         assert result == []
         mock_mcp_client.get_note_by_date.assert_called_once_with("2099-01-01")
+
+
+class TestListMemories:
+    """Tests for the list_memories MCP tool."""
+
+    def test_lists_memories(self, mock_mcp_client):
+        from server.mcp.main import list_memories
+        mock_mcp_client.list_memories.return_value = [
+            {"id": "m1", "content": "First", "memory_type": "experience"},
+            {"id": "m2", "content": "Second", "memory_type": "experience"},
+        ]
+        result = list_memories(workspace_id="ws1")
+        assert len(result) == 2
+        assert result[0]["id"] == "m1"
+        mock_mcp_client.list_memories.assert_called_once_with(
+            "ws1", "", 50,
+        )
+
+    def test_filters_by_memory_type(self, mock_mcp_client):
+        from server.mcp.main import list_memories
+        mock_mcp_client.list_memories.return_value = [
+            {"id": "m3", "content": "Observation", "memory_type": "observation"},
+        ]
+        result = list_memories(workspace_id="ws1", memory_type="observation", limit=10)
+        assert len(result) == 1
+        assert result[0]["memory_type"] == "observation"
+        mock_mcp_client.list_memories.assert_called_once_with(
+            "ws1", "observation", 10,
+        )
+
+    def test_empty_workspace(self, mock_mcp_client):
+        from server.mcp.main import list_memories
+        mock_mcp_client.list_memories.return_value = []
+        result = list_memories(workspace_id="empty_ws")
+        assert result == []
+        mock_mcp_client.list_memories.assert_called_once_with(
+            "empty_ws", "", 50,
+        )

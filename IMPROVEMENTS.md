@@ -98,28 +98,7 @@ Files: server/mcp/main.py
 Difficulty: Easy
 Est: 10min
 
-### ✅ Add `find_near_duplicates` MCP tool (Jun 26)
-Added `find_near_duplicates` MCP tool wrapping the Compounder method. Accepts
-`content`, `workspace_id`, `threshold` (default 0.92), `limit` (default 5).
-Returns formatted list of near-duplicate candidates with entity type, ID, score,
-and content snippet.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 8min
-
-### ✅ Add `cross_link` and `suggest_connections` MCP tools (Jun 26)
-Both tools already existed in `server/mcp/main.py` but had field-name mismatches
-with the Compounder return types:
-- `cross_link` read `result["edges_created"]` but compounder returns `links_created`.
-- `suggest_connections` did `result.get("suggestions", [])` on a list (AttributeError),
-  and used wrong field names (`source`/`target`/`score` instead of
-  `source_label`/`target_label`/`common_count`).
-- Both fixed to use correct compounder return field names.
-- Files: server/mcp/main.py
-- Difficulty: Easy
-- Est: 10min
-
----
+|---
 
 ## Deferred / Blocked
 

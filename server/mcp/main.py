@@ -370,6 +370,26 @@ def get_memory_history(memory_id: str) -> list[dict[str, Any]]:
 
 @mcp.tool()
 @require_api_key
+def list_memories(
+    workspace_id: str,
+    memory_type: str = "",
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """List active memories in a workspace, newest first.
+
+    Args:
+        workspace_id: Target workspace.
+        memory_type: Optional memory type filter (e.g. ``"experience"``, ``"observation"``).
+        limit: Max memories to return (default 50).
+
+    Returns:
+        List of memory records sorted by creation time, newest first.
+    """
+    return get_client().list_memories(workspace_id, memory_type, limit)
+
+
+@mcp.tool()
+@require_api_key
 def update_memory(
     memory_id: str,
     content: str = "",
@@ -939,6 +959,32 @@ def create_node(
 ) -> dict[str, Any]:
     """Create a knowledge graph node and index it for semantic search."""
     return get_client().create_node(workspace_id, label, node_type, summary, metadata_json)
+
+
+@mcp.tool()
+@require_api_key
+def update_node(
+    node_id: str,
+    label: str,
+    node_type: str = "concept",
+    summary: str = "",
+    metadata_json: str = "{}",
+    source_memory_id: str = "",
+) -> dict[str, Any]:
+    """Update an existing knowledge graph node's mutable fields.
+
+    Args:
+        node_id: The ID of the node to update.
+        label: New label (display name).
+        node_type: Type category (default: ``"concept"``).
+        summary: Updated summary text.
+        metadata_json: Updated JSON metadata string.
+        source_memory_id: Optional source memory ID.
+    """
+    return get_client().update_node(
+        node_id, label, node_type, summary, metadata_json,
+        source_memory_id,
+    )
 
 
 @mcp.tool()
