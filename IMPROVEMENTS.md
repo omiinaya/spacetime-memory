@@ -18,6 +18,15 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add citation management MCP tools (Jul 6)
+Added 3 MCP tools for KG citation provenance: `add_node_citation`,
+`add_edge_citation`, `get_citations`. Citations link KG nodes/edges to
+supporting source memories for provenance tracking (AGENTS.md workflow).
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 8min
+Test: 8/8 new tests passing (90/90 total MCP tests)
+
 ### ✅ Add `search_with_filters` MCP tool (Jul 6)
 Added `search_with_filters` MCP tool wrapping `Client.search_with_filters()`.
 Provides structured metadata and location-based filtering (metadata_filter,
@@ -106,6 +115,31 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jul 6 — Citation management MCP tools added; KG provenance gap closed
+- **MCP tools audit**: Added 3 citation MCP tools wrapping
+  `Client.add_node_citation()`, `Client.add_edge_citation()`,
+  `Client.get_citations()`. Citations provide provenance tracking —
+  recording which source memory supports each KG node and edge. This
+  fills a gap in the LLM Wiki workflow (AGENTS.md) where citations
+  power the source-attribution chain.
+- **Research**:
+  - Git log (7 days): 206 commits. Most recent before this tick:
+    f9890df (docs update) and f6f159f (search_with_filters MCP tool).
+    This tick: e8dedde (citation management MCP tools).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps remaining**: 3 citation MCP tools closed the citation gap.
+  Remaining `Client` methods without MCP wrappers are mostly
+  admin/utility/infrastructure (backup/restore, API key management,
+  peer listing, directory linking, context management, decay config,
+  profile search, community seeding, session semantic search, memory
+  recommendation, entity linking) — lower priority.
+- **Backlog**: 0 PENDING items (stale WASM binary still blocked by OOM).
+- **Commit**: e8dedde — 2 files changed, +218/-0 lines, 90/90 MCP tests passing.
 
 ### Jul 6 — `search_with_filters` MCP tool added; metadata/location search gap closed
 - **MCP tools audit**: Added `search_with_filters` MCP tool wrapping
