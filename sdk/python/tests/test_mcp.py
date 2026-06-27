@@ -727,3 +727,91 @@ class TestDeleteWorkspace:
         result = delete_workspace(workspace_id="ws1")
         assert result["status"] == "ok"
         mock_mcp_client.delete_workspace.assert_called_once_with("ws1")
+
+
+class TestFuzzyGet:
+    """Tests for the fuzzy_get MCP tool."""
+
+    def test_finds_best_match(self, mock_mcp_client):
+        from server.mcp.main import fuzzy_get
+        mock_mcp_client.fuzzy_get.return_value = {
+            "id": "abc123", "content": "Hello world", "score": 0.85,
+        }
+        result = fuzzy_get(workspace_id="ws1", name="hello", field="content",
+                           threshold=0.5, limit=50)
+        assert "abc123" in result
+        assert "Hello world" in result
+        mock_mcp_client.fuzzy_get.assert_called_once_with(
+            workspace_id="ws1", name="hello", field="content",
+            threshold=0.5, limit=50,
+        )
+
+    def test_no_match(self, mock_mcp_client):
+        from server.mcp.main import fuzzy_get
+        mock_mcp_client.fuzzy_get.return_value = None
+        result = fuzzy_get(workspace_id="ws1", name="xyz")
+        assert "No memory found" in result
+        assert "0.5" in result
+
+    def test_passes_defaults(self, mock_mcp_client):
+        from server.mcp.main import fuzzy_get
+        mock_mcp_client.fuzzy_get.return_value = None
+        fuzzy_get(workspace_id="ws1", name="test")
+        mock_mcp_client.fuzzy_get.assert_called_once_with(
+            workspace_id="ws1", name="test", field="content",
+            threshold=0.5, limit=50,
+        )
+
+
+class TestDetectPatterns:
+    """Tests for the detect_patterns MCP tool."""
+
+    def test_returns_json(self, mock_mcp_client):
+        from server.mcp.main import detect_patterns
+        mock_mcp_client.detect_patterns.return_value = {
+            "temporal_clusters": [{"date": "2026-07-06", "count": 5}],
+            "frequent_terms": [{"term": "AI", "count": 10}],
+            "co_occurrences": [{"pair": ("AI", "ML"), "count": 3}],
+            "total_memories": 100,
+            "summary": "Found patterns.",
+        }
+        result = detect_patterns(workspace_id="ws1")
+        assert "temporal_clusters" in result
+        assert "AI" in result
+        mock_mcp_client.detect_patterns.assert_called_once_with(
+            workspace_id="ws1", limit=200,
+            include_clusters=True, include_terms=True, include_co_occur=True,
+        )
+
+    def test_disables_flags(self, mock_mcp_client):
+        from server.mcp.main import detect_patterns
+        mock_mcp_client.detect_patterns.return_value = {}
+        detect_patterns(workspace_id="ws1", limit=50,
+                        include_clusters=False, include_terms=True,
+                        include_co_occur=False)
+        mock_mcp_client.detect_patterns.assert_called_once_with(
+            workspace_id="ws1", limit=50,
+            include_clusters=False, include_terms=True, include_co_occur=False,
+        )
+
+
+class TestGetNoteByDate:
+    """Tests for the get_note_by_date MCP tool."""
+
+    def test_returns_notes_for_date(self, mock_mcp_client):
+        from server.mcp.main import get_note_by_date
+        mock_mcp_client.get_note_by_date.return_value = [
+            {"id": "n1", "title": "Test", "note_date": "2026-07-06",
+             "content": "Content"},
+        ]
+        result = get_note_by_date(note_date="2026-07-06")
+        assert len(result) == 1
+        assert result[0]["title"] == "Test"
+        mock_mcp_client.get_note_by_date.assert_called_once_with("2026-07-06")
+
+    def test_empty_date(self, mock_mcp_client):
+        from server.mcp.main import get_note_by_date
+        mock_mcp_client.get_note_by_date.return_value = []
+        result = get_note_by_date(note_date="2099-01-01")
+        assert result == []
+        mock_mcp_client.get_note_by_date.assert_called_once_with("2099-01-01")
