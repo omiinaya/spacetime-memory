@@ -12,21 +12,28 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `update_node` MCP tool
-`Client.update_node()` has no MCP wrapper. Need tool to update existing KG
-nodes — needed for ripple update workflow.
-Files: server/mcp/main.py
-Difficulty: Easy
-
-### Add `list_memories` MCP tool
-`Client.list_memories()` has no MCP wrapper. Need tool to list active memories
-in a workspace with optional memory_type filter.
-Files: server/mcp/main.py
-Difficulty: Easy
+*(All actionable improvements complete. Next backlog item: stale WASM binary blocked by OOM.)*
 
 ---
 
 ## Recently Completed
+
+### ✅ Add `update_node` MCP tool (Jun 26)
+Added `update_node` MCP tool wrapping `Client.update_node()`. Updates existing
+KG nodes — needed for ripple update workflow. All params supported: node_id,
+label, node_type (default "concept"), summary, metadata_json, source_memory_id.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 8min
+Test: 74/74 MCP tests passing
+
+### ✅ Add `list_memories` MCP tool (Jun 26)
+Added `list_memories` MCP tool wrapping `Client.list_memories()`. Lists active
+memories in a workspace with optional memory_type filter and limit.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 74/74 MCP tests passing
 
 ### ✅ Add `create_edge` MCP tool (Jun 26)
 Added `create_edge` MCP tool wrapping `Client.create_edge()`. Creates directed,
@@ -123,6 +130,23 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jun 26 — `update_node` + `list_memories` MCP tools added; backlog cleared again
+- **MCP tools audit**: Added `update_node` and `list_memories` MCP tools.
+  All `Client` public methods now have MCP tool wrappers.
+- **Research**:
+  - Git log (7 days): Most recent commits are create_edge, fuzzy_get,
+    detect_patterns, get_note_by_date, update_node, list_memories MCP tools.
+    No unreviewed changes. Commit: 08f26d5.
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps remaining**: 0 `Client` methods without MCP wrappers. All actionable
+  improvement items are complete.
+- **Backlog**: 0 PENDING items (stale WASM binary still blocked by OOM).
+- **Commit**: 08f26d5 — 3 files (+130/-22 lines), 74/74 MCP tests passing.
 
 ### Jul 6 — All 3 remaining MCP gaps closed; backlog cleared
 - **MCP tools audit**: Added `fuzzy_get`, `detect_patterns`, `get_note_by_date`
