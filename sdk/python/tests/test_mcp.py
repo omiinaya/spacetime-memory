@@ -1938,3 +1938,78 @@ class TestBatchUpdateMemories:
             updates={"tier": "important"},
         )
 
+
+# ── ping ──────────────────────────────────────────────────────────────────
+
+
+class TestPing:
+    """Tests for the ping MCP diagnostic tool."""
+
+    def test_ping_ok(self, mock_mcp_client):
+        from server.mcp.main import ping
+        mock_mcp_client.ping.return_value = {
+            "status": "ok",
+            "latency_ms": 3.2,
+        }
+        result = ping()
+        assert "reachable" in result
+        assert "3.2" in result
+        mock_mcp_client.ping.assert_called_once_with()
+
+    def test_ping_error(self, mock_mcp_client):
+        from server.mcp.main import ping
+        mock_mcp_client.ping.return_value = {
+            "status": "error",
+            "message": "Connection refused",
+            "latency_ms": 5001.0,
+        }
+        result = ping()
+        assert "unreachable" in result
+        assert "Connection refused" in result
+        assert "5001" in result
+        mock_mcp_client.ping.assert_called_once_with()
+
+    def test_ping_unknown_status(self, mock_mcp_client):
+        from server.mcp.main import ping
+        mock_mcp_client.ping.return_value = {
+            "latency_ms": 0.0,
+        }
+        result = ping()
+        assert "unreachable" in result or "unknown" in result.lower()
+        mock_mcp_client.ping.assert_called_once_with()
+
+    def test_ping_calls_client(self, mock_mcp_client):
+        from server.mcp.main import ping
+        mock_mcp_client.ping.return_value = {
+            "status": "ok",
+            "latency_ms": 1.0,
+        }
+        ping()
+        mock_mcp_client.ping.assert_called_once_with()
+
+
+# ── add_alias ─────────────────────────────────────────────────────────────
+
+
+class TestAddAlias:
+    """Tests for the add_alias MCP tool."""
+
+    def test_adds_alias(self, mock_mcp_client):
+        from server.mcp.main import add_alias
+        mock_mcp_client.add_alias.return_value = None
+        result = add_alias(entity_link_id="el-123", alias="Bob")
+        assert "Alias" in result
+        assert "Bob" in result
+        assert "el-123" in result
+        mock_mcp_client.add_alias.assert_called_once_with(
+            "el-123", "Bob"
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import add_alias
+        mock_mcp_client.add_alias.return_value = None
+        add_alias(entity_link_id="el-xyz-987", alias="Alice")
+        mock_mcp_client.add_alias.assert_called_once_with(
+            "el-xyz-987", "Alice"
+        )
+

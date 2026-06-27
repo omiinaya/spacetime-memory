@@ -1542,6 +1542,26 @@ def resolve_entity(workspace_id: str, name: str) -> str:
     return f"Entity '{name}' resolved in workspace {workspace_id[:16]}..."
 
 
+@mcp.tool()
+@require_api_key
+def add_alias(entity_link_id: str, alias: str) -> str:
+    """Add an alias to an existing entity link.
+
+    Complements ``resolve_entity`` by allowing agents to register
+    aliases for entity name resolution.
+
+    Args:
+        entity_link_id: The entity link ID to add an alias to.
+        alias: The alias to add (e.g. a display name, username, or
+            common alternative identifier).
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().add_alias(entity_link_id, alias)
+    return f"Alias '{alias}' added to entity link {entity_link_id[:16]}..."
+
+
 # ---------------------------------------------------------------------------
 # Mental Model tools
 # ---------------------------------------------------------------------------
@@ -2768,6 +2788,34 @@ def get_decay_config(workspace_id: str) -> str:
     for key, value in result.items():
         lines.append(f"  {key}: {value}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Diagnostic tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def ping() -> str:
+    """Check connectivity to SpacetimeDB.
+
+    Quick health check that hits the database info endpoint and reports
+    latency.  Useful for agent self-diagnostics — confirms STDB is
+    reachable before performing memory operations.
+
+    Returns:
+        Status message with latency or error details.
+    """
+    result = get_client().ping()
+    status = result.get("status", "unknown")
+    latency = result.get("latency_ms", "N/A")
+    if status == "ok":
+        return f"SpacetimeDB reachable (latency: {latency}ms)."
+    return (
+        f"SpacetimeDB unreachable: {result.get('message', 'unknown error')} "
+        f"(latency: {latency}ms)."
+    )
 
 
 # ---------------------------------------------------------------------------

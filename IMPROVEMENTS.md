@@ -12,23 +12,29 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `ping` MCP tool for connectivity health check
-`ping` is not yet available as an MCP tool. A lightweight connectivity
-check is useful for agent self-diagnostics (confirming STDB is reachable).
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-
-### Add `add_alias` MCP tool for entity alias management
-`add_alias` is not yet available as an MCP tool. Complements `resolve_entity`
-by allowing agents to register aliases for entity name resolution.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
+*No pending items — all Client public methods now have MCP wrappers.*
 
 ---
 
 ## Recently Completed
+
+### ✅ Add `ping` MCP tool for connectivity health check (Jul 27)
+Added `ping` MCP tool wrapping `Client.ping()`. Lightweight connectivity
+check for agent self-diagnostics (confirms STDB is reachable before
+performing memory operations). Returns status and latency.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 4/4 new tests passing (152/152 total MCP tests)
+
+### ✅ Add `add_alias` MCP tool for entity alias management (Jul 27)
+Added `add_alias` MCP tool wrapping `Client.add_alias()`. Complements
+`resolve_entity` by allowing agents to register aliases for entity name
+resolution. Takes entity_link_id and alias string.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (152/152 total MCP tests)
 
 ### ✅ Add decay model + batch_update_memories MCP tools (Jul 27)
 Added `set_decay_model`, `get_decay_config`, and `batch_update_memories`
@@ -100,22 +106,8 @@ Difficulty: Easy
 Est: 5min
 Test: 2/2 new tests passing (107/107 total MCP tests)
 
-### ✅ Add `delete_tour` MCP tool (Jul 27)
-Added `delete_tour` MCP tool wrapping `Client.delete_tour()`. Tour CRUD is now
-complete (create_tour, add_tour_stop, delete_tour).
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 2/2 new tests passing (105/105 total MCP tests)
-
 
 ---
-
-## Recently Completed (archive)
-
-*Older completed entries purged — see Research Log for full history.*
-
-|---
 
 ## Deferred / Blocked
 
@@ -140,6 +132,26 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Research Log
+
+### Jul 27 — ping + add_alias MCP tools added; all Client methods now have MCP wrappers
+- **MCP tools audit**: Added `ping` (connectivity health check) and `add_alias`
+  (entity alias management) MCP tools. All 104 public `Client` methods now have
+  MCP wrappers — no remaining gaps.
+  - `ping`: Wraps `Client.ping()` — lightweight HTTP connectivity check that
+    reports status and latency. Useful for agent self-diagnostics.
+  - `add_alias`: Wraps `Client.add_alias()` — registers an alias for an existing
+    entity link. Complements `resolve_entity` for entity name resolution.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick: a37abd4 (docs update,
+    Jul 27). This tick: (pending commit).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged since last check).
+  - zep-python v2.0.2 (unchanged since last check).
+  - No new competitor features to adopt.
+- **Backlog**: 0 PENDING items (2 blocked items remain).
+- **Commit**: (pending commit) — 3 files changed, +91 lines, 152/152 MCP tests passing.
 
 ### Jul 27 — Decay model + batch_update MCP tools added; 2 new PENDING items
 - **MCP tools audit**: Added `set_decay_model`, `get_decay_config`, and
