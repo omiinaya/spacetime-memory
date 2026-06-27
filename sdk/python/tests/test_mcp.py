@@ -828,6 +828,157 @@ class TestComputeKgStats:
         assert parsed["workspace_id"] == "empty_ws"
 
 
+# ── Recommendation tools (recommend_memories, search_sessions_semantic,
+#    get_user_memories, search_profiles) ──────────────────────────────────
+
+
+class TestRecommendMemories:
+    """Tests for the recommend_memories MCP tool."""
+
+    def test_returns_recommendations(self, mock_mcp_client):
+        from server.mcp.main import recommend_memories
+        mock_mcp_client.recommend_memories.return_value = [
+            {"id": "r1", "content": "Urgent memory", "urgency": 0.9,
+             "reason": "low-trust"},
+            {"id": "r2", "content": "Decaying memory", "urgency": 0.7,
+             "reason": "decay"},
+        ]
+        result = recommend_memories(workspace_id="ws1")
+        import json as _json
+        parsed = _json.loads(result)
+        assert len(parsed) == 2
+        assert parsed[0]["urgency"] == 0.9
+        assert parsed[1]["reason"] == "decay"
+        mock_mcp_client.recommend_memories.assert_called_once_with(
+            workspace_id="ws1", limit=20, min_urgency=0.3,
+        )
+
+    def test_custom_params(self, mock_mcp_client):
+        from server.mcp.main import recommend_memories
+        mock_mcp_client.recommend_memories.return_value = [
+            {"id": "r3", "urgency": 0.6},
+        ]
+        result = recommend_memories(workspace_id="ws2", limit=5, min_urgency=0.5)
+        import json as _json
+        parsed = _json.loads(result)
+        assert len(parsed) == 1
+        mock_mcp_client.recommend_memories.assert_called_once_with(
+            workspace_id="ws2", limit=5, min_urgency=0.5,
+        )
+
+    def test_no_recommendations(self, mock_mcp_client):
+        from server.mcp.main import recommend_memories
+        mock_mcp_client.recommend_memories.return_value = []
+        result = recommend_memories(workspace_id="empty_ws")
+        import json as _json
+        parsed = _json.loads(result)
+        assert "message" in parsed
+        assert parsed["message"] == "No recommendations found"
+
+
+class TestSearchSessionsSemantic:
+    """Tests for the search_sessions_semantic MCP tool."""
+
+    def test_returns_sessions(self, mock_mcp_client):
+        from server.mcp.main import search_sessions_semantic
+        mock_mcp_client.search_sessions_semantic.return_value = [
+            {"session_id": "s1", "content": "AI discussion", "score": 0.95},
+            {"session_id": "s2", "content": "ML talk", "score": 0.85},
+        ]
+        result = search_sessions_semantic(query="machine learning", limit=10)
+        import json as _json
+        parsed = _json.loads(result)
+        assert len(parsed) == 2
+        assert parsed[0]["score"] == 0.95
+        mock_mcp_client.search_sessions_semantic.assert_called_once_with(
+            query="machine learning", limit=10,
+        )
+
+    def test_custom_limit(self, mock_mcp_client):
+        from server.mcp.main import search_sessions_semantic
+        mock_mcp_client.search_sessions_semantic.return_value = []
+        result = search_sessions_semantic(query="test", limit=5)
+        import json as _json
+        parsed = _json.loads(result)
+        assert parsed["message"] == "No sessions found"
+        mock_mcp_client.search_sessions_semantic.assert_called_once_with(
+            query="test", limit=5,
+        )
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import search_sessions_semantic
+        mock_mcp_client.search_sessions_semantic.return_value = []
+        result = search_sessions_semantic(query="nonexistent")
+        import json as _json
+        parsed = _json.loads(result)
+        assert "No sessions found" in parsed["message"]
+
+
+class TestGetUserMemories:
+    """Tests for the get_user_memories MCP tool."""
+
+    def test_returns_user_memories(self, mock_mcp_client):
+        from server.mcp.main import get_user_memories
+        mock_mcp_client.get_user_memories.return_value = [
+            {"id": "m1", "content": "User memory 1", "user_scope": "alice"},
+            {"id": "m2", "content": "User memory 2", "user_scope": "alice"},
+        ]
+        result = get_user_memories(user_scope="alice", workspace_id="ws1")
+        import json as _json
+        parsed = _json.loads(result)
+        assert len(parsed) == 2
+        assert parsed[0]["user_scope"] == "alice"
+        mock_mcp_client.get_user_memories.assert_called_once_with(
+            user_scope="alice", workspace_id="ws1",
+        )
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import get_user_memories
+        mock_mcp_client.get_user_memories.return_value = []
+        result = get_user_memories(user_scope="bob", workspace_id="ws1")
+        import json as _json
+        parsed = _json.loads(result)
+        assert "No user memories found" in parsed["message"]
+
+
+class TestSearchProfiles:
+    """Tests for the search_profiles MCP tool."""
+
+    def test_returns_profiles(self, mock_mcp_client):
+        from server.mcp.main import search_profiles
+        mock_mcp_client.search_profiles.return_value = [
+            {"id": "p1", "name": "Alice", "static_facts_json": "researcher"},
+            {"id": "p2", "name": "Bob", "static_facts_json": "developer"},
+        ]
+        result = search_profiles(workspace_id="ws1", query="researcher")
+        import json as _json
+        parsed = _json.loads(result)
+        assert len(parsed) == 2
+        assert parsed[0]["name"] == "Alice"
+        mock_mcp_client.search_profiles.assert_called_once_with(
+            workspace_id="ws1", query="researcher", limit=20,
+        )
+
+    def test_custom_limit(self, mock_mcp_client):
+        from server.mcp.main import search_profiles
+        mock_mcp_client.search_profiles.return_value = []
+        result = search_profiles(workspace_id="ws1", query="dev", limit=5)
+        import json as _json
+        parsed = _json.loads(result)
+        assert parsed["message"] == "No profiles found"
+        mock_mcp_client.search_profiles.assert_called_once_with(
+            workspace_id="ws1", query="dev", limit=5,
+        )
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import search_profiles
+        mock_mcp_client.search_profiles.return_value = []
+        result = search_profiles(workspace_id="ws2", query="nobody")
+        import json as _json
+        parsed = _json.loads(result)
+        assert "No profiles found" in parsed["message"]
+
+
 # ── Workspace tools ─────────────────────────────────────────────────────
 
 
