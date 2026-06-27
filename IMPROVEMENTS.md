@@ -12,6 +12,16 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add `delete_tour_stop` SDK method + MCP tool (Aug 2)
+The Rust `remove_tour_stop` reducer was not exposed in the Python SDK or MCP
+server. Added `Client.delete_tour_stop(stop_id)` method, `delete_tour_stop` MCP
+tool, MCP README entry, and 2 MCP tool tests. All Rust tour reducers now have
+full Python SDK + MCP coverage.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py,
+  server/mcp/README.md, sdk/python/tests/test_mcp.py
+Difficulty: Trivial
+Est: 5min
+
 ### ✅ Fix 9 stale SpacetimeDB v2.4/v2.4.1 doc references across 7 documentation files (Aug 2)
 Updated all STDB version references from v2.4/v2.4.1 to v2.6 (the actual
 dependency version since commit `d1d147f`). Fixed:
@@ -111,15 +121,7 @@ Test: 190/190 MCP tests passing
 
 ## Pending
 
-### Add `delete_tour_stop` SDK method + MCP tool (Aug 2)
-The Rust backend has `remove_tour_stop` reducer (in `server/spacetimedb/src/tour.rs`)
-since the tours feature was written, but the Python SDK `client.py` and MCP server
-`main.py` never exposed it. Users can create tours, add stops, and delete full tours,
-but cannot remove individual stops. Add `delete_tour_stop(stop_id)` to the SDK and
-a corresponding `delete_tour_stop` MCP tool.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py, server/mcp/README.md
-Difficulty: Trivial
-Est: 5min
+*No pending items — backlog cleared.*
 
 ---
 
@@ -251,6 +253,5 @@ Difficulty: Hard (needs live STDB)
   - Deeper scan found missing `delete_tour_stop` — Rust `remove_tour_stop`
     reducer was not exposed in Python SDK or MCP server. Added as new PENDING
     item and implemented in this tick.
-- **Backlog**: 1 PENDING item (delete_tour_stop — awaiting mark-done after
-  commit + push).
-- **Commit**: TBD — 4 files changed.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: 78875172 — 6 files changed, +77/-6 lines.
