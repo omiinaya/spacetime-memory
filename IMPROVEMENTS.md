@@ -113,7 +113,7 @@ Difficulty: Hard (needs live STDB)
   wrappers. Remaining untapped Client methods are admin/utility/infrastructure
   (backup/restore, API key management, peer listing, etc.) — lower priority.
 - **Backlog**: 0 PENDING items (stale WASM binary still blocked by OOM).
-- **Commit**: 834272f — 3 files changed, +113/-47 lines, 78/78 MCP tests passing.
+- **Commit**: 59b11a3 — 3 files changed, +113/-47 lines, 78/78 MCP tests passing.
 
 ### Jun 26 — `update_node` + `list_memories` MCP tools added; backlog cleared again
 - **MCP tools audit**: Added `update_node` and `list_memories` MCP tools.
