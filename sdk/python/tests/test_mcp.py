@@ -1554,3 +1554,113 @@ class TestRestore:
         result = restore(input_path="/tmp/empty-backup.json")
         assert "0" in result
 
+
+# ── create_api_key / deactivate_api_key / list_api_keys ────────────────
+
+
+class TestCreateApiKey:
+    """Tests for the create_api_key MCP tool."""
+
+    def test_creates_key(self, mock_mcp_client):
+        from server.mcp.main import create_api_key
+        mock_mcp_client.create_api_key.return_value = {
+            "status": "ok",
+            "api_key": "sk-abc123...",
+            "id": "key-001",
+        }
+        result = create_api_key(
+            workspace_id="ws1",
+            name="test-key",
+            permissions='["read"]',
+        )
+        assert "test-key" in result
+        assert "sk-abc123" in result
+        assert "key-001" in result
+        assert "Save this secret" in result
+        mock_mcp_client.create_api_key.assert_called_once_with(
+            workspace_id="ws1",
+            name="test-key",
+            permissions='["read"]',
+        )
+
+    def test_creates_key_with_write_perms(self, mock_mcp_client):
+        from server.mcp.main import create_api_key
+        mock_mcp_client.create_api_key.return_value = {
+            "status": "ok",
+            "api_key": "sk-xyz...",
+            "id": "key-002",
+        }
+        result = create_api_key(
+            workspace_id="ws1",
+            name="admin-key",
+            permissions='["read", "write"]',
+        )
+        assert "admin-key" in result
+        mock_mcp_client.create_api_key.assert_called_once_with(
+            workspace_id="ws1",
+            name="admin-key",
+            permissions='["read", "write"]',
+        )
+
+
+class TestDeactivateApiKey:
+    """Tests for the deactivate_api_key MCP tool."""
+
+    def test_deactivates_key(self, mock_mcp_client):
+        from server.mcp.main import deactivate_api_key
+        mock_mcp_client.deactivate_api_key.return_value = {
+            "status": "ok",
+        }
+        result = deactivate_api_key(key_id="key-001")
+        assert "key-001" in result
+        assert "deactivated" in result
+        mock_mcp_client.deactivate_api_key.assert_called_once_with("key-001")
+
+    def test_deactivate_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import deactivate_api_key
+        deactivate_api_key(key_id="key-abc")
+        mock_mcp_client.deactivate_api_key.assert_called_once_with("key-abc")
+
+
+class TestListApiKeys:
+    """Tests for the list_api_keys MCP tool."""
+
+    def test_lists_keys(self, mock_mcp_client):
+        from server.mcp.main import list_api_keys
+        mock_mcp_client.list_api_keys.return_value = [
+            {
+                "api_key_id": "key-001",
+                "name": "read-key",
+                "permissions": '["read"]',
+                "is_active": True,
+                "created_at": 1000,
+            },
+            {
+                "api_key_id": "key-002",
+                "name": "admin-key",
+                "permissions": '["read", "write"]',
+                "is_active": False,
+                "created_at": 2000,
+            },
+        ]
+        result = list_api_keys(workspace_id="ws1")
+        assert "Total: 2" in result
+        assert "read-key" in result
+        assert "admin-key" in result
+        assert "✅" in result
+        assert "❌" in result
+        mock_mcp_client.list_api_keys.assert_called_once_with("ws1")
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import list_api_keys
+        mock_mcp_client.list_api_keys.return_value = []
+        result = list_api_keys(workspace_id="ws1")
+        assert "No API keys found" in result
+        mock_mcp_client.list_api_keys.assert_called_once_with("ws1")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import list_api_keys
+        mock_mcp_client.list_api_keys.return_value = []
+        list_api_keys(workspace_id="ws-abc")
+        mock_mcp_client.list_api_keys.assert_called_once_with("ws-abc")
+

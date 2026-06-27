@@ -2554,6 +2554,99 @@ def restore(input_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# API Key management tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def create_api_key(
+    workspace_id: str,
+    name: str,
+    permissions: str = '["read"]',
+) -> str:
+    """Create a new API key for accessing the MCP server.
+
+    Generates a secure random key secret, hashes it, and stores the hash
+    in the SpacetimeDB database. The unhashed secret is returned **only
+    once** — save it immediately.
+
+    Args:
+        workspace_id: The workspace to associate the key with.
+        name: A human-readable label for this key.
+        permissions: JSON array of permission strings
+            (default: ``["read"]``). Example: ``'["read", "write"]'``.
+
+    Returns:
+        Confirmation message with the new API key (shown once only).
+    """
+    result = get_client().create_api_key(
+        workspace_id=workspace_id,
+        name=name,
+        permissions=permissions,
+    )
+    api_key = result.get("api_key", "(unknown)")
+    key_id = result.get("id", "(unknown)")
+    return (
+        f"API key '{name}' created successfully.\n"
+        f"  Key ID: {key_id}\n"
+        f"  Secret: {api_key}\n"
+        f"  Note: Save this secret — it will not be shown again."
+    )
+
+
+@mcp.tool()
+@require_api_key
+def deactivate_api_key(key_id: str) -> str:
+    """Deactivate (revoke) an API key so it can no longer be used.
+
+    Args:
+        key_id: The primary-key ID of the ApiKey row (returned by
+            ``create_api_key`` or ``list_api_keys``).
+
+    Returns:
+        Confirmation message.
+    """
+    result = get_client().deactivate_api_key(key_id)
+    status = result.get("status", "ok")
+    return f"API key {key_id} deactivated (status: {status})."
+
+
+@mcp.tool()
+@require_api_key
+def list_api_keys(workspace_id: str) -> str:
+    """List all API keys for a workspace.
+
+    Returns key metadata (key ID, name, permissions, active status,
+    creation time) — the key secret/hash is never exposed.
+
+    Args:
+        workspace_id: The workspace to query.
+
+    Returns:
+        Formatted list of API key metadata.
+    """
+    keys = get_client().list_api_keys(workspace_id)
+    if not keys:
+        return f"No API keys found for workspace '{workspace_id[:16]}...'."
+
+    lines = [
+        f"API keys for workspace '{workspace_id[:16]}...':",
+        f"  Total: {len(keys)}",
+    ]
+    for k in keys:
+        kid = k.get("api_key_id", "")[:16]
+        name = k.get("name", "?")
+        perms = k.get("permissions", "[]")
+        active = "✅ active" if k.get("is_active", False) else "❌ inactive"
+        created = k.get("created_at", 0)
+        lines.append(
+            f"  - {kid}  {name}  {perms}  {active}  (created: {created})"
+        )
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
 
