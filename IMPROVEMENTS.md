@@ -149,7 +149,7 @@ Difficulty: Hard (needs live STDB)
   resolve_entity, get_directory, link_memory_to_directory/unlink_memory_from_directory,
   backup/restore. All are admin/utility/infrastructure methods.
 - **Backlog**: 4 PENDING items (2 blocked items remain).
-- **Commit**: (pending) — 2 files changed, +26/-2 lines, 105/105 MCP tests passing.
+- **Commit**: f090a12 — 3 files changed, +89/-34 lines, 105/105 MCP tests passing.
 
 ### Jul 6 — 4 remaining MCP tools added; all Client SDK methods now have MCP wrappers
 - **MCP tools audit**: Added 4 MCP tools wrapping the last `Client` methods
