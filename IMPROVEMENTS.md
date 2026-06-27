@@ -122,7 +122,7 @@ Difficulty: Hard (needs live STDB)
   - opentelemetry-sdk v1.43.0 (unchanged).
   - No new competitor features to adopt from mem0, langgraph, zep.
   - Backlog: 1 PENDING item remaining (pre-commit config).
-- **Commit**: TBD.
+- **Commit**: 780a490 — 2 files changed, +249/-22 lines (README 95→303 lines).
 
 ### Jul 28 — Fixed stale STDB badge, added 2 new PENDING items for README/doc gaps
 - **Fixed**: Stale SpacetimeDB version badge in `README.md` (v2.4 → v2.6) and
