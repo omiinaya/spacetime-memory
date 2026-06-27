@@ -1612,6 +1612,64 @@ def list_directory(directory_id: str) -> str:
     return json.dumps(rows, default=str)
 
 
+@mcp.tool()
+@require_api_key
+def get_directory(workspace_id: str, path_or_id: str) -> str:
+    """Get a directory by ID or path.
+
+    Resolves a directory within a workspace using either its unique ID or
+    its path in the context directory tree.
+
+    Args:
+        workspace_id: The workspace ID to search in.
+        path_or_id: Directory ID or path string to look up.
+
+    Returns:
+        JSON array of matching directory entries.
+    """
+    rows = get_client().get_directory(workspace_id, path_or_id)
+    return json.dumps(rows, default=str)
+
+
+@mcp.tool()
+@require_api_key
+def link_memory_to_directory(directory_id: str, memory_id: str, workspace_id: str) -> str:
+    """Link a memory to a directory.
+
+    Associates a memory with a directory in the context directory tree so
+    the memory can be discovered via directory traversal.
+
+    Args:
+        directory_id: The directory ID to link into.
+        memory_id: The memory ID to link.
+        workspace_id: The workspace containing both the directory and memory.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().link_memory_to_directory(directory_id, memory_id, workspace_id)
+    return f"Memory {memory_id[:16]}... linked to directory {directory_id[:16]}..."
+
+
+@mcp.tool()
+@require_api_key
+def unlink_memory_from_directory(directory_id: str, memory_id: str) -> str:
+    """Unlink a memory from a directory.
+
+    Removes the association between a memory and a directory. The memory
+    itself is not deleted.
+
+    Args:
+        directory_id: The directory ID to unlink from.
+        memory_id: The memory ID to unlink.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().unlink_memory_from_directory(directory_id, memory_id)
+    return f"Memory {memory_id[:16]}... unlinked from directory {directory_id[:16]}..."
+
+
 # ---------------------------------------------------------------------------
 # Org-mode sync tool
 # ---------------------------------------------------------------------------
@@ -2441,6 +2499,58 @@ def export_workspace(
         for e in errors[:5]:
             summary += f"\n    - {e}"
     return summary
+
+
+@mcp.tool()
+@require_api_key
+def backup(workspace_id: str = "default", output_path: str = "") -> str:
+    """Back up all user data tables to a JSON file.
+
+    Exports memory, note, KG, and other user data tables to a portable
+    JSON backup file. The backup includes all tables, row counts, and a
+    creation timestamp.
+
+    Args:
+        workspace_id: The workspace to back up (default: "default").
+        output_path: Optional output file path. If empty, generates a
+            timestamped filename like
+            ``spacetime-memory-backup-YYYY-MM-DD.json``.
+
+    Returns:
+        Confirmation message with backup path and stats.
+    """
+    path = output_path or None
+    result = get_client().backup(output_path=path)
+    tbl_count = result.get("table_count", 0)
+    total_rows = result.get("total_rows", 0)
+    out = result.get("path", output_path or "auto")
+    return (
+        f"Backup written to {out}\n"
+        f"  Tables: {tbl_count}, Total rows: {total_rows}"
+    )
+
+
+@mcp.tool()
+@require_api_key
+def restore(input_path: str) -> str:
+    """Restore data from a backup JSON file.
+
+    Imports a previously-created backup file into the current database.
+    Tables and rows are inserted directly; duplicates are silently skipped.
+
+    Args:
+        input_path: Path to the backup JSON file created by ``backup``.
+
+    Returns:
+        Confirmation message with restore stats.
+    """
+    result = get_client().restore(input_path)
+    tbl_restored = len(result.get("restored", []))
+    total_rows = result.get("total_rows", 0)
+    return (
+        f"Restored {total_rows} row(s) across {tbl_restored} table(s) "
+        f"from {input_path}"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -1408,3 +1408,149 @@ class TestResolveEntity:
         resolve_entity(workspace_id="ws-abc", name="Bob")
         mock_mcp_client.resolve_entity.assert_called_once_with("ws-abc", "Bob")
 
+
+# ── get_directory ────────────────────────────────────────────────────────
+
+
+class TestGetDirectory:
+    """Tests for the get_directory MCP tool."""
+
+    def test_gets_by_id(self, mock_mcp_client):
+        from server.mcp.main import get_directory
+        mock_mcp_client.get_directory.return_value = [
+            {"id": "dir1", "name": "Projects", "path": "/projects"},
+        ]
+        result = get_directory(workspace_id="ws1", path_or_id="dir1")
+        assert "dir1" in result
+        assert "Projects" in result
+        mock_mcp_client.get_directory.assert_called_once_with("ws1", "dir1")
+
+    def test_gets_by_path(self, mock_mcp_client):
+        from server.mcp.main import get_directory
+        result = get_directory(workspace_id="ws1", path_or_id="/projects/ai")
+        mock_mcp_client.get_directory.assert_called_once_with("ws1", "/projects/ai")
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import get_directory
+        mock_mcp_client.get_directory.return_value = []
+        result = get_directory(workspace_id="ws1", path_or_id="nonexistent")
+        assert "[]" in result
+
+
+# ── link_memory_to_directory / unlink_memory_from_directory ────────────
+
+
+class TestLinkMemoryToDirectory:
+    """Tests for the link_memory_to_directory MCP tool."""
+
+    def test_links_memory(self, mock_mcp_client):
+        from server.mcp.main import link_memory_to_directory
+        result = link_memory_to_directory(
+            directory_id="dir-abc", memory_id="mem-xyz", workspace_id="ws1"
+        )
+        assert "link" in result.lower()
+        mock_mcp_client.link_memory_to_directory.assert_called_once_with(
+            "dir-abc", "mem-xyz", "ws1"
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import link_memory_to_directory
+        link_memory_to_directory("d1", "m1", "w1")
+        mock_mcp_client.link_memory_to_directory.assert_called_once_with(
+            "d1", "m1", "w1"
+        )
+
+
+class TestUnlinkMemoryFromDirectory:
+    """Tests for the unlink_memory_from_directory MCP tool."""
+
+    def test_unlinks_memory(self, mock_mcp_client):
+        from server.mcp.main import unlink_memory_from_directory
+        result = unlink_memory_from_directory(
+            directory_id="dir-abc", memory_id="mem-xyz"
+        )
+        assert "unlink" in result.lower()
+        mock_mcp_client.unlink_memory_from_directory.assert_called_once_with(
+            "dir-abc", "mem-xyz"
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import unlink_memory_from_directory
+        unlink_memory_from_directory("d1", "m1")
+        mock_mcp_client.unlink_memory_from_directory.assert_called_once_with(
+            "d1", "m1"
+        )
+
+
+# ── backup / restore ──────────────────────────────────────────────────
+
+
+class TestBackup:
+    """Tests for the backup MCP tool."""
+
+    def test_backup_with_default_path(self, mock_mcp_client):
+        from server.mcp.main import backup
+        mock_mcp_client.backup.return_value = {
+            "status": "ok",
+            "path": "spacetime-memory-backup-2026-07-27.json",
+            "tables": ["memory", "note", "kg_node"],
+            "total_rows": 150,
+            "table_count": 3,
+        }
+        result = backup(workspace_id="default")
+        assert "Backup written" in result
+        assert "150" in result
+        mock_mcp_client.backup.assert_called_once_with(output_path=None)
+
+    def test_backup_with_custom_path(self, mock_mcp_client):
+        from server.mcp.main import backup
+        mock_mcp_client.backup.return_value = {
+            "status": "ok",
+            "path": "/tmp/my-backup.json",
+            "tables": ["memory"],
+            "total_rows": 42,
+            "table_count": 1,
+        }
+        result = backup(workspace_id="ws1", output_path="/tmp/my-backup.json")
+        assert "/tmp/my-backup.json" in result
+        assert "42" in result
+        mock_mcp_client.backup.assert_called_once_with(
+            output_path="/tmp/my-backup.json"
+        )
+
+    def test_backup_empty_result(self, mock_mcp_client):
+        from server.mcp.main import backup
+        mock_mcp_client.backup.return_value = {
+            "status": "ok",
+            "path": "backup.json",
+            "tables": [],
+            "total_rows": 0,
+            "table_count": 0,
+        }
+        result = backup(workspace_id="empty")
+        assert "0" in result
+
+
+class TestRestore:
+    """Tests for the restore MCP tool."""
+
+    def test_restore_success(self, mock_mcp_client):
+        from server.mcp.main import restore
+        mock_mcp_client.restore.return_value = {
+            "restored": ["memory", "note"],
+            "total_rows": 200,
+        }
+        result = restore(input_path="/tmp/backup.json")
+        assert "200" in result
+        assert "2 table(s)" in result
+        mock_mcp_client.restore.assert_called_once_with("/tmp/backup.json")
+
+    def test_restore_no_data(self, mock_mcp_client):
+        from server.mcp.main import restore
+        mock_mcp_client.restore.return_value = {
+            "restored": [],
+            "total_rows": 0,
+        }
+        result = restore(input_path="/tmp/empty-backup.json")
+        assert "0" in result
+

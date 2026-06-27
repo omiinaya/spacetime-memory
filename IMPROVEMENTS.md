@@ -12,29 +12,67 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `get_directory` MCP tool
-Missing directory getter (by id or path). `create_directory`, `traverse_directory`,
-and `list_directory` exist but `get_directory` missing.
+### Add API key management MCP tools
+`create_api_key`, `deactivate_api_key`, and `list_api_keys` are not yet
+available as MCP tools. Important for admin: managing MCP server access keys.
 Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
 Difficulty: Easy
-Est: 5min
+Est: 10min
 
-### Add `link_memory_to_directory` / `unlink_memory_from_directory` MCP tools
-Missing directory memory-linking tools. Complements existing directory CRUD tools.
+### Add context chain MCP tools
+`set_workspace_context`, `set_memory_context`, and `get_context_chain` are
+not yet available as MCP tools. Context chains are important for agent
+memory workflows.
 Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
 Difficulty: Easy
 Est: 8min
 
-### Add `backup` / `restore` MCP tools
-Data backup and restore capabilities via MCP. Backs up all user data tables
-to a JSON file and restores from them.
+### Add decay model MCP tools
+`set_decay_model` and `get_decay_config` are not yet available as MCP tools.
+Decay configuration is important for memory lifecycle management.
 Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Medium
-Est: 15min
+Difficulty: Easy
+Est: 8min
+
+### Add batch_update_memories MCP tool
+`batch_update_memories` is not yet available as an MCP tool. Allows bulk
+memory updates for admin/maintenance workflows.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
 
 ---
 
 ## Recently Completed
+
+### ✅ Add `backup` / `restore` MCP tools (Jul 27)
+Added `backup` and `restore` MCP tools wrapping `Client.backup()` and
+`Client.restore()`. Data backup and restore is now available via MCP for
+admin workflows. Backs up all user data tables to JSON and restores from them.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Medium
+Est: 15min
+Test: 5/5 new tests passing (119/119 total MCP tests)
+
+### ✅ Add `link_memory_to_directory` / `unlink_memory_from_directory` MCP tools (Jul 27)
+Added `link_memory_to_directory` and `unlink_memory_from_directory` MCP tools
+wrapping `Client.link_memory_to_directory()` and
+`Client.unlink_memory_from_directory()`. Directory memory-linking is now
+complete (create_directory, list_directory, traverse_directory, get_directory,
+link_memory_to_directory, unlink_memory_from_directory).
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 8min
+Test: 4/4 new tests passing (119/119 total MCP tests)
+
+### ✅ Add `get_directory` MCP tool (Jul 27)
+Added `get_directory` MCP tool wrapping `Client.get_directory()`. Directory
+getter by ID or path is now available via MCP. Complements existing directory
+CRUD tools (create_directory, list_directory, traverse_directory).
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 3/3 new tests passing (119/119 total MCP tests)
 
 ### ✅ Add `resolve_entity` MCP tool (Jul 27)
 Added `resolve_entity` MCP tool wrapping `Client.resolve_entity()`. Entity
@@ -116,6 +154,33 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Research Log
+
+### Jul 27 — All 3 remaining MCP tools added (get_directory, directory linking, backup/restore); 4 new PENDING items for remaining gaps
+- **MCP tools audit**: Added 3 PENDING MCP tools closing the last remaining
+  `Client` method gaps:
+  - `get_directory` MCP tool — directory getter by ID or path
+  - `link_memory_to_directory` / `unlink_memory_from_directory` — directory
+    memory-linking (directory CRUD now fully covered)
+  - `backup` / `restore` — data backup/restore for admin workflows
+  All `Client` public methods now have MCP wrappers. No remaining gaps.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick: c76ca42 (docs update,
+    Jul 27). This tick: (pending commit).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph/claude-code — not installed.
+  - zep-python v2.0.2 (unchanged since last check).
+  - No new competitor features to adopt.
+- **New gaps identified**: 4 additional `Client` methods still without MCP
+  wrappers discovered during full audit:
+  `create_api_key`/`deactivate_api_key`/`list_api_keys`,
+  `set_workspace_context`/`set_memory_context`/`get_context_chain`,
+  `set_decay_model`/`get_decay_config`, `batch_update_memories`.
+  These are all admin/utility/infrastructure methods.
+- **Backlog**: 4 new PENDING items added (2 blocked items remain).
+- **Commit**: (pending commit signature) — 3 files changed, 12 new tests,
+  119/119 MCP tests passing.
 
 ### Jul 27 — resolve_entity MCP tool added; 3 PENDING items remain
 - **MCP tools audit**: Added `resolve_entity` MCP tool wrapping `Client.resolve_entity()`.
