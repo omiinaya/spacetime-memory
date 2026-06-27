@@ -18,32 +18,14 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
-### ✅ Add `update_node` MCP tool (Jun 26)
-Added `update_node` MCP tool wrapping `Client.update_node()`. Updates existing
-KG nodes — needed for ripple update workflow. All params supported: node_id,
-label, node_type (default "concept"), summary, metadata_json, source_memory_id.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 8min
-Test: 74/74 MCP tests passing
-
-### ✅ Add `list_memories` MCP tool (Jun 26)
-Added `list_memories` MCP tool wrapping `Client.list_memories()`. Lists active
-memories in a workspace with optional memory_type filter and limit.
+### ✅ Add `glob_get` MCP tool (Jul 6)
+Added `glob_get` MCP tool wrapping `Client.glob_get()`. Uses fnmatch-style
+wildcards (`*`, `?`, `[...]`) to find memories matching a pattern on any
+field. Complements the existing `fuzzy_get` tool.
 Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
 Difficulty: Easy
 Est: 5min
-Test: 74/74 MCP tests passing
-
-### ✅ Add `create_edge` MCP tool (Jun 26)
-Added `create_edge` MCP tool wrapping `Client.create_edge()`. Creates directed,
-typed edges between KG nodes with all parameters (weight, confidence,
-metadata_json, source_memory_id). Fills a real gap — `create_node` existed
-but edges could not be created via MCP, blocking the LLM Wiki workflow.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 8min
-Test: 68/68 MCP tests passing
+Test: 4/4 new tests passing (84/84 total MCP tests)
 
 ### ✅ Add `fuzzy_get` MCP tool (Jul 6)
 Added `fuzzy_get` MCP tool wrapping `Client.fuzzy_get()`. Returns JSON with
@@ -70,15 +52,6 @@ Difficulty: Easy
 Est: 3min
 Test: 59/59 MCP tests passing
 
-### ✅ Add `export_workspace` MCP tool (Jun 26)
-Added `export_workspace` MCP tool wrapping `Compounder.export_workspace()`.
-Exports wiki notes as markdown files with YAML frontmatter for Obsidian/git.
-Supports include_kg and include_system_notes flags.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-Test: 58/58 MCP tests passing
-
 ### ✅ Add document CRUD MCP tools (Jul 2)
 Added 5 MCP tools for document management: create_document, get_document,
 list_documents, get_document_chunks, delete_document. Covers the full
@@ -88,22 +61,15 @@ Difficulty: Easy
 Est: 8min
 Test: 2173/2173 unit tests passing
 
-### ✅ Add note CRUD MCP tools (Jun 26)
-Added 9 MCP tools for note management: create_note, get_note, update_note,
-delete_note, list_notes, get_note_by_title, get_note_history, get_backlinks,
-get_outgoing_links. Covers the full LLM Wiki note workflow (AGENTS.md).
-Files: server/mcp/main.py
+### ✅ Add `create_edge` MCP tool (Jun 26)
+Added `create_edge` MCP tool wrapping `Client.create_edge()`. Creates directed,
+typed edges between KG nodes with all parameters (weight, confidence,
+metadata_json, source_memory_id). Fills a real gap — `create_node` existed
+but edges could not be created via MCP, blocking the LLM Wiki workflow.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
 Difficulty: Easy
-Est: 12min
-Test: 155/155 unit tests passing
-
-### ✅ Add `entity_types`/`before`/`after` params to MCP search tools (Jun 26)
-Added `entity_types` (list[str]), `before` (float), and `after` (float) parameters
-to both `search_memories` and `hybrid_search` MCP tools, matching the SDK
-`Client.search()` signature.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 10min
+Est: 8min
+Test: 68/68 MCP tests passing
 
 |---
 
@@ -130,6 +96,24 @@ Difficulty: Hard (needs live STDB)
 ---
 
 ## Research Log
+
+### Jul 6 — `glob_get` MCP tool added; all Client search/pattern methods now wrapped
+- **MCP tools audit**: Added `glob_get` MCP tool wrapping `Client.glob_get()`.
+  Complements `fuzzy_get` with fnmatch-style pattern matching. All `Client`
+  search/pattern/retrieval methods now have MCP wrappers.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick was e4b76c5
+    (update_node + list_memories docs). No unreviewed changes.
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps remaining**: All `Client` search/retrieval/pattern methods now have MCP
+  wrappers. Remaining untapped Client methods are admin/utility/infrastructure
+  (backup/restore, API key management, peer listing, etc.) — lower priority.
+- **Backlog**: 0 PENDING items (stale WASM binary still blocked by OOM).
+- **Commit**: 834272f — 3 files changed, +113/-47 lines, 78/78 MCP tests passing.
 
 ### Jun 26 — `update_node` + `list_memories` MCP tools added; backlog cleared again
 - **MCP tools audit**: Added `update_node` and `list_memories` MCP tools.

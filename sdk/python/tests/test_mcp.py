@@ -935,3 +935,50 @@ class TestListMemories:
         mock_mcp_client.list_memories.assert_called_once_with(
             "empty_ws", "", 50,
         )
+
+
+# ── glob_get ────────────────────────────────────────────────────────────
+
+
+class TestGlobGet:
+    """Tests for the glob_get MCP tool."""
+
+    def test_finds_matching_memories(self, mock_mcp_client):
+        from server.mcp.main import glob_get
+        mock_mcp_client.glob_get.return_value = [
+            {"id": "auth-token-1", "content": "Auth token config"},
+            {"id": "auth-token-2", "content": "Another auth token"},
+        ]
+        result = glob_get(workspace_id="ws1", pattern="auth-*")
+        assert "auth-token-1" in result
+        assert "auth-token-2" in result
+        mock_mcp_client.glob_get.assert_called_once_with(
+            workspace_id="ws1", pattern="auth-*", field="id", limit=200,
+        )
+
+    def test_no_matches_returns_message(self, mock_mcp_client):
+        from server.mcp.main import glob_get
+        mock_mcp_client.glob_get.return_value = []
+        result = glob_get(workspace_id="ws1", pattern="nope-*")
+        assert "No memories matching pattern" in result
+        assert "nope-*" in result
+
+    def test_custom_field_and_limit(self, mock_mcp_client):
+        from server.mcp.main import glob_get
+        mock_mcp_client.glob_get.return_value = [
+            {"id": "m1", "content": "agent memory"},
+        ]
+        result = glob_get(workspace_id="ws1", pattern="*agent*", field="content", limit=50)
+        assert "agent memory" in result
+        mock_mcp_client.glob_get.assert_called_once_with(
+            workspace_id="ws1", pattern="*agent*", field="content", limit=50,
+        )
+
+    def test_empty_pattern(self, mock_mcp_client):
+        from server.mcp.main import glob_get
+        mock_mcp_client.glob_get.return_value = []
+        result = glob_get(workspace_id="ws1", pattern="")
+        assert "No memories matching pattern" in result
+        mock_mcp_client.glob_get.assert_called_once_with(
+            workspace_id="ws1", pattern="", field="id", limit=200,
+        )

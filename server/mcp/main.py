@@ -497,6 +497,41 @@ def fuzzy_get(
 
 @mcp.tool()
 @require_api_key
+def glob_get(
+    workspace_id: str,
+    pattern: str,
+    field: str = "id",
+    limit: int = 200,
+) -> str:
+    """Find memories matching a glob pattern (fnmatch-style).
+
+    Fetches up to *limit* memories and returns those whose *field*
+    matches the glob *pattern* (``*``, ``?``, ``[...]`` wildcards).
+
+    Args:
+        workspace_id: The workspace to search.
+        pattern: Glob pattern (e.g. ``"auth-*"``, ``"*agent*"``).
+        field: Which memory field to match against (default "id").
+        limit: Max memories to scan (default 200).
+
+    Returns:
+        JSON string with matching memories, or a message if none found.
+    """
+    import json as _json
+
+    result = get_client().glob_get(
+        workspace_id=workspace_id,
+        pattern=pattern,
+        field=field,
+        limit=limit,
+    )
+    if not result:
+        return f"No memories matching pattern '{pattern}' (field: {field})."
+    return _json.dumps(result, default=str)
+
+
+@mcp.tool()
+@require_api_key
 def detect_patterns(
     workspace_id: str,
     limit: int = 200,
