@@ -12,14 +12,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add context chain MCP tools
-`set_workspace_context`, `set_memory_context`, and `get_context_chain` are
-not yet available as MCP tools. Context chains are important for agent
-memory workflows.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 8min
-
 ### Add decay model MCP tools
 `set_decay_model` and `get_decay_config` are not yet available as MCP tools.
 Decay configuration is important for memory lifecycle management.
@@ -37,6 +29,17 @@ Est: 5min
 ---
 
 ## Recently Completed
+
+### ✅ Add context chain MCP tools (Jul 27)
+Added `set_workspace_context`, `set_memory_context`, and `get_context_chain`
+MCP tools wrapping `Client.set_workspace_context()`,
+`Client.set_memory_context()`, and `Client.get_context_chain()`. Context
+chain management (QMD-style workspace + memory context) is now available
+via MCP for agent memory workflows.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 8min
+Test: 7/7 new tests passing (133/133 total MCP tests)
 
 ### ✅ Add API key management MCP tools (Jul 27)
 Added `create_api_key`, `deactivate_api_key`, and `list_api_keys` MCP tools
@@ -128,6 +131,23 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Research Log
+
+### Jul 27 — Context chain MCP tools added; 2 PENDING items remain
+- **MCP tools audit**: Added `set_workspace_context`, `set_memory_context`,
+  and `get_context_chain` MCP tools wrapping the corresponding `Client`
+  methods. Context chain management (QMD-style workspace + memory context)
+  is now available via MCP for agent memory workflows.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick: 69906ba (docs
+    update, Jul 27). This tick: 803d075 (context chain MCP tools).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged since last check).
+  - zep-python v2.0.2 (unchanged since last check).
+  - No new competitor features to adopt.
+- **Backlog**: 2 PENDING items remain (2 blocked items unchanged).
+- **Commit**: 803d075 — 3 files changed, +130/-30 lines, 133/133 MCP tests passing.
 
 ### Jul 27 — API key management MCP tools added; 3 PENDING items remain
 - **MCP tools audit**: Added `create_api_key`, `deactivate_api_key`, and
