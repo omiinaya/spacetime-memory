@@ -161,9 +161,25 @@ infrastructure is available for investigation.
 Files: server/spacetimedb/src/lib.rs, tests/concurrent/
 Difficulty: Hard (needs live STDB)
 
-||---
+|---|
 
 ## Research Log
+
+### Jun 27 — Backlog remains empty; all dependencies unchanged; no new gaps found
+- **Completed**: None — 0 PENDING items in backlog.
+- **Cleanup**: 10 items in Recently Completed (at max limit, no purge needed).
+- **Research**:
+  - Git log (7 days): ~242 commits, latest: c74d3def (this tick's commit hash fix).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged from last tick — added AsyncMemory/AsyncMemoryClient in
+    v2.0.10, but implementing full async Client is a major refactor beyond single-tick scope).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
+  - Deeper scan: no new gaps found. All 106 Client SDK methods have MCP wrappers.
+    3315 tests collected (246/246 test_client + test_compounder confirmed passing).
+    No code-level TODO/FIXME markers in source code.
+  - Web UI directory (web/src/) does not exist — no frontend gaps to fill.
+- **Backlog**: 0 PENDING items — backlog remains empty.
+- **Commit**: No commit needed — no code changes this tick.
 
 ### Aug 2 — Added `expires_at` support to `update_memory`; backlog stays clear
 - **Completed**: Added optional `expires_at` parameter to Rust `update_memory`
