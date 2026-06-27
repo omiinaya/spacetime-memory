@@ -2340,3 +2340,175 @@ class TestDetectCommunities:
         result = detect_communities(workspace_id="no-ws")
         assert "error" in result
 
+
+# ── seed_communities ────────────────────────────────────────────────────
+
+
+class TestSeedCommunities:
+    """Tests for the seed_communities MCP tool."""
+
+    def test_seeds_communities(self, mock_mcp_client):
+        from server.mcp.main import seed_communities
+        mock_mcp_client.seed_communities.return_value = {
+            "status": "ok",
+            "workspace_id": "ws-1",
+        }
+        result = seed_communities(workspace_id="ws-1")
+        assert result["status"] == "ok"
+        assert result["workspace_id"] == "ws-1"
+        mock_mcp_client.seed_communities.assert_called_once_with("ws-1")
+
+    def test_no_unassigned_nodes(self, mock_mcp_client):
+        from server.mcp.main import seed_communities
+        mock_mcp_client.seed_communities.return_value = {
+            "status": "ok",
+            "workspace_id": "ws-empty",
+            "message": "All nodes already assigned to communities",
+        }
+        result = seed_communities(workspace_id="ws-empty")
+        assert result["status"] == "ok"
+        assert "All nodes already assigned" in result["message"]
+
+
+# ── detect_bridge_nodes ─────────────────────────────────────────────────
+
+
+class TestDetectBridgeNodes:
+    """Tests for the detect_bridge_nodes MCP tool."""
+
+    def test_detects_bridge_nodes(self, mock_mcp_client):
+        from server.mcp.main import detect_bridge_nodes
+        mock_mcp_client.detect_bridge_nodes.return_value = [
+            {"node_id": "n1", "label": "AI", "bridge_score": 0.85,
+             "communities": [1, 2, 3]},
+            {"node_id": "n2", "label": "Data", "bridge_score": 0.72,
+             "communities": [1, 4]},
+        ]
+        result = detect_bridge_nodes(workspace_id="ws-1")
+        import json
+        parsed = json.loads(result)
+        assert len(parsed) == 2
+        assert parsed[0]["node_id"] == "n1"
+        assert parsed[0]["bridge_score"] == 0.85
+        mock_mcp_client.detect_bridge_nodes.assert_called_once_with("ws-1", 20, 2)
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import detect_bridge_nodes
+        mock_mcp_client.detect_bridge_nodes.return_value = []
+        result = detect_bridge_nodes(workspace_id="ws-nobridge")
+        import json
+        parsed = json.loads(result)
+        assert parsed == []
+
+    def test_with_custom_params(self, mock_mcp_client):
+        from server.mcp.main import detect_bridge_nodes
+        mock_mcp_client.detect_bridge_nodes.return_value = []
+        detect_bridge_nodes(workspace_id="ws-1", limit=10, min_communities=3)
+        mock_mcp_client.detect_bridge_nodes.assert_called_once_with("ws-1", 10, 3)
+
+
+# ── create_entity_link ──────────────────────────────────────────────────
+
+
+class TestCreateEntityLink:
+    """Tests for the create_entity_link MCP tool."""
+
+    def test_creates_entity_link(self, mock_mcp_client):
+        from server.mcp.main import create_entity_link
+        mock_mcp_client.create_entity_link.return_value = None  # returns None
+        result = create_entity_link(
+            workspace_id="ws-1",
+            canonical_name="Alice",
+            entity_type="person",
+            description="A researcher",
+        )
+        assert "Alice" in result
+        assert "ws-1" in result
+        mock_mcp_client.create_entity_link.assert_called_once_with(
+            "ws-1", "Alice", "person", "A researcher",
+        )
+
+    def test_without_description(self, mock_mcp_client):
+        from server.mcp.main import create_entity_link
+        mock_mcp_client.create_entity_link.return_value = None
+        result = create_entity_link(
+            workspace_id="ws-1",
+            canonical_name="Bob",
+            entity_type="org",
+        )
+        assert "Bob" in result
+        mock_mcp_client.create_entity_link.assert_called_once_with(
+            "ws-1", "Bob", "org", "",
+        )
+
+
+# ── list_context_packs ──────────────────────────────────────────────────
+
+
+class TestListContextPacks:
+    """Tests for the list_context_packs MCP tool."""
+
+    def test_lists_packs(self, mock_mcp_client):
+        from server.mcp.main import list_context_packs
+        mock_mcp_client.list_context_packs.return_value = [
+            {"id": "pack-1", "workspace_id": "ws-1", "created_at": "2026-06-27T00:00:00Z"},
+            {"id": "pack-2", "workspace_id": "ws-1", "created_at": "2026-06-27T01:00:00Z"},
+        ]
+        result = list_context_packs(workspace_id="ws-1")
+        assert len(result) == 2
+        assert result[0]["id"] == "pack-1"
+        mock_mcp_client.list_context_packs.assert_called_once_with("ws-1")
+
+    def test_empty_workspace(self, mock_mcp_client):
+        from server.mcp.main import list_context_packs
+        mock_mcp_client.list_context_packs.return_value = []
+        result = list_context_packs(workspace_id="empty-ws")
+        assert result == []
+
+
+# ── list_context_entries ────────────────────────────────────────────────
+
+
+class TestListContextEntries:
+    """Tests for the list_context_entries MCP tool."""
+
+    def test_lists_entries(self, mock_mcp_client):
+        from server.mcp.main import list_context_entries
+        mock_mcp_client.list_context_entries.return_value = [
+            {"id": "entry-1", "pack_id": "pack-1", "content": "Agent state: active"},
+        ]
+        result = list_context_entries(pack_id="pack-1")
+        assert len(result) == 1
+        assert result[0]["content"] == "Agent state: active"
+        mock_mcp_client.list_context_entries.assert_called_once_with("pack-1")
+
+    def test_no_entries(self, mock_mcp_client):
+        from server.mcp.main import list_context_entries
+        mock_mcp_client.list_context_entries.return_value = []
+        result = list_context_entries(pack_id="empty-pack")
+        assert result == []
+
+
+# ── list_context_deltas ─────────────────────────────────────────────────
+
+
+class TestListContextDeltas:
+    """Tests for the list_context_deltas MCP tool."""
+
+    def test_lists_deltas(self, mock_mcp_client):
+        from server.mcp.main import list_context_deltas
+        mock_mcp_client.list_context_deltas.return_value = [
+            {"previous_pack_id": "pack-1", "current_pack_id": "pack-2",
+             "change": "summary modified"},
+        ]
+        result = list_context_deltas(previous_pack_id="pack-1")
+        assert len(result) == 1
+        assert result[0]["change"] == "summary modified"
+        mock_mcp_client.list_context_deltas.assert_called_once_with("pack-1")
+
+    def test_no_deltas(self, mock_mcp_client):
+        from server.mcp.main import list_context_deltas
+        mock_mcp_client.list_context_deltas.return_value = []
+        result = list_context_deltas(previous_pack_id="nonexistent")
+        assert result == []
+

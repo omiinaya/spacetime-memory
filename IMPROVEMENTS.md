@@ -152,4 +152,4 @@ Difficulty: Hard (needs live STDB)
   - opentelemetry-sdk v1.43.0 (unchanged).
   - No new competitor features to adopt.
 - **Backlog**: 4 PENDING items.
-- **Commit**: TBD
+- **Commit**: 0b90108 — 3 files changed, +81 lines, 177/177 MCP tests passing.

@@ -548,6 +548,58 @@ def get_context_chain(memory_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 @require_api_key
+def list_context_packs(workspace_id: str) -> list[dict[str, Any]]:
+    """List all context packs in a workspace.
+
+    Context packs group related context entries together for QMD-style
+    context management. Each pack represents a "state snapshot" of a
+    conversation or agent session.
+
+    Args:
+        workspace_id: The workspace to list packs for.
+
+    Returns:
+        List of context pack records.
+    """
+    return get_client().list_context_packs(workspace_id)
+
+
+@mcp.tool()
+@require_api_key
+def list_context_entries(pack_id: str) -> list[dict[str, Any]]:
+    """List all entries in a context pack.
+
+    Each entry is a piece of contextual data within the pack, such as
+    agent state, conversation history, or metadata.
+
+    Args:
+        pack_id: The context pack ID to list entries for.
+
+    Returns:
+        List of context entry records.
+    """
+    return get_client().list_context_entries(pack_id)
+
+
+@mcp.tool()
+@require_api_key
+def list_context_deltas(previous_pack_id: str) -> list[dict[str, Any]]:
+    """List delta entries between two context packs.
+
+    Deltas show what changed between consecutive context pack snapshots.
+    Useful for diffing agent state across sessions.
+
+    Args:
+        previous_pack_id: The ID of the earlier context pack to compare.
+
+    Returns:
+        List of context delta records showing changes.
+    """
+    return get_client().list_context_deltas(previous_pack_id)
+
+
+@mcp.tool()
+@require_api_key
 def fuzzy_get(
     workspace_id: str,
     name: str,
@@ -1472,6 +1524,54 @@ def detect_communities(workspace_id: str) -> dict[str, Any]:
     return result
 
 
+@mcp.tool()
+@require_api_key
+def seed_communities(workspace_id: str) -> dict[str, Any]:
+    """Seed unassigned KG nodes into new communities.
+
+    Takes any knowledge-graph nodes that do not yet belong to a community
+    and assigns them to new communities using label-propagation seeding.
+    Useful after adding new nodes to an existing workspace.
+
+    Args:
+        workspace_id: The workspace to seed communities in.
+
+    Returns:
+        Dict with reducer response status.
+    """
+    return get_client().seed_communities(workspace_id)
+
+
+@mcp.tool()
+@require_api_key
+def detect_bridge_nodes(
+    workspace_id: str,
+    limit: int = 20,
+    min_communities: int = 2,
+) -> str:
+    """Detect bridge nodes — concepts that connect multiple communities.
+
+    Bridge nodes are knowledge-graph entities that belong to or are
+    referenced by multiple communities, making them integration points
+    between otherwise separate knowledge clusters. Results are stored
+    in the ``bridge_result`` table and returned here sorted by bridge
+    score (higher = more integrative).
+
+    Args:
+        workspace_id: The workspace to analyze.
+        limit: Max bridge nodes to return (default: 20).
+        min_communities: Minimum number of communities a node must
+            bridge to be included (default: 2).
+
+    Returns:
+        JSON string with bridge nodes sorted by score descending.
+    """
+    import json as _json
+
+    rows = get_client().detect_bridge_nodes(workspace_id, limit, min_communities)
+    return _json.dumps(rows, default=str)
+
+
 # ---------------------------------------------------------------------------
 # Recommendation tools
 # ---------------------------------------------------------------------------
@@ -1732,6 +1832,34 @@ def add_alias(entity_link_id: str, alias: str) -> str:
     """
     get_client().add_alias(entity_link_id, alias)
     return f"Alias '{alias}' added to entity link {entity_link_id[:16]}..."
+
+
+@mcp.tool()
+@require_api_key
+def create_entity_link(
+    workspace_id: str,
+    canonical_name: str,
+    entity_type: str,
+    description: str = "",
+) -> str:
+    """Create a canonical entity link for Mem0-style entity resolution.
+
+    Entity links map names to canonical entities within a workspace,
+    enabling resolution of aliases and nicknames. Useful for name
+    disambiguation in multi-agent systems.
+
+    Args:
+        workspace_id: The workspace to create the entity link in.
+        canonical_name: The canonical (preferred) name for this entity.
+        entity_type: The entity type (e.g. ``"person"``, ``"org"``,
+            ``"concept"``, ``"product"``).
+        description: Optional human-readable description of this entity.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().create_entity_link(workspace_id, canonical_name, entity_type, description)
+    return f"Entity link '{canonical_name}' created in workspace {workspace_id[:16]}..."
 
 
 # ---------------------------------------------------------------------------
