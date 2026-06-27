@@ -349,6 +349,48 @@ def hybrid_search(
 
 @mcp.tool()
 @require_api_key
+def search_with_filters(
+    workspace_id: str,
+    query: str = "",
+    memory_type: str = "",
+    tier: str = "",
+    metadata_filter: str = "",
+    location_filter: str = "",
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Search memories with metadata and location filters.
+
+    Provides structured metadata and location-based filtering that the
+    general ``search_memories`` and ``hybrid_search`` tools do not
+    expose.
+
+    Args:
+        workspace_id: Target workspace.
+        query: Optional text query (keyword search).
+        memory_type: Optional memory type filter (e.g. "memory", "note").
+        tier: Optional tier filter (e.g. "L0", "L1", "L2").
+        metadata_filter: JSON string of metadata key/value pairs to match
+            (e.g. ``'{"source": "wiki", "priority": "high"}'``).
+        location_filter: JSON string of location coordinates or named
+            location (e.g. ``'{"lat": 37.77, "lng": -122.42}'``).
+        limit: Max results (default: 20).
+
+    Returns:
+        List of matching memory dicts.
+    """
+    return get_client().search_with_filters(
+        workspace_id=workspace_id,
+        query=query,
+        memory_type=memory_type,
+        tier=tier,
+        metadata_filter=metadata_filter,
+        location_filter=location_filter,
+        limit=limit,
+    )
+
+
+@mcp.tool()
+@require_api_key
 def get_memory(id: str) -> list[dict[str, Any]]:
     """Retrieve a single memory by its ID. Auto-reinforces on read."""
     return get_client().get_memory(id)

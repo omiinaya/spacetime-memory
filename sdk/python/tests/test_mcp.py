@@ -982,3 +982,69 @@ class TestGlobGet:
         mock_mcp_client.glob_get.assert_called_once_with(
             workspace_id="ws1", pattern="", field="id", limit=200,
         )
+
+
+# ── search_with_filters ─────────────────────────────────────────────────
+
+
+class TestSearchWithFilters:
+    """Tests for the search_with_filters MCP tool."""
+
+    def test_filters_by_metadata(self, mock_mcp_client):
+        from server.mcp.main import search_with_filters
+        mock_mcp_client.search_with_filters.return_value = [
+            {"id": "m1", "content": "Confidential doc", "metadata": {"source": "wiki"}},
+            {"id": "m2", "content": "Another doc", "metadata": {"source": "wiki"}},
+        ]
+        result = search_with_filters(
+            workspace_id="ws1",
+            metadata_filter='{"source": "wiki"}',
+        )
+        assert len(result) == 2
+        assert result[0]["metadata"]["source"] == "wiki"
+        mock_mcp_client.search_with_filters.assert_called_once_with(
+            workspace_id="ws1", query="", memory_type="", tier="",
+            metadata_filter='{"source": "wiki"}', location_filter="", limit=20,
+        )
+
+    def test_filters_by_location(self, mock_mcp_client):
+        from server.mcp.main import search_with_filters
+        mock_mcp_client.search_with_filters.return_value = [
+            {"id": "m1", "content": "Nearby place", "location": {"lat": 37.77}},
+        ]
+        result = search_with_filters(
+            workspace_id="ws1",
+            location_filter='{"lat": 37.77, "lng": -122.42}',
+        )
+        assert len(result) == 1
+        assert result[0]["id"] == "m1"
+        mock_mcp_client.search_with_filters.assert_called_once_with(
+            workspace_id="ws1", query="", memory_type="", tier="",
+            metadata_filter="", location_filter='{"lat": 37.77, "lng": -122.42}',
+            limit=20,
+        )
+
+    def test_all_params_passed(self, mock_mcp_client):
+        from server.mcp.main import search_with_filters
+        mock_mcp_client.search_with_filters.return_value = []
+        search_with_filters(
+            workspace_id="ws2",
+            query="test query",
+            memory_type="note",
+            tier="L0",
+            metadata_filter='{"priority": "high"}',
+            location_filter='{"city": "NYC"}',
+            limit=5,
+        )
+        mock_mcp_client.search_with_filters.assert_called_once_with(
+            workspace_id="ws2", query="test query", memory_type="note",
+            tier="L0", metadata_filter='{"priority": "high"}',
+            location_filter='{"city": "NYC"}', limit=5,
+        )
+
+    def test_empty_result_returns_empty_list(self, mock_mcp_client):
+        from server.mcp.main import search_with_filters
+        mock_mcp_client.search_with_filters.return_value = []
+        result = search_with_filters(workspace_id="ws1")
+        assert result == []
+
