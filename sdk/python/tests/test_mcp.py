@@ -1369,3 +1369,22 @@ class TestGetCitations:
             "ws1", "n1", "node",
         )
 
+
+# ── delete_tour ─────────────────────────────────────────────────────
+
+
+class TestDeleteTour:
+    """Tests for the delete_tour MCP tool."""
+
+    def test_deletes_tour(self, mock_mcp_client):
+        from server.mcp.main import delete_tour
+        result = delete_tour(tour_id="tour123")
+        assert "deleted" in result
+        assert "tour123" in result
+        mock_mcp_client.delete_tour.assert_called_once_with("tour123")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import delete_tour
+        delete_tour(tour_id="my-tour-id")
+        mock_mcp_client.delete_tour.assert_called_once_with("my-tour-id")
+

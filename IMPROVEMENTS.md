@@ -12,11 +12,44 @@ and works the top pending item each tick.
 
 ## Pending
 
-*No pending items. All known Client SDK methods now have MCP tool wrappers.*
+### Add `resolve_entity` MCP tool
+Missing entity resolution MCP tool. Wraps `Client.resolve_entity()`.
+Relevant to AGENTS.md workflow for entity resolution.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+
+### Add `get_directory` MCP tool
+Missing directory getter (by id or path). `create_directory`, `traverse_directory`,
+and `list_directory` exist but `get_directory` missing.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+
+### Add `link_memory_to_directory` / `unlink_memory_from_directory` MCP tools
+Missing directory memory-linking tools. Complements existing directory CRUD tools.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 8min
+
+### Add `backup` / `restore` MCP tools
+Data backup and restore capabilities via MCP. Backs up all user data tables
+to a JSON file and restores from them.
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Medium
+Est: 15min
 
 ---
 
 ## Recently Completed
+
+### ✅ Add `delete_tour` MCP tool (Jul 27)
+Added `delete_tour` MCP tool wrapping `Client.delete_tour()`. Tour CRUD is now
+complete (create_tour, add_tour_stop, delete_tour).
+Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 5min
+Test: 2/2 new tests passing (105/105 total MCP tests)
 
 ### ✅ Add `search_profiles` MCP tool (Jul 6)
 Added MCP tool wrapping `Client.search_profiles()`. Searches peer profiles by
@@ -68,41 +101,11 @@ Difficulty: Easy
 Est: 8min
 Test: 8/8 new tests passing (90/90 total MCP tests)
 
-### ✅ Add `search_with_filters` MCP tool (Jul 6)
-Added `search_with_filters` MCP tool wrapping `Client.search_with_filters()`.
-Provides structured metadata and location-based filtering (metadata_filter,
-location_filter as JSON strings) that the existing search_memories and
-hybrid_search tools don't expose.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 10min
-Test: 4/4 new tests passing (82/82 total MCP tests)
+---
 
-### ✅ Add `glob_get` MCP tool (Jul 6)
-Added `glob_get` MCP tool wrapping `Client.glob_get()`. Uses fnmatch-style
-wildcards (`*`, `?`, `[...]`) to find memories matching a pattern on any
-field. Complements the existing `fuzzy_get` tool.
-Files: server/mcp/main.py, sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 5min
-Test: 4/4 new tests passing (84/84 total MCP tests)
+## Recently Completed (archive)
 
-### ✅ Add `fuzzy_get` MCP tool (Jul 6)
-Added `fuzzy_get` MCP tool wrapping `Client.fuzzy_get()`. Returns JSON with
-best fuzzy-match or no-match message. Uses difflib SequenceMatcher.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-Test: 59/59 MCP tests passing
-
-### ✅ Add `detect_patterns` MCP tool (Jul 6)
-Added `detect_patterns` MCP tool wrapping `Client.detect_patterns()`. Accepts
-include_clusters, include_terms, include_co_occur flags. Returns JSON with
-temporal clusters, frequent terms, co-occurrences.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-Test: 59/59 MCP tests passing
+*Older completed entries purged — see Research Log for full history.*
 
 |---
 
@@ -129,6 +132,24 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Research Log
+
+### Jul 27 — delete_tour MCP tool added; 4 new PENDING items for remaining gaps
+- **MCP tools audit**: Added `delete_tour` MCP tool wrapping `Client.delete_tour()`.
+  Tour CRUD (create_tour, add_tour_stop, delete_tour) is now complete. This was
+  a remaining gap in the tour management tools.
+- **Research**:
+  - Git log (7 days): Most recent commit before this tick: 582adfb (docs update,
+    mark 4 MCP tools done, Jul 6). This tick: (pending commit).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged since last check).
+  - opentelemetry-sdk v1.43.0 (unchanged since last check).
+  - langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged).
+  - No new competitor features to adopt.
+- **Gaps remaining**: 4 `Client` public methods without MCP wrappers remain:
+  resolve_entity, get_directory, link_memory_to_directory/unlink_memory_from_directory,
+  backup/restore. All are admin/utility/infrastructure methods.
+- **Backlog**: 4 PENDING items (2 blocked items remain).
+- **Commit**: (pending) — 2 files changed, +26/-2 lines, 105/105 MCP tests passing.
 
 ### Jul 6 — 4 remaining MCP tools added; all Client SDK methods now have MCP wrappers
 - **MCP tools audit**: Added 4 MCP tools wrapping the last `Client` methods

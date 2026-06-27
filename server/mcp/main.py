@@ -1454,6 +1454,21 @@ def add_tour_stop(tour_id: str, node_id: str, heading: str, description: str = "
     return f"Stop '{heading}' added to tour."
 
 
+@mcp.tool()
+@require_api_key
+def delete_tour(tour_id: str) -> str:
+    """Delete a guided tour and all its stops.
+
+    Args:
+        tour_id: The ID of the tour to delete.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().delete_tour(tour_id)
+    return f"Tour {tour_id[:16]}... deleted."
+
+
 # ---------------------------------------------------------------------------
 # Mental Model tools
 # ---------------------------------------------------------------------------
