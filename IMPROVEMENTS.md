@@ -156,7 +156,7 @@ Difficulty: Hard (needs live STDB)
   - No other real gaps found: all Client SDK methods have MCP wrappers; no
     code-level TODO/FIXME markers; 3313 tests collected; pre-commit config active.
 - **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: TBD
+- **Commit**: 669e53e8 — 8 files changed, +44/-9 lines.
 
 ### Jun 27 — Fixed test mock, added pre-commit CI step; backlog cleared
 - **Completed**: Fixed `test_get_memory_history_found` mock (side_effect for
