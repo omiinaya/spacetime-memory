@@ -190,7 +190,7 @@ Difficulty: Hard (needs live STDB)
   immediately useful additions identified: list_profiles, get_peer_reputation,
   run_maintenance, check_embedder_health.
 - **Backlog**: 4 PENDING items (2 blocked items remain).
-- **Commit**: (pending commit)
+- **Commit**: 4c9819f — 3 files changed, +131/-2 lines, 156/156 MCP tests passing.
 
 ### Jul 27 — ping + add_alias MCP tools added; all Client methods now have MCP wrappers
 - **MCP tools audit**: Added `ping` (connectivity health check) and `add_alias`
