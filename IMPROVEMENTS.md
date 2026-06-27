@@ -12,14 +12,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Update MCP README with full tool catalog
-`server/mcp/README.md` only documents ~15 of ~120 MCP tools. The table needs
-expansion to cover all tool categories (memory, notes, graph, sessions,
-profiles, tours, compounder, etc.) for agent discoverability.
-Files: server/mcp/README.md
-Difficulty: Medium
-Est: 20min
-
 ### Add pre-commit config for automated linting
 The project is mature (~37K LOC) but lacks a `.pre-commit-config.yaml`.
 Add config for ruff (Python), rustfmt (Rust), and markdownlint.
@@ -30,6 +22,19 @@ Est: 10min
 ---
 
 ## Recently Completed
+
+### ✅ Update MCP README with full tool catalog (Jun 27)
+The README at `server/mcp/README.md` previously documented only ~15 of ~128 MCP
+tools across 5 categories. Expanded to a comprehensive catalog covering all 24
+categories: Workspace, Memory CRUD, Memory Management, Search, Pattern Detection,
+Context Management, Notes, Documents, Profile, Knowledge Graph Base, KG Analytics,
+Graph Traversal, Entity Resolution, Tours, Sessions, Mental Models, Facts,
+Directory, Access Control, Compounder, Maintenance, Decay Model, Peers, and
+System. Each tool has its description and parameter list documented.
+Files: server/mcp/README.md
+Difficulty: Medium
+Est: 20min
+Test: README now 303 lines (was 95), 128 tools documented in clean tables
 
 ### ✅ Fix stale SpacetimeDB version badge in README.md (Jul 28)
 The README badge at the top still said `SpacetimeDB v2.4` but the dependency
@@ -104,6 +109,20 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Research Log
+
+### Jun 27 — Expanded MCP README to full 128-tool catalog; 1 PENDING item remaining
+- **Completed**: Updated `server/mcp/README.md` from ~15 documented tools (5 categories)
+  to all 128 tools across 24 categories. Each tool has description and parameter list.
+- **Cleanup**: Moved MCP README item to Recently Completed. Purged oldest 2 entries
+  (detect_communities/context tools) to keep 6 completed entries.
+- **Research**:
+  - Git log (7 days): 128 commits, latest: 2afec3c.
+  - spacetimedb-sdk v0.7.0 (unchanged, latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
+  - opentelemetry-sdk v1.43.0 (unchanged).
+  - No new competitor features to adopt from mem0, langgraph, zep.
+  - Backlog: 1 PENDING item remaining (pre-commit config).
+- **Commit**: TBD.
 
 ### Jul 28 — Fixed stale STDB badge, added 2 new PENDING items for README/doc gaps
 - **Fixed**: Stale SpacetimeDB version badge in `README.md` (v2.4 → v2.6) and
