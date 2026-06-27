@@ -1097,6 +1097,87 @@ def create_edge(
 
 @mcp.tool()
 @require_api_key
+def add_node_citation(
+    workspace_id: str,
+    node_id: str,
+    memory_id: str,
+    description: str = "",
+) -> dict[str, Any]:
+    """Add a citation linking a KG node to a supporting source memory.
+
+    Citations provide provenance: they record which memory (raw source,
+    note, or observation) supports a particular knowledge-graph node.
+
+    Args:
+        workspace_id: Target workspace.
+        node_id: The knowledge graph node ID.
+        memory_id: The memory record that supports this node.
+        description: Optional description of the citation relationship.
+
+    Returns:
+        Dict with operation status and citation details.
+    """
+    return get_client().add_node_citation(
+        workspace_id, node_id, memory_id, description,
+    )
+
+
+@mcp.tool()
+@require_api_key
+def add_edge_citation(
+    workspace_id: str,
+    edge_id: str,
+    memory_id: str,
+    description: str = "",
+) -> dict[str, Any]:
+    """Add a citation linking a KG edge to a supporting source memory.
+
+    Citations provide provenance for edges — useful for marking which
+    source memory supports a particular ``informed_by``, ``related_to``,
+    or ``contradicts`` relationship between nodes.
+
+    Args:
+        workspace_id: Target workspace.
+        edge_id: The knowledge graph edge ID.
+        memory_id: The memory record that supports this edge.
+        description: Optional description of the citation relationship.
+
+    Returns:
+        Dict with operation status and citation details.
+    """
+    return get_client().add_edge_citation(
+        workspace_id, edge_id, memory_id, description,
+    )
+
+
+@mcp.tool()
+@require_api_key
+def get_citations(
+    workspace_id: str,
+    entity_id: str,
+    entity_type: str = "node",
+) -> list[dict[str, Any]]:
+    """Get all citations for a KG entity (node or edge).
+
+    Citations link KG nodes/edges back to the source memories that
+    support them. Use this to trace provenance for any KG entity.
+
+    Args:
+        workspace_id: Target workspace.
+        entity_id: The node or edge ID.
+        entity_type: ``"node"`` (default) or ``"edge"``.
+
+    Returns:
+        List of citation records, each with source_memory_id,
+        description, and timestamp.
+    """
+    return get_client().get_citations(
+        workspace_id, entity_id, entity_type,
+    )
+
+
+@mcp.tool()
+@require_api_key
 def query_graph(workspace_id: str, query: str = "") -> list[dict[str, Any]]:
     """Search knowledge graph nodes by label within a workspace."""
     return get_client().query_graph(workspace_id, query)

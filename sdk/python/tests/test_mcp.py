@@ -1048,3 +1048,140 @@ class TestSearchWithFilters:
         result = search_with_filters(workspace_id="ws1")
         assert result == []
 
+
+# ── Citation tools (add_node_citation, add_edge_citation, get_citations) ──
+
+
+class TestAddNodeCitation:
+    """Tests for the add_node_citation MCP tool."""
+
+    def test_adds_citation(self, mock_mcp_client):
+        from server.mcp.main import add_node_citation
+        mock_mcp_client.add_node_citation.return_value = {
+            "status": "ok", "citation_id": "cit1",
+        }
+        result = add_node_citation(
+            workspace_id="ws1",
+            node_id="n1",
+            memory_id="mem1",
+            description="Supports the entity summary",
+        )
+        assert result["status"] == "ok"
+        assert result["citation_id"] == "cit1"
+        mock_mcp_client.add_node_citation.assert_called_once_with(
+            "ws1", "n1", "mem1", "Supports the entity summary",
+        )
+
+    def test_minimal_args(self, mock_mcp_client):
+        from server.mcp.main import add_node_citation
+        mock_mcp_client.add_node_citation.return_value = {"status": "ok"}
+        result = add_node_citation(
+            workspace_id="ws1",
+            node_id="n1",
+            memory_id="mem1",
+        )
+        assert result["status"] == "ok"
+        mock_mcp_client.add_node_citation.assert_called_once_with(
+            "ws1", "n1", "mem1", "",
+        )
+
+
+class TestAddEdgeCitation:
+    """Tests for the add_edge_citation MCP tool."""
+
+    def test_adds_edge_citation(self, mock_mcp_client):
+        from server.mcp.main import add_edge_citation
+        mock_mcp_client.add_edge_citation.return_value = {
+            "status": "ok", "citation_id": "cit2",
+        }
+        result = add_edge_citation(
+            workspace_id="ws1",
+            edge_id="e1",
+            memory_id="mem2",
+            description="Supports this edge relationship",
+        )
+        assert result["status"] == "ok"
+        mock_mcp_client.add_edge_citation.assert_called_once_with(
+            "ws1", "e1", "mem2", "Supports this edge relationship",
+        )
+
+    def test_edge_citation_minimal(self, mock_mcp_client):
+        from server.mcp.main import add_edge_citation
+        mock_mcp_client.add_edge_citation.return_value = {"status": "ok"}
+        result = add_edge_citation(
+            workspace_id="ws1",
+            edge_id="e1",
+            memory_id="mem2",
+        )
+        assert result["status"] == "ok"
+        mock_mcp_client.add_edge_citation.assert_called_once_with(
+            "ws1", "e1", "mem2", "",
+        )
+
+
+class TestGetCitations:
+    """Tests for the get_citations MCP tool."""
+
+    def test_gets_citations_for_node(self, mock_mcp_client):
+        from server.mcp.main import get_citations
+        mock_mcp_client.get_citations.return_value = [
+            {
+                "entity_id": "n1",
+                "entity_type": "node",
+                "source_memory_id": "mem1",
+                "description": "Supports entity",
+                "created_at": 1700000000,
+            },
+        ]
+        result = get_citations(
+            workspace_id="ws1",
+            entity_id="n1",
+            entity_type="node",
+        )
+        assert len(result) == 1
+        assert result[0]["source_memory_id"] == "mem1"
+        mock_mcp_client.get_citations.assert_called_once_with(
+            "ws1", "n1", "node",
+        )
+
+    def test_gets_citations_for_edge(self, mock_mcp_client):
+        from server.mcp.main import get_citations
+        mock_mcp_client.get_citations.return_value = [
+            {
+                "entity_id": "e1",
+                "entity_type": "edge",
+                "source_memory_id": "mem2",
+                "description": "Supports edge",
+            },
+        ]
+        result = get_citations(
+            workspace_id="ws1",
+            entity_id="e1",
+            entity_type="edge",
+        )
+        assert len(result) == 1
+        assert result[0]["entity_type"] == "edge"
+        mock_mcp_client.get_citations.assert_called_once_with(
+            "ws1", "e1", "edge",
+        )
+
+    def test_empty_citations(self, mock_mcp_client):
+        from server.mcp.main import get_citations
+        mock_mcp_client.get_citations.return_value = []
+        result = get_citations(
+            workspace_id="ws1",
+            entity_id="nonexistent",
+        )
+        assert result == []
+        mock_mcp_client.get_citations.assert_called_once_with(
+            "ws1", "nonexistent", "node",
+        )
+
+    def test_default_entity_type_is_node(self, mock_mcp_client):
+        from server.mcp.main import get_citations
+        mock_mcp_client.get_citations.return_value = []
+        get_citations(workspace_id="ws1", entity_id="n1")
+        mock_mcp_client.get_citations.assert_called_once_with(
+            "ws1", "n1", "node",
+        )
+
