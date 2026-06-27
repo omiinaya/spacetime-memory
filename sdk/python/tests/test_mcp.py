@@ -2301,3 +2301,42 @@ class TestCheckEmbedderHealth:
         assert result["dimension"] == 768
         assert result["uptime_seconds"] == 3600
 
+
+# ── detect_communities ────────────────────────────────────────────────────
+
+
+class TestDetectCommunities:
+    """Tests for the detect_communities MCP tool."""
+
+    def test_detects_communities(self, mock_mcp_client):
+        from server.mcp.main import detect_communities
+        mock_mcp_client.detect_communities.return_value = {
+            "status": "ok",
+            "workspace_id": "ws-1",
+            "nodes_processed": 42,
+            "communities_found": 5,
+        }
+        result = detect_communities(workspace_id="ws-1")
+        assert result["status"] == "ok"
+        assert result["nodes_processed"] == 42
+        assert result["communities_found"] == 5
+        mock_mcp_client.detect_communities.assert_called_once_with("ws-1")
+
+    def test_no_nodes(self, mock_mcp_client):
+        from server.mcp.main import detect_communities
+        mock_mcp_client.detect_communities.return_value = {
+            "status": "ok",
+            "workspace_id": "empty-ws",
+            "nodes_processed": 0,
+            "communities_found": 0,
+        }
+        result = detect_communities(workspace_id="empty-ws")
+        assert result["nodes_processed"] == 0
+        assert result["communities_found"] == 0
+
+    def test_none_result(self, mock_mcp_client):
+        from server.mcp.main import detect_communities
+        mock_mcp_client.detect_communities.return_value = None
+        result = detect_communities(workspace_id="no-ws")
+        assert "error" in result
+

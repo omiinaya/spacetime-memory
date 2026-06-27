@@ -1451,6 +1451,27 @@ def compute_kg_stats(workspace_id: str) -> str:
     return json.dumps(result, default=str)
 
 
+@mcp.tool()
+@require_api_key
+def detect_communities(workspace_id: str) -> dict[str, Any]:
+    """Run label-propagation community detection on the knowledge graph.
+
+    Identifies communities of closely-connected nodes within a workspace
+    using a label-propagation algorithm. Each node gets assigned a
+    ``community_id``.
+
+    Args:
+        workspace_id: The workspace to run detection on.
+
+    Returns:
+        Dict with status, nodes_processed, and communities_found.
+    """
+    result = get_client().detect_communities(workspace_id)
+    if result is None:
+        return {"workspace_id": workspace_id, "error": "No result"}
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Recommendation tools
 # ---------------------------------------------------------------------------
