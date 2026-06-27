@@ -121,7 +121,7 @@ Difficulty: Hard (needs live STDB)
   - Deeper scan found doc gaps: stale badge (#1), incomplete MCP README (#2),
     missing pre-commit config (#3).
 - **Backlog**: 2 PENDING items remaining.
-- **Commit**: TBD — 3 files changed.
+- **Commit**: c100b3e — 3 files changed, +42/-48 lines.
 
 ### Jul 27 — Added 6 MCP tools; cleared all remaining PENDING items; backlog now empty
 - **MCP tools**: Added `seed_communities`, `detect_bridge_nodes`,
