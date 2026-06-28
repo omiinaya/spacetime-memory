@@ -8,14 +8,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `dedup_memories` SDK alias + update MCP tool to use SDK method
-`client.dedup()` exists but is named inconsistently — add `dedup_memories` alias.
-MCP `dedup_memories` tool still uses `get_client()._call("dedup_memories", ...)`
-instead of SDK method. Fix both.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-
 ### Add `grant_space_access` + `revoke_space_access` SDK methods + update MCP tools
 Both reducers exist in workspace.rs (lines 284, 357) and have MCP tools, but
 no SDK methods. The MCP tools use `get_client()._call()` directly.
@@ -46,6 +38,18 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Add `dedup_memories` SDK alias + update MCP tool (this tick)
+Added `Client.dedup_memories(workspace_id)` as a named alias for the existing
+`Client.dedup()` method (which calls the `dedup_memories` reducer at
+consolidation.rs:478), with full docstring. Updated the `dedup_memories` MCP
+tool to use the SDK method (`get_client().dedup()`) instead of raw
+`get_client()._call(...)`. 166/166 test_client.py unit tests passing, all
+tests clean.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 5min
+Commit: 28577d3f
 
 ### ✅ Add `get_session_steps` and `list_space_members` SDK methods + update MCP tools (this tick)
 Added `Client.get_session_steps(session_id)` and `Client.list_space_members(workspace_id)`
@@ -178,6 +182,33 @@ Commit: 744edcef
 ---
 
 ## Research Log
+
+### Jun 28 (this tick) — Added `dedup_memories` SDK alias + MCP tool cleanup; found 13 remaining `_call()` gaps
+- **Completed**: Added `Client.dedup_memories(workspace_id)` SDK alias and
+  updated the MCP `dedup_memories` tool to use the SDK method instead of raw
+  `get_client()._call(...)`. 166/166 test_client.py tests passing.
+- **Cleanup**: Added new completed entry at top of Recently Completed (now 10
+  entries, at max limit — no purge needed). Removed completed `dedup_memories`
+  PENDING item from backlog.
+- **Research**:
+  - Git log (7 days): 291+ commits, latest: 28577d3f (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.43.0 — all unchanged from last tick.
+  - Deeper scan: found **13 `._call(` calls remaining in server/mcp/main.py**.
+    Previous tick's claim \"last MCP _call() removed\" was inaccurate — it only
+    fixed `get_session_steps` and `list_space_members`. Breakdown:
+    - 9 tools have SDK methods already but still use `_call`: `rate_memory`,
+      `consolidate_memories`, `set_memory_scope`, `synthesize_mental_models`,
+      `add_fact`, `list_facts`, `delete_fact`, `update_fact`, `search_facts`
+    - 3 tools have no SDK method: `dedup_memories` (now fixed), `grant_space_access`,
+      `revoke_space_access`
+    - 1 internal reducer: `add_agent_step`
+  - All 336 unit tests passing (166 client, 91 compounder, 48 observability, 31 shmr).
+  - No code-level TODO/FIXME markers. No new competitor features to adopt.
+- **Backlog**: 2 PENDING items remaining (grant_space_access + revoke_space_access SDK,
+  9 MCP tool SDK-method conversions).
+- **Commit**: 28577d3f — 3 files changed, +38/-2 lines.
 
 ### Jun 28 (this tick) — Added `get_session_steps` and `list_space_members` SDK methods; last MCP raw _call() removed
 - **Completed**: Added `Client.get_session_steps(session_id)` and
