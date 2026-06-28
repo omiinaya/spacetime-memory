@@ -23,6 +23,7 @@ KG CRUD operations — `create_node`/`update_node`/`delete_node` and
 Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
 Difficulty: Easy
 Est: 10min
+Commit: 34802109
 
 ### ✅ Add SDK methods for set_memory_scope, mental_models (5), and facts (add_fact + list_facts) (this tick)
 Added 8 new ``Client`` SDK methods to close all remaining SDK parity gaps:
@@ -212,7 +213,7 @@ Difficulty: Hard (needs live STDB)
   - STDB SDK changelogs checked: no relevant new features.
 - **Backlog**: 3 PENDING items remaining (delete_fact/update_fact/search_facts,
   tag_memory/untag_memory/create_tag, expire_memories).
-- **Commit**: TBD — 4 files changed (client.py +46 lines, main.py +30 lines,
+- **Commit**: 34802109 — 3 files changed (client.py +27 lines, main.py +30 lines,
   IMPROVEMENTS.md).
 
 ### Jun 27 (tick 7) — Added 8 SDK methods (set_memory_scope, 5 mental model ops, add_fact + list_facts); backlog cleared
