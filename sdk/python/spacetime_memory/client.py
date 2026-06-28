@@ -3368,6 +3368,82 @@ class Client:
                 pass
         return []
 
+    def delete_fact(self, fact_id: str) -> dict[str, Any]:
+        """Deactivate a fact (soft delete).
+
+        Parameters
+        ----------
+        fact_id:
+            The fact ID to delete.
+
+        Returns:
+            The reducer result dict.
+        """
+        return self._call("delete_fact", [fact_id])
+
+    def update_fact(
+        self,
+        fact_id: str,
+        content: str = "",
+        confidence: float = 0.0,
+        category: str = "",
+        tier: str = "",
+    ) -> dict[str, Any]:
+        """Update a fact's content, confidence, category, and/or tier.
+
+        Empty string parameters leave the corresponding field unchanged.
+        A confidence of 0.0 leaves confidence unchanged.
+
+        Parameters
+        ----------
+        fact_id:
+            The fact ID to update.
+        content:
+            New content text (empty string = no change).
+        confidence:
+            New confidence score (0.0 = no change, 0.0–1.0).
+        category:
+            New category (empty string = no change).
+        tier:
+            New memory tier: ``\"L0\"``, ``\"L1\"``, or ``\"L2\"`` (empty string = no change).
+
+        Returns:
+            The reducer result dict.
+        """
+        return self._call("update_fact", [fact_id, content, confidence, category, tier])
+
+    def search_facts(
+        self,
+        workspace_id: str,
+        query: str,
+        tier: str = "",
+    ) -> list[dict[str, Any]]:
+        """Search facts by content text (substring / case-insensitive match).
+
+        Parameters
+        ----------
+        workspace_id:
+            The workspace ID.
+        query:
+            The search query text.
+        tier:
+            Optional: filter by memory tier (``\"L0\"``, ``\"L1\"``, ``\"L2\"``).
+
+        Returns:
+            List of matching fact records from the ``fact_result`` table.
+        """
+        self._call("search_facts", [workspace_id, query, tier])
+        query_hash = f"search:{query}:{tier}"
+        rows = self._sql(
+            f"SELECT * FROM fact_result WHERE query_hash = '{_esc(query_hash)}' ORDER BY created_at DESC"
+        )
+        if rows:
+            try:
+                return json.loads(rows[0].get("json_data", "[]"))
+            except (json.JSONDecodeError, IndexError):
+                pass
+        return []
+
     # -----------------------------------------------------------------------
     # Knowledge Graph — additional queries
     # -----------------------------------------------------------------------

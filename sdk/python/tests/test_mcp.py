@@ -1215,6 +1215,48 @@ class TestGetProfileContext:
         assert result == []
 
 
+class TestDeleteFactMCP:
+    """Tests for the delete_fact MCP tool."""
+
+    def test_deletes_fact(self, mock_mcp_client):
+        from server.mcp.main import delete_fact
+
+        result = delete_fact(fact_id="fact-1")
+        assert "deactivated" in result
+        assert "fact-1" in result
+        mock_mcp_client._call.assert_called_once_with("delete_fact", ["fact-1"])
+
+
+class TestUpdateFactMCP:
+    """Tests for the update_fact MCP tool."""
+
+    def test_updates_fact(self, mock_mcp_client):
+        from server.mcp.main import update_fact
+
+        result = update_fact(fact_id="fact-1", content="new", confidence=0.9, category="cat", tier="L1")
+        assert "updated" in result
+        mock_mcp_client._call.assert_called_once_with("update_fact", ["fact-1", "new", 0.9, "cat", "L1"])
+
+
+class TestSearchFactsMCP:
+    """Tests for the search_facts MCP tool."""
+
+    def test_returns_results(self, mock_mcp_client):
+        from server.mcp.main import search_facts
+
+        mock_mcp_client._sql.return_value = [{"json_data": '[{"id":"f1"}]'}]
+        result = search_facts(workspace_id="ws1", query="hello", tier="L1")
+        assert result == [{"id": "f1"}]
+        mock_mcp_client._call.assert_called_once_with("search_facts", ["ws1", "hello", "L1"])
+
+    def test_empty_results(self, mock_mcp_client):
+        from server.mcp.main import search_facts
+
+        mock_mcp_client._sql.return_value = []
+        result = search_facts(workspace_id="ws1", query="nonexistent")
+        assert result == []
+
+
 # ── Workspace tools ─────────────────────────────────────────────────────
 
 

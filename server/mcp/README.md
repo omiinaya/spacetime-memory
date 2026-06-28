@@ -204,7 +204,10 @@ Set these environment variables (or accept defaults):
 | Tool | Description | Parameters |
 |---|---|---|
 | `add_fact` | Add a fact about a peer | `workspace_id`, `peer_id`, `content`, `fact_type`, `category`, `confidence`, `source`, `tier` |
+| `delete_fact` | Deactivate a fact (soft delete) | `fact_id` |
+| `update_fact` | Update a fact's content, confidence, category, and/or tier | `fact_id`, `content`, `confidence`, `category`, `tier` |
 | `list_facts` | List facts with optional filters | `workspace_id`, `peer_id`, `fact_type`, `tier`, `category` |
+| `search_facts` | Search facts by content text (substring / case-insensitive) | `workspace_id`, `query`, `tier` |
 
 ### 📂 Directory (Context Directory Tree)
 

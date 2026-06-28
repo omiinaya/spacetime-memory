@@ -1050,6 +1050,42 @@ class TestProfileStubs:
         assert results[0]["peer_id"] == "p1"
 
 
+# ── Fact stubs ──────────────────────────────────────────────────────────
+
+
+class TestFactStubs:
+    """Simple fact delegation methods (delete_fact, update_fact, search_facts)."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        return c
+
+    def test_delete_fact(self, client):
+        client.delete_fact("fact-1")
+        client._call.assert_called_with("delete_fact", ["fact-1"])
+
+    def test_update_fact(self, client):
+        client.update_fact("fact-1", content="new content", confidence=0.9, category="updated", tier="L1")
+        client._call.assert_called_with("update_fact", ["fact-1", "new content", 0.9, "updated", "L1"])
+
+    def test_update_fact_defaults(self, client):
+        client.update_fact("fact-1")
+        client._call.assert_called_with("update_fact", ["fact-1", "", 0.0, "", ""])
+
+    def test_search_facts(self, client):
+        client._sql = Mock(return_value=[{"json_data": '[{"id":"f1","content":"hello"}]'}])
+        result = client.search_facts("ws1", "hello", tier="L1")
+        client._call.assert_called_with("search_facts", ["ws1", "hello", "L1"])
+        assert result == [{"id": "f1", "content": "hello"}]
+
+    def test_search_facts_empty(self, client):
+        client._sql = Mock(return_value=[])
+        result = client.search_facts("ws1", "nonexistent")
+        assert result == []
+
+
 # ── Tour stubs ─────────────────────────────────────────────────────────
 
 

@@ -2082,6 +2082,54 @@ def list_facts(
     return []
 
 
+@mcp.tool()
+@require_api_key
+def delete_fact(fact_id: str) -> str:
+    """Deactivate a fact (soft delete)."""
+    get_client()._call("delete_fact", [fact_id])
+    return f"Fact {fact_id[:16]}... deactivated."
+
+
+@mcp.tool()
+@require_api_key
+def update_fact(
+    fact_id: str,
+    content: str = "",
+    confidence: float = 0.0,
+    category: str = "",
+    tier: str = "",
+) -> str:
+    """Update a fact's content, confidence, category, and/or tier.
+
+    Empty string parameters leave the corresponding field unchanged.
+    A confidence of 0.0 leaves confidence unchanged.
+    """
+    get_client()._call("update_fact", [fact_id, content, confidence, category, tier])
+    return f"Fact {fact_id[:16]}... updated."
+
+
+@mcp.tool()
+@require_api_key
+def search_facts(
+    workspace_id: str,
+    query: str,
+    tier: str = "",
+) -> list[dict[str, Any]]:
+    """Search facts by content text (substring / case-insensitive match)."""
+    client = get_client()
+    client._call("search_facts", [workspace_id, query, tier])
+    query_hash = f"search:{query}:{tier}"
+    rows = client._sql(
+        f"SELECT * FROM fact_result WHERE query_hash = '{query_hash}' ORDER BY created_at DESC"
+    )
+    if rows:
+        try:
+            return json.loads(rows[0].get("json_data", "[]"))
+        except (json.JSONDecodeError, IndexError):
+            pass
+    return []
+
+
 # ---------------------------------------------------------------------------
 # Directory tools
 # ---------------------------------------------------------------------------
