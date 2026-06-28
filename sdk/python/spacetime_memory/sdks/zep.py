@@ -32,7 +32,7 @@ Usage::
 
     from spacetime_memory.sdks.zep import ZepClient
 
-    client = ZepClient(host="localhost", port=3001)
+    client = ZepClient(host="127.0.0.1", port=3001)
 
     # Add memory messages to a session
     result = client.add_memory(
@@ -355,7 +355,7 @@ class ZepClient:
 
         from spacetime_memory.sdks.zep import ZepClient
 
-        client = ZepClient(host="localhost", port=3001)
+        client = ZepClient(host="127.0.0.1", port=3001)
         client.add_memory(
             session_id="my-session",
             messages=[{"role": "user", "content": "Hello world"}],
@@ -1276,7 +1276,7 @@ class UserClient:
 
         from spacetime_memory.sdks.zep import ZepClient
 
-        client = ZepClient(host="localhost", port=3001)
+        client = ZepClient(host="127.0.0.1", port=3001)
         users = UserClient(client._client)
 
         # Add a user
@@ -1757,7 +1757,7 @@ class Zep(ZepClient):
 
         from spacetime_memory.sdks.zep import Zep
 
-        client = Zep(host="localhost", port=3001)
+        client = Zep(host="127.0.0.1", port=3001)
 
         # v2.0.2 API — sub-client pattern
         client.memory.add(session_id="s1", messages=[{"role": "user", "content": "Hi"}])
@@ -1794,7 +1794,7 @@ class AsyncZepClient:
 
         from spacetime_memory.sdks.zep import AsyncZepClient
 
-        client = AsyncZepClient(host="localhost", port=3001)
+        client = AsyncZepClient(host="127.0.0.1", port=3001)
 
         async with client:
             result = await client.add_memory(
@@ -2248,7 +2248,7 @@ class AsyncZep(AsyncZepClient):
 
         from spacetime_memory.sdks.zep import AsyncZep
 
-        client = AsyncZep(host="localhost", port=3001)
+        client = AsyncZep(host="127.0.0.1", port=3001)
 
         async with client:
             await client.memory.add(session_id="s1", messages=[...])

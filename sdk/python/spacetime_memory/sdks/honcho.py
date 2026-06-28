@@ -20,7 +20,7 @@ Usage::
     from spacetime_memory.sdks.honcho import Honcho
 
     client = Honcho(workspace_id="my-workspace", base_url=None,
-                    stdb_host="localhost", stdb_port=3001)
+                    stdb_host="127.0.0.1", stdb_port=3001)
 
     alice = client.peer("alice")
     session = client.session("conversation-1")
@@ -1648,7 +1648,7 @@ class Honcho:
     Usage::
 
         honcho = Honcho(workspace_id="my-workspace", base_url=None,
-                        stdb_host="localhost", stdb_port=3001)
+                        stdb_host="127.0.0.1", stdb_port=3001)
         peer = honcho.peer("alice")
         session = honcho.session("chat-1")
         session.add_peers([peer])
@@ -1674,12 +1674,12 @@ class Honcho:
 
         self._ws_id = workspace_id or os.environ.get("HONCHO_WORKSPACE_ID", "default")
         self._api_key = api_key
-        self._base_url = base_url or f"http://{stdb_host or 'localhost'}:{stdb_port or 3001}"
+        self._base_url = base_url or f"http://{stdb_host or '127.0.0.1'}:{stdb_port or 3001}"
         self._timeout = timeout or 30.0
 
         db = stdb_database or hashlib.md5(self._ws_id.encode()).hexdigest()[:16]
         self._client = Client(
-            host=stdb_host or os.environ.get("SPACETIMEDB_HOST", "localhost"),
+            host=stdb_host or os.environ.get("SPACETIMEDB_HOST", "127.0.0.1"),
             port=stdb_port or os.environ.get("SPACETIMEDB_PORT", "3001"),
             database=db,
             timeout=self._timeout,

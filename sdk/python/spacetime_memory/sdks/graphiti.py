@@ -28,7 +28,7 @@ Usage::
 
     from spacetime_memory.sdks.graphiti import Graphiti
 
-    g = Graphiti(host="localhost", port=3001)
+    g = Graphiti(host="127.0.0.1", port=3001)
 
     # Add a triplet (subject → relation → object)
     result = g.add_triplet(
@@ -448,11 +448,11 @@ class Graphiti:
     ) -> None:
         """
         Args:
-            host: SpacetimeDB host (default: localhost).
+            host: SpacetimeDB host (default: 127.0.0.1).
             port: SpacetimeDB port (default: 3001).
             database: SpacetimeDB database identity.
             token: JWT token for authenticated requests.
-            embedder_url: Embedder sidecar URL (default: http://localhost:9090).
+            embedder_url: Embedder sidecar URL (default: http://127.0.0.1:9090).
             client: An existing Client instance (overrides other params).
         """
         if client is not None:

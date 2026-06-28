@@ -9,12 +9,12 @@ Usage::
 
     from spacetime_memory.sdks.hindsight import Hindsight
 
-    h = Hindsight(base_url=None, stdb_host="localhost", stdb_port=3001, stdb_database="my_db")
+    h = Hindsight(base_url=None, stdb_host="127.0.0.1", stdb_port=3001, stdb_database="my_db")
     result = h.retain(bank_id="alice", content="Alice loves pizza")
     response = h.recall(bank_id="alice", query="What does Alice like?")
     answer = h.reflect(bank_id="alice", query="What are Alice's interests?")
 
-    with Hindsight(base_url=None, stdb_host="localhost") as h:
+    with Hindsight(base_url=None, stdb_host="127.0.0.1") as h:
         h.retain(bank_id="bob", content="Bob likes hiking")
 
     # Async
@@ -407,7 +407,7 @@ class Hindsight:
         timeout: float = 300.0,
         user_agent: str | None = None,
         # SpacetimeDB-specific params (used when base_url is None)
-        stdb_host: str = "localhost",
+        stdb_host: str = "127.0.0.1",
         stdb_port: int = 3001,
         stdb_database: str | None = None,
     ) -> None:

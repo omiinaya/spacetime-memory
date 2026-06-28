@@ -2,7 +2,7 @@
 
 This document provides reference latency data for Spacetime-Memory operations
 measured against a live SpacetimeDB v2.6 standalone with the ONNX embedder
-sidecar running on localhost:9090.
+sidecar running on 127.0.0.1:9090.
 
 ## Quick Start
 
@@ -18,7 +18,7 @@ See `scripts/README.md` for detailed usage.
 
 ## Reference Results
 
-**System:** localhost:3001 | **DB:** fresh publish | **Iterations:** 20 per op
+**System:** 127.0.0.1:3001 | **DB:** fresh publish | **Iterations:** 20 per op
 **Date:** 2026-06-09 00:55 UTC | **Embedder:** all-MiniLM-L6-v2 (ONNX sidecar) | **Failures:** 0/180
 
 | # | Operation | p50 (ms) | p90 (ms) | p99 (ms) | Mean (ms) | Min (ms) | Max (ms) |

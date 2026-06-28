@@ -24,7 +24,7 @@ pip install spacetime-memory
 ```python
 from spacetime_memory import Client
 
-c = Client(host="localhost", port="3001", database="your-db")
+c = Client(host="127.0.0.1", port="3001", database="your-db")
 ws = c.create_workspace("my-app")
 c.store(ws["id"], "AI agents need persistent memory", peer_id="me")
 results = c.search(ws["id"], "AI agents", semantic=True)
@@ -34,7 +34,7 @@ Or use any drop-in adapter:
 
 ```python
 from spacetime_memory.sdks.mem0 import Memory
-m = Memory(config={"host": "localhost", "port": "3001"})
+m = Memory(config={"host": "127.0.0.1", "port": "3001"})
 m.add("I like pizza", user_id="alice")
 ```
 
@@ -185,12 +185,12 @@ All 6 adapters live in `sdk/python/spacetime_memory/sdks/` and are importable as
 ```python
 # Mem0
 from spacetime_memory.sdks import Mem0Memory
-m = Mem0Memory(config={"host": "localhost", "port": "3001"})
+m = Mem0Memory(config={"host": "127.0.0.1", "port": "3001"})
 m.add("I like pizza", user_id="alice")
 
 # Hindsight
 from spacetime_memory.sdks import Hindsight
-h = Hindsight(base_url="http://localhost:3001", api_key="optional")
+h = Hindsight(base_url="http://127.0.0.1:3001", api_key="optional")
 h.retain("my_bank", "I like pizza")
 
 # Honcho
@@ -216,7 +216,7 @@ pip install spacetime-memory
 ```python
 from spacetime_memory import Client
 
-c = Client(host="localhost", port="3001", database="your-db")
+c = Client(host="127.0.0.1", port="3001", database="your-db")
 
 # Create a workspace and store a memory
 ws = c.create_workspace("my-app")
@@ -277,10 +277,10 @@ stmem --help
 **5. Configure embeddings (optional — needed for semantic search):**
 ```bash
 export OPENAI_API_KEY=<your-key>
-export OPENAI_BASE_URL=http://localhost:4000/v1
+export OPENAI_BASE_URL=http://127.0.0.1:4000/v1
 export EMBEDDING_MODEL=baai/bge-m3
 ```
-The embedding proxy at `localhost:4000` forwards to NVIDIA NIM (bge-m3, 1024-dim). See [CONFIG.md](CONFIG.md) for all env vars.
+The embedding proxy at `127.0.0.1:4000` forwards to NVIDIA NIM (bge-m3, 1024-dim). See [CONFIG.md](CONFIG.md) for all env vars.
 
 **6. Start MCP server (optional — for agent integration):**
 ```bash
@@ -293,7 +293,7 @@ stmem serve --transport sse  # HTTP SSE transport
 cd client
 npm install
 cp .env.example .env
-npm run dev                  # opens on localhost:5173
+npm run dev                  # opens on 127.0.0.1:5173
 ```
 
 Now jump back to [Quick Start](#quick-start-i-have-a-running-spacetimedb) above to use the Python SDK.
@@ -318,11 +318,11 @@ All env vars are documented in [CONFIG.md](CONFIG.md). Key ones:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SPACETIMEDB_HOST` | `localhost` | STDB server address |
+| `SPACETIMEDB_HOST` | `127.0.0.1` | STDB server address |
 | `SPACETIMEDB_PORT` | `3001` | STDB HTTP port |
 | `SPACETIMEDB_DB` | `spacetime-memory` | Database identity hex |
 | `OPENAI_API_KEY` | *(none)* | API key for embeddings + LLM |
-| `OPENAI_BASE_URL` | `http://localhost:4000/v1` | OpenAI-compatible endpoint |
+| `OPENAI_BASE_URL` | `http://127.0.0.1:4000/v1` | OpenAI-compatible endpoint |
 | `EMBEDDING_MODEL` | `baai/bge-m3` | Embedding model name |
 
 ## Features

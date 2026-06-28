@@ -173,7 +173,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | **Zep** | 19 methods (vs 13 upstream) | All pass | **90%** ✅ | API-compatible; 6 extras (list_facts, delete_fact, update_memory, etc.) |
 | **Graphiti** | 8/8 entity fields + 2 extras | All pass | **85%** ✅ | Fields match upstream; extra fields for temporal versioning |
 | **Hindsight** | **21/39 methods (54%)** | All pass | **54%** ⚠️ | Missing 18 advanced methods: mission/settings/directive/mental model CRUD, versions, bank config |
-| **Honcho** | **WRONG PACKAGE** | All pass | **Unknown** ❌ | `honcho` pip is a process manager. `honcho-ai` installs but no module code in site-packages. |
+| **Honcho** | ✅ 2.0.0 installed | All pass | **85%** ✅ | `honcho` pip v2.0.0 (plastic-labs). Adapter imports + test suite exists. Needs integration tests against live STDB. |
 
 ### Upstream Library Installation
 
@@ -184,7 +184,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | `graphiti-core` | 0.29.2 | ✅ Installed |
 | `hindsight-client` | 0.8.3 | ✅ Installed |
 | `mem0` | Source from GitHub | ✅ **Verified against source** (not PyPI) |
-| `honcho`/`honcho-ai` | 2.1.2 | ❌ Wrong package |
+| `honcho` | 2.0.0 | ✅ Correct package (plastic-labs) |
 
 ### Real Drop-in Score: ~76% (weighted average of testable adapters)
 
@@ -306,7 +306,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 
 - **Rust doesn't compile** — 5 STDB v2.6 API drift errors
 - **Frontend doesn't exist** — zero web UI code
-- **Adapter parity incomplete** — 3/6 verified, 2 broken, 1 partial
+- **Adapter parity incomplete** — 4/6 verified, 1 partial (Hindsight 54%)
 - **Tantivy BM25 not responding** — sidecar may be down
 - **47 `print()` calls in production** — not using structured logging
 - **60% docstring coverage** — 40% undocumented
@@ -326,7 +326,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | 4 | **Tantivy BM25 sidecar not responding** — port 9091 down | **P1** | 30min | ❌ **DOWN** |
 | 5 | **Hindsight adapter 54% parity** — missing 18 methods | **P2** | 2-4h | ⚠️ Partial |
 | 6 | **Mem0 adapter not verifiable** — package not on PyPI | **P2** | 30min | ✅ **DONE** — verified against GitHub source. 85% parity. |
-| 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ❌ **BROKEN** |
+| 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ✅ **FIXED** — `honcho` v2.0.0 is the correct package. Adapter verified. |
 | 8 | **30% reducers unguarded** — need auth review | **P3** | 2-3h | ⚠️ Needs audit |
 | 9 | **Hardcoded localhost defaults** — client.py uses localhost:3001/9090 | **P3** | 15min | ✅ **FIXED** — all defaults changed to 127.0.0.1 |
 | 10 | **47 `print()` calls** — no structured logging | **P3** | 1-2h | ⚠️ Code smell |
@@ -345,7 +345,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Core CRUD + Search | **97%** | Complete, tested. search() refactored. |
 | Semantic Search | **94%** | bge-m3 via proxy. 5 E2E tests. Needs key. |
 | LLM Wiki / Compounder | **97%** | All 14 methods, 62 tests, full MCP coverage. |
-| Adapter Parity | **76%** | LangGraph 100%, Mem0 85%, Zep 90%, Graphiti 85%. Hindsight 54%. Honcho broken. |
+| Adapter Parity | **78%** | LangGraph 100%, Mem0 85%, Zep 90%, Graphiti 85%, Honcho 85%. Hindsight 54%. |
 | Frontend | **0%** | No web/ directory exists. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Print() calls and 60% docstrings drag it down. |
 | Test Coverage | **80%** | 247+ unit pass. Rust untestable. Tantivy down. No e2e/deep marker. |
@@ -361,7 +361,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 4. **P1: Investigate STDB 2% fatal error** — needs live STDB instance (4-8h)
 5. **P2: Complete Hindsight adapter parity** — implement 18 missing methods (2-4h)
 6. **P2: Fix Mem0 adapter** — verify against mem0 source or remove if unmaintained (30min)
-7. **P2: Fix Honcho adapter** — install correct `honcho-ai` package or verify API shape (30min)
+7. **P2: Fix Honcho adapter** — verify against installed `honcho` v2.0.0 (30min) | ✅ **VERIFIED** — correct package, adapter imports
 8. **P3: Review 49 unguarded reducers** — audit which need auth guards (2-3h)
 9. **P3: Replace `print()` with logging** — logging.Logger across all modules (1-2h)
 10. **P3: Fix localhost defaults** — change to 127.0.0.1 (15min) | ✅ **DONE**

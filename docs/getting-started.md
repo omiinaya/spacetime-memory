@@ -10,7 +10,7 @@ This guide covers SDK usage examples. For setup instructions (installing Spaceti
 ```python
 from spacetime_memory import Client
 
-client = Client(host="localhost", port="3001", database="your-db")
+client = Client(host="127.0.0.1", port="3001", database="your-db")
 
 # Create a workspace
 ws = client.create_workspace("my-app")
@@ -29,7 +29,7 @@ print(results)
 ```python
 from spacetime_memory.sdks import Mem0Memory
 
-m = Mem0Memory(config={"host": "localhost", "port": "3001"})
+m = Mem0Memory(config={"host": "127.0.0.1", "port": "3001"})
 m.add("I like pizza", user_id="alice")
 results = m.search("food preferences", user_id="alice")
 ```
@@ -39,7 +39,7 @@ results = m.search("food preferences", user_id="alice")
 ```python
 from spacetime_memory.sdks import Hindsight
 
-h = Hindsight(base_url="http://localhost:3001", api_key="optional")
+h = Hindsight(base_url="http://127.0.0.1:3001", api_key="optional")
 h.retain("my_bank", "I like pizza")
 results = h.recall("my_bank", "food preferences")
 ```
@@ -62,7 +62,7 @@ print(results)
 ```python
 from spacetime_memory.sdks import StmemStore
 
-store = StmemStore(host="localhost", port="3001")
+store = StmemStore(host="127.0.0.1", port="3001")
 store.put(("memories", "alice"), {"data": "I like pizza"})
 items = store.search(("memories", "alice"), query="pizza")
 ```
@@ -94,4 +94,36 @@ make test
 
 # Integration tests only — auto-builds module, auto-publishes
 make test-integration
+```
+
+## Working with the LLM Wiki
+
+Spacetime Memory includes a full **LLM Wiki / Knowledge Compounder** layer — a pattern for agents to build and maintain a persistent, compounding knowledge base. See **[AGENTS.md](../AGENTS.md)** for the complete schema and workflow:
+
+- **Ingest sources** → auto-summarize, extract entities, link to knowledge graph
+- **Wiki pages** → notes with `[[wiki-links]]`, YAML frontmatter, backlinks
+- **Knowledge graph** → typed entity nodes, communities, contradiction checking
+- **Ripple updates** → new info merges into existing entity summaries
+- **Health checks** → lint for orphans, missing cross-refs, contradictions
+
+```python
+from spacetime_memory import Client
+from spacetime_memory.compounder import KnowledgeCompounder
+
+client = Client()
+compounder = KnowledgeCompounder(client, workspace_id="my-wiki")
+
+# Ingest a source — auto-summarize, extract entities, create KG
+compounder.ingest_source("path/to/article.txt")
+
+# Store an LLM answer as a wiki page
+compounder.store_answer(
+    query="What is RLHF?",
+    answer="Reinforcement Learning from Human Feedback is...",
+    tags=["alignment", "rlhf"],
+)
+
+# Health-check: find orphans and missing cross-refs
+report = compounder.lint_workspace()
+print(report)
 ```

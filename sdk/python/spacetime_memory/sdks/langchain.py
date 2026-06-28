@@ -8,7 +8,7 @@ Usage::
     from langgraph.store.base import Item
     from spacetime_memory.sdks.langchain import StmemStore
 
-    store = StmemStore(config={"host": "localhost", "port": 3001})
+    store = StmemStore(config={"host": "127.0.0.1", "port": 3001})
 
     # Store an item
     store.put(("users", "alice"), "preferences", {"likes": "pizza"})
@@ -30,7 +30,7 @@ Also provides a ``StmemMemoryStore`` that implements LangChain's
 
     from spacetime_memory.sdks.langchain import StmemMemoryStore
 
-    store = StmemMemoryStore(config={"host": "localhost", "port": 3001})
+    store = StmemMemoryStore(config={"host": "127.0.0.1", "port": 3001})
     store.mset([("key1", {"text": "hello"})])
     values = store.mget(["key1"])
 """
@@ -82,7 +82,7 @@ class StmemMemoryStore:
     Example::
 
         store = StmemMemoryStore(
-            config={"host": "localhost", "port": 3001}
+            config={"host": "127.0.0.1", "port": 3001}
         )
         store.mset([("m1", {"role": "user", "content": "Hello!"})])
         values = store.mget(["m1"])
@@ -282,7 +282,7 @@ class StmemStore(BaseStore):
 
         from spacetime_memory.sdks.langchain import StmemStore
 
-        store = StmemStore(config={"host": "localhost", "port": 3001})
+        store = StmemStore(config={"host": "127.0.0.1", "port": 3001})
 
         # Store
         store.put(("users", "alice"), "prefs", {"theme": "dark"})
@@ -842,7 +842,7 @@ class StmemChatMessageHistory:
 
         history = StmemChatMessageHistory(
             session_id="conversation-1",
-            config={"host": "localhost", "port": 3001},
+            config={"host": "127.0.0.1", "port": 3001},
         )
 
         # Add messages

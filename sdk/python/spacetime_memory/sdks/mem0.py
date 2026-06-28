@@ -27,7 +27,7 @@ Usage::
 
     from spacetime_memory.sdks.mem0 import Memory
 
-    m = Memory(config={"host": "localhost", "port": 3001})
+    m = Memory(config={"host": "127.0.0.1", "port": 3001})
     m.add("I like pizza", user_id="alice", agent_id="assistant")
     results = m.search("food preferences", user_id="alice")
     memory = m.get(memory_id=results["results"][0]["id"])
