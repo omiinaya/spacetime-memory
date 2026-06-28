@@ -8,7 +8,31 @@ and works the top pending item each tick.
 
 ## Pending
 
-_(No items — backlog cleared.)_
+### Fix 85 ruff lint errors in test files (F841, E402, E731, E741)
+50 unused-variable (F841), 22 import-not-at-top (E402), 9 lambda-assignment (E731),
+6 ambiguous-variable-name (E741), 1 multiple-statements-on-one-line (E702) across
+sdk/python/tests/. Most are safe style fixes; unused variables should be reviewed
+for actual logic bugs before removal.
+Files: sdk/python/tests/
+Difficulty: Medium
+Est: 30min
+
+### Improve docstring coverage from 60% to 80%
+ROADMAP.md (June 28 audit) shows 545/900 functions have docstrings — 40%
+undocumented. Target 720/900 (80%) by adding docstrings to the most-used
+public methods first.
+Files: sdk/python/spacetime_memory/
+Difficulty: Medium
+Est: 1-2h
+
+### Update ROADMAP.md stale claims
+ROADMAP.md (June 28) says "0 ruff errors" (line 351) — but ruff check finds
+90 errors (85 in tests, 2 in MCP). Also says "~47 print() calls" (line 311)
+but all production print() calls have been converted to logging. Score/Python
+Quality section references resolved issues.
+Files: ROADMAP.md
+Difficulty: Easy
+Est: 10min
 
 ## Deferred / Blocked
 
@@ -24,6 +48,15 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Fix 2 ruff E402 errors in MCP main.py (this tick)
+Moved `from mcp.server.fastmcp import FastMCP` and `from spacetime_memory import Client`
+before `logger = logging.getLogger(__name__)` in server/mcp/main.py to resolve ruff
+E402 (module-import-not-at-top-of-file). 170/170 test_client.py tests passing,
+ruff check returns 0 errors on server/mcp/.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 2min
 
 ### ✅ Convert MCP main.py startup print to logging (this tick)
 Added module-level `logger = logging.getLogger(__name__)` to server/mcp/main.py and
@@ -66,6 +99,28 @@ Difficulty: Easy
 Est: 5min
 
 ## Research Log
+
+### Jun 28 (this tick) — Fixed 2 ruff E402 errors in MCP main.py; added 3 PENDING items to backlog
+- **Completed**:
+  - Fixed 2 `ruff` E402 errors in server/mcp/main.py by reordering imports above
+    `logger = logging.getLogger(__name__)`. All 170 test_client.py tests passing.
+  - Committed + pushed as ae7c1af9.
+- **Cleanup**: Added new completed entry at top of Recently Completed. Kept 6 items
+  (within 5-10 limit, no purge needed). Replaced empty Pending section with 3 new items.
+- **Research**:
+  - Git log (7 days): 254+ commits, latest: ae7c1af9 (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 installed, v2.0.10 available on PyPI. Key new feature:
+    `expiration_date` on `update()` — already matched by SpacetimeMemory's
+    `expires_at` parameter on `update_memory` (commit 2ef708cd).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
+  - Deeper scan:
+    - **85 ruff errors in test files** — 50× F841, 22× E402, 9× E731, 6× E741, 1× E702
+    - **Docstring coverage at 60%** (545/900 functions) — 40% undocumented
+    - **ROADMAP.md stale claims** — says "0 ruff errors" (but 90 exist), says "~47 print()" (but 0 remain)
+    - Production code is clean: 0 ruff errors in sdk/python/spacetime_memory/, 0 TODO/FIXME/HACK markers, 0 production print() calls
+- **Backlog**: 3 PENDING items added (test ruff errors, docstring coverage, ROADMAP stale claims).
+- **Commit**: ae7c1af9 — 1 file changed, +2/-2 lines (server/mcp/main.py).
 
 |### Jun 28 (this tick) — Converted MCP main.py print→logging, audited orgmode TODO markers; backlog cleared
 |- **Completed**:
