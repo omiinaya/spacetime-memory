@@ -216,7 +216,7 @@ Difficulty: Hard (needs live STDB)
     exists, no SDK method). All added as PENDING.
   - No code-level TODO/FIXME markers. Web UI directory (web/) does not exist.
 - **Backlog**: 3 PENDING items remaining.
-- **Commit**: 7e13a382 — 3 files changed, +110/-16 lines (client.py, main.py, IMPROVEMENTS.md).
+- **Commit**: 8b0cfa76 — 3 files changed, +110/-16 lines (client.py, main.py, IMPROVEMENTS.md).
 
 ### Jun 27 (tick 5) — Added `update_memory_tier` SDK + MCP; backlog down to 1 PENDING
 - **Completed**: Added `Client.update_memory_tier(memory_id, tier)` SDK method
