@@ -35,6 +35,22 @@ Difficulty: Hard (needs live STDB)
 
 ## Recently Completed
 
+### ✅ Add `get_edge_history` SDK method + MCP tool (this tick)
+Added `Client.get_edge_history(edge_group_id)` Python SDK method that
+calls the ``get_edge_history`` reducer (knowledge_graph.rs:411) and
+queries the ``edge_history_result`` table. The reducer iterates all KG
+edge versions sharing the same ``edge_group_id`` and returns them ordered
+by ``created_at``, letting users trace how relationships evolved over time.
+162/162 test_client.py unit tests passing, 146 MCP tools registered.
+Includes 3 pre-existing Rust fixes: .to_string() calls on sender hex
+(memory.rs, note.rs), missing imports (query.rs), trailing comma (replication.rs).
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py,
+  sdk/python/tests/test_client.py,
+  server/spacetimedb/src/memory.rs, note.rs, query.rs, replication.rs
+Difficulty: Easy
+Est: 10min
+Commit: c96784bb
+
 ### ✅ Add `expire_memories` SDK method + MCP tool (this tick)
 Added `Client.expire_memories()` Python SDK method that calls the
 ``expire_memories`` reducer (memory.rs:313), and a matching
@@ -145,21 +161,37 @@ Difficulty: Easy
 Est: 10min
 Commit: 9e934930
 
-### ✅ Add `consolidate_memories` SDK tests + MCP README documentation + commit (Jun 27)
-The `consolidate_memories` reducer existed in Rust (`consolidation.rs`) and the
-Python SDK method + MCP tool were already written but uncommitted. Added:
-1. Unit test for `Client.consolidate_memories()` in test_client.py
-2. MCP README catalog entry under "🔧 Memory — Management"
-3. Git commit + push
-Files: sdk/python/tests/test_client.py, server/mcp/README.md
-Difficulty: Easy
-Est: 15min
 
 
 
 |---
 
 ## Research Log
+
+### Jun 28 (this tick) — Added `get_edge_history` SDK method + MCP tool; 1 new gap found
+- **Completed**: Added `Client.get_edge_history(edge_group_id)` SDK method
+  and `get_edge_history` MCP tool — returns all historical versions of a KG
+  edge. The reducer (knowledge_graph.rs:411) iterates all edge versions
+  sharing the same ``edge_group_id`` and stores them in ``edge_history_result``.
+  SDK calls the reducer then queries the result table via SQL. Also fixed 3
+  pre-existing Rust issues: .to_string() on sender hex (memory.rs, note.rs),
+  missing imports (query.rs), trailing comma (replication.rs).
+  162/162 test_client.py tests passing, 146 MCP tools registered.
+- **Cleanup**: Purged oldest Recently Completed entry (consolidate_memories tests)
+  to keep 10 entries total. Added new completed entry at top.
+- **Research**:
+  - Git log (7 days): 300+ commits, latest: c96784bb (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.43.0 — all unchanged from last tick.
+  - Deeper scan: found `get_edge_history` gap — now implemented. Remaining
+    Rust-only reducers are internal (replication, auth flows, proxy metrics,
+    indexing, change events, connectors, session internals, insight CRUD) that
+    don't need SDK exposure. No new competitor features to adopt. No code-level
+    TODO/FIXME markers in source code.
+  - Web UI directory (web/) does not exist — no frontend gaps to fill.
+- **Backlog**: 0 PENDING items — backlog remains empty.
+- **Commit**: c96784bb — 7 files changed, +54/-4 lines.
 
 ### Jun 28 (this tick) — Backlog remains empty; all deps unchanged; no new gaps found
 - **Completed**: None — 0 PENDING items in backlog.
