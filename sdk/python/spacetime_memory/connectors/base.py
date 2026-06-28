@@ -23,6 +23,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 import httpx
 
 
@@ -330,7 +332,7 @@ class ConnectorRegistry:
             try:
                 results[name] = connector.poll()
             except Exception as e:
-                print(f"  [registry error] {name}: {e}")
+                logger.warning("registry error %s: %s", name, e)
                 results[name] = []
         return results
 

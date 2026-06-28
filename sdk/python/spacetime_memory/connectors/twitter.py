@@ -1,5 +1,8 @@
+import logging
 import httpx
 from .base import Connector, Event
+
+logger = logging.getLogger(__name__)
 
 
 class TwitterConnector(Connector):
@@ -71,17 +74,21 @@ class TwitterConnector(Connector):
                     timeout=30,
                 )
             except httpx.RequestError as e:
-                print(f"  [Twitter HTTP error] {e}")
+                logger.warning("Twitter HTTP error: %s", e)
                 return events
 
             if resp.status_code == 429:
-                print("  [Twitter] Rate limited")
+                logger.warning("Twitter rate limited")
                 return events
             if resp.status_code == 401:
-                print("  [Twitter] Unauthorized — check bearer token")
+                logger.warning("Twitter unauthorized — check bearer token")
                 return events
             if resp.status_code != 200:
-                print(f"  [Twitter] Unexpected status {resp.status_code}: {resp.text[:200]}")
+                logger.warning(
+                    "Twitter unexpected status %s: %s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
                 return events
 
             data = resp.json()

@@ -1,7 +1,10 @@
+import logging
 import time
 from typing import Any
 import httpx
 from .base import Connector, Event
+
+logger = logging.getLogger(__name__)
 
 
 class NotionConnector(Connector):
@@ -69,22 +72,22 @@ class NotionConnector(Connector):
                         timeout=30,
                     )
                 except httpx.RequestError as e:
-                    print(f"  [Notion HTTP error] {e}")
+                    logger.warning("Notion HTTP error: %s", e)
                     break
 
                 # ── Rate-limit handling with Retry-After ──────────
                 if resp.status_code == 429:
                     retry_after = int(resp.headers.get("Retry-After", 5))
-                    print(f"  [Notion] Rate limited, waiting {retry_after}s ...")
+                    logger.warning("Notion rate limited, waiting %ss ...", retry_after)
                     time.sleep(retry_after)
                     continue  # retry the same page
 
                 if resp.status_code == 401:
-                    print("  [Notion] Unauthorised — check integration token")
+                    logger.warning("Notion unauthorised — check integration token")
                     break
 
                 if resp.status_code != 200:
-                    print(f"  [Notion] Unexpected status {resp.status_code}")
+                    logger.warning("Notion unexpected status %s", resp.status_code)
                     break
 
                 data = resp.json()
@@ -240,7 +243,7 @@ class NotionConnector(Connector):
             start = date.get("start", "")
             end = date.get("end")
             if end:
-                return f"{start} → {end}"
+                return f"{start} \u2192 {end}"
             return start
 
         # ── Primitives ────────────────────────────────────────────

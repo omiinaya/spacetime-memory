@@ -1,7 +1,10 @@
+import logging
 import re
 from typing import Any
 import httpx
 from .base import Connector, Event
+
+logger = logging.getLogger(__name__)
 
 
 class DiscordConnector(Connector):
@@ -95,14 +98,20 @@ class DiscordConnector(Connector):
         try:
             resp = client.get(url, headers=headers, timeout=15)
         except httpx.RequestError as e:
-            print(f"  [Discord HTTP error] channel info {channel_id}: {e}")
+            logger.warning("Discord HTTP error channel info %s: %s", channel_id, e)
             return None
 
         if resp.status_code == 404:
-            print(f"  [Discord] Unknown channel {channel_id} — removing from active list")
+            logger.info(
+                "Discord unknown channel %s — removing from active list",
+                channel_id,
+            )
             return None
         if resp.status_code == 403:
-            print(f"  [Discord] Forbidden on channel {channel_id} — check bot permissions")
+            logger.warning(
+                "Discord forbidden on channel %s — check bot permissions",
+                channel_id,
+            )
             return None
         if resp.status_code == 200:
             return resp.json()
@@ -143,10 +152,11 @@ class DiscordConnector(Connector):
                     if channel_type in (10, 11, 12):
                         parent_id = channel_info.get("parent_id")
                         if parent_id:
-                            print(
-                                f"  [Discord] Channel {channel_id} is a"
-                                f" thread in parent {parent_id},"
-                                f" fetching parent messages"
+                            logger.info(
+                                "Discord channel %s is a thread in parent %s, "
+                                "fetching parent messages",
+                                channel_id,
+                                parent_id,
                             )
                             parent_msgs = self._fetch_messages(
                                 client,
@@ -204,7 +214,7 @@ class DiscordConnector(Connector):
                     timeout=30,
                 )
             except httpx.RequestError as e:
-                print(f"  [Discord HTTP error] channel={channel_id}: {e}")
+                logger.warning("Discord HTTP error channel=%s: %s", channel_id, e)
                 break
 
             # Handle rate limiting
@@ -213,22 +223,36 @@ class DiscordConnector(Connector):
                     "retry_after",
                     5.0,
                 )
-                print(f"  [Discord] Rate limited on {channel_id}, retry after {retry_after}s")
+                logger.warning(
+                    "Discord rate limited on %s, retry after %ss",
+                    channel_id,
+                    retry_after,
+                )
                 break
 
             if resp.status_code == 403:
-                print(f"  [Discord] Forbidden on channel {channel_id} — check bot permissions")
+                logger.warning(
+                    "Discord forbidden on channel %s — check bot permissions",
+                    channel_id,
+                )
                 break
 
             # Handle 404 gracefully — remove channel from active list
             if resp.status_code == 404:
-                print(f"  [Discord] Unknown channel {channel_id} — removing from active list")
+                logger.info(
+                    "Discord unknown channel %s — removing from active list",
+                    channel_id,
+                )
                 if channel_id in self.channel_ids:
                     self.channel_ids.remove(channel_id)
                 break
 
             if resp.status_code != 200:
-                print(f"  [Discord] Unexpected status {resp.status_code} on {channel_id}")
+                logger.warning(
+                    "Discord unexpected status %s on %s",
+                    resp.status_code,
+                    channel_id,
+                )
                 break
 
             messages = resp.json()

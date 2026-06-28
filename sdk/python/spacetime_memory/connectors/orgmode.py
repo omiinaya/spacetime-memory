@@ -1,4 +1,7 @@
+import logging
 from .base import Connector, Event
+
+logger = logging.getLogger(__name__)
 
 
 class OrgModeParser(Connector):
@@ -51,10 +54,10 @@ class OrgModeParser(Connector):
             with open(self.file_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
         except FileNotFoundError:
-            print(f"  [OrgMode] File not found: {self.file_path}")
+            logger.warning("OrgMode file not found: %s", self.file_path)
             return []
         except OSError as e:
-            print(f"  [OrgMode] Error reading file: {e}")
+            logger.error("OrgMode error reading file: %s", e)
             return []
 
         events: list[Event] = []
@@ -214,7 +217,9 @@ class OrgModeParser(Connector):
             "WAITING",
         ]
         for kw in keywords:
-            if rest.startswith(kw) and (len(rest) == len(kw) or rest[len(kw)] in (" ", "\t")):
+            if rest.startswith(kw) and (
+                len(rest) == len(kw) or rest[len(kw)] in (" ", "\t")
+            ):
                 todo_state = kw
                 rest = rest[len(kw) :].strip()
                 break

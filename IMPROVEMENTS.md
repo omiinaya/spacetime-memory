@@ -8,7 +8,18 @@ and works the top pending item each tick.
 
 ## Pending
 
-*None — backlog cleared.*
+### Convert MCP main.py startup print to logging
+1 `print()` at server/mcp/main.py:57 (startup notification when MCP_API_KEY is set).
+Deferred — MCP main.py lacks a module-level logger; startup banner print is acceptable
+for a CLI tool.
+Difficulty: Easy
+Est: 2min
+
+### Fix 3 TODO markers in orgmode connector
+3 TODO/FIXME markers in connectors/orgmode.py and tests/test_orgmode_connector.py.
+Files: sdk/python/spacetime_memory/connectors/orgmode.py
+Difficulty: Easy
+Est: 5min
 
 ## Deferred / Blocked
 
@@ -25,6 +36,18 @@ Difficulty: Hard (needs live STDB)
 
 ## Recently Completed
 
+### ✅ Convert 34 remaining print() calls to structured logging in connectors + ingest (this tick)
+Replaced all 34 `print()` calls in connectors (slack.py 6, discord.py 9, notion.py 4,
+twitter.py 4, orgmode.py 2, base.py 1) and ingest.py (8) with `logger.info()`/`.warning()`/`.error()`.
+Added `import logging` + `logger = logging.getLogger(__name__)` to 5 connector files
+(slack.py, discord.py, notion.py, twitter.py, orgmode.py) that lacked it. Added module-level
+`logger` to base.py's ConnectorRegistry. All 8 ingest.py prints converted (the module
+already had logger setup). 284 connector + 170 client tests passing, 0 ruff errors.
+Remaining 13 `print(` matches in SDK are all in docstring examples (not production code).
+Files: 8 files in sdk/python/spacetime_memory/connectors/*.py + ingest.py
+Difficulty: Easy
+Est: 20min
+
 ### ✅ Convert print() calls to structured logging in shmr.py (this tick)
 Replaced 7 `print()` calls in `shmr.py` with `logging.Logger` calls:
 `logger.info()` for status messages, `logger.warning()` for error conditions.
@@ -34,128 +57,25 @@ Files: sdk/python/spacetime_memory/shmr.py
 Difficulty: Easy
 Est: 5min
 
-### ✅ Add 5 missing docstrings in client.py; fix hardcoded localhost defaults (this tick)
-Added docstrings to `__init__`, `_do_sql`, `_do_call`, `from_dict`, and `format`.
-`__init__`: full parameter docstring. `_do_sql`/`_do_call`: internal closure docs.
-`from_dict`/`format`: proper args/return docs.
-Docstring coverage: 175/175 methods = 100%.
-Fixed 7 hardcoded `localhost` defaults to `127.0.0.1` across client.py,
-query_expansion.py, and 6 adapter SDK files.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 5min
-Commit: 92415ced
-
-### ✅ Fix 2 ruff lint issues in MCP main.py — F541 f-string + F841 unused var (this tick)
-Fixed `f"..."` without placeholders at server/mcp/main.py:1992 (`shortest_path`
-return message). Removed extraneous `f` prefix.
-Fixed `llm_available` assigned but never used at server/mcp/main.py:2736
-(`ingest_source` MCP tool). Removed assignment.
-Ruff check now returns 0 errors across SDK + MCP code.
-170/170 test_client.py tests passing.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 2min
-Commit: 25ed22e2
-
-### ✅ Add `add_agent_step` SDK method; eliminate last raw `_call()` from MCP (this tick)
-Added `Client.add_agent_step(session_id, workspace_id, step_type, content, summary, parent_step_id)`
-Python SDK method wrapping the `add_agent_step` reducer (session.rs:194), with full docstring and
-optional `parent_step_id` parameter. Updated the `add_agent_step` MCP tool to use the SDK method
-instead of raw `get_client()._call()`. This completes the MCP `_call()` elimination project —
-**0 remaining raw `_call()` calls in server/mcp/main.py**. 170/170 test_client.py tests passing.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-Commit: 14758893
-
-### ✅ Add `delete_mental_model` + `update_mental_model` MCP tools (this tick)
-Added `delete_mental_model(model_id)` and `update_mental_model(model_id, content, confidence, status)`
-MCP tools in main.py — these SDK methods (client.py:4004 and client.py:4014) were exposed in the
-Python SDK but had no corresponding MCP tool. Mental model CRUD (synthesize, get, list, delete,
-update) is now fully exposed via MCP. Also added catalog entries in MCP README.
-170/170 test_client.py unit tests passing, 148 MCP tools registered.
-Files: server/mcp/main.py, server/mcp/README.md
-Difficulty: Easy
-Est: 5min
-
-### ✅ Add `grant_space_access` + `revoke_space_access` SDK methods + convert 9 MCP tools from `_call()` to SDK methods (this tick)
-Added `Client.grant_space_access(workspace_id, peer_id, permission)` and
-`Client.revoke_space_access(workspace_id, peer_id)` Python SDK methods
-wrapping the ``grant_space_access`` (workspace.rs:284) and
-``revoke_space_access`` (workspace.rs:357) Rust reducers. Both return
-the reducer status dict. Updated MCP ``grant_space_access`` and
-``revoke_space_access`` tools to use SDK methods.
-
-Simultaneously converted 9 MCP tools from raw ``get_client()._call()``
-to proper SDK methods: ``rate_memory``, ``consolidate_memories``,
-``set_memory_scope``, ``synthesize_mental_models``, ``add_fact``,
-``list_facts``, ``delete_fact``, ``update_fact``, ``search_facts``.
-Removed inline SQL from ``list_facts`` and ``search_facts`` MCP tools.
-Only remaining ``_call()`` in MCP is ``add_agent_step`` (internal
-reducer with no SDK method needed).
-170/170 test_client.py unit tests passing (166 existing + 4 new).
-139 compounder + observability tests passing.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py,
-  sdk/python/tests/test_client.py
-Difficulty: Easy
-Est: 15min
-Commit: 8c73dbf5
-
-### ✅ Add `dedup_memories` SDK alias + update MCP tool (this tick)
-Added `Client.dedup_memories(workspace_id)` as a named alias for the existing
-`Client.dedup()` method (which calls the `dedup_memories` reducer at
-consolidation.rs:478), with full docstring. Updated the `dedup_memories` MCP
-tool to use the SDK method (`get_client().dedup()`) instead of raw
-`get_client()._call(...)`. 166/166 test_client.py unit tests passing, all
-tests clean.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-Commit: 28577d3f
-
-### ✅ Add `get_session_steps` and `list_space_members` SDK methods + update MCP tools (this tick)
-Added `Client.get_session_steps(session_id)` and `Client.list_space_members(workspace_id)`
-Python SDK methods wrapping the `get_session_steps` (session.rs:438) and `list_space_members`
-(workspace.rs:230) Rust reducers. Both call the reducer and query the corresponding result
-table (`session_step_result` / `space_member_result`). Updated the `get_session_steps` and
-`list_space_members` MCP tools in main.py to use the SDK methods instead of raw `_call` + SQL.
-All 166 test_client.py unit tests passing (162 existing + 4 new). 79 shmr + observability
-passing. 336 deep tests passing.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py, sdk/python/tests/test_client.py
-Difficulty: Easy
-Est: 10min
-Commit: 06993807
-
-### ✅ Rename stale MNEMOSYNE_* env vars to STMEM_* (this tick)
-Renamed 7 `MNEMOSYNE_*` env vars in shmr.py to `STMEM_*` with backward-compatible
-fallback — old vars still work but emit a `DeprecationWarning`. Added `_get_env()`
-helper with automatic old→new lookup. Updated test docstring in test_shmr_resonate.py.
-241/241 tests passing (31 shmr, 162 client, 48 observability). Also cleaned up
-ROADMAP.md: marked env-var item resolved, marked stale-WASM item resolved (binary
-rebuilt Jun 28 01:44, 2.36MB, by commit 9b95d508).
-Files: sdk/python/spacetime_memory/shmr.py, sdk/python/tests/test_shmr_resonate.py,
-  ROADMAP.md, IMPROVEMENTS.md
-Difficulty: Easy
-Est: 10min
-
-### ✅ Add `get_edge_history` SDK method + MCP tool (this tick)
-Added `Client.get_edge_history(edge_group_id)` Python SDK method that
-calls the ``get_edge_history`` reducer (knowledge_graph.rs:411) and
-queries the ``edge_history_result`` table. The reducer iterates all KG
-edge versions sharing the same ``edge_group_id`` and returns them ordered
-by ``created_at``, letting users trace how relationships evolved over time.
-162/162 test_client.py unit tests passing, 146 MCP tools registered.
-Includes 3 pre-existing Rust fixes: .to_string() calls on sender hex
-(memory.rs, note.rs), missing imports (query.rs), trailing comma (replication.rs).
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py,
-  sdk/python/tests/test_client.py,
-  server/spacetimedb/src/memory.rs, note.rs, query.rs, replication.rs
-Difficulty: Easy
-Est: 10min
-Commit: c96784bb
-
 ## Research Log
+
+### Jun 28 (this tick) — Converted 34 print()→logging in connectors + ingest; backlog has 2 PENDING
+- **Completed**:
+  - Replaced all 34 `print()` calls in connectors (slack.py, discord.py, notion.py,
+    twitter.py, orgmode.py, base.py) and ingest.py with `logger.info()/.warning()/.error()`.
+    Added `import logging` + `logger` to 5 connector files. 284 connector tests + 170
+    client tests passing. 0 ruff errors.
+- **Cleanup**: Added new completed entry at top of Recently Completed. Purged 9 oldest
+  completed entries to keep 10 in Recently Completed.
+- **Research**:
+  - Git log (7 days): 253+ commits, latest: fc35bc43 (print→logging in shmr.py, this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged), langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged),
+    opentelemetry-sdk v1.43.0 (unchanged).
+  - Deeper scan: Remaining code-quality items identified. 2 PENDING items remain
+    (TODO markers in orgmode, MCP startup print deferred).
+- **Backlog**: 2 PENDING items remaining.
+- **Commit**: [this tick]
 
 ### Jun 28 (this tick) — Converted print()→logging in shmr.py; 5 missing docstrings + localhost fixes; backlog cleared
 - **Completed**: 

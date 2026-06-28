@@ -1,6 +1,9 @@
+import logging
 from typing import Any
 import httpx
 from .base import Connector, Event
+
+logger = logging.getLogger(__name__)
 
 
 class SlackConnector(Connector):
@@ -62,8 +65,8 @@ class SlackConnector(Connector):
                 self.token = new_token
                 return
         if not self._refresh_warned:
-            print(
-                "  [Slack] No token refresh mechanism configured — "
+            logger.warning(
+                "Slack no token refresh mechanism configured — "
                 "if your token expires, override _refresh_token() "
                 "or set _token_refresh_callback"
             )
@@ -102,16 +105,19 @@ class SlackConnector(Connector):
                     timeout=30,
                 )
             except httpx.RequestError as e:
-                print(f"  [Slack pagination HTTP error] {e}")
+                logger.warning("Slack pagination HTTP error: %s", e)
                 break
 
             if resp.status_code == 429:
                 retry_after = int(resp.headers.get("Retry-After", 5))
-                print(f"  [Slack] Rate limited during pagination, retry after {retry_after}s")
+                logger.warning("Slack rate limited during pagination, retry after %ss", retry_after)
                 break
 
             if resp.status_code != 200:
-                print(f"  [Slack] Unexpected status {resp.status_code} during pagination")
+                logger.warning(
+                    "Slack unexpected status %s during pagination",
+                    resp.status_code,
+                )
                 break
 
             data = resp.json()
@@ -119,9 +125,12 @@ class SlackConnector(Connector):
                 error = data.get("error", "unknown")
                 # Handle not_in_channel gracefully
                 if error == "not_in_channel":
-                    print(f"  [Slack] Bot not in channel {params.get('channel', '?')} — skipping")
+                    logger.info(
+                        "Slack bot not in channel %s — skipping",
+                        params.get("channel", "?"),
+                    )
                     return all_items
-                print(f"  [Slack] API error during pagination: {error}")
+                logger.warning("Slack API error during pagination: %s", error)
                 break
 
             # Both conversations.history and conversations.replies

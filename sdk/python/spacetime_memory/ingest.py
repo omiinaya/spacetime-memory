@@ -44,7 +44,7 @@ class _LangConfig:
             try:
                 ok[key] = Query(self.lang, src)
             except Exception as e:
-                print(f"  [warn] {self.name}/{key} query error: {e}")
+                logger.warning("%s/%s query error: %s", self.name, key, e)
         self.queries = ok
 
 
@@ -220,7 +220,7 @@ class CodebaseIngester:
             try:
                 self._parsers[lang] = _LangConfig(lang)
             except Exception as e:
-                print(f"  [warn] no parser for '{lang}': {e}")
+                logger.warning("no parser for '%s': %s", lang, e)
                 return None
         return self._parsers[lang]
 
@@ -250,7 +250,7 @@ class CodebaseIngester:
         if not root.is_dir():
             raise NotADirectoryError(f"Not a directory: {root}")
 
-        print(f"Ingesting {root} ...")
+        logger.info("Ingesting %s ...", root)
 
         # Phase 1: walk files, create file nodes, collect definitions
         file_nodes: dict[Path, str] = {}
@@ -279,7 +279,7 @@ class CodebaseIngester:
                 )
                 processed += 1
             except Exception as e:
-                print(f"  [error] {fpath}: {e}")
+                logger.error("%s: %s", fpath, e)
                 self._stats["errors"] += 1
 
         # Phase 2: create dependency edges
@@ -288,11 +288,11 @@ class CodebaseIngester:
         # Phase 3: detect communities
         try:
             self.client.detect_communities(workspace_id)
-            print("  communities detected")
+            logger.info("communities detected")
         except Exception as e:
-            print(f"  [warn] community detection: {e}")
+            logger.warning("community detection: %s", e)
 
-        print(f"Done: {self._stats}")
+        logger.info("Done: %s", self._stats)
         return dict(self._stats)
 
     # ── Internal ──────────────────────────────────────────────────
@@ -347,7 +347,7 @@ class CodebaseIngester:
         )
         self._stats["files"] += 1
         if self._stats["files"] % 50 == 0:
-            print(f"  ... {self._stats['files']} files processed")
+            logger.info("... %s files processed", self._stats["files"])
 
     def _extract_defs(
         self,
