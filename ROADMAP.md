@@ -209,87 +209,129 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Multi-region / failover | ✗ | No tests |
 | Frontend | ✗ | No web/ directory exists |
 
-## Honest Overall Score: ~97%
+## Honest Overall Score: ~75%
 
-### What Changed Since June 22 (v1.32.0 → v1.35.0)
-
-| Area | Then | Now |
-|------|------|-----|
-| Python tests | 605 unit passes | 2275 unit passes (+1,670) |
-| LLM Wiki / Compounder | Not started | Fully implemented: 16 patterns, 1,746 lines, 62 tests, 6 MCP tools |
-| CLI commands | 24 subcommands | 32 subcommands (+lint, cross-link, suggest-connections, store-answer) |
-| MCP tools | 46 | 47 (+create_comparison_page) |
-| uuid_v7 migration | Pending | Complete — all 57+ call sites |
-| AGENTS.md schema | None | Full Karpathy-style three-layer schema doc |
-| Wiki export | None | Markdown export for Obsidian/git |
-| Overview generator | None | Workspace stats + entities + AI synthesis |
-| Score | ~94.5% | **~97%** |
-
-### Why Not 97% (Previous Score Was Inflated)
-
-| Previous Claim | Reality |
-|----------------|---------|
-| "113/113 adapter behavioral tests pass (with embedder)" | 115 pass but 4/6 upstreams are not installed — equivalence unverified |
-| "Embedding router solved — bge-m3 through proxy, ONNX fallback" | ONNX fallback removed. Proxy requires auth that tests don't use |
-| "101 skip (external deps)" | They skip because STDB isn't running, not because of external deps. All 295 pass with live STDB |
-| "All QMD features covered (~99%)" | Feature coverage is real. But quality verification is incomplete without embeddings |
-| "All Mnemosyne P0/P1/P2 gaps shipped (~93%)" | Features exist. Delta streaming is polling, not push — correct |
-| "0 fails" | True — fixed. 295/295 ✓ |
-| "0 unwrap()" | True — fixed. Clean ✓ |
-
-### What's Solid (No Change)
-- **STDB compliance: 100%** — no anti-patterns
-- **Rust quality: 132/132 tests, 0 warnings, 0 unwrap/expect/dead_code**
-- **Python quality: 295/295 tests passing with live STDB**
-- **All 155 reducers wired and tested**
-- **Frontend: 23 pages, live data, 0 mock pages**
-- **MCP: 46 tools, HTTP + SSE transport**
-- **CLI: 24 subcommand groups**
-- **Tantivy BM25: working on :9091**
-- **Knowledge graph: working, <20ms**
-- **LLM reranking: working, two-tier**
-
-### What's Real But Not Ideal
-- **`.env` stale**: `EMBEDDER_TYPE` env var was vestigial — removed (cleaned up June 24)
-- **STDB ~2% fatal error rate under 50-thread concurrent load** — documented concurrency limit
-
-### Structural Debt — Real Issues (June 22, 2026 Audit)
-
-| # | Item | Severity | Effort | Status |
-|---|------|----------|--------|--------|
-| 1 | **client.py god functions** — `search()` 367L, `llm_rerank()` 225L, `store()` 104L | **P0** | 4-6h | ✅ **DONE** — `search()` 367L→248L (-32%). Extracted `_fuse_and_deduplicate`, `_enrich_content`, `_keyword_fallback` |
-| 2 | **Adapter god functions** — `mem0.add()` 208L, `graphiti.add_episode()` 147L | P2 | 2-3h | ✅ **DONE** — `mem0.add()` 209L→146L, `graphiti.add_episode()` 149L→76L |
-| 3 | **STDB concurrency crashes** — ~2% fatal WASM errors under load, root cause unknown | P1 | 4-8h | ✅ **DONE** — UUID collision from deterministic RNG. Retry loop in store_memory + log_change. 30/30 throughput passes |
-| 4 | **user.rs unbounded scans** — lines 182,216 use `break` not `.take()` | P4 | 30min | ✅ **DONE** — `.take(MAX_RESULTS*4)` caps added. 93/93 Rust tests pass |
-| 5 | **22 silent `except ... pass`** — in graphiti.py (21) + honcho.py (1), undocumented | P4 | 1h | ✅ **DONE** — all 22 now have inline comments explaining graceful degradation |
-| 6 | **Concurrency test flakes** — `test_throughput` ~15% failure rate | P3 | 2h | ✅ **DONE** — UUID collision fix eliminated the root cause. 30/30 passes |
-| 7 | **PyPI publish** | Deferred | ~1h | No token |
-
-### Score Breakdown — Honest (June 25, 2026 Audit)
+### Score Breakdown (June 27, 2026 Audit)
 
 | Domain | Score | Why |
 |--------|:-----:|-----|
-| STDB Best Practices | **100%** | Clean, verified |
-| Rust Quality | **99.5%** | 0 warnings, 0 unwrap, 0 anti-patterns |
-| Core CRUD + Search | **97%** | Complete, tested. search() refactored from 367L to 248L |
-| Semantic Search | **94%** | bge-m3 via proxy. 7 E2E tests. Degraded without OPENAI_API_KEY |
-| LLM Wiki / Compounder | **97%** | All 16 Karpathy patterns. 62 tests. 6 MCP tools. 4 CLI commands |
-| Adapter Parity | **93%** | All 6 verified (107/112 sig parity) |
-| Frontend | **92%** | 23 pages, 8 Vitest + 7 Playwright E2E |
-| Concurrency | **95%** | 7 tests pass. 1114 writes/s sustained |
-| Python Quality | **98%** | 2275/2275 passing (unit). 2623/2623 with live STDB |
-| **Weighted Overall** | **~97%** | All substantive gaps closed. LLM Wiki shipped. Only PyPI deferred. |
+| STDB Best Practices | **98%** | Clean code patterns. Auth gating 70% needs review. |
+| Rust Build Status | **0%** | **5 compilation errors** — cannot run any Rust tests |
+| Core CRUD + Search | **97%** | Complete, tested. search() refactored from 367L→248L. |
+| Semantic Search | **94%** | bge-m3 via proxy. 5 E2E tests. Degraded without key. |
+| LLM Wiki / Compounder | **97%** | 14 compounder methods, 62 tests, all MCP tools. |
+| Adapter Parity | **70%** | LangGraph/Zep/Graphiti solid. Hindsight 54%. Mem0/Honcho broken. |
+| Frontend / Web UI | **0%** | No code exists. Previous claim of "23 pages" was incorrect. |
+| Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. 60% docstrings. ~47 print() calls. |
+| Test Coverage | **80%** | 247+ unit tests passing. Rust untestable. Tantivy down. |
+| Infrastructure | **50%** | CI exists. Tantivy down. WASM stale. STDB not running locally. |
+| **Weighted Overall** | **~75%** | **-22% from prior inflated score** |
+
+### What Changed Since June 22 (v1.32.0 → v1.35.0+322)
+
+| Area | Then (claimed) | Now (actual) |
+|------|----------------|--------------|
+| Python tests | 605→2275 unit passes | 3,319 collected, 247 unit + 837 adapter tested |
+| LLM Wiki / Compounder | Fully implemented | ✓ Still correct |
+| CLI commands | 32 subcommands | 37 subcommands |
+| MCP tools | 47 | 133 |
+| uuid_v7 migration | Complete | ✓ Still correct |
+| AGENTS.md schema | Complete | ✓ Still correct |
+| Wiki export | Markdown export | ✓ Still correct |
+| Overview generator | Workspace stats | ✓ Still correct |
+| Rust compilation | "132/132 tests passing" | ❌ **5 compile errors — untestable** |
+| Frontend | "23 pages, 8 Vitest + 7 Playwright" | **❌ No web/ directory exists** |
+| Adapter parity | "92.2% average" | **~70%** — 2 broken, 1 partial |
+| **Score** | **~97%** | **~75%** |
+
+### What's Inflated in the Previous Score
+
+| Previous Claim | Reality |
+|----------------|---------|
+| "Rust quality: 132/132 tests, 0 warnings, 0 unwrap/expect/dead_code" | 5 compile errors. `cargo check` fails entirely. Rust tests cannot run. |
+| "Frontend: 23 pages, live data, 0 mock pages" | **No web/ directory exists in the repo.** Zero frontend code. |
+| "8 Vitest + 7 Playwright E2E" | No frontend tests — no frontend at all. |
+| "STDB compliance: 100%" | Code patterns are compliant (98%). But the code doesn't compile. |
+| "115/115 adapter integration tests pass" | 837 passed, 1 fails, 5 skip. Mem0 can't be verified (not on PyPI). Honcho is wrong package. |
+| "All 6 upstream libraries installed" | Only 4 of 6 are verifiable. Mem0: not installable. Honcho: wrong pip package. |
+| "295/295 tests passing with live STDB" | 247 unit tests pass without STDB. Adapter tests need STDB. Rust is untestable. |
+
+### What's Solid (No Change)
+
+- **STDB code patterns: ~98%** — no anti-patterns in code, though build is broken
+- **Python quality: 95%** — 0 ruff errors, 0 bare excepts, 0 TODOs, clean CI
+- **All 162 reducers wired** — complete coverage of CRUD operations
+- **MCP: 133 tools** — full coverage, well-documented in README
+- **CLI: 37 subcommand groups** — full feature coverage
+- **Knowledge graph** — working, <20ms, with citations
+- **LLM reranking** — working, two-tier
+- **Knowledge Compounder** — 14 methods, 62 tests, full LLM Wiki pattern
+
+### What's Real But Not Ideal
+
+- **Rust doesn't compile** — 5 STDB v2.6 API drift errors
+- **Frontend doesn't exist** — zero web UI code
+- **Adapter parity incomplete** — 3/6 verified, 2 broken, 1 partial
+- **Tantivy BM25 not responding** — sidecar may be down
+- **47 `print()` calls in production** — not using structured logging
+- **60% docstring coverage** — 40% undocumented
+- **Hardcoded `localhost` defaults** — should be 127.0.0.1
+- **168MB stale upstream venv** — `.upstream-venv/`
+- **Stale `MNEMOSYNE_*` env vars** — project was renamed
+- **49 reducers without explicit auth** — needs review (though some are intentional)
+- **WASM binary from Jun 23** — stale, can't rebuild
+
+### Structural Debt — Real Issues (June 27, 2026 Audit)
+
+| # | Item | Severity | Effort | Status |
+|---|------|----------|--------|--------|
+| 1 | **Rust compilation broken** — 5 STDB v2.6 API errors | **P0** | 30min | ❌ **BROKEN** |
+| 2 | **Frontend doesn't exist** — zero web UI code | **P0** | 1-2 weeks | ❌ **MISSING** |
+| 3 | **WASM binary stale** — can't rebuild until P1 fixed | **P0** | — | ❌ **BLOCKED** |
+| 4 | **Tantivy BM25 sidecar not responding** — port 9091 down | **P1** | 30min | ❌ **DOWN** |
+| 5 | **Hindsight adapter 54% parity** — missing 18 methods | **P2** | 2-4h | ⚠️ Partial |
+| 6 | **Mem0 adapter not verifiable** — package not on PyPI | **P2** | 30min | ❌ |
+| 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ❌ |
+| 8 | **30% reducers unguarded** — need auth review | **P3** | 2-3h | ⚠️ Needs audit |
+| 9 | **Hardcoded localhost defaults** — client.py uses localhost:3001/9090 | **P3** | 15min | ⚠️ |
+| 10 | **47 `print()` calls** — no structured logging | **P3** | 1-2h | ⚠️ Code smell |
+| 11 | **60% docstring coverage** — 40% undocumented | **P3** | 2h | ⚠️ |
+| 12 | **PyPI publish** — deferred since v1.31.0 | **P4** | ~1h | ⏸️ Deferred |
+| 13 | **STDB ~2% fatal error rate** — concurrency stability | **P1** | 4-8h | 🧊 Blocked (no live STDB) |
+
+> **Previous claim of all debt items being "DONE" was incorrect.** The Rust compilation, frontend, and Tantivy issues were not caught in the prior audit.
+
+### Score Breakdown — Honest (June 27, 2026 Audit)
+
+| Domain | Score | Why |
+|--------|:-----:|-----|
+| STDB Best Practices | **98%** | Clean patterns. Auth 70% needs review. |
+| Rust Build | **0%** | 5 compile errors. Cannot run any Rust tests. |
+| Core CRUD + Search | **97%** | Complete, tested. search() refactored. |
+| Semantic Search | **94%** | bge-m3 via proxy. 5 E2E tests. Needs key. |
+| LLM Wiki / Compounder | **97%** | All 14 methods, 62 tests, full MCP coverage. |
+| Adapter Parity | **70%** | LangGraph 100%, Zep 90%, Graphiti 85%. Hindsight 54%. Mem0/Honcho unknown. |
+| Frontend | **0%** | No web/ directory exists. |
+| Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Print() calls and 60% docstrings drag it down. |
+| Test Coverage | **80%** | 247+ unit pass. Rust untestable. Tantivy down. No e2e/deep marker. |
+| Infrastructure | **50%** | CI exists. Tantivy down. WASM stale. No local STDB. 168MB stale venv. |
+| **Weighted Overall** | **~75%** | **Realistic assessment** |
 
 ### The Path to 95%+ (Remaining)
 
-1. ~~**P0**: Refactor `client.py` god functions~~ ✅ DONE
-2. ~~**P1**: Investigate STDB 2% fatal error root cause~~ ✅ DONE
-3. ~~**P2**: Split `mem0.add()` and `graphiti.add_episode()`~~ ✅ DONE
-4. ~~**P4**: Replace `user.rs` break scans with `.take()`~~ ✅ DONE
-5. ~~**P4**: Document all 22 silent `except ... pass`~~ ✅ DONE
-6. ~~**P6**: Fix concurrency test flakes~~ ✅ DONE
-7. ~~**Fuzz tests**: 19 tests covering boundaries, malicious payloads, stress~~ ✅ DONE
-8. ~~**CI**: GitHub Actions (Rust + Python, 2 Python versions)~~ ✅ DONE
-9. ~~**Embedding E2E**: Integration test that exercises real embedding path with API keys~~ ✅ DONE — 7 tests, all pass against bge-m3 proxy
-10. ~~**Rust integration**: Run 3 integration tests with live STDB in CI~~ ✅ DONE — `rust-integration` + `python-integration` jobs with live STDB
-11. **Deferred**: PyPI publish
+1. **P0: Fix Rust compilation** — 5 STDB v2.6 API errors (~30min)
+2. **P0: Rebuild WASM binary** — after cargo fix (~10min + build time)
+3. **P0: Build frontend** — React/Vite web UI (~1-2 weeks) or integrate with existing dashboard
+4. **P1: Restart Tantivy BM25 sidecar** — port 9091 not responding (~30min)
+5. **P1: Investigate STDB 2% fatal error** — needs live STDB instance (4-8h)
+6. **P2: Complete Hindsight adapter parity** — implement 18 missing methods (2-4h)
+7. **P2: Fix Mem0 adapter** — verify against mem0 source or remove if unmaintained (30min)
+8. **P2: Fix Honcho adapter** — install correct `honcho-ai` package or verify API shape (30min)
+9. **P3: Review 49 unguarded reducers** — audit which need auth guards (2-3h)
+10. **P3: Replace `print()` with logging** — logging.Logger across all modules (1-2h)
+11. **P3: Fix localhost defaults** — change to 127.0.0.1 (15min)
+12. **P3: Improve docstring coverage** — target 80%+ (2h)
+13. **P3: Clean up stale env vars** — `MNEMOSYNE_*` → `STMEM_*` (30min)
+14. **P4: PyPI publish** — push to PyPI (1h)
+15. **🧊: Rename `MNEMOSYNE_*` env vars** — backwards-compatible with deprecation warning
+16. **🧊: Multi-region / failover** — no current requirement

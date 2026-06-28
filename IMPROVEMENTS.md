@@ -45,26 +45,26 @@ All previously missing SDK methods now have coverage — backlog cleared.
 Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
 Difficulty: Easy
 Est: 5min
-|Commit: e27ea0a9
-|
-|### ✅ Add `update_workspace`, `set_workspace_visibility`, `get_workspace_context` SDK methods + MCP tools (this tick)
-|Added 3 new ``Client`` SDK methods for workspace management that were
-|identified as gaps in earlier research but never implemented:
-|- ``Client.update_workspace(id, name, description)`` — wraps ``update_workspace``
-|  reducer (workspace.rs:72), requires owner access
-|- ``Client.set_workspace_visibility(workspace_id, is_public)`` — wraps
-|  ``set_workspace_visibility`` reducer (workspace.rs:196), toggles public/private
-|- ``Client.get_workspace_context(workspace_id)`` — calls ``get_workspace_context``
-|  reducer (workspace.rs:136) and queries ``workspace_context_result`` table
-|All three have matching MCP tools (``update_workspace``, ``set_workspace_visibility``,
-|``get_workspace_context``). 161/161 test_client.py tests passing, 145 MCP tools
-|registered. Workspace CRUD + visibility + context is now fully covered.
-|Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-|Difficulty: Easy
-|Est: 10min
-|Commit: a00eca57
-|
-|### ✅ Add `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools (this tick)
+Commit: e27ea0a9
+
+### ✅ Add `update_workspace`, `set_workspace_visibility`, `get_workspace_context` SDK methods + MCP tools (this tick)
+Added 3 new ``Client`` SDK methods for workspace management that were
+identified as gaps in earlier research but never implemented:
+- ``Client.update_workspace(id, name, description)`` — wraps ``update_workspace``
+  reducer (workspace.rs:72), requires owner access
+- ``Client.set_workspace_visibility(workspace_id, is_public)`` — wraps
+  ``set_workspace_visibility`` reducer (workspace.rs:196), toggles public/private
+- ``Client.get_workspace_context(workspace_id)`` — calls ``get_workspace_context``
+  reducer (workspace.rs:136) and queries ``workspace_context_result`` table
+All three have matching MCP tools (``update_workspace``, ``set_workspace_visibility``,
+``get_workspace_context``). 161/161 test_client.py tests passing, 145 MCP tools
+registered. Workspace CRUD + visibility + context is now fully covered.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+Commit: a00eca57
+
+### ✅ Add `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools (this tick)
 Added `Client.create_tag(workspace_id, name, color)`, `Client.tag_memory(memory_id, tag_id)`,
 and `Client.untag_memory(memory_id, tag_id)` Python SDK methods wrapping the ``create_tag``,
 ``tag_memory``, and ``untag_memory`` Rust reducers (tag.rs:32, 55, 71). Added matching
