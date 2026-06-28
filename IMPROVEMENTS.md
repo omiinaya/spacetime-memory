@@ -8,12 +8,8 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `expire_memories` SDK method + MCP tool
-The `expire_memories` reducer (memory.rs) triggers manual expiration of
-overdue memories. Currently no Python SDK or MCP access.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 5min
+*None — backlog cleared.*
+
 
 ## Deferred / Blocked
 
@@ -38,6 +34,18 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Add `expire_memories` SDK method + MCP tool (this tick)
+Added `Client.expire_memories()` Python SDK method that calls the
+``expire_memories`` reducer (memory.rs:313), and a matching
+``expire_memories`` MCP tool in main.py. The reducer iterates all
+memories and deactivates any whose ``expires_at`` is in the past.
+161/161 test_client.py unit tests passing, 143 MCP tools registered.
+All previously missing SDK methods now have coverage — backlog cleared.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 5min
+Commit: e27ea0a9
 
 ### ✅ Add `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools (this tick)
 Added `Client.create_tag(workspace_id, name, color)`, `Client.tag_memory(memory_id, tag_id)`,
@@ -169,20 +177,31 @@ Files: README.md, plugins/hermes/README.md, docs/development.md,
 Difficulty: Trivial
 Est: 5min
 
-### ✅ Fix `test_get_memory_history_found` mock setup (Jun 27)
-The mock used `return_value` (single response) but `get_memory_history()` calls
-`_query()` twice — once for `memory_revision` and once for `memory` (current
-state). Fixed by switching to `side_effect` with proper revision + current-memory
-data including version fields, so the version-dedup logic correctly produces 1
-result. All 2020 unit tests now passing (was 1 pre-existing failure).
-Files: sdk/python/tests/test_client_deep.py
-Difficulty: Easy
-Est: 10min
-Test: 2020/2020 unit tests passing
-
----
+|---
 
 ## Research Log
+
+### Jun 28 (this tick) — Added `expire_memories` SDK method + MCP tool; backlog cleared
+- **Completed**: Added `Client.expire_memories()` Python SDK method wrapping the
+  `expire_memories` reducer (memory.rs:313) and a matching `expire_memories` MCP
+  tool in main.py. The reducer requires admin privileges and deactivates all
+  memories whose `expires_at` is past. 161/161 test_client.py unit tests passing,
+  143 MCP tools registered. This was the last PENDING item — backlog is now empty.
+- **Cleanup**: Removed completed `expire_memories` PENDING item from backlog.
+  Added new completed entry to top of Recently Completed (now 10 total, at max
+  limit, purged oldest entry "Fix test_get_memory_history_found mock setup" to
+  stay within 10).
+- **Research**:
+  - Git log (7 days): 280+ commits, latest: e27ea0a9 (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai, langgraph, zep-python, opentelemetry-sdk — all unchanged from last tick.
+  - Deeper scan: compared all 159 Rust reducers against 97+ SDK public methods.
+    Every reducer that accepts a direct call now has SDK + MCP coverage. Remaining
+    reducers are internal (replication, auth flows, proxy metrics) that don't need
+    SDK exposure. No new competitor features to adopt. No code-level TODO/FIXME
+    markers. Web UI directory (web/) does not exist.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: e27ea0a9 — 2 files changed, +26 lines (client.py, main.py).
 
 ### Jun 28 (this tick) — Added `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools; 1 PENDING remaining
 - **Completed**: Added `Client.create_tag(workspace_id, name, color)`,
