@@ -2222,6 +2222,19 @@ class Client:
             raise ValueError(f"Invalid tier '{tier}'. Must be L0, L1, or L2.")
         return self._call("update_memory_tier", [memory_id, tier])
 
+    def set_memory_scope(self, memory_id: str, user_scope: str) -> dict[str, Any]:
+        """Scope an existing memory to a specific user identity for isolation.
+
+        Parameters
+        ----------
+        memory_id:
+            The UUID of the memory to scope.
+        user_scope:
+            The user identity hash to scope the memory to. Pass empty string
+            to make the memory shared/unscoped.
+        """
+        return self._call("set_memory_scope", [memory_id, user_scope])
+
     def set_workspace_context(self, workspace_id: str, context: str) -> dict[str, Any]:
         """Attach a context string to a workspace for QMD-style context trees."""
         return self._call("set_workspace_context", [workspace_id, context])
@@ -3250,6 +3263,85 @@ class Client:
         return rows[0] if rows else None
 
     # -----------------------------------------------------------------------
+    # Facts
+    # -----------------------------------------------------------------------
+
+    def add_fact(
+        self,
+        workspace_id: str,
+        peer_id: str,
+        content: str,
+        fact_type: str = "dynamic",
+        category: str = "custom",
+        confidence: float = 0.8,
+        source: str = "manual",
+        tier: str = "L1",
+    ) -> dict[str, Any]:
+        """Add a fact about a peer.
+
+        Parameters
+        ----------
+        workspace_id:
+            The workspace ID.
+        peer_id:
+            The peer to associate the fact with.
+        content:
+            The fact content text.
+        fact_type:
+            Fact type (e.g. ``"dynamic"``, ``"static"``).
+        category:
+            Fact category (e.g. ``"custom"``).
+        confidence:
+            Confidence score (0.0–1.0). Default 0.8.
+        source:
+            Source of the fact (e.g. ``"manual"``).
+        tier:
+            Memory tier: ``"L0"``, ``"L1"``, or ``"L2"``.
+        """
+        return self._call(
+            "add_fact",
+            [workspace_id, peer_id, fact_type, category, content, confidence, source, tier],
+        )
+
+    def list_facts(
+        self,
+        workspace_id: str,
+        peer_id: str = "",
+        fact_type: str = "",
+        tier: str = "",
+        category: str = "",
+    ) -> list[dict[str, Any]]:
+        """List facts for a workspace with optional filters.
+
+        Parameters
+        ----------
+        workspace_id:
+            The workspace ID.
+        peer_id:
+            Optional: filter by peer ID.
+        fact_type:
+            Optional: filter by fact type.
+        tier:
+            Optional: filter by memory tier.
+        category:
+            Optional: filter by category.
+
+        Returns:
+            List of fact records from the ``fact_result`` table.
+        """
+        self._call("list_facts", [workspace_id, peer_id, fact_type, tier, category])
+        query_hash = f"{workspace_id}:{peer_id}:{fact_type}:{tier}:{category}"
+        rows = self._sql(
+            f"SELECT * FROM fact_result WHERE query_hash = '{_esc(query_hash)}' ORDER BY created_at DESC"
+        )
+        if rows:
+            try:
+                return json.loads(rows[0].get("json_data", "[]"))
+            except (json.JSONDecodeError, IndexError):
+                pass
+        return []
+
+    # -----------------------------------------------------------------------
     # Knowledge Graph — additional queries
     # -----------------------------------------------------------------------
 
@@ -3586,6 +3678,93 @@ class Client:
         """Get immediate neighbours of a node.
         Results in graph_traversal_result table with depth=1."""
         self._call("get_neighbors", [workspace_id, node_id])
+
+    # -------------------------------------------------------------------
+    # Mental Models
+    # -------------------------------------------------------------------
+
+    def synthesize_mental_models(self, workspace_id: str, memory_ids: list[str]) -> dict[str, Any]:
+        """Request synthesis of a mental model from a set of source memories.
+
+        Creates a pending ``MentalModel`` record. Run ``mental_model_synthesis.py``
+        to generate actual LLM content.
+
+        Parameters
+        ----------
+        workspace_id:
+            The workspace containing the source memories.
+        memory_ids:
+            List of memory IDs to synthesize a mental model from.
+        """
+        return self._call(
+            "synthesize_mental_models",
+            [workspace_id, json.dumps(memory_ids)],
+        )
+
+    def get_mental_model(self, model_id: str) -> list[dict[str, Any]]:
+        """Get a single mental model by its ID.
+
+        Parameters
+        ----------
+        model_id:
+            The UUID of the mental model.
+        """
+        return self._sql(f"SELECT * FROM mental_model WHERE id = '{_esc(model_id)}'")
+
+    def list_mental_models(
+        self, workspace_id: str, status: str = ""
+    ) -> list[dict[str, Any]]:
+        """List mental models for a workspace, optionally filtered by status.
+
+        Parameters
+        ----------
+        workspace_id:
+            The workspace ID.
+        status:
+            Optional filter: ``"pending"``, ``"completed"``, ``"failed"``,
+            or ``""`` for all.
+        """
+        where = f"workspace_id = '{_esc(workspace_id)}'"
+        if status:
+            where += f" AND status = '{_esc(status)}'"
+        return self._sql(
+            f"SELECT * FROM mental_model WHERE {where} ORDER BY created_at DESC"
+        )
+
+    def delete_mental_model(self, model_id: str) -> dict[str, Any]:
+        """Delete a mental model.
+
+        Parameters
+        ----------
+        model_id:
+            The UUID of the mental model to delete.
+        """
+        return self._call("delete_mental_model", [model_id])
+
+    def update_mental_model(
+        self,
+        model_id: str,
+        content: str,
+        confidence: float = 0.5,
+        status: str = "completed",
+    ) -> dict[str, Any]:
+        """Update the content, confidence, and status of an existing mental model.
+
+        Parameters
+        ----------
+        model_id:
+            The UUID of the mental model.
+        content:
+            The new synthesized content.
+        confidence:
+            Confidence score (0.0–1.0) for this mental model. Default 0.5.
+        status:
+            Status: ``"pending"``, ``"completed"``, or ``"failed"``.
+        """
+        return self._call(
+            "update_mental_model",
+            [model_id, content, confidence, status],
+        )
 
     # -------------------------------------------------------------------
     # Tours
