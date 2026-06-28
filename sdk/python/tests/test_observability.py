@@ -190,6 +190,25 @@ class TestTracerNoOpSpan:
         with _NoOpSpan() as span:
             assert span is not None
 
+    def test_noop_span_add_event(self):
+        from spacetime_memory.tracer import _NoOpSpan
+
+        span = _NoOpSpan()
+        span.add_event("test_event")  # should not raise
+        span.add_event("test_event", {"key": "val"}, 123456)  # with optional params
+
+    def test_noop_span_is_recording(self):
+        from spacetime_memory.tracer import _NoOpSpan
+
+        span = _NoOpSpan()
+        assert span.is_recording() is False
+
+    def test_noop_span_update_name(self):
+        from spacetime_memory.tracer import _NoOpSpan
+
+        span = _NoOpSpan()
+        span.update_name("new_name")  # should not raise
+
 
 class TestCheckOtelAvailable:
     """Tests for the _check_otel_available() cache."""

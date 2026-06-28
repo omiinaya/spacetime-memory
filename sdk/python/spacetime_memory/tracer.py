@@ -65,6 +65,12 @@ def _check_otel_available() -> bool:
 class _NoOpSpan:
     """Drop-in no-op span that does nothing."""
 
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None, timestamp: int | None = None) -> None:
+        pass
+
+    def is_recording(self) -> bool:
+        return False
+
     def set_attribute(self, key: str, value: Any) -> None:
         pass
 
@@ -75,6 +81,9 @@ class _NoOpSpan:
         pass
 
     def set_status(self, status: Any) -> None:
+        pass
+
+    def update_name(self, name: str) -> None:
         pass
 
     def end(self) -> None:
