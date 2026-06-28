@@ -191,7 +191,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Retrieval MRR | **0.960** | Good ranking quality |
 | Graph ops latency | <20ms | Verified |
 | Semantic embeddings | **Working** | Via proxy, 5 tests skipped without key |
-| Rust compilation | **❌ BROKEN** | 5 errors against STDB v2.6 |
+| Rust compilation | **✅ FIXED** | cargo check passes cleanly. WASM rebuilt Jun 28. |
 | Tantivy BM25 | **?** | Port 9091 not responding — may be down |
 
 ### What's Actually Tested vs Not (June 27)
@@ -285,9 +285,9 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 
 | # | Item | Severity | Effort | Status |
 |---|------|----------|--------|--------|
-| 1 | **Rust compilation broken** — 5 STDB v2.6 API errors | **P0** | 30min | ❌ **BROKEN** |
+| 1 | **Rust compilation broken** — 5 STDB v2.6 API errors | **P0** | 30min | ✅ **FIXED** — WASM rebuilt Jun 28 |
 | 2 | **Frontend doesn't exist** — zero web UI code | **P0** | 1-2 weeks | ❌ **MISSING** |
-| 3 | **WASM binary stale** — can't rebuild until P1 fixed | **P0** | — | ❌ **BLOCKED** |
+| 3 | **WASM binary stale** — can't rebuild until P1 fixed | **P0** | — | ✅ **FIXED** — fresh binary 2.36MB |
 | 4 | **Tantivy BM25 sidecar not responding** — port 9091 down | **P1** | 30min | ❌ **DOWN** |
 | 5 | **Hindsight adapter 54% parity** — missing 18 methods | **P2** | 2-4h | ⚠️ Partial |
 | 6 | **Mem0 adapter not verifiable** — package not on PyPI | **P2** | 30min | ❌ |
@@ -306,7 +306,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Domain | Score | Why |
 |--------|:-----:|-----|
 | STDB Best Practices | **98%** | Clean patterns. Auth 70% needs review. |
-| Rust Build | **0%** | 5 compile errors. Cannot run any Rust tests. |
+| Rust Build | **95%** | Compiles cleanly. WASM rebuilt (2.36MB). 0 warnings. |
 | Core CRUD + Search | **97%** | Complete, tested. search() refactored. |
 | Semantic Search | **94%** | bge-m3 via proxy. 5 E2E tests. Needs key. |
 | LLM Wiki / Compounder | **97%** | All 14 methods, 62 tests, full MCP coverage. |
@@ -315,12 +315,12 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Print() calls and 60% docstrings drag it down. |
 | Test Coverage | **80%** | 247+ unit pass. Rust untestable. Tantivy down. No e2e/deep marker. |
 | Infrastructure | **50%** | CI exists. Tantivy down. WASM stale. No local STDB. 168MB stale venv. |
-| **Weighted Overall** | **~75%** | **Realistic assessment** |
+| **Weighted Overall** | **~82%** | Rust fixed (+20%). Still missing frontend, Tantivy, partial adapter parity. |
 
 ### The Path to 95%+ (Remaining)
 
-1. **P0: Fix Rust compilation** — 5 STDB v2.6 API errors (~30min)
-2. **P0: Rebuild WASM binary** — after cargo fix (~10min + build time)
+1. **P0: Fix Rust compilation** — 5 STDB v2.6 API errors (~30min) | ✅ **DONE**
+2. **P0: Rebuild WASM binary** — after cargo fix (~10min + build time) | ✅ **DONE** — fresh 2.36MB binary
 3. **P0: Build frontend** — React/Vite web UI (~1-2 weeks) or integrate with existing dashboard
 4. **P1: Restart Tantivy BM25 sidecar** — port 9091 not responding (~30min)
 5. **P1: Investigate STDB 2% fatal error** — needs live STDB instance (4-8h)
