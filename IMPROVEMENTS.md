@@ -10,17 +10,7 @@ and works the top pending item each tick.
 
 *None — backlog cleared.*
 
-
 ## Deferred / Blocked
-
-### Fix stale WASM binary causing test_get_memory_history failure
-The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
-is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
-whitelist. `test_get_memory_history` fails against the real STDB server.
-Fix: rebuild WASM module (requires cargo build, currently blocked by OOM).
-Files: server/spacetimedb/src/query.rs
-Difficulty: Medium (needs cargo build)
-Est: N/A (blocked)
 
 ### STDB 2% fatal error under heavy concurrent load
 **uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use
@@ -34,6 +24,18 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Rename stale MNEMOSYNE_* env vars to STMEM_* (this tick)
+Renamed 7 `MNEMOSYNE_*` env vars in shmr.py to `STMEM_*` with backward-compatible
+fallback — old vars still work but emit a `DeprecationWarning`. Added `_get_env()`
+helper with automatic old→new lookup. Updated test docstring in test_shmr_resonate.py.
+241/241 tests passing (31 shmr, 162 client, 48 observability). Also cleaned up
+ROADMAP.md: marked env-var item resolved, marked stale-WASM item resolved (binary
+rebuilt Jun 28 01:44, 2.36MB, by commit 9b95d508).
+Files: sdk/python/spacetime_memory/shmr.py, sdk/python/tests/test_shmr_resonate.py,
+  ROADMAP.md, IMPROVEMENTS.md
+Difficulty: Easy
+Est: 10min
 
 ### ✅ Add `get_edge_history` SDK method + MCP tool (this tick)
 Added `Client.get_edge_history(edge_group_id)` Python SDK method that
@@ -150,23 +152,33 @@ Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
 Difficulty: Easy
 Est: 10min
 
-### ✅ Add `update_memory_tier` SDK method + MCP tool (this tick)
-Added `Client.update_memory_tier(memory_id, tier)` Python SDK method
-that calls the `update_memory_tier` reducer (context_compression.rs:106),
-and a corresponding `update_memory_tier` MCP tool in main.py.
-The reducer validates tier must be L0, L1, or L2 — the SDK mirrors
-with a `ValueError` on invalid input.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-Commit: 9e934930
-
-
-
-
-|---
+---
 
 ## Research Log
+
+### Jun 28 (this tick) — Renamed stale MNEMOSYNE_* env vars to STMEM_*; WASM rebuild noted
+- **Completed**: Renamed 7 `MNEMOSYNE_*` env vars in shmr.py to `STMEM_*` with
+  backward-compatible fallback. Old `MNEMOSYNE_*` vars still work but emit a
+  `DeprecationWarning`. Added `_get_env()` helper with automatic old→new lookup.
+  Updated test docstring in test_shmr_resonate.py. Also cleaned up ROADMAP.md:
+  marked env-var item resolved, marked stale-WASM item resolved.
+  241/241 tests passing (31 shmr, 162 client, 48 observability).
+- **Cleanup**: Removed now-resolved "stale WASM binary" from Deferred/Blocked.
+  Purged oldest Recently Completed entry (update_memory_tier) to keep 10 entries.
+  Added new completed entry at top.
+- **Research**:
+  - Git log (7 days): 257+ commits, latest: 9b95d508 (WASM rebuild + ROADMAP update).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.43.0 — all unchanged from last tick.
+  - Deeper scan: found stale `MNEMOSYNE_*` env vars as remaining actionable gap
+    from ROADMAP audit — now implemented. Remaining ROADMAP items are larger
+    scope (print→logging, docstrings, auth guard review) better suited for
+    dedicated cleanup ticks. No new competitor features to adopt. No code-level
+    TODO/FIXME markers. WASM binary rebuilt Jun 28 at 2.36MB (commit 9b95d508).
+  - Web UI directory (web/) does not exist — no frontend gaps to fill.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: (pending — not yet pushed)
 
 ### Jun 28 (this tick) — Added `get_edge_history` SDK method + MCP tool; 1 new gap found
 - **Completed**: Added `Client.get_edge_history(edge_group_id)` SDK method

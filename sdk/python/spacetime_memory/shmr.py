@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import warnings
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,14 +29,55 @@ import numpy as np
 from spacetime_memory.client import Client
 
 # ── Config ──────────────────────────────────────────────────────────
+# NOTE: The MNEMOSYNE_* env vars are deprecated. Use STMEM_* instead.
+# Old vars still work with a deprecation warning.
 
-SHMR_BATCH_SIZE = int(os.environ.get("MNEMOSYNE_SHMR_BATCH_SIZE", "50"))
-SHMR_MAX_ITERATIONS = int(os.environ.get("MNEMOSYNE_SHMR_MAX_ITERATIONS", "3"))
-SHMR_SIMILARITY_THRESHOLD = float(os.environ.get("MNEMOSYNE_SHMR_SIMILARITY_THRESHOLD", "0.70"))
-SHMR_HARMONY_THRESHOLD = float(os.environ.get("MNEMOSYNE_SHMR_HARMONY_THRESHOLD", "0.60"))
-SHMR_MODEL = os.environ.get("MNEMOSYNE_SHMR_MODEL", "")
-SHMR_MIN_CLUSTER_SIZE = int(os.environ.get("MNEMOSYNE_SHMR_MIN_CLUSTER_SIZE", "2"))
-SHMR_TEMPERATURE = float(os.environ.get("MNEMOSYNE_SHMR_TEMPERATURE", "0.2"))
+_DEPRECATED_ENV_MAP: dict[str, str] = {
+    "MNEMOSYNE_SHMR_BATCH_SIZE": "STMEM_SHMR_BATCH_SIZE",
+    "MNEMOSYNE_SHMR_MAX_ITERATIONS": "STMEM_SHMR_MAX_ITERATIONS",
+    "MNEMOSYNE_SHMR_SIMILARITY_THRESHOLD": "STMEM_SHMR_SIMILARITY_THRESHOLD",
+    "MNEMOSYNE_SHMR_HARMONY_THRESHOLD": "STMEM_SHMR_HARMONY_THRESHOLD",
+    "MNEMOSYNE_SHMR_MODEL": "STMEM_SHMR_MODEL",
+    "MNEMOSYNE_SHMR_MIN_CLUSTER_SIZE": "STMEM_SHMR_MIN_CLUSTER_SIZE",
+    "MNEMOSYNE_SHMR_TEMPERATURE": "STMEM_SHMR_TEMPERATURE",
+}
+
+
+def _get_env(new_name: str, default: str) -> str:
+    """Get env var by new name, with deprecated-old-name fallback."""
+    # Look up which old name maps to this new name
+    old_name: str | None = None
+    for old, new in _DEPRECATED_ENV_MAP.items():
+        if new == new_name:
+            old_name = old
+            break
+
+    # Try new name first
+    value = os.environ.get(new_name)
+    if value is not None:
+        return value
+
+    # Fall back to old name with deprecation warning
+    if old_name is not None:
+        value = os.environ.get(old_name)
+        if value is not None:
+            warnings.warn(
+                f"{old_name} is deprecated, use {new_name} instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return value
+
+    return default
+
+
+SHMR_BATCH_SIZE = int(_get_env("STMEM_SHMR_BATCH_SIZE", "50"))
+SHMR_MAX_ITERATIONS = int(_get_env("STMEM_SHMR_MAX_ITERATIONS", "3"))
+SHMR_SIMILARITY_THRESHOLD = float(_get_env("STMEM_SHMR_SIMILARITY_THRESHOLD", "0.70"))
+SHMR_HARMONY_THRESHOLD = float(_get_env("STMEM_SHMR_HARMONY_THRESHOLD", "0.60"))
+SHMR_MODEL = _get_env("STMEM_SHMR_MODEL", "")
+SHMR_MIN_CLUSTER_SIZE = int(_get_env("STMEM_SHMR_MIN_CLUSTER_SIZE", "2"))
+SHMR_TEMPERATURE = float(_get_env("STMEM_SHMR_TEMPERATURE", "0.2"))
 
 
 # ── Results ─────────────────────────────────────────────────────────

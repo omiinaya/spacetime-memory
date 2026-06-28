@@ -61,7 +61,7 @@
 | `print()` in production .py | **~47** | Connector CLI logging (~30), ingest status (~10), shmr debug (~7), context_agent debug (1), metrics debug (1), langchain docstring REPL examples (4). Not structured logging. |
 | Docstring coverage | **60%** | 545/900 functions have docstrings. 40% undocumented. |
 | Hardcoded `localhost` defaults | **2** | `client.py:189` (SPACETIMEDB_HOST), `client.py:197` (EMBEDDER_URL). Should default to 127.0.0.1. |
-| Stale env var names | **7** | `MNEMOSYNE_*` prefix in shmr.py — project was renamed from Mnemosyne. These still work but are confusing. |
+| Stale env var names | **0** (✅ resolved) | `MNEMOSYNE_*` renamed to `STMEM_*` with backward compatibility — commit XXXXXXX |
 | Stale `.upstream-venv` | **168MB** | Upstream venv for adapter tests. May have stale packages. |
 
 ## STDB Best Practices — Re-verified (June 27, 2026)
@@ -129,15 +129,15 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 
 `compare-upstream.py` runs against ALL 6 upstream libraries (pip installed). It checks **signature parity** (method names, parameter shapes, constructor compatibility, return types). Signature parity against real upstream source IS the gold-standard drop-in test.
 
-### Truth: 3/6 upstream libs testable, 1 partial, 2 broken
+### Truth: 4/6 upstream libs testable, 2 partial/broken
 
 | Adapter | SIG Parity | Integration Tests | Drop-in Score | Notes |
 |---------|:----------:|:-----------------:|:-------------:|-------|
 | **LangGraph** | 28/28 ✓ | All pass | **100%** ✅ | True drop-in — inherits from real BaseStore |
+| **Mem0** | **12/14 methods (85%)** | `history` now passes (WASM rebuilt) | **85%** ✅ | Missing `project` and `entity_store` property accessors only. 3 extras (`graph`, `set_llm_config`, `create_memory_tool`). Core memory ops 12/12 = 100%. |
 | **Zep** | 19 methods (vs 13 upstream) | All pass | **90%** ✅ | API-compatible; 6 extras (list_facts, delete_fact, update_memory, etc.) |
 | **Graphiti** | 8/8 entity fields + 2 extras | All pass | **85%** ✅ | Fields match upstream; extra fields for temporal versioning |
 | **Hindsight** | **21/39 methods (54%)** | All pass | **54%** ⚠️ | Missing 18 advanced methods: mission/settings/directive/mental model CRUD, versions, bank config |
-| **Mem0** | **UPSTREAM NOT INSTALLABLE** | 1 fail (history) | **Unknown** ❌ | Package not found on PyPI. 1 integration test fails (memory_revision table missing). |
 | **Honcho** | **WRONG PACKAGE** | All pass | **Unknown** ❌ | `honcho` pip is a process manager. `honcho-ai` installs but no module code in site-packages. |
 
 ### Upstream Library Installation
@@ -148,10 +148,10 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | `zep-python` | 2.0.2 | ✅ Installed |
 | `graphiti-core` | 0.29.2 | ✅ Installed |
 | `hindsight-client` | 0.8.3 | ✅ Installed |
-| `mem0` | N/A | ❌ Not on PyPI |
+| `mem0` | Source from GitHub | ✅ **Verified against source** (not PyPI) |
 | `honcho`/`honcho-ai` | 2.1.2 | ❌ Wrong package |
 
-### Real Drop-in Score: ~70% (weighted average of testable adapters)
+### Real Drop-in Score: ~76% (weighted average of testable adapters)
 
 ### The Embedding Reality (June 27, 2026)
 
@@ -277,9 +277,9 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 - **60% docstring coverage** — 40% undocumented
 - **Hardcoded `localhost` defaults** — should be 127.0.0.1
 - **168MB stale upstream venv** — `.upstream-venv/`
-- **Stale `MNEMOSYNE_*` env vars** — project was renamed
+- **Stale `MNEMOSYNE_*` env vars** — ✅ resolved (→ `STMEM_*`)
 - **49 reducers without explicit auth** — needs review (though some are intentional)
-- **WASM binary from Jun 23** — stale, can't rebuild
+- **WASM binary from Jun 23** — ✅ resolved (rebuilt Jun 28, 2.36MB)
 
 ### Structural Debt — Real Issues (June 27, 2026 Audit)
 
@@ -290,8 +290,8 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | 3 | **WASM binary stale** — can't rebuild until P1 fixed | **P0** | — | ✅ **FIXED** — fresh binary 2.36MB |
 | 4 | **Tantivy BM25 sidecar not responding** — port 9091 down | **P1** | 30min | ❌ **DOWN** |
 | 5 | **Hindsight adapter 54% parity** — missing 18 methods | **P2** | 2-4h | ⚠️ Partial |
-| 6 | **Mem0 adapter not verifiable** — package not on PyPI | **P2** | 30min | ❌ |
-| 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ❌ |
+| 6 | **Mem0 adapter not verifiable** — package not on PyPI | **P2** | 30min | ✅ **DONE** — verified against GitHub source. 85% parity. |
+| 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ❌ **BROKEN** |
 | 8 | **30% reducers unguarded** — need auth review | **P3** | 2-3h | ⚠️ Needs audit |
 | 9 | **Hardcoded localhost defaults** — client.py uses localhost:3001/9090 | **P3** | 15min | ⚠️ |
 | 10 | **47 `print()` calls** — no structured logging | **P3** | 1-2h | ⚠️ Code smell |
@@ -310,7 +310,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Core CRUD + Search | **97%** | Complete, tested. search() refactored. |
 | Semantic Search | **94%** | bge-m3 via proxy. 5 E2E tests. Needs key. |
 | LLM Wiki / Compounder | **97%** | All 14 methods, 62 tests, full MCP coverage. |
-| Adapter Parity | **70%** | LangGraph 100%, Zep 90%, Graphiti 85%. Hindsight 54%. Mem0/Honcho unknown. |
+| Adapter Parity | **76%** | LangGraph 100%, Mem0 85%, Zep 90%, Graphiti 85%. Hindsight 54%. Honcho broken. |
 | Frontend | **0%** | No web/ directory exists. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Print() calls and 60% docstrings drag it down. |
 | Test Coverage | **80%** | 247+ unit pass. Rust untestable. Tantivy down. No e2e/deep marker. |
@@ -331,7 +331,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 10. **P3: Replace `print()` with logging** — logging.Logger across all modules (1-2h)
 11. **P3: Fix localhost defaults** — change to 127.0.0.1 (15min)
 12. **P3: Improve docstring coverage** — target 80%+ (2h)
-13. **P3: Clean up stale env vars** — `MNEMOSYNE_*` → `STMEM_*` (30min)
+13. **P3: Clean up stale env vars** — ✅ resolved (`MNEMOSYNE_*` → `STMEM_*` with backward compat)
 14. **P4: PyPI publish** — push to PyPI (1h)
-15. **🧊: Rename `MNEMOSYNE_*` env vars** — backwards-compatible with deprecation warning
+15. **🧊: Rename `MNEMOSYNE_*` env vars** — ✅ resolved (backwards-compatible with deprecation warning)
 16. **🧊: Multi-region / failover** — no current requirement

@@ -204,7 +204,7 @@ class TestCallClientLLM:
                     assert call_kwargs["json"]["model"] == "custom-shmr-model"
 
     def test_llm_model_fallback(self, mock_client):
-        """When MNEMOSYNE_SHMR_MODEL is unset, uses LLM_MODEL or default."""
+        """When STMEM_SHMR_MODEL is unset, uses LLM_MODEL or default."""
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {
