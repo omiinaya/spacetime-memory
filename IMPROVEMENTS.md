@@ -75,7 +75,7 @@ Est: 5min
   - Deeper scan: Remaining code-quality items identified. 2 PENDING items remain
     (TODO markers in orgmode, MCP startup print deferred).
 - **Backlog**: 2 PENDING items remaining.
-- **Commit**: [this tick]
+- **Commit**: fe1c84ff
 
 ### Jun 28 (this tick) — Converted print()→logging in shmr.py; 5 missing docstrings + localhost fixes; backlog cleared
 - **Completed**: 
