@@ -12,6 +12,22 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add `delete_fact`, `update_fact`, and `search_facts` SDK methods + MCP tools (this tick)
+Added 3 new ``Client`` SDK methods completing the full facts CRUD suite:
+- ``Client.delete_fact(fact_id)`` — soft-delete a fact via the ``delete_fact`` reducer
+- ``Client.update_fact(fact_id, content, confidence, category, tier)`` — update fact fields
+  via the ``update_fact`` reducer (profile.rs:218)
+- ``Client.search_facts(workspace_id, query, tier)`` — substring search across fact content
+  via the ``search_facts`` reducer (profile.rs:332), reads ``fact_result`` table
+All three have corresponding MCP tools and MCP README entries.
+2640/2640 unit tests passing, 688 skipped (live STDB-dependent).
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py,
+  server/mcp/README.md, sdk/python/tests/test_client.py,
+  sdk/python/tests/test_mcp.py
+Difficulty: Easy
+Est: 15min
+Commit: 33287f0a
+
 ### ✅ Add `delete_node` and `delete_edge` SDK methods + MCP tools (this tick)
 Added `Client.delete_node(node_id)` and `Client.delete_edge(edge_id)` Python
 SDK methods wrapping the `delete_node` and `delete_edge` KG reducers
@@ -136,16 +152,6 @@ Test: 2020/2020 unit tests passing
 ---
 
 ## Pending
-
-### Add `delete_fact`, `update_fact`, `search_facts` SDK methods + MCP tools
-The `delete_fact` (profile.rs:261), `update_fact` (profile.rs:218), and
-`search_facts` (profile.rs:332) reducers exist in Rust but have no Python
-SDK methods or MCP tools. The CLI currently calls `_call("delete_fact", ...)`
-directly. Adding proper SDK methods would complete fact CRUD (add_fact,
-list_facts exist).
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py, cli/stmem.py
-Difficulty: Easy
-Est: 15min
 
 ### Add `tag_memory`, `untag_memory`, `create_tag` SDK methods + MCP tools
 The `create_tag` (tag.rs:32), `tag_memory` (tag.rs:55), and `untag_memory`
@@ -521,3 +527,24 @@ Difficulty: Hard (needs live STDB)
 - **Backlog**: 0 PENDING items — backlog cleared.
 - **Commit**: 12f8ef72 — 6 files changed, +82/-18 lines (client.py, main.py, test_client.py,
   README.md, IMPROVEMENTS.md, .coverage deleted).
+
+### Jun 28 (this tick) — Added delete_fact, update_fact, search_facts SDK methods + MCP tools
+- **Completed**: Added 3 new `Client` SDK methods completing the full facts CRUD suite:
+  `Client.delete_fact(fact_id)`, `Client.update_fact(fact_id, content, confidence, category, tier)`,
+  `Client.search_facts(workspace_id, query, tier)`. All three have corresponding MCP tools
+  (`delete_fact`, `update_fact`, `search_facts`) and MCP README catalog entries.
+  2640/2640 unit tests passing, 688 skipped (live STDB-dependent).
+- **Cleanup**: Added new completed item to Recently Completed (10 total, at limit, no purge
+  needed). Removed completed `delete_fact/update_fact/search_facts` PENDING item from backlog.
+- **Research**:
+  - Git log (7 days): 150+ commits, latest: 33287f0a (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged, PyPI latest).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all at latest.
+  - Deeper scan: compared all 160+ Rust reducers against 125+ SDK public methods.
+    Fact CRUD is now complete (add_fact, list_facts, delete_fact, update_fact, search_facts
+    all have SDK + MCP coverage). 2 PENDING items remain (tag_memory/untag_memory/create_tag,
+    expire_memories). No new competitor features to adopt — mem0, langgraph, zep all
+    unchanged. No code-level TODO/FIXME markers.
+- **Backlog**: 2 PENDING items remaining.
+- **Commit**: 33287f0a — 5 files changed, +205 lines.<｜end▁of▁thinking｜>
