@@ -8,21 +8,7 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Add `grant_space_access` + `revoke_space_access` SDK methods + update MCP tools
-Both reducers exist in workspace.rs (lines 284, 357) and have MCP tools, but
-no SDK methods. The MCP tools use `get_client()._call()` directly.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-
-### Update 9 MCP tools to use SDK methods instead of raw `_call`
-MCP tools for `rate_memory`, `consolidate_memories`, `set_memory_scope`,
-`synthesize_mental_models`, `add_fact`, `list_facts`, `delete_fact`,
-`update_fact`, `search_facts` all call `get_client()._call(...)` directly
-despite having proper SDK methods. Update to use SDK methods for consistency.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 10min
+*None — backlog cleared.*
 
 ## Deferred / Blocked
 
@@ -38,6 +24,29 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Add `grant_space_access` + `revoke_space_access` SDK methods + convert 9 MCP tools from `_call()` to SDK methods (this tick)
+Added `Client.grant_space_access(workspace_id, peer_id, permission)` and
+`Client.revoke_space_access(workspace_id, peer_id)` Python SDK methods
+wrapping the ``grant_space_access`` (workspace.rs:284) and
+``revoke_space_access`` (workspace.rs:357) Rust reducers. Both return
+the reducer status dict. Updated MCP ``grant_space_access`` and
+``revoke_space_access`` tools to use SDK methods.
+
+Simultaneously converted 9 MCP tools from raw ``get_client()._call()``
+to proper SDK methods: ``rate_memory``, ``consolidate_memories``,
+``set_memory_scope``, ``synthesize_mental_models``, ``add_fact``,
+``list_facts``, ``delete_fact``, ``update_fact``, ``search_facts``.
+Removed inline SQL from ``list_facts`` and ``search_facts`` MCP tools.
+Only remaining ``_call()`` in MCP is ``add_agent_step`` (internal
+reducer with no SDK method needed).
+170/170 test_client.py unit tests passing (166 existing + 4 new).
+139 compounder + observability tests passing.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py,
+  sdk/python/tests/test_client.py
+Difficulty: Easy
+Est: 15min
+Commit: 8c73dbf5
 
 ### ✅ Add `dedup_memories` SDK alias + update MCP tool (this tick)
 Added `Client.dedup_memories(workspace_id)` as a named alias for the existing
@@ -149,39 +158,36 @@ Difficulty: Easy
 Est: 15min
 Commit: 33287f0a
 
-### ✅ Add `delete_node` and `delete_edge` SDK methods + MCP tools (this tick)
-Added `Client.delete_node(node_id)` and `Client.delete_edge(edge_id)` Python
-SDK methods wrapping the `delete_node` and `delete_edge` KG reducers
-(knowledge_graph.rs:185, knowledge_graph.rs:269). Also added corresponding
-`delete_node` and `delete_edge` MCP tools in main.py. These complete the
-KG CRUD operations — `create_node`/`update_node`/`delete_node` and
-`create_edge`/`update_edge`/`delete_edge` now all have SDK + MCP coverage.
-492/492 unit tests passing, 4 skipped (pre-existing live-STDB tests).
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-Commit: 34802109
 
-### ✅ Add SDK methods for set_memory_scope, mental_models (5), and facts (add_fact + list_facts) (this tick)
-Added 8 new ``Client`` SDK methods to close all remaining SDK parity gaps:
-- ``Client.set_memory_scope(memory_id, user_scope)`` — scope memory to a user identity
-- ``Client.synthesize_mental_models(workspace_id, memory_ids)`` — request mental model synthesis
-- ``Client.get_mental_model(model_id)`` — get mental model by ID
-- ``Client.list_mental_models(workspace_id, status)`` — list with optional status filter
-- ``Client.delete_mental_model(model_id)`` — delete a mental model
-- ``Client.update_mental_model(model_id, content, confidence, status)`` — update a mental model
-- ``Client.add_fact(workspace_id, peer_id, content, ...)`` — add a fact about a peer
-- ``Client.list_facts(workspace_id, peer_id, fact_type, tier, category)`` — list facts with filters
-All three PENDING items resolved in one tick. 1712/2099 unit tests passing,
-386 skipped (live STDB-dependent), 1 pre-existing MCP import failure.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy (bulk)
-Est: 25min
-Commit: 744edcef
-
----
 
 ## Research Log
+
+### Jun 28 (this tick) — Added `grant_space_access` + `revoke_space_access` SDK methods; converted 9 MCP tools from `_call()` to SDK methods; backlog cleared
+- **Completed**: Added `Client.grant_space_access(workspace_id, peer_id, permission)`
+  and `Client.revoke_space_access(workspace_id, peer_id)` Python SDK methods
+  wrapping the `grant_space_access` (workspace.rs:284) and `revoke_space_access`
+  (workspace.rs:357) Rust reducers. Updated both MCP tools to use SDK methods.
+  Also converted 9 MCP tools from raw `get_client()._call()` to proper SDK
+  methods: `rate_memory`, `consolidate_memories`, `set_memory_scope`,
+  `synthesize_mental_models`, `add_fact`, `list_facts`, `delete_fact`,
+  `update_fact`, `search_facts`. Only remaining `_call()` in MCP is
+  `add_agent_step` (internal, no SDK method needed). Removed inline SQL from
+  `list_facts` and `search_facts` MCP tools.
+  170/170 test_client.py tests passing, 139 compounder+observability passing.
+- **Cleanup**: Added new completed entry at top of Recently Completed. Purged
+  2 oldest entries (delete_node+delete_edge, 8 SDK methods batch) to keep 10.
+  Removed both completed PENDING items from backlog. Backlog is now empty.
+- **Research**:
+  - Git log (7 days): 254+ commits, latest: 8c73dbf5 (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.43.0 — all unchanged from last tick.
+  - Deeper scan: all `_call()` usage in MCP tools now eliminated except
+    `add_agent_step` (internal reducer). All Rust workspace access reducers
+    now have SDK + MCP coverage. No remaining PENDING items. No new competitor
+    features to adopt.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: 8c73dbf5 — 3 files changed, +81/-21 lines.
 
 ### Jun 28 (this tick) — Added `dedup_memories` SDK alias + MCP tool cleanup; found 13 remaining `_call()` gaps
 - **Completed**: Added `Client.dedup_memories(workspace_id)` SDK alias and
