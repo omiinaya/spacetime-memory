@@ -1347,6 +1347,20 @@ def run_maintenance() -> dict[str, Any]:
 
 @mcp.tool()
 @require_api_key
+def expire_memories() -> dict[str, Any]:
+    """Manually expire all overdue memories.
+
+    Iterates all memories and deactivates any whose expires_at
+    timestamp is in the past. Requires database admin privileges.
+
+    Returns:
+        Reducer status.
+    """
+    return get_client().expire_memories()
+
+
+@mcp.tool()
+@require_api_key
 def check_embedder_health() -> dict[str, Any]:
     """Check if the embedder sidecar is running.
 

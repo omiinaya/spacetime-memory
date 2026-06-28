@@ -3115,6 +3115,18 @@ class Client:
         """Trigger periodic maintenance (expire, decay, dedup)."""
         return self._call("manual_maintenance", [])
 
+    def expire_memories(self) -> dict[str, Any]:
+        """Manually expire all overdue memories.
+
+        Iterates all memories and deactivates any whose ``expires_at``
+        timestamp is in the past (greater than 0 and less than current
+        time). Requires admin privileges on the database.
+
+        Returns:
+            Reducer status.
+        """
+        return self._call("expire_memories", [])
+
     def dedup(self, workspace_id: str) -> dict[str, Any]:
         """Run dedup within a workspace."""
         return self._call("dedup_memories", [workspace_id])
