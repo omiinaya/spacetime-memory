@@ -25,6 +25,17 @@ Difficulty: Hard (needs live STDB)
 
 ## Recently Completed
 
+### ✅ Add `add_agent_step` SDK method; eliminate last raw `_call()` from MCP (this tick)
+Added `Client.add_agent_step(session_id, workspace_id, step_type, content, summary, parent_step_id)`
+Python SDK method wrapping the `add_agent_step` reducer (session.rs:194), with full docstring and
+optional `parent_step_id` parameter. Updated the `add_agent_step` MCP tool to use the SDK method
+instead of raw `get_client()._call()`. This completes the MCP `_call()` elimination project —
+**0 remaining raw `_call()` calls in server/mcp/main.py**. 170/170 test_client.py tests passing.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+Commit: 14758893
+
 ### ✅ Add `delete_mental_model` + `update_mental_model` MCP tools (this tick)
 Added `delete_mental_model(model_id)` and `update_mental_model(model_id, content, confidence, status)`
 MCP tools in main.py — these SDK methods (client.py:4004 and client.py:4014) were exposed in the
@@ -171,6 +182,29 @@ Commit: 33287f0a
 
 
 ## Research Log
+
+### Jun 28 (this tick) — Added `add_agent_step` SDK method; eliminated last raw `_call()` from MCP; backlog cleared
+- **Completed**: Added `Client.add_agent_step(session_id, workspace_id, step_type, content, summary, parent_step_id)`
+  Python SDK method wrapping the `add_agent_step` reducer (session.rs:194), with full docstring and
+  optional `parent_step_id` parameter. Updated the `add_agent_step` MCP tool to use the SDK method
+  instead of raw `get_client()._call()`. This completes the MCP `_call()` elimination project —
+  **0 remaining raw `_call()` calls in server/mcp/main.py**. 170/170 test_client.py tests passing.
+- **Cleanup**: Added new completed entry at top of Recently Completed. Purged oldest completed entry
+  (`Add delete_fact, update_fact, search_facts SDK methods + MCP tools`) to keep 10 entries.
+- **Research**:
+  - Git log (7 days): 307+ commits, latest: 14758893 (this tick — `add_agent_step` SDK method).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged, PyPI latest).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.42.1 — all unchanged from last tick.
+  - Deeper scan: verified auth guard coverage across all Rust modules — all modules have
+    `require_auth`/`require_admin`/`check_space_access` in all reducers except 4 intentionally
+    unguarded cases (register, login, logout, set_initial_admin). Auth guard review complete
+    — no action needed. 63.4% docstring coverage in client.py (104/164 methods) — identified
+    as a quality improvement candidate for future ticks.
+  - All `_call()` usage in MCP tools now eliminated — 0 remaining.
+  - No code-level TODO/FIXME markers. No new competitor features to adopt.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: 14758893 — 2 files changed, +39/-3 lines (client.py, main.py).
 
 ### Jun 28 (this tick) — Added `grant_space_access` + `revoke_space_access` SDK methods; converted 9 MCP tools from `_call()` to SDK methods; backlog cleared
 - **Completed**: Added `Client.grant_space_access(workspace_id, peer_id, permission)`
