@@ -1369,6 +1369,30 @@ def create_edge(
 
 @mcp.tool()
 @require_api_key
+def update_edge(
+    edge_id: str,
+    relation: str,
+    weight: float = 1.0,
+    metadata_json: str = "{}",
+) -> dict[str, Any]:
+    """Update an existing knowledge-graph edge's mutable fields.
+
+    Args:
+        edge_id: The ID of the edge to update.
+        relation: New relationship type label.
+        weight: New edge weight (default: 1.0).
+        metadata_json: Updated JSON metadata string.
+
+    Returns:
+        Dict with operation status and updated edge details.
+    """
+    return get_client().update_edge(
+        edge_id, relation, weight, metadata_json,
+    )
+
+
+@mcp.tool()
+@require_api_key
 def add_node_citation(
     workspace_id: str,
     node_id: str,

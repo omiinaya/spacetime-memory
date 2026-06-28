@@ -125,24 +125,38 @@ Difficulty: Medium
 Est: 25min
 Test: 749/749 unit tests passing (was 1 pre-existing failure: test_get_memory_history_found)
 
-### ✅ Update MCP README with full tool catalog (Jun 27)
-The README at `server/mcp/README.md` previously documented only ~15 of ~128 MCP
-tools across 5 categories. Expanded to a comprehensive catalog covering all 24
-categories: Workspace, Memory CRUD, Memory Management, Search, Pattern Detection,
-Context Management, Notes, Documents, Profile, Knowledge Graph Base, KG Analytics,
-Graph Traversal, Entity Resolution, Tours, Sessions, Mental Models, Facts,
-Directory, Access Control, Compounder, Maintenance, Decay Model, Peers, and
-System. Each tool has its description and parameter list documented.
-Files: server/mcp/README.md
-Difficulty: Medium
-Est: 20min
-Test: README now 303 lines (was 95), 128 tools documented in clean tables
+---
+
+### ✅ Add `update_edge` SDK method + MCP tool (Aug 2 — this tick)
+The `update_edge` Rust reducer (knowledge_graph.rs:298) updates a KG edge's
+relation, weight, and metadata. Added `Client.update_edge()` SDK method and
+`update_edge` MCP tool with matching parameter signature (edge_id, relation,
+weight, metadata_json). `update_node` already existed — `update_edge` was the
+analogous gap. All tests continue to pass.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 15min
+Test: 1833/1833 unit tests passing
 
 ---
 
 ## Pending
 
-*No pending items — backlog cleared.*
+### 🟡 Add `update_memory_tier` SDK method + MCP tool
+The `update_memory_tier` Rust reducer (context_compression.rs:106) changes a
+memory's compression tier (L0, L1, L2). Not exposed in SDK or MCP. This is
+important for context compression workflows that manage token budgets across
+workspaces.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+
+### 🟡 Add `search_directory_contents` SDK method + MCP tool
+The `search_directory_contents` Rust reducer (profile_query.rs:213) recursively
+searches directory contents in a workspace. Not exposed in SDK or MCP.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
 
 ## Deferred / Blocked
 
@@ -167,6 +181,25 @@ Difficulty: Hard (needs live STDB)
 |---|
 
 ## Research Log
+
+### Aug 2 (tick 4) — Added `update_edge` SDK + MCP; found 2 more SDK gaps
+- **Completed**: Added `update_edge` SDK method and MCP tool — fills the last
+  KG gap (update_node already existed). 1833/1833 unit tests passing.
+- **Cleanup**: Purged oldest Recently Completed entry (Update MCP README) to
+  keep 10 items. Moved update_edge to Recently Completed.
+- **Research**:
+  - Git log (7 days): 250+ commits, latest: 031daaea (previous tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all
+    unchanged from last tick.
+  - Deeper scan: compared all 160 Rust reducers against 107 Client SDK methods.
+    Found 3 reducers with no SDK/MCP coverage: `update_edge` (now done),
+    `update_memory_tier`, `search_directory_contents`. Both added as PENDING.
+  - No competitor features to adopt. No code-level TODO/FIXME markers.
+  - Web UI directory (web/) does not exist — no frontend gaps to fill.
+- **Backlog**: 2 PENDING items remaining.
+- **Commit**: Commit pending — needs code review and push.
 
 ### Aug 2 (tick 3) — Fixed missing _NoOpSpan OTel interface methods; backlog remains empty
 - **Completed**: Added 3 missing OpenTelemetry Span interface methods to

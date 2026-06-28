@@ -2859,6 +2859,31 @@ class Client:
             ],
         )
 
+    def update_edge(
+        self,
+        edge_id: str,
+        relation: str,
+        weight: float = 1.0,
+        metadata_json: str = "{}",
+    ) -> dict[str, Any]:
+        """Update an existing knowledge-graph edge's mutable fields.
+
+        Args:
+            edge_id: The ID of the edge to update.
+            relation: New relationship type label.
+            weight: New edge weight (default: 1.0).
+            metadata_json: Updated JSON metadata string.
+        """
+        return self._call(
+            "update_edge",
+            [
+                edge_id,
+                relation,
+                weight,
+                metadata_json,
+            ],
+        )
+
     def add_node_citation(
         self,
         workspace_id: str,
