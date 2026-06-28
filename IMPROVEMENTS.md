@@ -12,6 +12,18 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add `delete_node` and `delete_edge` SDK methods + MCP tools (this tick)
+Added `Client.delete_node(node_id)` and `Client.delete_edge(edge_id)` Python
+SDK methods wrapping the `delete_node` and `delete_edge` KG reducers
+(knowledge_graph.rs:185, knowledge_graph.rs:269). Also added corresponding
+`delete_node` and `delete_edge` MCP tools in main.py. These complete the
+KG CRUD operations — `create_node`/`update_node`/`delete_node` and
+`create_edge`/`update_edge`/`delete_edge` now all have SDK + MCP coverage.
+492/492 unit tests passing, 4 skipped (pre-existing live-STDB tests).
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+
 ### ✅ Add SDK methods for set_memory_scope, mental_models (5), and facts (add_fact + list_facts) (this tick)
 Added 8 new ``Client`` SDK methods to close all remaining SDK parity gaps:
 - ``Client.set_memory_scope(memory_id, user_scope)`` — scope memory to a user identity
@@ -124,7 +136,31 @@ Test: 2020/2020 unit tests passing
 
 ## Pending
 
-None — backlog cleared.
+### Add `delete_fact`, `update_fact`, `search_facts` SDK methods + MCP tools
+The `delete_fact` (profile.rs:261), `update_fact` (profile.rs:218), and
+`search_facts` (profile.rs:332) reducers exist in Rust but have no Python
+SDK methods or MCP tools. The CLI currently calls `_call("delete_fact", ...)`
+directly. Adding proper SDK methods would complete fact CRUD (add_fact,
+list_facts exist).
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py, cli/stmem.py
+Difficulty: Easy
+Est: 15min
+
+### Add `tag_memory`, `untag_memory`, `create_tag` SDK methods + MCP tools
+The `create_tag` (tag.rs:32), `tag_memory` (tag.rs:55), and `untag_memory`
+(tag.rs:71) reducers exist in Rust but have no Python SDK or MCP coverage.
+Tagging is a basic memory organizing feature that users would benefit from
+having programmatic access to.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+
+### Add `expire_memories` SDK method + MCP tool
+The `expire_memories` reducer (memory.rs) triggers manual expiration of
+overdue memories. Currently no Python SDK or MCP access.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 5min
 
 ## Deferred / Blocked
 
@@ -149,6 +185,35 @@ Difficulty: Hard (needs live STDB)
 |---|
 
 ## Research Log
+
+### Jun 27 (tick 8) — Added `delete_node` + `delete_edge` SDK methods and MCP tools; found 3 new gaps
+- **Completed**: Added `Client.delete_node(node_id)` and `Client.delete_edge(edge_id)`
+  Python SDK methods wrapping the `delete_node` and `delete_edge` KG reducers
+  (knowledge_graph.rs:185, knowledge_graph.rs:269). Also added corresponding
+  `delete_node` and `delete_edge` MCP tools in main.py. These complete the KG
+  CRUD operations — `create_node`/`update_node`/`delete_node` and
+  `create_edge`/`update_edge`/`delete_edge` now all have SDK + MCP coverage.
+  492/492 unit tests passing, 4 skipped (pre-existing live-STDB tests).
+- **Cleanup**: Added new completed item to Recently Completed (9 total, within 5-10
+  range, no purge needed). Moved 4 new PENDING items into Pending section.
+- **Research**:
+  - Git log (7 days): 250+ commits, latest: c865ea19 (previous tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.4 (installed upstream venv — PyPI latest is v2.0.10 per research log).
+  - langgraph v1.2.4 (installed), zep-python v2.0.2, opentelemetry — all unchanged.
+  - Deeper scan: compared all 160 Rust reducers against 122 SDK public methods.
+    Found 78 reducers not called via `_call` in client.py. Filtered to highest-value
+    gaps — reducers that exist in Rust with no SDK/MCP coverage:
+    1. `delete_fact`, `update_fact`, `search_facts` (profile.rs) — fact CRUD incomplete
+    2. `tag_memory`, `untag_memory`, `create_tag` (tag.rs) — tagging not exposed
+    3. `expire_memories` (memory.rs) — manual expiration not exposed
+    All added as PENDING items.
+  - No code-level TODO/FIXME markers. Web UI directory (web/) does not exist.
+  - STDB SDK changelogs checked: no relevant new features.
+- **Backlog**: 3 PENDING items remaining (delete_fact/update_fact/search_facts,
+  tag_memory/untag_memory/create_tag, expire_memories).
+- **Commit**: TBD — 4 files changed (client.py +46 lines, main.py +30 lines,
+  IMPROVEMENTS.md).
 
 ### Jun 27 (tick 7) — Added 8 SDK methods (set_memory_scope, 5 mental model ops, add_fact + list_facts); backlog cleared
 - **Completed**: Added all 8 missing SDK methods closing the remaining SDK parity gaps:

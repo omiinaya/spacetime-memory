@@ -1357,6 +1357,21 @@ def update_node(
 
 @mcp.tool()
 @require_api_key
+def delete_node(
+    node_id: str,
+) -> dict[str, Any]:
+    """Soft-delete a knowledge graph node by ID.
+
+    Removes the node from the KG. The node's edges remain but become orphaned.
+
+    Args:
+        node_id: The ID of the node to delete.
+    """
+    return get_client().delete_node(node_id)
+
+
+@mcp.tool()
+@require_api_key
 def create_edge(
     workspace_id: str,
     source_node_id: str,
@@ -1408,6 +1423,21 @@ def update_edge(
     return get_client().update_edge(
         edge_id, relation, weight, metadata_json,
     )
+
+
+@mcp.tool()
+@require_api_key
+def delete_edge(
+    edge_id: str,
+) -> dict[str, Any]:
+    """Soft-delete a knowledge graph edge by ID.
+
+    Removes the edge from the KG.
+
+    Args:
+        edge_id: The ID of the edge to delete.
+    """
+    return get_client().delete_edge(edge_id)
 
 
 @mcp.tool()

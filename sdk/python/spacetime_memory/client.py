@@ -2878,6 +2878,20 @@ class Client:
             ],
         )
 
+    def delete_node(
+        self,
+        node_id: str,
+    ) -> dict[str, Any]:
+        """Soft-delete a knowledge-graph node by ID.
+
+        Removes the node from the KG (sets ``is_active = false``).
+        The node's edges remain but become orphaned.
+
+        Args:
+            node_id: The ID of the node to delete.
+        """
+        return self._call("delete_node", [node_id])
+
     def create_edge(
         self,
         workspace_id: str,
@@ -2939,6 +2953,19 @@ class Client:
                 metadata_json,
             ],
         )
+
+    def delete_edge(
+        self,
+        edge_id: str,
+    ) -> dict[str, Any]:
+        """Soft-delete a knowledge-graph edge by ID.
+
+        Removes the edge from the KG (sets ``is_active = false``).
+
+        Args:
+            edge_id: The ID of the edge to delete.
+        """
+        return self._call("delete_edge", [edge_id])
 
     def add_node_citation(
         self,
