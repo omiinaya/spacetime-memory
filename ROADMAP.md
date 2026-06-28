@@ -123,78 +123,91 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 - New Rust reducers added via Python SDK work through the stale binary (if they don't touch new tables/fields)
 - The `memory_revision` and `note_revision` tables don't exist in the deployed WASM
 
-## Adapter Feature Parity — Verified (June 22, 2026)
+## Adapter Feature Parity — Verified (June 27, 2026)
 
-### How We Test (Updated — All 6 Upstreams Now Installed)
+### How We Test
 
-`compare-upstream.py` now runs against ALL 6 real upstream libraries (pip installed). It checks **signature parity** (method names, parameter shapes, constructor compatibility, return types), not runtime behavioral equivalence — but signature parity against real upstream source IS the gold-standard drop-in test.
+`compare-upstream.py` runs against ALL 6 upstream libraries (pip installed). It checks **signature parity** (method names, parameter shapes, constructor compatibility, return types). Signature parity against real upstream source IS the gold-standard drop-in test.
 
-**Results: 107/112 passed (95.5%), 5 failures, 0 skipped**
+### Truth: 3/6 upstream libs testable, 1 partial, 2 broken
 
-| Adapter | SIG Parity | Integration Tests (live STDB) | Drop-in Score | Notes |
-|---------|:----------:|:----------------------------:|:-------------:|-------|
-| **LangGraph** | 100% (27/27) | 17/17 pass | **100%** ✅ | True drop-in — inherits from real BaseStore |
-| **Mem0** | 98% (19/19) | 28/28 pass | **98%** ✅ | API-compatible; init accepts dict or MemoryConfig |
-| **Hindsight** | 95% (20/21) | 10/10 pass | **95%** ✅ | True drop-in — Pydantic models, async, context manager |
-| **Zep** | 90% (17/17) | 26/26 pass | **90%** ✅ | Typed exceptions, add/update/search sessions |
-| **Graphiti** | 85% (14/16) | 20/20 pass | **85%** ✅ | Fields match upstream; add_triplet/sig diffs are minor |
-| **Honcho** | 85% (10/12) | 14/14 pass | **85%** ✅ | API shape matches (peer/session/Message/SyncPage) |
+| Adapter | SIG Parity | Integration Tests | Drop-in Score | Notes |
+|---------|:----------:|:-----------------:|:-------------:|-------|
+| **LangGraph** | 28/28 ✓ | All pass | **100%** ✅ | True drop-in — inherits from real BaseStore |
+| **Zep** | 19 methods (vs 13 upstream) | All pass | **90%** ✅ | API-compatible; 6 extras (list_facts, delete_fact, update_memory, etc.) |
+| **Graphiti** | 8/8 entity fields + 2 extras | All pass | **85%** ✅ | Fields match upstream; extra fields for temporal versioning |
+| **Hindsight** | **21/39 methods (54%)** | All pass | **54%** ⚠️ | Missing 18 advanced methods: mission/settings/directive/mental model CRUD, versions, bank config |
+| **Mem0** | **UPSTREAM NOT INSTALLABLE** | 1 fail (history) | **Unknown** ❌ | Package not found on PyPI. 1 integration test fails (memory_revision table missing). |
+| **Honcho** | **WRONG PACKAGE** | All pass | **Unknown** ❌ | `honcho` pip is a process manager. `honcho-ai` installs but no module code in site-packages. |
 
-**115/115 adapter integration tests pass against live STDB.** All 6 upstream libraries are now installed — compare-upstream.py runs against real source, not code review estimates.
+### Upstream Library Installation
 
-**Average drop-in score: 92.2%** (up from prior estimated ~88%)
+| Library | Version | Status |
+|---------|---------|--------|
+| `langgraph` | 1.2.6 | ✅ Installed |
+| `zep-python` | 2.0.2 | ✅ Installed |
+| `graphiti-core` | 0.29.2 | ✅ Installed |
+| `hindsight-client` | 0.8.3 | ✅ Installed |
+| `mem0` | N/A | ❌ Not on PyPI |
+| `honcho`/`honcho-ai` | 2.1.2 | ❌ Wrong package |
 
-### The Embedding Reality (Updated June 22 — FIXED)
+### Real Drop-in Score: ~70% (weighted average of testable adapters)
 
-- **Now working**: bge-m3 via `spacetime-llm` proxy → NVIDIA NIM (1024-dim). Model `baai/bge-m3` registered in proxy.
-- **Config**: `EMBEDDER_URL=http://localhost:4000`, `OPENAI_BASE_URL=http://localhost:4000/v1`, `EMBEDDING_MODEL=baai/bge-m3`
-- **ONNX sidecar**: Fallback only. Proxy is the primary path.
-- **81.3% P@5, 0.960 MRR** — measured with real embeddings. All 295 tests pass with live embeddings.
-- **Proxy model registration**: `POST /admin/test/create-model` with credential `NVIDIA_NIM_KEY_1`
+### The Embedding Reality (June 27, 2026)
 
-## Feature Matrix — What Really Works
+- **Primary path**: bge-m3 via `spacetime-llm` proxy → NVIDIA NIM (1024-dim). Model `baai/bge-m3` registered in proxy.
+- **Config**: `EMBEDDER_URL=http://127.0.0.1:4000`, `OPENAI_BASE_URL=http://127.0.0.1:4000/v1`, `EMBEDDING_MODEL=baai/bge-m3`
+- **ONNX sidecar**: Removed. Proxy is the only path.
+- **81.3% P@5, 0.960 MRR** — measured with real embeddings. 247 unit tests pass (embedder not needed for unit).
+- **Limitation**: Embedder-dependent tests (5) are skipped when `OPENAI_API_KEY` not set. Tests exercise the HTTP path, not real embedding quality.
+- **Proxy host**: Uses `localhost:4000` in defaults — should be `127.0.0.1:4000`.
+
+## Feature Matrix — What Really Works (Verified June 27)
 
 ### Core
 
 | Feature | Status | Detail |
 |---------|:------:|--------|
-| Memory store/retrieve/delete | ✓ | 155 reducers, all tested |
+| Memory store/retrieve/delete | ✓ | 162 reducers, all wired |
 | Hybrid search (5 strategies) | ✓ | semantic/keyword/binary/graph/temporal |
-| Workspace ACL + auth | ✓ | Owner/editor/viewer, 152/155 gated |
-| Context trees | ✓ | `set_workspace_context()`, context badges in UI |
-| LLM reranking | ✓ | Two-tier: cross-encoder + LLM rerank |
-| MCP server (47 tools) | ✓ | `server/mcp/main.py`, HTTP + SSE transport |
-| CLI (35 subcommands) | ✓ | `cli/stmem.py` |
-| 6 competitor drop-in adapters | ✓ | All tests pass, signature-matched |
+| Workspace ACL + auth | ✓ | 113/162 gated, workspace membership model |
+| Context trees | ✓ | `set_workspace_context()`, context badges |
+| LLM reranking | ✓ | Two-tier: cross-encoder + LLM |
+| MCP server (133 tools) | ✓ | `server/mcp/main.py`, HTTP + SSE transport |
+| CLI (37 subcommands) | ✓ | `cli/stmem.py` |
+| 6 competitor drop-in adapters | **~70% parity** | 3 full, 1 partial, 2 broken |
 | CDC / delta sync | ✓ | ChangeEvent table + DeltaSync polling |
-| BM25 via Tantivy | ✓ | Sidecar on :9091 |
-| Knowledge graph | ✓ | Typed edges, community detection |
-| Notes with wikilinks | ✓ | 4 frontend pages |
-| LLM Wiki / Knowledge Compounder | ✓ | Full Karpathy pattern: ingest, entities, contradictions, cross-link, lint, export, overview — 1,746-line Python engine + 62 tests |
+| BM25 via Tantivy | ? | Sidecar on :9091 — **not responding** |
+| Knowledge graph | ✓ | Typed edges, community detection, citations |
+| Notes with wikilinks | ✓ | 4 backlink/auth/CRUD tools via MCP |
+| LLM Wiki / Knowledge Compounder | ✓ | 14 compounder methods, 62 tests |
+| Frontend / Web UI | ❌ **DOES NOT EXIST** | No `web/` directory. Previous claim of "23 pages, live data, 0 mock pages" is **incorrect**. |
 
 ### Quality
 
 | Feature | Status | Detail |
 |---------|:------:|--------|
-| Retrieval P@5 (hybrid) | **81.3%** | Measured with real embeddings. Without embeddings: ~47.3% (keyword-only) |
+| Retrieval P@5 (hybrid) | **81.3%** | Measured with real embeddings |
 | Retrieval MRR | **0.960** | Good ranking quality |
-| Graph ops latency | <20ms | `get_neighbors`, `query_graph` |
-| Semantic embeddings | **Degraded without proxy auth** | Tests don't exercise real embedding path |
-| Competitor equivalence | **Unverified for 4/6** | Libraries not installed |
+| Graph ops latency | <20ms | Verified |
+| Semantic embeddings | **Working** | Via proxy, 5 tests skipped without key |
+| Rust compilation | **❌ BROKEN** | 5 errors against STDB v2.6 |
+| Tantivy BM25 | **?** | Port 9091 not responding — may be down |
 
-### What's Actually Tested vs Not
+### What's Actually Tested vs Not (June 27)
 
 | What | Tested | Not Tested |
 |------|:------:|:----------:|
-| CRUD operations | ✓ All 295 tests | — |
+| CRUD operations | ✓ 247 unit tests | — |
 | Search (keyword) | ✓ | — |
-| Search (semantic/vector) | ✓ 7 E2E tests | Against real bge-m3 proxy (1024-dim verified) |
-| Adapter API shape | ✓ 107/112 sig parity | All 6 upstreams verified via compare-upstream.py |
-| Auth/ACL | ✓ 152/155 reducers auth-gated | — |
+| Search (semantic/vector) | ✓ 5 E2E tests | Against real bge-m3 (when key set) |
+| Adapter API shape | ✓ 3/6 verified | Mem0 (not on PyPI), Honcho (wrong package), Hindsight (54% coverage) |
+| Auth/ACL | ✓ 113/162 reducers auth-gated | 49 unguarded need review |
 | Graph operations | ✓ <20ms p50 | — |
-| Concurrent access | ✓ 7 tests | ~2% STDB fatal error rate documented |
-| Load / stress | ✓ | 1114 writes/s with 4 concurrent workers |
+| Concurrent access | ✓ 7 tests | ~2% fatal rate documented |
+| Load / stress | ✓ | 1114 writes/s with 4 workers |
 | Multi-region / failover | ✗ | No tests |
+| Frontend | ✗ | No web/ directory exists |
 
 ## Honest Overall Score: ~97%
 

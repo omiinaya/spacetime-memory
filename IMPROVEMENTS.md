@@ -45,9 +45,26 @@ All previously missing SDK methods now have coverage — backlog cleared.
 Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
 Difficulty: Easy
 Est: 5min
-Commit: e27ea0a9
-
-### ✅ Add `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools (this tick)
+|Commit: e27ea0a9
+|
+|### ✅ Add `update_workspace`, `set_workspace_visibility`, `get_workspace_context` SDK methods + MCP tools (this tick)
+|Added 3 new ``Client`` SDK methods for workspace management that were
+|identified as gaps in earlier research but never implemented:
+|- ``Client.update_workspace(id, name, description)`` — wraps ``update_workspace``
+|  reducer (workspace.rs:72), requires owner access
+|- ``Client.set_workspace_visibility(workspace_id, is_public)`` — wraps
+|  ``set_workspace_visibility`` reducer (workspace.rs:196), toggles public/private
+|- ``Client.get_workspace_context(workspace_id)`` — calls ``get_workspace_context``
+|  reducer (workspace.rs:136) and queries ``workspace_context_result`` table
+|All three have matching MCP tools (``update_workspace``, ``set_workspace_visibility``,
+|``get_workspace_context``). 161/161 test_client.py tests passing, 145 MCP tools
+|registered. Workspace CRUD + visibility + context is now fully covered.
+|Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+|Difficulty: Easy
+|Est: 10min
+|Commit: a00eca57
+|
+|### ✅ Add `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools (this tick)
 Added `Client.create_tag(workspace_id, name, color)`, `Client.tag_memory(memory_id, tag_id)`,
 and `Client.untag_memory(memory_id, tag_id)` Python SDK methods wrapping the ``create_tag``,
 ``tag_memory``, and ``untag_memory`` Rust reducers (tag.rs:32, 55, 71). Added matching
@@ -143,6 +160,35 @@ Est: 15min
 |---
 
 ## Research Log
+
+### Jun 28 (this tick) — Added `update_workspace`, `set_workspace_visibility`, `get_workspace_context` SDK methods + MCP tools
+- **Completed**: Added 3 new ``Client`` SDK methods for workspace management:
+  - ``Client.update_workspace(id, name, description)`` — wraps ``update_workspace``
+    reducer (workspace.rs:72), updates workspace name/description
+  - ``Client.set_workspace_visibility(workspace_id, is_public)`` — wraps
+    ``set_workspace_visibility`` reducer (workspace.rs:196), toggles public/private
+  - ``Client.get_workspace_context(workspace_id)`` — calls ``get_workspace_context``
+    reducer (workspace.rs:136) and reads ``workspace_context_result`` table
+  All three have matching MCP tools. Workspace CRUD management (create, update, delete)
+  plus visibility toggle and context get/set are now fully exposed. 161/161
+  test_client.py tests passing, 145 MCP tools registered.
+- **Cleanup**: Purged 3 oldest Recently Completed entries (expires_at support,
+  delete_tour_stop, stale doc references) to keep 8 entries total. Added new
+  completed entry at top of Recently Completed.
+- **Research**:
+  - Git log (7 days): 250+ commits, latest: a00eca57 (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.43.0 — all unchanged from last tick.
+  - Deeper scan: compared all 158 Rust reducers against 158 SDK public methods.
+    Found 77 reducers with no direct SDK call. Filtered to highest-value:
+    `update_workspace`, `set_workspace_visibility`, `get_workspace_context` —
+    now implemented. Remaining gaps are internal (replication, auth flows, proxy
+    metrics, indexing, consolidation internals) that don't need SDK exposure.
+    No code-level TODO/FIXME markers in source code.
+  - Web UI directory (web/) does not exist — no frontend gaps to fill.
+- **Backlog**: 0 PENDING items — backlog remains empty.
+- **Commit**: a00eca57 — 4 files changed, +177/-79 lines.
 
 ### Jun 28 (this tick) — Added `expire_memories` SDK method + MCP tool; backlog cleared
 - **Completed**: Added `Client.expire_memories()` Python SDK method wrapping the
