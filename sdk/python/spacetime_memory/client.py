@@ -846,6 +846,49 @@ class Client:
         """Delete a workspace and all its data."""
         return self._call("delete_workspace", [workspace_id])
 
+    def update_workspace(self, id: str, name: str, description: str) -> dict[str, Any]:
+        """Update a workspace's name and description. Requires owner access.
+
+        Args:
+            id: The workspace ID.
+            name: New name for the workspace.
+            description: New description for the workspace.
+
+        Returns:
+            Dict with reducer response status.
+        """
+        return self._call("update_workspace", [id, name, description])
+
+    def set_workspace_visibility(self, workspace_id: str, is_public: bool) -> dict[str, Any]:
+        """Toggle whether a workspace is public or private. Requires owner access.
+
+        Args:
+            workspace_id: The workspace to update.
+            is_public: True to make public, False to make private.
+
+        Returns:
+            Dict with reducer response status.
+        """
+        return self._call("set_workspace_visibility", [workspace_id, is_public])
+
+    def get_workspace_context(self, workspace_id: str) -> dict[str, Any]:
+        """Get the context string attached to a workspace.
+
+        Calls the ``get_workspace_context`` reducer which writes to the
+        ``workspace_context_result`` table, then queries that table.
+
+        Args:
+            workspace_id: The workspace to retrieve context for.
+
+        Returns:
+            Dict with workspace_id, context, and queried_at fields.
+        """
+        self._call("get_workspace_context", [workspace_id])
+        rows = self._query("workspace_context_result")
+        if rows:
+            return rows[0]
+        return {"workspace_id": workspace_id, "context": "", "queried_at": 0}
+
     # -----------------------------------------------------------------------
     # Memory
     # -----------------------------------------------------------------------

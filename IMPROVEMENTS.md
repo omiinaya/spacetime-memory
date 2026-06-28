@@ -138,44 +138,7 @@ Files: sdk/python/tests/test_client.py, server/mcp/README.md
 Difficulty: Easy
 Est: 15min
 
-### ✅ Add `expires_at` support to `update_memory` — SDK + MCP + Rust reducer (Aug 2)
 
-Convention: `-1` = preserve existing expiration, `0` = never expires (clear),
-`>0` = set specific timestamp in microseconds. Python SDK maps `None` → `-1`.
-
-This was the last Client SDK method that couldn't modify `expires_at` despite
-the `Memory` table already having the field.
-Files: server/spacetimedb/src/memory.rs, sdk/python/spacetime_memory/client.py,
-  server/mcp/main.py
-Difficulty: Easy
-Est: 15min
-Notes: Rust reducer change requires WASM rebuild (blocked by OOM — see Deferred).
-
-### ✅ Add `delete_tour_stop` SDK method + MCP tool (Aug 2)
-The Rust `remove_tour_stop` reducer was not exposed in the Python SDK or MCP
-server. Added `Client.delete_tour_stop(stop_id)` method, `delete_tour_stop` MCP
-tool, MCP README entry, and 2 MCP tool tests. All Rust tour reducers now have
-full Python SDK + MCP coverage.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py,
-  server/mcp/README.md, sdk/python/tests/test_mcp.py
-Difficulty: Trivial
-Est: 5min
-
-### ✅ Fix 9 stale SpacetimeDB v2.4/v2.4.1 doc references across 7 documentation files (Aug 2)
-Updated all STDB version references from v2.4/v2.4.1 to v2.6 (the actual
-dependency version since commit `d1d147f`). Fixed:
-- README.md (CLI prerequisite: v2.4+ → v2.6+)
-- plugins/hermes/README.md (durable storage: v2.4.1 → v2.6)
-- docs/development.md (prerequisite: v2.4+ → v2.6+)
-- docs/getting-started.md (prerequisite: v2.4+ → v2.6+)
-- docs/PERFORMANCE.md (benchmark context: v2.4.1 → v2.6)
-- docs/usage/self-hosted.md (runtime includes: v2.4.1 → v2.6)
-- DEPLOYMENT.md (3 refs: CLI version, download URL, Docker image v2.4.1 → v2.6)
-Files: README.md, plugins/hermes/README.md, docs/development.md,
-  docs/getting-started.md, docs/PERFORMANCE.md, docs/usage/self-hosted.md,
-  DEPLOYMENT.md
-Difficulty: Trivial
-Est: 5min
 
 |---
 

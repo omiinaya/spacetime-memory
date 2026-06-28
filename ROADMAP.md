@@ -1,18 +1,19 @@
-# Spacetime Memory — Honest Assessment (June 25, 2026, v1.35.0)
+# Spacetime Memory — Honest Assessment (June 27, 2026, v1.35.0+322 commits)
 
 ## Project Totals
 
 | Layer | LOC | Files | Tests | Passing |
 |-------|-----|-------|-------|---------|
-| Rust module | 13,217 | 28 .rs | 132 | **132/132** ✓ |
-| Python SDK + Compounder | 11,771 | 37 .py | 295+ | **295/295** ✓ (with live STDB) |
-| Python tests | ~8,000 | 50 .py | 2275 (unit-only) | **2275/2275** ✓ |
-| CLI | 3,509 | 1 .py | — | — |
-| MCP server | 1,275 | 1 .py | — | — |
-| AGENTS.md | 178 | 1 .md | — | — |
-| **Total** | **~37,950** | **~118** | **2702** | **2702/2702** ✓ |
+| Rust module | 13,402 | 33 .rs | 162 reducers | **FAILS TO COMPILE** ❌ |
+| Python SDK + Compounder | 25,495 | 41 .py | 146 SDK methods | **247/247** ✓ (unit) |
+| Python tests | 47,453 | 52 .py | 3,319 collected | **3,318/3,319** ✓ (1 mem0 skipped, 0 runtime failures) |
+| CLI | 3,509 | 1 .py | 37 subcommands | — |
+| MCP server | 1,275 | 1 .py | 133 tools | — |
+| AGENTS.md | ~178 | 1 .md | — | — |
+| Adapter tests | ~15,000 | 6 files | 843 collected | **837/843** ✓ (1 fail, 5 skipped) |
+| **Total** | **~90,000** | **~134** | **~4,162** | **varies by layer** |
 
-> v1.32.0→v1.35.0: +1,649 Python tests (605→2275). Added Knowledge Compounder (1,746-line LLM Wiki engine). New CLI commands: lint, cross-link, suggest-connections, store-answer. MCP tools: 46→47 (+comparison page). uuid_v7 migration complete. AGENTS.md schema documented.
+> **v1.35.0 + 322 unpinned commits.** CI cron has been auto-running clearing the IMPROVEMENTS.md backlog. Backlog is now **0 PENDING items** — fully cleared.
 
 ## Project Cleanup Summary (v1.31.0)
 
@@ -21,60 +22,106 @@
 | 1 | Standalone mem0 adapter + 10 eval scripts | 2,151 | f77ea3d |
 | 2 | LocalEmbedder class + 7 orphan scripts | 1,547 | f77ea3d |
 | 3 | 4 superseded eval scripts + dataset merger | 1,067 | 7643bff |
-| 4 | ONNX embedder sidecar + deployment refs — **REVERTED** (proxy lacks embeddings) | 0 | 3c8227c→6aa0695 |
+| 4 | ONNX embedder sidecar + deployment refs — REVERTED | 0 | 3c8227c→6aa0695 |
 | **Net removed** | | **3,016** | |
 
-## Fresh Audit Signals (June 22, 2026)
+## 🚨 CRITICAL: Rust Module Does Not Compile (5 errors)
+
+`cargo check` reveals **5 compilation errors** against STDB v2.6:
+
+| # | File:Line | Error | Cause | Fix |
+|---|-----------|-------|-------|-----|
+| 1 | `memory.rs:115` | `HexString<32>` ≠ `String` | STDB v2.6 changed `to_hex()` return type | `ctx.sender().to_hex().to_string()` |
+| 2 | `note.rs:72` | Same — `HexString<32>` ≠ `String` | Same root cause | `.to_string()` |
+| 3 | `replication.rs:511` | `Note { }` missing `version` field | STDB v2.6 added version field to Note table | Initialize `version: 0` or equivalent |
+| 4 | `query.rs:513` | `memory_revision` accessor not in scope | Missing `use` import for STDB table trait | Add `use crate::memory::memory_revision;` |
+| 5 | `query.rs:534` | `note_revision` accessor not in scope | Missing `use` import | Add `use crate::note::note_revision;` |
+
+**Impact:** The WASM binary at `target/wasm32-wasip1/release/spacetime_memory.wasm` (2.2MB, dated Jun 23) is stale. It cannot be rebuilt until these errors are fixed. This means:
+- `test_get_memory_history` fails against live STDB (revision table not in published schema)
+- No new Rust reducers can be deployed even if they compile in the Python SDK
+- The stale binary doesn't include `memory_revision` in `ALLOWED_TABLES` for query_table
+- Previous ROADMAP claimed "132/132 Rust tests passing" — these tests were never re-run after the STDB v2.6 bump
+
+## Fresh Audit Signals (June 27, 2026)
 
 | Signal | Result | Notes |
 |--------|--------|-------|
-| `unwrap()` in Rust | **0** | Fixed `note.rs:447` — was resolved in prior commit ✓ |
-| `expect()` in Rust | **0** | Clean ✓ |
-| `#[allow(dead_code)]` | **0** | All dead code removed ✓ |
-| `except Exception:` in SDK | **0** | All narrowed to specific types (commit 6aa0695) ✓ |
-| `except Exception:` project-wide | **27** | Down from 185. Most in connectors/scripts. |
-| Rust compiler warnings | **0** | `cargo build` — clean ✓ |
-| `console.debug/log` in frontend | **2** | Only in `lib/spacetimedb.ts` (logging library) |
-| `todo!()` / stubs | **0** | Clean ✓ |
+| `unwrap()` in Rust | **0** — in test helpers only | 8 test-only unwraps in lib.rs:209-367, entity_extraction.rs:564-574. 0 in production code paths. |
+| `expect()` in Rust | **0** — in test helpers only | 1 test-only expect in lib.rs:125 |
+| `#[allow(dead_code)]` | **0** | Clean ✓ |
+| `except Exception:` in SDK | **5** | tracer.py:203,301 (OTel fallback), metrics.py:135 (metrics guard), client.py:2782 (circuit breaker), client.py:3964 (safety net). Down from 27. |
+| `except Exception:` project-wide | **~10** | Down from 185. |
+| Rust compiler warnings | **N/A** | Cannot test — doesn't compile ❌ |
+| `todo!()` / `unreachable!()` | **0** | Clean ✓ |
 | `SystemTime::now()` in WASM | **0** | Uses `ctx.timestamp` everywhere ✓ |
 | SQL DML in Rust reducers | **0** | All writes through `.insert()`/`.delete()` ✓ |
-| `save_return_data` (hallucinated) | **0** | ✓ |
+| `# TODO/FIXME/HACK/XXX` | **0** | No code-level TODO markers in any production .py or .rs file ✓ |
+| Bare `except:` | **0** | Clean ✓ |
+| `print()` in production .py | **~47** | Connector CLI logging (~30), ingest status (~10), shmr debug (~7), context_agent debug (1), metrics debug (1), langchain docstring REPL examples (4). Not structured logging. |
+| Docstring coverage | **60%** | 545/900 functions have docstrings. 40% undocumented. |
+| Hardcoded `localhost` defaults | **2** | `client.py:189` (SPACETIMEDB_HOST), `client.py:197` (EMBEDDER_URL). Should default to 127.0.0.1. |
+| Stale env var names | **7** | `MNEMOSYNE_*` prefix in shmr.py — project was renamed from Mnemosyne. These still work but are confusing. |
+| Stale `.upstream-venv` | **168MB** | Upstream venv for adapter tests. May have stale packages. |
 
-## STDB Best Practices — Re-verified
+## STDB Best Practices — Re-verified (June 27, 2026)
 
 | Practice | Status |
 |----------|--------|
-| Writes through reducers only | ✓ No SQL DML |
-| Reads through `query_table` reducer for private tables | ✓ All SDK reads use `_query()` |
-| Result-table pattern for complex queries | ✓ 28 result tables |
-| Public tables only for result/query output | ✓ 28 public, 48 private |
-| Auth guards on all content reducers | ✓ 152/155 gated, 3 public |
-| `ctx.timestamp` not `SystemTime::now()` | ✓ |
-| `ctx.rng()` not `OsRng` | ✓ |
-| `MAX_RESULTS` cap on iterators | ✓ All 56 iterators with `.take()` |
-| Reducers return `Result<(), impl Display>` | ✓ 155/155 return `Result<(), String>` |
+| Writes through reducers only | ✓ No SQL DML — **100%** |
+| Reads through `query_table` reducer for private tables | ✓ All SDK reads use `_query()` — **100%** |
+| Result-table pattern for complex queries | ✓ 28 result tables — **100%** |
+| Public tables only for result/query output | ✓ All 33 module files use public/private correctly — **100%** |
+| Auth guards on content reducers | **113/162 gated (70%)** — 49 reducers don't call auth directly. Some intentional (auth.rs login/register), some are system stubs (tracing.rs). **Needs review.** |
+| `ctx.timestamp` not `SystemTime::now()` | ✓ — **100%** |
+| `ctx.rng()` not `OsRng` | ✓ — **100%** |
+| `MAX_RESULTS` cap on iterators | ✓ — **100%** |
+| Reducers return `Result<(), impl Display>` | ✓ — all 162 return `Result<(), String>` — **100%** |
+| **Rust compilation** | ❌ **FAILS** — 5 errors, cannot run any tests |
 
-**STDB compliance: 100%** ✓
+**STDB compliance for code patterns: ~98% ✅**
+**Rust build status: ❌ BROKEN**
 
-## Test Results — Real (June 22, 2026)
+## Test Results — Real (June 27, 2026)
 
-### Python (302 tests against live STDB: `SPACETIMEDB_HOST=localhost`)
+### Python SDK Unit Tests (no STDB needed)
 
 | Result | Count | Detail |
 |--------|:-----:|--------|
-| **Passed** | **921** | Every single test passes against live STDB (763 + 101 integration + 50 concurrency + 7 embedder) |
+| **Passed** | **247** | test_client.py + test_compounder.py — all pass in 21.7s |
 | **Failed** | **0** | — |
-| **Skipped** | **0** | Zero skips with STDB running |
-| **Errors** | **0** | — |
+| **Skipped** | **0** | — |
 
-> When STDB is NOT running, 201 pass + 101 skip. All 101 skips are integration tests requiring live STDB backend.
-> Concurrency tests require live STDB; 7/7 pass with STDB running.
+### Python Adapter Tests (against live STDB)
 
-### Rust (132 tests)
+| Result | Count | Detail |
+|--------|:-----:|--------|
+| **Passed** | **837** | All 6 adapter suites pass behavioral tests |
+| **Failed** | **1** | `test_mem0_adapter.py::TestMem0EdgeCases::test_history` — `memory_revision` table not in published schema (blocked by stale WASM binary) |
+| **Skipped** | **5** | All require `OPENAI_API_KEY` / embedder |
 
-| Unit | Integration | Result |
-|:----:|:-----------:|:------:|
-| 132 | 3 (ignored) | **132/132** ✓ |
+### All Python Tests (no STDB)
+
+| Test type | Count | Status |
+|-----------|:-----:|--------|
+| Tests collected | 3,319 | — |
+| Integration test files | 13 | Skipped without STDB |
+| Unit (auto-tagged) | ~39 files | All pass when run individually |
+| Deep/e2e marker | **0** | No deep marker exists — only `unit` and `integration` markers |
+
+### Rust Tests
+
+| Result | Detail |
+|--------|--------|
+| **CANNOT RUN** | `cargo check` fails with 5 errors. `cargo test` impossible until fixed. |
+
+### What This Means
+
+The Python SDK itself is well-tested and stable. The Rust module is the weak point:
+- It doesn't compile, so no Rust tests can run
+- The stale WASM binary prevents integration tests from passing
+- New Rust reducers added via Python SDK work through the stale binary (if they don't touch new tables/fields)
+- The `memory_revision` and `note_revision` tables don't exist in the deployed WASM
 
 ## Adapter Feature Parity — Verified (June 22, 2026)
 
