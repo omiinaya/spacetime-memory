@@ -161,6 +161,23 @@ Est: 15min
 
 ## Research Log
 
+### Jun 28 (this tick) — Backlog remains empty; all deps unchanged; no new gaps found
+- **Completed**: None — 0 PENDING items in backlog.
+- **Cleanup**: 10 items in Recently Completed (at max limit 10, no purge needed).
+- **Research**:
+  - Git log (7 days): 285+ commits, latest: 95ccba49 (this tick's docs fix).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.43.0 — all unchanged from last tick.
+  - Deeper scan: compared all Rust reducers against 161+ SDK public methods.
+    All reducers that accept a direct SDK call have coverage. Remaining gaps
+    are internal (replication, auth flows, proxy metrics, indexing internals)
+    that don't need SDK exposure. No code-level TODO/FIXME markers.
+  - All 300 tests pass (161 test_client, 91 test_compounder, 48 test_observability).
+  - Web UI directory (web/) does not exist — no frontend gaps to fill.
+- **Backlog**: 0 PENDING items — backlog remains empty.
+- **Commit**: No commit needed — no code changes this tick.
+
 ### Jun 28 (this tick) — Added `update_workspace`, `set_workspace_visibility`, `get_workspace_context` SDK methods + MCP tools
 - **Completed**: Added 3 new ``Client`` SDK methods for workspace management:
   - ``Client.update_workspace(id, name, description)`` — wraps ``update_workspace``
