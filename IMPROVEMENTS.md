@@ -340,3 +340,26 @@ Difficulty: Hard (needs live STDB)
   - 2062/2062 unit tests passing, no code-level TODO/FIXME markers.
 - **Backlog**: 0 PENDING items — backlog remains empty.
 - **Commit**: f096398b — 3 files changed, +32/-10 lines.
+
+### Jun 27 — Completed consolidate_memories SDK/MCP with tests + MCP README doc; backlog cleared
+- **Completed**: Added `consolidate_memories` unit test in test_client.py and
+  MCP README catalog entry. The Python SDK `Client.consolidate_memories()` and
+  MCP `consolidate_memories` tool were already written but uncommitted (staged
+  in working tree from a previous session). Missing bits: tests + README entry.
+  Now all committed and pushed.
+- **Cleanup**: Moved completed item to Recently Completed (now 10 entries at max).
+  Purged oldest entry (Fix test_batch_update_success test assertions) to stay
+  within 10-item limit.
+- **Research**:
+  - Git log (7 days): ~243 commits, latest: 12f8ef72 (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
+  - Deeper scan: found uncommitted `consolidate_memories` work-in-progress
+    (SDK method + MCP tool written but never committed, missing tests + README).
+    No other gaps found. All Client SDK methods have MCP wrappers (130+ tools).
+    No code-level TODO/FIXME markers indicating real bugs. Web UI directory (web/)
+    does not exist — no frontend gaps to fill.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: 12f8ef72 — 6 files changed, +82/-18 lines (client.py, main.py, test_client.py,
+  README.md, IMPROVEMENTS.md, .coverage deleted).
