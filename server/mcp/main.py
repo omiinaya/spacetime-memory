@@ -23,11 +23,11 @@ import logging
 import os
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 from mcp.server.fastmcp import FastMCP
 
 from spacetime_memory import Client
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Configuration
