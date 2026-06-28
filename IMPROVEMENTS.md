@@ -49,6 +49,7 @@ passing (test_client), 141 MCP tools registered.
 Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
 Difficulty: Easy
 Est: 10min
+Commit: c952d09a
 
 ### ✅ Add `delete_fact`, `update_fact`, and `search_facts` SDK methods + MCP tools (this tick)
 Added 3 new ``Client`` SDK methods completing the full facts CRUD suite:
