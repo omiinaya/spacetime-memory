@@ -56,6 +56,7 @@ Set these environment variables (or accept defaults):
 |---|---|---|
 | `escalate_memories` | Batch-escalate memory tiers (L2→L1→L0) | `workspace_id`, `l2_to_l1`, `l1_to_l0` |
 | `dedup_memories` | Dedup near-duplicate memories (cosine ≥0.85 + edit dist ≤30%) | `workspace_id` |
+| `consolidate_memories` | Merge several source memories into one consolidated memory | `workspace_id`, `source_ids_json`, `target_content`, `target_summary` |
 | `suggest_merges` | Find candidate merge pairs | `workspace_id`, `threshold` |
 | `approve_merge` | Approve a pending merge | `suggestion_id` |
 | `reject_merge` | Reject a pending merge | `suggestion_id` |

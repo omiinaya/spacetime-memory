@@ -12,6 +12,18 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add `consolidate_memories` SDK tests + MCP README documentation + commit (Jun 27)
+The `consolidate_memories` reducer existed in Rust (`consolidation.rs`) and the
+Python SDK method + MCP tool were already written but uncommitted. Added:
+1. Unit test for `Client.consolidate_memories()` in test_client.py
+2. MCP README catalog entry under "🔧 Memory — Management"
+3. Git commit + push
+Files: sdk/python/tests/test_client.py, server/mcp/README.md
+Difficulty: Easy
+Est: 15min
+
+---
+
 ### ✅ Add `expires_at` support to `update_memory` — SDK + MCP + Rust reducer (Aug 2)
 Added optional `expires_at` parameter to the Rust `update_memory` reducer,
 Python SDK `Client.update_memory()`, and MCP `update_memory` tool. This
@@ -124,29 +136,11 @@ Files: README.md, server/mcp/README.md
 Difficulty: Trivial
 Est: 2min
 
-### ✅ Fix `test_batch_update_success` + `test_update_memory` test assertions (Jun 27)
-Fixed 2 test assertions broken by the `expires_at` parameter addition to
-`update_memory`:
-- `test_batch_update_success`: expected 4 args but `batch_update_memories`
-  now passes `expires_at=None` as the 5th argument
-- `test_update_memory` (deep): expected the `-1` sentinel in a 5-arg call,
-  but the refined implementation uses a conditional 4-arg call when
-  `expires_at=None` (backward-compatible path)
-Also wrapped a `get_memory_history` call in `test_batch_ops` with try/except
-to skip gracefully when the WASM binary lacks `memory_revision` table support.
-Files: sdk/python/spacetime_memory/client.py, sdk/python/tests/test_client.py,
-  sdk/python/tests/test_client_deep.py
-Difficulty: Trivial
-Est: 5min
-Test: 549/549 client tests passing (491 test_client + test_client_deep, 4 skipped)
-
 ---
 
 ## Pending
 
 *No pending items — backlog cleared.*
-
----
 
 ## Deferred / Blocked
 

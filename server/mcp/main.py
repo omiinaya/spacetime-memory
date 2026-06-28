@@ -1035,6 +1035,39 @@ def dedup_memories(workspace_id: str) -> str:
 
 @mcp.tool()
 @require_api_key
+def consolidate_memories(
+    workspace_id: str,
+    source_ids_json: str,
+    target_content: str,
+    target_summary: str,
+) -> str:
+    """Merge several source memories into a single new consolidated memory.
+
+    Source memories are deactivated and a ConsolidationLog entry is created.
+    The caller must be a workspace admin.
+
+    Args:
+        workspace_id: The workspace containing the source memories.
+        source_ids_json: JSON array of memory IDs to consolidate,
+            e.g. '["id1","id2","id3"]'.
+        target_content: Content for the new consolidated memory.
+        target_summary: Summary for the new consolidated memory.
+
+    Returns:
+        Confirmation message.
+    """
+    get_client()._call(
+        "consolidate_memories",
+        [workspace_id, source_ids_json, target_content, target_summary],
+    )
+    return (
+        f"Consolidation complete for workspace {workspace_id[:16]}... "
+        f"{len(json.loads(source_ids_json))} source memories merged."
+    )
+
+
+@mcp.tool()
+@require_api_key
 def suggest_merges(workspace_id: str, threshold: float = 0.8) -> str:
     """Find candidate merge pairs in a workspace and record them as MergeSuggestion rows.
 

@@ -3011,6 +3011,33 @@ class Client:
         """Run dedup within a workspace."""
         return self._call("dedup_memories", [workspace_id])
 
+    def consolidate_memories(
+        self,
+        workspace_id: str,
+        source_ids: list[str],
+        target_content: str,
+        target_summary: str,
+    ) -> dict[str, Any]:
+        """Merge several source memories into a single new consolidated memory.
+
+        Source memories are deactivated and a ``ConsolidationLog`` entry is
+        created linking them to the new memory. The caller must be a workspace
+        admin.
+
+        Args:
+            workspace_id: The workspace containing the source memories.
+            source_ids: List of memory IDs to consolidate.
+            target_content: Content for the new consolidated memory.
+            target_summary: Summary for the new consolidated memory.
+
+        Returns:
+            Reducer status.
+        """
+        return self._call(
+            "consolidate_memories",
+            [workspace_id, json.dumps(source_ids), target_content, target_summary],
+        )
+
     # -----------------------------------------------------------------------
     # Merge suggestions
     # -----------------------------------------------------------------------

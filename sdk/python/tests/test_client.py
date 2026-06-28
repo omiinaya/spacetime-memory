@@ -1247,6 +1247,15 @@ class TestMethodStubs:
         client.suggest_merges("ws1", 0.85)
         client._call.assert_called_with("suggest_merges", ["ws1", 0.85])
 
+    def test_consolidate_memories(self, client):
+        """consolidate_memories calls reducer with JSON-serialized source_ids."""
+        source_ids = ["mem-1", "mem-2", "mem-3"]
+        client.consolidate_memories("ws1", source_ids, "merged content", "merged summary")
+        client._call.assert_called_with(
+            "consolidate_memories",
+            ["ws1", json.dumps(source_ids), "merged content", "merged summary"],
+        )
+
     def test_get_profile_context(self, client):
         """get_profile_context calls the reducer and reads the result table."""
         c = Client(host="localhost", port="3001", database="test-db")
