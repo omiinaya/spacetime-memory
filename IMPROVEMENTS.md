@@ -12,16 +12,16 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
-### ✅ Add missing OTel span interface methods to _NoOpSpan (Aug 2 — this tick)
-The `_NoOpSpan` fallback used when OpenTelemetry is disabled was missing
-three standard OpenTelemetry Span interface methods: `add_event()`,
-`update_name()`, and `is_recording()`. Calling these on a span obtained
-via `tracer.start_span()` when OTel is unavailable would raise
-`AttributeError`. Added the missing methods plus 3 unit tests.
-Files: sdk/python/spacetime_memory/tracer.py, sdk/python/tests/test_observability.py
-Difficulty: Trivial
-Est: 3min
-Commit: 763181aa
+### ✅ Add `update_memory_tier` SDK method + MCP tool (this tick)
+Added `Client.update_memory_tier(memory_id, tier)` Python SDK method
+that calls the `update_memory_tier` reducer (context_compression.rs:106),
+and a corresponding `update_memory_tier` MCP tool in main.py.
+The reducer validates tier must be L0, L1, or L2 — the SDK mirrors
+with a `ValueError` on invalid input.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+Commit: 9e934930
 
 ---
 
@@ -142,15 +142,6 @@ Test: 1833/1833 unit tests passing
 
 ## Pending
 
-### 🟡 Add `update_memory_tier` SDK method + MCP tool
-The `update_memory_tier` Rust reducer (context_compression.rs:106) changes a
-memory's compression tier (L0, L1, L2). Not exposed in SDK or MCP. This is
-important for context compression workflows that manage token budgets across
-workspaces.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-
 ### 🟡 Add `search_directory_contents` SDK method + MCP tool
 The `search_directory_contents` Rust reducer (profile_query.rs:213) recursively
 searches directory contents in a workspace. Not exposed in SDK or MCP.
@@ -181,6 +172,28 @@ Difficulty: Hard (needs live STDB)
 |---|
 
 ## Research Log
+
+### Jun 27 (tick 5) — Added `update_memory_tier` SDK + MCP; backlog down to 1 PENDING
+- **Completed**: Added `Client.update_memory_tier(memory_id, tier)` SDK method
+  and `update_memory_tier` MCP tool — fills the last context-compression gap
+  in the Python SDK (update_memory_tier reducer existed in Rust since
+  context_compression.rs:106 but was never exposed). Client method validates
+  tier with ValueError; MCP tool mirrors the same signature. Python import
+  verified. Committed + pushed (9e934930).
+- **Cleanup**: Purged oldest Recently Completed entry (OTel span interface
+  methods) to keep 10 items. Moved update_memory_tier to Recently Completed.
+- **Research**:
+  - Git log (7 days): 250+ commits, latest: 9e934930 (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.8 (unchanged — latest check shows v2.0.8, not v2.0.10 as
+    previously recorded; correcting).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all
+    unchanged from last tick.
+  - Deeper scan: no new gaps found. 1 remaining PENDING item
+    (search_directory_contents). No code-level TODO/FIXME markers.
+  - Web UI directory (web/) does not exist — no frontend gaps to fill.
+- **Backlog**: 1 PENDING item remaining.
+- **Commit**: 9e934930 — 2 files changed, +35/-0 lines (client.py, main.py, IMPROVEMENTS.md).
 
 ### Aug 2 (tick 4) — Added `update_edge` SDK + MCP; found 2 more SDK gaps
 - **Completed**: Added `update_edge` SDK method and MCP tool — fills the last
