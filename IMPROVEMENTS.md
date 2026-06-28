@@ -178,7 +178,7 @@ Est: 10min
     TODO/FIXME markers. WASM binary rebuilt Jun 28 at 2.36MB (commit 9b95d508).
   - Web UI directory (web/) does not exist — no frontend gaps to fill.
 - **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: (pending — not yet pushed)
+- **Commit**: 5101cf72 — 4 files changed, +99/-45 lines.
 
 ### Jun 28 (this tick) — Added `get_edge_history` SDK method + MCP tool; 1 new gap found
 - **Completed**: Added `Client.get_edge_history(edge_group_id)` SDK method

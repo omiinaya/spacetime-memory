@@ -61,7 +61,7 @@
 | `print()` in production .py | **~47** | Connector CLI logging (~30), ingest status (~10), shmr debug (~7), context_agent debug (1), metrics debug (1), langchain docstring REPL examples (4). Not structured logging. |
 | Docstring coverage | **60%** | 545/900 functions have docstrings. 40% undocumented. |
 | Hardcoded `localhost` defaults | **2** | `client.py:189` (SPACETIMEDB_HOST), `client.py:197` (EMBEDDER_URL). Should default to 127.0.0.1. |
-| Stale env var names | **0** (✅ resolved) | `MNEMOSYNE_*` renamed to `STMEM_*` with backward compatibility — commit XXXXXXX |
+| Stale env var names | **0** (✅ resolved) | `MNEMOSYNE_*` renamed to `STMEM_*` with backward compatibility — commit 5101cf72 |
 | Stale `.upstream-venv` | **168MB** | Upstream venv for adapter tests. May have stale packages. |
 
 ## STDB Best Practices — Re-verified (June 27, 2026)
