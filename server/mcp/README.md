@@ -198,6 +198,8 @@ Set these environment variables (or accept defaults):
 | `synthesize_mental_models` | Synthesize a mental model from source memories | `workspace_id`, `memory_ids_json` |
 | `get_mental_model` | Get a mental model by ID | `id` |
 | `list_mental_models` | List mental models (filtered by status) | `workspace_id`, `status` |
+| `delete_mental_model` | Delete a mental model | `model_id` |
+| `update_mental_model` | Update a mental model's content, confidence, and status | `model_id`, `content`, `confidence`, `status` |
 
 ### 📋 Facts
 

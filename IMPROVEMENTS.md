@@ -25,6 +25,16 @@ Difficulty: Hard (needs live STDB)
 
 ## Recently Completed
 
+### ✅ Add `delete_mental_model` + `update_mental_model` MCP tools (this tick)
+Added `delete_mental_model(model_id)` and `update_mental_model(model_id, content, confidence, status)`
+MCP tools in main.py — these SDK methods (client.py:4004 and client.py:4014) were exposed in the
+Python SDK but had no corresponding MCP tool. Mental model CRUD (synthesize, get, list, delete,
+update) is now fully exposed via MCP. Also added catalog entries in MCP README.
+170/170 test_client.py unit tests passing, 148 MCP tools registered.
+Files: server/mcp/main.py, server/mcp/README.md
+Difficulty: Easy
+Est: 5min
+
 ### ✅ Add `grant_space_access` + `revoke_space_access` SDK methods + convert 9 MCP tools from `_call()` to SDK methods (this tick)
 Added `Client.grant_space_access(workspace_id, peer_id, permission)` and
 `Client.revoke_space_access(workspace_id, peer_id)` Python SDK methods
@@ -734,4 +744,29 @@ Commit: 33287f0a
     expire_memories). No new competitor features to adopt — mem0, langgraph, zep all
     unchanged. No code-level TODO/FIXME markers.
 - **Backlog**: 2 PENDING items remaining.
-- **Commit**: 33287f0a — 5 files changed, +205 lines.<｜end▁of▁thinking｜>
+- **Commit**: 33287f0a — 5 files changed, +205 lines.
+
+
+### Jun 28 (this tick) — Added `delete_mental_model` + `update_mental_model` MCP tools; found 2 MCP gaps
+- **Completed**: Added `delete_mental_model(model_id)` and
+  `update_mental_model(model_id, content, confidence, status)` MCP tools in main.py.
+  These SDK methods (client.py:4004 and client.py:4014) were exposed in the Python SDK
+  but had no corresponding MCP tool. Mental model CRUD (synthesize, get, list, delete,
+  update) is now fully exposed via MCP with 5 tools. Also added catalog entries in MCP
+  README.md. 170/170 test_client.py unit tests passing, 148 MCP tools registered.
+- **Cleanup**: Added new completed entry at top of Recently Completed (10 total, within
+  5-10 limit, no purge needed). Removed both completed PENDING items from backlog.
+  Backlog is now empty.
+- **Research**:
+  - Git log (7 days): 255+ commits, latest: ab8155c2 (previous tick's docs).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.42.1 — all unchanged from last tick.
+  - Deeper scan: compared all SDK public methods (138) against MCP tools (148). Found
+    2 real gaps: `delete_mental_model` and `update_mental_model` SDK methods had no
+    MCP tools — now implemented. Remaining "gaps" are intentional (compounder methods,
+    internal helpers, differently-named equivalents like `health`/`health_check`,
+    `reinforce`/`reinforce_memory`, `search`/`hybrid_search`). No new competitor
+    features to adopt. No code-level TODO/FIXME markers.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: 1607c593 — 3 files changed, +70/-1 lines.<｜end▁of▁thinking｜>

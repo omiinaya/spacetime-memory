@@ -2159,6 +2159,38 @@ def list_mental_models(workspace_id: str, status: str = "") -> str:
     return json.dumps(rows, default=str)
 
 
+@mcp.tool()
+@require_api_key
+def delete_mental_model(model_id: str) -> str:
+    """Delete a mental model by its ID.
+
+    Args:
+        model_id: The UUID of the mental model to delete.
+    """
+    get_client().delete_mental_model(model_id)
+    return f"Mental model {model_id[:16]}... deleted."
+
+
+@mcp.tool()
+@require_api_key
+def update_mental_model(
+    model_id: str,
+    content: str,
+    confidence: float = 0.5,
+    status: str = "completed",
+) -> str:
+    """Update the content, confidence, and status of an existing mental model.
+
+    Args:
+        model_id: The UUID of the mental model.
+        content: The new synthesized content.
+        confidence: Confidence score (0.0–1.0). Default 0.5.
+        status: Status: "pending", "completed", or "failed". Default "completed".
+    """
+    get_client().update_mental_model(model_id, content, confidence, status)
+    return f"Mental model {model_id[:16]}... updated."
+
+
 # -------------------------------------------------------------------------
 # Fact tools
 # ---------------------------------------------------------------------------
