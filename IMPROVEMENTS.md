@@ -12,6 +12,19 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add missing OTel span interface methods to _NoOpSpan (Aug 2 — this tick)
+The `_NoOpSpan` fallback used when OpenTelemetry is disabled was missing
+three standard OpenTelemetry Span interface methods: `add_event()`,
+`update_name()`, and `is_recording()`. Calling these on a span obtained
+via `tracer.start_span()` when OTel is unavailable would raise
+`AttributeError`. Added the missing methods plus 3 unit tests.
+Files: sdk/python/spacetime_memory/tracer.py, sdk/python/tests/test_observability.py
+Difficulty: Trivial
+Est: 3min
+Commit: 763181aa
+
+---
+
 ### ✅ Add `consolidate_memories` SDK tests + MCP README documentation + commit (Jun 27)
 The `consolidate_memories` reducer existed in Rust (`consolidation.rs`) and the
 Python SDK method + MCP tool were already written but uncommitted. Added:
@@ -25,9 +38,6 @@ Est: 15min
 ---
 
 ### ✅ Add `expires_at` support to `update_memory` — SDK + MCP + Rust reducer (Aug 2)
-Added optional `expires_at` parameter to the Rust `update_memory` reducer,
-Python SDK `Client.update_memory()`, and MCP `update_memory` tool. This
-matches mem0 v2.0.10's new `expiration_date` on update feature.
 
 Convention: `-1` = preserve existing expiration, `0` = never expires (clear),
 `>0` = set specific timestamp in microseconds. Python SDK maps `None` → `-1`.
@@ -128,14 +138,6 @@ Difficulty: Medium
 Est: 20min
 Test: README now 303 lines (was 95), 128 tools documented in clean tables
 
-### ✅ Fix stale SpacetimeDB version badge in README.md (Jul 28)
-The README badge at the top still said `SpacetimeDB v2.4` but the dependency
-was upgraded to v2.6 in commit `d1d147f`. Updated the badge URL and alt text
-in both `README.md` and `server/mcp/README.md`.
-Files: README.md, server/mcp/README.md
-Difficulty: Trivial
-Est: 2min
-
 ---
 
 ## Pending
@@ -165,6 +167,30 @@ Difficulty: Hard (needs live STDB)
 |---|
 
 ## Research Log
+
+### Aug 2 (tick 3) — Fixed missing _NoOpSpan OTel interface methods; backlog remains empty
+- **Completed**: Added 3 missing OpenTelemetry Span interface methods to
+  `_NoOpSpan`: `add_event()`, `update_name()`, `is_recording()`. These are
+  standard methods that any code calling spans from `start_span()` might
+  invoke. The fallback was incomplete — missing them could cause
+  `AttributeError` when OTel is disabled. Added 3 unit tests. Committed +
+  pushed (763181aa).
+- **Cleanup**: Added new completed item to Recently Completed (11 total at
+  max 10 limit — purged oldest entry to keep 10).
+- **Research**:
+  - Git log (7 days): 312+ commits (since v1.20.0), latest: 763181aa (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all
+    unchanged from last tick.
+  - Deeper scan: no new competitor features to adopt. All 106 Client SDK
+    methods have MCP wrappers (130+ tools). 3316 tests collected. No
+    code-level TODO/FIXME markers in source code. Web UI directory (web/)
+    does not exist — no frontend gaps to fill.
+  - Found missing OTel Span interface methods on _NoOpSpan — implemented
+    this tick.
+- **Backlog**: 0 PENDING items — backlog remains empty.
+- **Commit**: 763181aa — 3 files changed, +28/-0 lines (tracer.py, test_observability.py, IMPROVEMENTS.md).
 
 ### Aug 2 (tick 2) — Backlog remains empty; all dependencies unchanged; no new gaps found
 - **Completed**: None — 0 PENDING items in backlog.
