@@ -19,8 +19,11 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from mcp.server.fastmcp import FastMCP
 
@@ -54,8 +57,8 @@ os.environ.setdefault("LLM_RERANK_MODEL", "ds-deepseek-v4-flash")
 # ---------------------------------------------------------------------------
 
 if MCP_API_KEY:
-    print(
-        "  [mcp] MCP API key authentication is enabled. "
+    logger.info(
+        "MCP API key authentication is enabled. "
         "Tools will require a valid key for HTTP/SSE transport."
     )
 

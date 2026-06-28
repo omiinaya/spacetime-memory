@@ -93,9 +93,9 @@ A comprehensive external review was published as [Spacetime Memory: An Honest Re
 | SQL DML in Rust reducers | **0** | All writes through `.insert()`/`.delete()` ✓ |
 | `# TODO/FIXME/HACK/XXX` | **0** | No code-level TODO markers in any production .py or .rs file ✓ |
 | Bare `except:` | **0** | Clean ✓ |
-| `print()` in production .py | **~47** | Connector CLI logging (~30), ingest status (~10), shmr debug (~7), context_agent debug (1), metrics debug (1), langchain docstring REPL examples (4). Not structured logging. |
+| `print()` in production .py | **0** | All production print() calls converted to logger. 0 remaining. Only docstring example prints remain. |
 | Docstring coverage | **60%** | 545/900 functions have docstrings. 40% undocumented. |
-| Hardcoded `localhost` defaults | **2** | `client.py:189` (SPACETIMEDB_HOST), `client.py:197` (EMBEDDER_URL). Should default to 127.0.0.1. |
+| Hardcoded `localhost` defaults | **0** (✅ resolved) | Fixed in commit 92415ced — all defaults changed to 127.0.0.1. |
 | Stale env var names | **0** (✅ resolved) | `MNEMOSYNE_*` renamed to `STMEM_*` with backward compatibility — commit 5101cf72 |
 | Stale `.upstream-venv` | **168MB** | Upstream venv for adapter tests. May have stale packages. |
 
@@ -308,9 +308,9 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 - **Frontend doesn't exist** — zero web UI code
 - **Adapter parity incomplete** — 4/6 verified, 1 partial (Hindsight 54%)
 - **Tantivy BM25 not responding** — sidecar may be down
-- **47 `print()` calls in production** — not using structured logging
+- **47 `print()` calls in production** — ✅ **FIXED** — all converted to structured logging. 0 remaining.
 - **60% docstring coverage** — 40% undocumented
-- **Hardcoded `localhost` defaults** — should be 127.0.0.1
+- **Hardcoded `localhost` defaults** — ✅ **FIXED** — all changed to 127.0.0.1 (commit 92415ced)
 - **168MB stale upstream venv** — `.upstream-venv/`
 - **Stale `MNEMOSYNE_*` env vars** — ✅ resolved (→ `STMEM_*`)
 - **49 reducers without explicit auth** — needs review (though some are intentional)
@@ -363,7 +363,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 6. **P2: Fix Mem0 adapter** — verify against mem0 source or remove if unmaintained (30min)
 7. **P2: Fix Honcho adapter** — verify against installed `honcho` v2.0.0 (30min) | ✅ **VERIFIED** — correct package, adapter imports
 8. **P3: Review 49 unguarded reducers** — audit which need auth guards (2-3h)
-9. **P3: Replace `print()` with logging** — logging.Logger across all modules (1-2h)
+9. **P3: Replace `print()` with logging** — logging.Logger across all modules (1-2h) | ✅ **DONE** — all production print() calls converted to structured logging. 0 remaining.
 10. **P3: Fix localhost defaults** — change to 127.0.0.1 (15min) | ✅ **DONE**
 11. **P3: Improve docstring coverage** — target 80%+ (2h)
 12. **P3: Clean up stale env vars** — ✅ resolved (`MNEMOSYNE_*` → `STMEM_*` with backward compat)

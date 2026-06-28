@@ -8,18 +8,7 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Convert MCP main.py startup print to logging
-1 `print()` at server/mcp/main.py:57 (startup notification when MCP_API_KEY is set).
-Deferred — MCP main.py lacks a module-level logger; startup banner print is acceptable
-for a CLI tool.
-Difficulty: Easy
-Est: 2min
-
-### Fix 3 TODO markers in orgmode connector
-3 TODO/FIXME markers in connectors/orgmode.py and tests/test_orgmode_connector.py.
-Files: sdk/python/spacetime_memory/connectors/orgmode.py
-Difficulty: Easy
-Est: 5min
+_(No items — backlog cleared.)_
 
 ## Deferred / Blocked
 
@@ -35,6 +24,25 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Convert MCP main.py startup print to logging (this tick)
+Added module-level `logger = logging.getLogger(__name__)` to server/mcp/main.py and
+converted the 1 `print()` startup banner (line 57, MCP_API_KEY notification) to
+`logger.info()`. No other `print()` calls remain in MCP main.py.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 2min
+
+### ✅ Fix 3 TODO markers in orgmode connector (this tick) — already resolved
+Audited connectors/orgmode.py and tests/test_orgmode_connector.py — **0** actual
+code-level TODO/FIXME/HACK markers exist. The prior search matched org-mode keyword
+references (`** TODO`, `* DONE`) in docstrings, not code markers. The ROADMAP.md
+(June 28 audit) also confirms 0 code-level TODO markers project-wide. This item
+was already resolved before being added as PENDING.
+Files: sdk/python/spacetime_memory/connectors/orgmode.py,
+  sdk/python/tests/test_orgmode_connector.py
+Difficulty: Easy
+Est: 5min (audit only)
 
 ### ✅ Convert 34 remaining print() calls to structured logging in connectors + ingest (this tick)
 Replaced all 34 `print()` calls in connectors (slack.py 6, discord.py 9, notion.py 4,
@@ -58,6 +66,27 @@ Difficulty: Easy
 Est: 5min
 
 ## Research Log
+
+|### Jun 28 (this tick) — Converted MCP main.py print→logging, audited orgmode TODO markers; backlog cleared
+|- **Completed**:
+|  - Added `logger = logging.getLogger(__name__)` to server/mcp/main.py and converted the
+|    single startup `print()` (MCP_API_KEY notification) to `logger.info()`. Now 0 `print()`
+|    calls remain in MCP production code (only docstring examples remain).
+|  - Audited "3 TODO markers" in orgmode connector — found 0 actual code markers (false
+|    alarm: matched org-mode keyword usage, not code TODO comments). Item marked done.
+|- **Cleanup**: Removed 2 PENDING items from backlog (MCP print→logging done, TODO markers
+|  already resolved). Added both to Recently Completed. Backlog is now empty.
+|- **Research**:
+|  - Git log (7 days): 320+ commits, latest: fe1c84ff (this tick's 34 print→logging fix).
+|  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest, uploaded Dec 2023).
+|  - mem0ai v2.0.10 latest (installed 2.0.8), langgraph v1.2.6, zep-python v2.0.2,
+|    opentelemetry-sdk v1.43.0 — all unchanged from last tick.
+|  - Deeper scan: No new competitor features to adopt. All 163 Rust reducers have SDK +
+|    MCP coverage. 0 code-level TODO/FIXME markers. 0 production `print()` calls remain
+|    (MCP startup banner now uses logging). ROADMAP.md still has stale print count (~47)
+|    and localhost marks — should be updated separately.
+|- **Backlog**: 0 PENDING items — backlog cleared.
+|- **Commit**: [this tick]
 
 ### Jun 28 (this tick) — Converted 34 print()→logging in connectors + ingest; backlog has 2 PENDING
 - **Completed**:
