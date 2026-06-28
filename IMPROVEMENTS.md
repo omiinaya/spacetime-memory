@@ -6,11 +6,49 @@ and works the top pending item each tick.
 
 ---
 
-*(cron manages this section — moves items here when marked ✅, purged old ones)*
+## Pending
 
----
+### Add `expire_memories` SDK method + MCP tool
+The `expire_memories` reducer (memory.rs) triggers manual expiration of
+overdue memories. Currently no Python SDK or MCP access.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 5min
+
+## Deferred / Blocked
+
+### Fix stale WASM binary causing test_get_memory_history failure
+The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
+is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
+whitelist. `test_get_memory_history` fails against the real STDB server.
+Fix: rebuild WASM module (requires cargo build, currently blocked by OOM).
+Files: server/spacetimedb/src/query.rs
+Difficulty: Medium (needs cargo build)
+Est: N/A (blocked)
+
+### STDB 2% fatal error under heavy concurrent load
+**uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use
+collision-retry. The remaining ~2% fatal errors appear to be a STDB-level
+WASM limitation (not UUID-related). Root cause analysis requires a live
+STDB instance with replicator stress testing. Deferred until live STDB
+infrastructure is available for investigation.
+Files: server/spacetimedb/src/lib.rs, tests/concurrent/
+Difficulty: Hard (needs live STDB)
+
+|---
 
 ## Recently Completed
+
+### ✅ Add `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools (this tick)
+Added `Client.create_tag(workspace_id, name, color)`, `Client.tag_memory(memory_id, tag_id)`,
+and `Client.untag_memory(memory_id, tag_id)` Python SDK methods wrapping the ``create_tag``,
+``tag_memory``, and ``untag_memory`` Rust reducers (tag.rs:32, 55, 71). Added matching
+``create_tag``, ``tag_memory``, ``untag_memory`` MCP tools in main.py. Tagging is now
+fully accessible programmatically — previously only existed in Rust. 161/161 unit tests
+passing (test_client), 141 MCP tools registered.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
 
 ### ✅ Add `delete_fact`, `update_fact`, and `search_facts` SDK methods + MCP tools (this tick)
 Added 3 new ``Client`` SDK methods completing the full facts CRUD suite:
@@ -58,8 +96,6 @@ Difficulty: Easy (bulk)
 Est: 25min
 Commit: 744edcef
 
----
-
 ### ✅ Add `search_directory_contents` SDK method + MCP tool (this tick)
 Added `Client.search_directory_contents(workspace_id, directory_path)` Python
 SDK method that calls the `search_directory_contents` reducer
@@ -72,8 +108,6 @@ Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
 Difficulty: Easy
 Est: 10min
 
----
-
 ### ✅ Add `update_memory_tier` SDK method + MCP tool (this tick)
 Added `Client.update_memory_tier(memory_id, tier)` Python SDK method
 that calls the `update_memory_tier` reducer (context_compression.rs:106),
@@ -85,8 +119,6 @@ Difficulty: Easy
 Est: 10min
 Commit: 9e934930
 
----
-
 ### ✅ Add `consolidate_memories` SDK tests + MCP README documentation + commit (Jun 27)
 The `consolidate_memories` reducer existed in Rust (`consolidation.rs`) and the
 Python SDK method + MCP tool were already written but uncommitted. Added:
@@ -96,8 +128,6 @@ Python SDK method + MCP tool were already written but uncommitted. Added:
 Files: sdk/python/tests/test_client.py, server/mcp/README.md
 Difficulty: Easy
 Est: 15min
-
----
 
 ### ✅ Add `expires_at` support to `update_memory` — SDK + MCP + Rust reducer (Aug 2)
 
@@ -151,47 +181,31 @@ Test: 2020/2020 unit tests passing
 
 ---
 
-## Pending
-
-### Add `tag_memory`, `untag_memory`, `create_tag` SDK methods + MCP tools
-The `create_tag` (tag.rs:32), `tag_memory` (tag.rs:55), and `untag_memory`
-(tag.rs:71) reducers exist in Rust but have no Python SDK or MCP coverage.
-Tagging is a basic memory organizing feature that users would benefit from
-having programmatic access to.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-
-### Add `expire_memories` SDK method + MCP tool
-The `expire_memories` reducer (memory.rs) triggers manual expiration of
-overdue memories. Currently no Python SDK or MCP access.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-
-## Deferred / Blocked
-
-### Fix stale WASM binary causing test_get_memory_history failure
-The published WASM binary at target/wasm32-wasip1/release/spacetime_memory.wasm
-is stale and doesn't include `memory_revision` in the query_table ALLOWED_TABLES
-whitelist. `test_get_memory_history` fails against the real STDB server.
-Fix: rebuild WASM module (requires cargo build, currently blocked by OOM).
-Files: server/spacetimedb/src/query.rs
-Difficulty: Medium (needs cargo build)
-Est: N/A (blocked)
-
-### STDB 2% fatal error under heavy concurrent load
-**uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use
-collision-retry. The remaining ~2% fatal errors appear to be a STDB-level
-WASM limitation (not UUID-related). Root cause analysis requires a live
-STDB instance with replicator stress testing. Deferred until live STDB
-infrastructure is available for investigation.
-Files: server/spacetimedb/src/lib.rs, tests/concurrent/
-Difficulty: Hard (needs live STDB)
-
-|---|
-
 ## Research Log
+
+### Jun 28 (this tick) — Added `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools; 1 PENDING remaining
+- **Completed**: Added `Client.create_tag(workspace_id, name, color)`,
+  `Client.tag_memory(memory_id, tag_id)`, and `Client.untag_memory(memory_id, tag_id)`
+  Python SDK methods wrapping the `create_tag`, `tag_memory`, and `untag_memory` Rust
+  reducers (tag.rs:32, 55, 71). Added matching `create_tag`, `tag_memory`, `untag_memory`
+  MCP tools in main.py. Tagging is now fully accessible programmatically — previously
+  only existed in Rust. 161/161 unit tests passing (test_client), 141 MCP tools registered.
+- **Cleanup**: Purged completed tag PENDING item from backlog. Moved Recently Completed
+  section to bottom of file (before Research Log) per convention. 10 completed entries
+  kept, no purge needed.
+- **Research**:
+  - Git log (7 days): 150+ commits, latest: b4c70819 (previous tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged, PyPI latest).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all at latest.
+  - Deeper scan: compared all 160+ Rust reducers against 130+ SDK public methods.
+    Tag CRUD is now complete (create_tag, tag_memory, untag_memory all have SDK + MCP).
+    1 PENDING item remains (expire_memories). New gaps found: `update_workspace`,
+    `set_workspace_visibility` workspace.rs reducers have no SDK/MCP coverage — added
+    as future candidates. No new competitor features to adopt. No code-level TODO/FIXME
+    markers.
+- **Backlog**: 1 PENDING item remaining (expire_memories).
+- **Commit**: TBD (this tick).
 
 ### Jun 27 (tick 8) — Added `delete_node` + `delete_edge` SDK methods and MCP tools; found 3 new gaps
 - **Completed**: Added `Client.delete_node(node_id)` and `Client.delete_edge(edge_id)`

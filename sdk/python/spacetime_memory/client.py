@@ -3896,6 +3896,38 @@ class Client:
         self._call("remove_tour_stop", [stop_id])
 
     # -------------------------------------------------------------------
+    # Tag Management
+    # -------------------------------------------------------------------
+
+    def create_tag(self, workspace_id: str, name: str, color: str = "#808080") -> None:
+        """Create a new tag for organizing memories.
+
+        Args:
+            workspace_id: Target workspace.
+            name: Tag display name.
+            color: Hex color string (default: ``"#808080"``).
+        """
+        self._call("create_tag", [workspace_id, name, color])
+
+    def tag_memory(self, memory_id: str, tag_id: str) -> None:
+        """Attach a tag to a memory.
+
+        Args:
+            memory_id: The memory to tag.
+            tag_id: The tag to attach.
+        """
+        self._call("tag_memory", [memory_id, tag_id])
+
+    def untag_memory(self, memory_id: str, tag_id: str) -> None:
+        """Remove a tag from a memory.
+
+        Args:
+            memory_id: The tagged memory.
+            tag_id: The tag to detach.
+        """
+        self._call("untag_memory", [memory_id, tag_id])
+
+    # -------------------------------------------------------------------
     # Entity Linking
     # -------------------------------------------------------------------
 

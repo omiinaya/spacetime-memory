@@ -485,6 +485,55 @@ def update_memory_tier(memory_id: str, tier: str) -> dict[str, Any]:
 
 @mcp.tool()
 @require_api_key
+def create_tag(workspace_id: str, name: str, color: str = "#808080") -> dict[str, Any]:
+    """Create a new tag for organizing memories.
+
+    Tags can be attached to memories to group them by topic, project,
+    or any custom category.
+
+    Args:
+        workspace_id: Target workspace.
+        name: Tag display name.
+        color: Hex color string (default: ``"#808080"``).
+
+    Returns:
+        Confirmation dict with tag details.
+    """
+    return get_client().create_tag(workspace_id, name, color)
+
+
+@mcp.tool()
+@require_api_key
+def tag_memory(memory_id: str, tag_id: str) -> dict[str, Any]:
+    """Attach a tag to a memory.
+
+    Args:
+        memory_id: The memory to tag.
+        tag_id: The tag ID to attach.
+
+    Returns:
+        Confirmation dict.
+    """
+    return get_client().tag_memory(memory_id, tag_id)
+
+
+@mcp.tool()
+@require_api_key
+def untag_memory(memory_id: str, tag_id: str) -> dict[str, Any]:
+    """Remove a tag from a memory.
+
+    Args:
+        memory_id: The tagged memory.
+        tag_id: The tag ID to detach.
+
+    Returns:
+        Confirmation dict.
+    """
+    return get_client().untag_memory(memory_id, tag_id)
+
+
+@mcp.tool()
+@require_api_key
 def store_batch(
     items_json: str,
     workspace_id: str = "default",
