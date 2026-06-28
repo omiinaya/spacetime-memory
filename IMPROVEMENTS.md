@@ -25,6 +25,19 @@ Difficulty: Hard (needs live STDB)
 
 ## Recently Completed
 
+### ✅ Add `get_session_steps` and `list_space_members` SDK methods + update MCP tools (this tick)
+Added `Client.get_session_steps(session_id)` and `Client.list_space_members(workspace_id)`
+Python SDK methods wrapping the `get_session_steps` (session.rs:438) and `list_space_members`
+(workspace.rs:230) Rust reducers. Both call the reducer and query the corresponding result
+table (`session_step_result` / `space_member_result`). Updated the `get_session_steps` and
+`list_space_members` MCP tools in main.py to use the SDK methods instead of raw `_call` + SQL.
+All 166 test_client.py unit tests passing (162 existing + 4 new). 79 shmr + observability
+passing. 336 deep tests passing.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py, sdk/python/tests/test_client.py
+Difficulty: Easy
+Est: 10min
+Commit: 06993807
+
 ### ✅ Rename stale MNEMOSYNE_* env vars to STMEM_* (this tick)
 Renamed 7 `MNEMOSYNE_*` env vars in shmr.py to `STMEM_*` with backward-compatible
 fallback — old vars still work but emit a `DeprecationWarning`. Added `_get_env()`
@@ -140,21 +153,32 @@ Difficulty: Easy (bulk)
 Est: 25min
 Commit: 744edcef
 
-### ✅ Add `search_directory_contents` SDK method + MCP tool (this tick)
-Added `Client.search_directory_contents(workspace_id, directory_path)` Python
-SDK method that calls the `search_directory_contents` reducer
-(profile_query.rs:213) and queries the `directory_content_result` table.
-Also added a corresponding MCP tool in main.py. The reducer recursively
-collects all subdirectories and memory entries in the tree rooted at a
-given directory path. 427/427 unit tests passing, 4 skipped (pre-existing
-live-STDB tests).
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-
 ---
 
 ## Research Log
+
+### Jun 28 (this tick) — Added `get_session_steps` and `list_space_members` SDK methods; last MCP raw _call() removed
+- **Completed**: Added `Client.get_session_steps(session_id)` and
+  `Client.list_space_members(workspace_id)` SDK methods — the last two MCP
+  tools that were calling `_call()` directly now have clean SDK wrappers.
+  Updated MCP tools in main.py to use the SDK methods instead of raw
+  `_call` + inline SQL. 166/166 test_client.py tests passing (4 new tests).
+  79 shmr + observability passing. 336 deep tests passing.
+- **Cleanup**: Added new completed entry at top, purged oldest completed
+  entry (`search_directory_contents`) to keep 10 entries.
+- **Research**:
+  - Git log (7 days): 290+ commits, latest: 06993807 (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest, uploaded Dec 2023).
+  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
+    v1.43.0 — all unchanged from last tick.
+  - Deeper scan: compared all 160 Rust reducers against SDK methods. Found
+    2 remaining MCP tools that called `_call()` directly (`get_session_steps`,
+    `list_space_members`) — now implemented. No remaining MCP tools use raw
+    `_call()` — all go through clean SDK methods. No unreachable code-level
+    TODO/FIXME/HACK markers. No new competitor features to adopt.
+  - Web UI directory (web/) does not exist — no frontend gaps to fill.
+- **Backlog**: 0 PENDING items — backlog remains empty.
+- **Commit**: 06993807 — 3 files changed, +105/-16 lines.
 
 ### Jun 28 (this tick) — Renamed stale MNEMOSYNE_* env vars to STMEM_*; WASM rebuild noted
 - **Completed**: Renamed 7 `MNEMOSYNE_*` env vars in shmr.py to `STMEM_*` with
