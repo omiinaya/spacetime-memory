@@ -2431,6 +2431,71 @@ class TestSearchEntityTypes:
         assert result == []
 
 
+class TestListSpaceMembers:
+    """Tests for list_space_members SDK method."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._query = Mock(return_value=[])
+        return c
+
+    def test_list_space_members_calls_reducer(self, client):
+        """list_space_members calls list_space_members reducer then queries result table."""
+        client.list_space_members("ws-1")
+        client._call.assert_called_with("list_space_members", ["ws-1"])
+        client._query.assert_called_with("space_member_result")
+
+    def test_list_space_members_returns_sorted(self, client):
+        """list_space_members returns rows sorted by created_at."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._query = Mock(
+            return_value=[
+                {"peer_id": "p2", "permission": "owner", "created_at": 200},
+                {"peer_id": "p1", "permission": "viewer", "created_at": 100},
+            ]
+        )
+        rows = c.list_space_members("ws-1")
+        assert rows[0]["peer_id"] == "p1"
+        assert rows[1]["peer_id"] == "p2"
+
+
+class TestGetSessionSteps:
+    """Tests for get_session_steps SDK method."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._query = Mock(return_value=[])
+        return c
+
+    def test_get_session_steps_calls_reducer(self, client):
+        """get_session_steps calls the reducer then queries result table with steps: hash."""
+        client.get_session_steps("session-1")
+        client._call.assert_called_with("get_session_steps", ["session-1"])
+        client._query.assert_called_with(
+            "session_step_result",
+            filter_dict={"query_hash": "steps:session-1"},
+        )
+
+    def test_get_session_steps_returns_sorted(self, client):
+        """get_session_steps returns rows sorted by created_at."""
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._query = Mock(
+            return_value=[
+                {"id": "step-2", "content": "second", "created_at": 200},
+                {"id": "step-1", "content": "first", "created_at": 100},
+            ]
+        )
+        rows = c.get_session_steps("session-1")
+        assert rows[0]["id"] == "step-1"
+        assert rows[1]["id"] == "step-2"
+
+
 class TestMakeSnippet:
     """Tests for the _make_snippet() pure function (word-boundary text truncation)."""
 

@@ -2467,14 +2467,7 @@ def list_space_members(workspace_id: str) -> list[dict[str, str]]:
         A list of dicts, each with keys: peer_id, permission, granted_by, created_at.
     """
     client = get_client()
-    client._call("list_space_members", [workspace_id])
-    rows = client._sql(
-        f"SELECT peer_id, permission, granted_by, created_at "
-        f"FROM space_member_result WHERE "
-        f"workspace_id = '{workspace_id}' "
-        f"ORDER BY created_at ASC"
-    )
-    return rows
+    return client.list_space_members(workspace_id)
 
 
 # ---------------------------------------------------------------------------
@@ -2522,14 +2515,7 @@ def get_session_steps(session_id: str) -> list[dict[str, Any]]:
         A list of step dicts ordered by creation time.
     """
     client = get_client()
-    client._call("get_session_steps", [session_id])
-    query_hash = f"steps:{session_id}"
-    steps = client._sql(
-        "SELECT * FROM session_step_result WHERE "
-        f"query_hash = '{query_hash}' "
-        "ORDER BY created_at ASC"
-    )
-    return steps
+    return client.get_session_steps(session_id)
 
 
 @mcp.tool()

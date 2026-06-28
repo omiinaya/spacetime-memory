@@ -889,6 +889,24 @@ class Client:
             return rows[0]
         return {"workspace_id": workspace_id, "context": "", "queried_at": 0}
 
+    def list_space_members(self, workspace_id: str) -> list[dict[str, Any]]:
+        """List all members with their permissions for a workspace.
+
+        Calls the ``list_space_members`` reducer which writes to the
+        ``space_member_result`` table, then queries that table.
+
+        Args:
+            workspace_id: The workspace (space) ID.
+
+        Returns:
+            A list of dicts with keys: id, workspace_id, peer_id, permission,
+            granted_by, created_at, queried_at.
+        """
+        self._call("list_space_members", [workspace_id])
+        rows = self._query("space_member_result")
+        rows.sort(key=lambda r: r.get("created_at", 0))
+        return rows
+
     # -----------------------------------------------------------------------
     # Memory
     # -----------------------------------------------------------------------
@@ -3290,6 +3308,26 @@ class Client:
     def get_session_messages(self, session_id: str) -> list[dict[str, Any]]:
         """Retrieve messages for a session."""
         rows = self._query("message", filter_dict={"session_id": session_id})
+        rows.sort(key=lambda r: r.get("created_at", 0))
+        return rows
+
+    def get_session_steps(self, session_id: str) -> list[dict[str, Any]]:
+        """Retrieve all reasoning steps for a session.
+
+        Calls the ``get_session_steps`` reducer which writes to the
+        ``session_step_result`` table, then queries that table.
+
+        Args:
+            session_id: The session to get steps for.
+
+        Returns:
+            A list of step dicts ordered by creation time, each with keys:
+            query_hash, id, session_id, workspace_id, step_type, content,
+            summary, parent_step_id, created_at.
+        """
+        self._call("get_session_steps", [session_id])
+        query_hash = f"steps:{session_id}"
+        rows = self._query("session_step_result", filter_dict={"query_hash": query_hash})
         rows.sort(key=lambda r: r.get("created_at", 0))
         return rows
 
