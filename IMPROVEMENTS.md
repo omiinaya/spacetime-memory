@@ -8,14 +8,7 @@ and works the top pending item each tick.
 
 ## Pending
 
-### ✅ Add docstrings to 5 undocumented methods in client.py (this tick)
-Added docstrings to `__init__`, `_do_sql`, `_do_call`, `from_dict`, and `format`.
-`__init__`: full parameter docstring. `_do_sql`/`_do_call`: internal closure docs.
-`from_dict`/`format`: proper args/return docs.
-Docstring coverage: 175/175 methods = 100%.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 5min
+*None — backlog cleared.*
 
 ## Deferred / Blocked
 
@@ -31,6 +24,27 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Convert print() calls to structured logging in shmr.py (this tick)
+Replaced 7 `print()` calls in `shmr.py` with `logging.Logger` calls:
+`logger.info()` for status messages, `logger.warning()` for error conditions.
+Added `import logging` + `logger = logging.getLogger(__name__` at module top.
+31/31 shmr tests passing, 170/170 client tests passing.
+Files: sdk/python/spacetime_memory/shmr.py
+Difficulty: Easy
+Est: 5min
+
+### ✅ Add 5 missing docstrings in client.py; fix hardcoded localhost defaults (this tick)
+Added docstrings to `__init__`, `_do_sql`, `_do_call`, `from_dict`, and `format`.
+`__init__`: full parameter docstring. `_do_sql`/`_do_call`: internal closure docs.
+`from_dict`/`format`: proper args/return docs.
+Docstring coverage: 175/175 methods = 100%.
+Fixed 7 hardcoded `localhost` defaults to `127.0.0.1` across client.py,
+query_expansion.py, and 6 adapter SDK files.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 5min
+Commit: 92415ced
 
 ### ✅ Fix 2 ruff lint issues in MCP main.py — F541 f-string + F841 unused var (this tick)
 Fixed `f"..."` without placeholders at server/mcp/main.py:1992 (`shortest_path`
@@ -141,36 +155,21 @@ Difficulty: Easy
 Est: 10min
 Commit: c96784bb
 
-### ✅ Add `expire_memories` SDK method + MCP tool (this tick)
-Added `Client.expire_memories()` Python SDK method that calls the
-``expire_memories`` reducer (memory.rs:313), and a matching
-``expire_memories`` MCP tool in main.py. The reducer iterates all
-memories and deactivates any whose ``expires_at`` is in the past.
-161/161 test_client.py unit tests passing, 143 MCP tools registered.
-All previously missing SDK methods now have coverage — backlog cleared.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 5min
-Commit: e27ea0a9
-
-### ✅ Add `update_workspace`, `set_workspace_visibility`, `get_workspace_context` SDK methods + MCP tools (this tick)
-Added 3 new ``Client`` SDK methods for workspace management that were
-identified as gaps in earlier research but never implemented:
-- ``Client.update_workspace(id, name, description)`` — wraps ``update_workspace``
-  reducer (workspace.rs:72), requires owner access
-- ``Client.set_workspace_visibility(workspace_id, is_public)`` — wraps
-  ``set_workspace_visibility`` reducer (workspace.rs:196), toggles public/private
-- ``Client.get_workspace_context(workspace_id)`` — calls ``get_workspace_context``
-  reducer (workspace.rs:136) and queries ``workspace_context_result`` table
-All three have matching MCP tools (``update_workspace``, ``set_workspace_visibility``,
-``get_workspace_context``). 161/161 test_client.py tests passing, 145 MCP tools
-registered. Workspace CRUD + visibility + context is now fully covered.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-Commit: a00eca57
-
 ## Research Log
+
+### Jun 28 (this tick) — Converted print()→logging in shmr.py; 5 missing docstrings + localhost fixes; backlog cleared
+- **Completed**: 
+  - Added 5 missing docstrings to client.py (`__init__`, `_do_sql`, `_do_call`, `from_dict`, `format`). 175/175 client methods now documented. Fixed 7 hardcoded `localhost` defaults → `127.0.0.1` across client.py, query_expansion.py, 6 adapters.
+  - Converted 7 `print()` calls in shmr.py to structured `logging.Logger` calls (`logger.info()`/`logger.warning()`). Added `import logging` + logger setup. 31/31 shmr tests, 170/170 client tests passing.
+- **Cleanup**: Moved ✅ docstrings item from Pending → Recently Completed. Moved ✅ print→logging item from Pending → Recently Completed. Purged 2 oldest completed entries to keep 9 in Recently Completed.
+- **Research**:
+  - Git log (7 days): 320+ commits, latest: d00beaba (honcho adapter fix + docs).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged), langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged), opentelemetry-sdk v1.43.0 (at latest).
+  - All 138 Client SDK methods have MCP tool coverage. 0 ruff errors. 0 code-level TODO/FIXME markers.
+  - Deeper scan: ROADMAP identifies remaining ~47 `print()` calls across SDK (connectors, ingest, sdks, metrics, client). No new competitor features to adopt.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: 92415ced (docstrings + localhost fixes), d00beaba (honcho adapter + docs), [this tick] (print→logging in shmr.py).
 
 ### Jun 28 (this tick) — Fixed 2 ruff lint issues in MCP main.py; backlog now has 1 PENDING
 - **Completed**: Fixed 2 ruff lint issues in MCP main.py (`F541 f-string` and `F841 unused variable`).

@@ -18,6 +18,7 @@ Core flow:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import warnings
@@ -27,6 +28,8 @@ from typing import Any
 import numpy as np
 
 from spacetime_memory.client import Client
+
+logger = logging.getLogger(__name__)
 
 # ── Config ──────────────────────────────────────────────────────────
 # NOTE: The MNEMOSYNE_* env vars are deprecated. Use STMEM_* instead.
@@ -315,16 +318,16 @@ def shmr_resonate(
             indexed.append({"embedding": emb, **mem})
 
     if not indexed:
-        print("  No indexed memories found.")
+        logger.info("No indexed memories found.")
         result.duration_ms = int((time.time() - t0) * 1000)
         return result
 
-    print(f"  Memories with embeddings: {len(indexed)}/{len(memories)}")
+    logger.info("Memories with embeddings: %d/%d", len(indexed), len(memories))
 
     # 2. Cluster by embedding similarity
     clusters = _cluster_by_similarity(indexed, threshold=similarity_threshold)
     result.clusters_found = len(clusters)
-    print(f"  Clusters found: {len(clusters)} (threshold={similarity_threshold})")
+    logger.info("Clusters found: %d (threshold=%s)", len(clusters), similarity_threshold)
 
     if not clusters:
         result.duration_ms = int((time.time() - t0) * 1000)
@@ -339,7 +342,7 @@ def shmr_resonate(
         prompt = HARMONY_PROMPT + "\n\n" + _format_cluster_for_llm(cluster)
 
         if dry_run:
-            print(f"    [DRY] Cluster {i + 1}/{len(clusters)}: {len(cluster)} memories")
+            logger.info("[DRY] Cluster %d/%d: %d memories", i + 1, len(clusters), len(cluster))
             result.beliefs_generated += 3  # estimate
             continue
 
@@ -348,7 +351,7 @@ def shmr_resonate(
         try:
             llm_result = _call_client_llm(client, prompt)
         except Exception as e:
-            print(f"    LLM call failed for cluster {i}: {e}")
+            logger.warning("LLM call failed for cluster %d: %s", i, e)
             result.errors += 1
             continue
 
@@ -383,14 +386,14 @@ def shmr_resonate(
                 ],
             )
             dampens = sum(1 for b in beliefs if b.get("action") == "dampen")
-            print(
-                f"    [OK] Cluster {i + 1}/{len(clusters)}: "
-                f"{len(beliefs)} beliefs ({dampens} dampened, harmony={harmony:.2f})"
+            logger.info(
+                "[OK] Cluster %d/%d: %d beliefs (%d dampened, harmony=%.2f)",
+                i + 1, len(clusters), len(beliefs), dampens, harmony,
             )
             result.beliefs_generated += len(beliefs)
             result.contradictions_resolved += dampens
         except Exception as e:
-            print(f"    Store failed for cluster {i}: {e}")
+            logger.warning("Store failed for cluster %d: %s", i, e)
             result.errors += 1
 
     # 4. Compute average harmony score
