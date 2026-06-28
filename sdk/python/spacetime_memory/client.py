@@ -3220,6 +3220,20 @@ class Client:
         """Run dedup within a workspace."""
         return self._call("dedup_memories", [workspace_id])
 
+    def dedup_memories(self, workspace_id: str) -> dict[str, Any]:
+        """Deduplicate near-duplicate memories in a workspace.
+
+        Wraps the ``dedup_memories`` reducer (consolidation.rs:478).
+        Near-duplicate detection uses cosine >= 0.85 + edit distance <= 30%.
+
+        Args:
+            workspace_id: The workspace to deduplicate.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self.dedup(workspace_id)
+
     def consolidate_memories(
         self,
         workspace_id: str,

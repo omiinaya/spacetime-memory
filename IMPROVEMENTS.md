@@ -8,7 +8,29 @@ and works the top pending item each tick.
 
 ## Pending
 
-*None — backlog cleared.*
+### Add `dedup_memories` SDK alias + update MCP tool to use SDK method
+`client.dedup()` exists but is named inconsistently — add `dedup_memories` alias.
+MCP `dedup_memories` tool still uses `get_client()._call("dedup_memories", ...)`
+instead of SDK method. Fix both.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 5min
+
+### Add `grant_space_access` + `revoke_space_access` SDK methods + update MCP tools
+Both reducers exist in workspace.rs (lines 284, 357) and have MCP tools, but
+no SDK methods. The MCP tools use `get_client()._call()` directly.
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+
+### Update 9 MCP tools to use SDK methods instead of raw `_call`
+MCP tools for `rate_memory`, `consolidate_memories`, `set_memory_scope`,
+`synthesize_mental_models`, `add_fact`, `list_facts`, `delete_fact`,
+`update_fact`, `search_facts` all call `get_client()._call(...)` directly
+despite having proper SDK methods. Update to use SDK methods for consistency.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 10min
 
 ## Deferred / Blocked
 
