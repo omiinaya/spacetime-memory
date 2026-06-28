@@ -2206,6 +2206,22 @@ class Client:
                 return {"status": "ok", "note": "already deleted"}
             raise
 
+    def update_memory_tier(self, memory_id: str, tier: str) -> dict[str, Any]:
+        """Change a memory's compression tier.
+
+        Parameters
+        ----------
+        memory_id:
+            Target memory ID.
+        tier:
+            New tier. Must be one of ``"L0"``, ``"L1"``, or ``"L2"``.
+            L0 = highest importance / shortest retention window,
+            L2 = lowest importance / longest retention window.
+        """
+        if tier not in ("L0", "L1", "L2"):
+            raise ValueError(f"Invalid tier '{tier}'. Must be L0, L1, or L2.")
+        return self._call("update_memory_tier", [memory_id, tier])
+
     def set_workspace_context(self, workspace_id: str, context: str) -> dict[str, Any]:
         """Attach a context string to a workspace for QMD-style context trees."""
         return self._call("set_workspace_context", [workspace_id, context])

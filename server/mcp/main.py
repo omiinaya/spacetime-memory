@@ -466,6 +466,25 @@ def delete_memory(memory_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 @require_api_key
+def update_memory_tier(memory_id: str, tier: str) -> dict[str, Any]:
+    """Change a memory's compression tier.
+
+    L0 = highest importance / shortest retention window (fits in primary context).
+    L1 = warm cache (moderate importance, compressed periodically).
+    L2 = cold storage (low importance, long-term archival).
+
+    Args:
+        memory_id: The ID of the memory to update.
+        tier: New tier. Must be ``"L0"``, ``"L1"``, or ``"L2"``.
+
+    Returns:
+        The updated memory object.
+    """
+    return get_client().update_memory_tier(memory_id, tier)
+
+
+@mcp.tool()
+@require_api_key
 def store_batch(
     items_json: str,
     workspace_id: str = "default",
