@@ -3377,6 +3377,39 @@ class Client:
         rows.sort(key=lambda r: r.get("created_at", 0))
         return rows
 
+    def add_agent_step(
+        self,
+        session_id: str,
+        workspace_id: str,
+        step_type: str,
+        content: str,
+        summary: str = "",
+        parent_step_id: str = "",
+    ) -> dict[str, Any]:
+        """Record an agent reasoning step (thought, action, tool_call, etc.).
+
+        Calls the ``add_agent_step`` reducer to append a reasoning step to a
+        session's chain of thought.
+
+        Args:
+            session_id: The session to attach the step to.
+            workspace_id: The workspace containing the session.
+            step_type: One of ``"thought"``, ``"action"``, ``"observation"``,
+                ``"tool_call"``, or ``"tool_result"``.
+            content: The step content (text or JSON).
+            summary: Optional short summary of the step.
+            parent_step_id: Optional parent step ID for chain-of-thought
+                linking.
+
+        Returns:
+            The reducer status dict. On success the calling tool can extract
+            the created step id from the ``"id"`` key.
+        """
+        return self._call(
+            "add_agent_step",
+            [session_id, workspace_id, step_type, content, summary, parent_step_id],
+        )
+
     # -----------------------------------------------------------------------
     # Profiles
     # -----------------------------------------------------------------------

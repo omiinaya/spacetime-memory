@@ -2519,9 +2519,12 @@ def add_agent_step(
     Returns:
         Confirmation message with step ID.
     """
-    get_client()._call(
-        "add_agent_step",
-        [session_id, workspace_id, step_type, content, summary, ""],
+    get_client().add_agent_step(
+        session_id=session_id,
+        workspace_id=workspace_id,
+        step_type=step_type,
+        content=content,
+        summary=summary,
     )
     return f"Agent step recorded for session {session_id[:16]}..."
 
