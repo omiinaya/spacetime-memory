@@ -3060,6 +3060,34 @@ class Client:
             ],
         )
 
+    def get_edge_history(
+        self,
+        edge_group_id: str,
+    ) -> list[dict[str, Any]]:
+        """Get all historical versions of a knowledge-graph edge.
+
+        Edges in the KG are versioned — when an edge is updated, a new
+        version is created with the same ``edge_group_id``. This method
+        returns every version ordered by ``created_at``, letting you
+        trace how a relationship evolved over time.
+
+        Args:
+            edge_group_id: The group ID of the edge(s) to query. All
+                versions sharing this group ID are returned.
+
+        Returns:
+            List of edge version records with source_node_id,
+            target_node_id, relation, weight, confidence, version, and
+            timestamps (created_at, valid_at, invalid_at).
+        """
+        self._call("get_edge_history", [edge_group_id])
+        rows = self._sql(
+            "SELECT * FROM edge_history_result WHERE "
+            f"edge_group_id = '{_esc(edge_group_id)}' "
+            "ORDER BY created_at ASC"
+        )
+        return rows
+
     def get_citations(
         self,
         workspace_id: str,

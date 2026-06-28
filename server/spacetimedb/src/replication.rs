@@ -520,6 +520,7 @@ fn apply_incoming_insert(
                 created_at: data.get("created_at").and_then(|v| v.as_i64()).unwrap_or(now),
                 updated_at: data.get("updated_at").and_then(|v| v.as_i64()).unwrap_or(now),
                 is_active: data.get("is_active").and_then(|v| v.as_bool()).unwrap_or(true),
+                version: data.get("version").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
             };
             ctx.db.note().insert(note);
             Ok(())

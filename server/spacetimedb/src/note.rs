@@ -69,7 +69,7 @@ pub fn record_note_revision(
         new_title: new_title.to_string(),
         new_content: new_content.to_string(),
         changed_at: now_micros(ctx),
-        changed_by: ctx.sender().to_hex(),
+        changed_by: ctx.sender().to_hex().to_string(),
     };
     ctx.db.note_revision().insert(revision);
 }

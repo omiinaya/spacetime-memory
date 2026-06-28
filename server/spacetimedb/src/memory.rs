@@ -112,7 +112,7 @@ pub fn record_revision(
         new_summary: new_summary.to_string(),
         new_confidence,
         changed_at: now_micros(ctx),
-        changed_by: ctx.sender().to_hex(),
+        changed_by: ctx.sender().to_hex().to_string(),
     };
     ctx.db.memory_revision().insert(revision);
 }

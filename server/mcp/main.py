@@ -1631,6 +1631,22 @@ def get_citations(
 
 @mcp.tool()
 @require_api_key
+def get_edge_history(edge_group_id: str) -> list[dict[str, Any]]:
+    """Get all historical versions of a KG edge.
+
+    Edges in the knowledge graph are versioned — when an edge is updated
+    a new version is created with the same ``edge_group_id``. This tool
+    returns every version ordered by ``created_at``, letting you trace
+    how a relationship evolved over time.
+
+    Args:
+        edge_group_id: The group ID shared by all versions of the edge.
+    """
+    return get_client().get_edge_history(edge_group_id)
+
+
+@mcp.tool()
+@require_api_key
 def query_graph(workspace_id: str, query: str = "") -> list[dict[str, Any]]:
     """Search knowledge graph nodes by label within a workspace."""
     return get_client().query_graph(workspace_id, query)

@@ -1230,6 +1230,11 @@ class TestMethodStubs:
         client.add_edge_citation("ws1", "src", "tgt", "desc")
         client._call.assert_called_with("add_edge_citation", ["ws1", "src", "tgt", "desc"])
 
+    def test_get_edge_history(self, client):
+        client.get_edge_history("eg-1")
+        client._call.assert_called_with("get_edge_history", ["eg-1"])
+        client._sql.assert_called_once()
+
     def test_create_document(self, client):
         client.create_document("ws1", "title", "content", "md", "/path", "url", {"key": "val"})
         client._call.assert_called()
