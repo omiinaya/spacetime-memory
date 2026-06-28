@@ -1989,7 +1989,7 @@ def graph_bfs(workspace_id: str, start_node_id: str, max_depth: int = 3) -> str:
 def shortest_path(workspace_id: str, source_id: str, target_id: str, max_hops: int = 6) -> str:
     """Find shortest path between two KG nodes. Results in shortest_path_result table."""
     get_client().shortest_path(workspace_id, source_id, target_id, max_hops)
-    return f"Shortest path computed. Read via SQL on shortest_path_result."
+    return "Shortest path computed. Read via SQL on shortest_path_result."
 
 
 # ---------------------------------------------------------------------------
@@ -2733,7 +2733,6 @@ def ingest_source(
     from spacetime_memory.compounder import Compounder
 
     client = get_client()
-    llm_available = bool(os.environ.get("OPENAI_API_KEY", False))
     cp = Compounder(client)
     result = cp.ingest_source(
         source_text=source_text,
