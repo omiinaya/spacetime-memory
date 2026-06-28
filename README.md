@@ -15,25 +15,28 @@
 
 ## Quick Start
 
-```bash
-pip install spacetime-memory[local-embed]
+If you already have a SpacetimeDB instance with the memory module published (see [Setup](#setup) if you don't):
 
+```bash
+pip install spacetime-memory
+```
+
+```python
 from spacetime_memory import Client
 
 c = Client(host="localhost", port="3001", database="your-db")
-c.store("AI agents need persistent memory", "memory")
-results = c.search("AI agents", limit=5)
+ws = c.create_workspace("my-app")
+c.store(ws["id"], "AI agents need persistent memory", peer_id="me")
+results = c.search(ws["id"], "AI agents", semantic=True)
 ```
 
-Or drop in as any supported adapter:
+Or use any drop-in adapter:
 
 ```python
 from spacetime_memory.sdks.mem0 import Memory
 m = Memory(config={"host": "localhost", "port": "3001"})
 m.add("I like pizza", user_id="alice")
 ```
-
-See [Getting Started](docs/getting-started.md) for setup, or jump to the [Adapter Authoring Guide](docs/adapter-authoring-guide.md) to write your own.
 
 ## Drop-in Adapters
 
@@ -198,49 +201,72 @@ s = honcho.session("my_session")
 s.add_messages([{"role": "user", "content": "I like pizza"}])
 ```
 
-## Quick Start
+## Setup
 
-### Prerequisites
+Two paths depending on your situation:
 
+### Quick Start (I have a running SpacetimeDB)
+
+If you already have a SpacetimeDB instance with the memory module published:
+
+```bash
+pip install spacetime-memory
+```
+
+```python
+from spacetime_memory import Client
+
+c = Client(host="localhost", port="3001", database="your-db")
+
+# Create a workspace and store a memory
+ws = c.create_workspace("my-app")
+c.store(ws["id"], "AI agents need persistent memory", peer_id="me")
+
+# Search across all strategies
+results = c.search(ws["id"], "AI agents", semantic=True)
+```
+
+Or use any of the 6 drop-in adapters with the same import API you already know:
+
+```python
+from spacetime_memory.sdks.mem0 import Memory   # Mem0 API
+from spacetime_memory.sdks.hindsight import Hindsight  # Hindsight API
+from spacetime_memory.sdks.zep import Zep       # Zep API
+from spacetime_memory.sdks.graphiti import Graphiti  # Graphiti API
+from spacetime_memory.sdks.honcho import Honcho  # Honcho API
+from spacetime_memory.sdks.langchain import StmemStore  # LangGraph BaseStore
+```
+
+See `docs/getting-started.md` for more SDK examples.
+
+### Full Stack Setup (from scratch — need to run STDB)
+
+If you're setting up a SpacetimeDB instance for the first time:
+
+**Prerequisites:**
 - Rust toolchain (`cargo`, `rustup`)
 - SpacetimeDB CLI v2.6+ (`spacetime version upgrade`)
-- Node.js 18+ and npm
 - Python 3.10+ (for SDK/CLI/MCP)
 
-### 1. Clone & Setup
-
+**1. Clone & enter the repo:**
 ```bash
 git clone https://github.com/omiinaya/spacetime-memory.git
 cd spacetime-memory
 ```
 
-### 2. Start SpacetimeDB
-
+**2. Start SpacetimeDB:**
 ```bash
 spacetime start --listen-addr 0.0.0.0:3001 &
 ```
 
-### 3. Build & Publish Module
-
+**3. Build & publish the Rust module:**
 ```bash
 cd server/spacetimedb
 cargo build --target wasm32-unknown-unknown
 spacetime publish spacetime-memory -p ./ --yes
 ```
 
-### 4. Start Embedder Sidecar
-
-```bash
-# Embeddings are routed through the spacetime-llm proxy (localhost:4000)
-# which forwards to NVIDIA NIM (baai/bge-m3, 1024-dim).
-# Set env vars:
-#   OPENAI_API_KEY=<your-key>
-#   OPENAI_BASE_URL=http://localhost:4000/v1
-#   EMBEDDING_MODEL=baai/bge-m3
-```
-
-### 5. Install Python SDK & CLI
-
+**4. Install Python SDK & CLI:**
 ```bash
 cd sdk/python
 pip install -e .
@@ -248,25 +274,56 @@ pip install -e .
 stmem --help
 ```
 
-### 6. Start MCP Server
+**5. Configure embeddings (optional — needed for semantic search):**
+```bash
+export OPENAI_API_KEY=<your-key>
+export OPENAI_BASE_URL=http://localhost:4000/v1
+export EMBEDDING_MODEL=baai/bge-m3
+```
+The embedding proxy at `localhost:4000` forwards to NVIDIA NIM (bge-m3, 1024-dim). See [CONFIG.md](CONFIG.md) for all env vars.
 
+**6. Start MCP server (optional — for agent integration):**
 ```bash
 stmem serve                  # stdio transport (local LLM integration)
 stmem serve --transport sse  # HTTP SSE transport
 ```
 
-### 7. Start Frontend
-
+**7. Start frontend (optional):**
 ```bash
 cd client
 npm install
-cp .env.example .env       # configure host/db
-npm run dev                 # opens on localhost:5173
+cp .env.example .env
+npm run dev                  # opens on localhost:5173
 ```
 
-### 8. Login (First Run)
+Now jump back to [Quick Start](#quick-start-i-have-a-running-spacetimedb) above to use the Python SDK.
 
-Open the frontend. On first launch, register as the admin user. Subsequent launches will prompt for login. All note operations are auth-gated.
+### Running Tests
+
+```bash
+# Unit tests only — no STDB needed (~30s)
+cd sdk/python && python -m pytest tests/ -m unit -v
+
+# Full suite (unit + integration) — needs STDB on :3001
+make test
+
+# Integration tests only — auto-builds module, auto-publishes
+make test-integration
+```
+The integration tests auto-publish the module via HTTP API. If no STDB is running, they skip cleanly.
+
+### Configuration Reference
+
+All env vars are documented in [CONFIG.md](CONFIG.md). Key ones:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SPACETIMEDB_HOST` | `localhost` | STDB server address |
+| `SPACETIMEDB_PORT` | `3001` | STDB HTTP port |
+| `SPACETIMEDB_DB` | `spacetime-memory` | Database identity hex |
+| `OPENAI_API_KEY` | *(none)* | API key for embeddings + LLM |
+| `OPENAI_BASE_URL` | `http://localhost:4000/v1` | OpenAI-compatible endpoint |
+| `EMBEDDING_MODEL` | `baai/bge-m3` | Embedding model name |
 
 ## Features
 

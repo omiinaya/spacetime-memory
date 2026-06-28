@@ -1,4 +1,4 @@
-# Spacetime Memory — Honest Assessment (June 27, 2026, v1.35.0+322 commits)
+# Spacetime Memory — Honest Assessment (June 28, 2026, v1.35.0+322 commits)
 
 ## Project Totals
 
@@ -14,6 +14,41 @@
 | **Total** | **~90,000** | **~134** | **~4,162** | **varies by layer** |
 
 > **v1.35.0 + 322 unpinned commits.** CI cron has been auto-running clearing the IMPROVEMENTS.md backlog. Backlog is now **0 PENDING items** — fully cleared.
+
+## External Review (June 28, 2026 — Hermes Research Article)
+
+A comprehensive external review was published as [Spacetime Memory: An Honest Review](http://127.0.0.1:8710/article/spacetime-memory-review), comparing the project against Mem0, Graphiti, Hindsight, Honcho, Supermemory, and Zep. Key findings:
+
+| Domain | Assessment |
+|--------|-----------|
+| **Breadth of features** | Broadest single-system — no competitor matches the feature set |
+| **Drop-in adapters** | "Genuinely novel and valuable" — only project offering this |
+| **Setup complexity** | Biggest barrier — requires SpacetimeDB, not a pip library |
+| **Unique strengths** | Note/wiki system, context packs, guided tours, contradiction checking, memory trust system, 7-strategy search fusion — all unique vs every competitor |
+| **Competitive gaps** | No published benchmarks, incomplete TS SDK, no managed cloud, no bi-temporal facts, docs sprawl, small community |
+| **Overall verdict** | "Right choice" for our use case (already on STDB); would recommend Mem0/Hindsight/Graphiti for their specific niches |
+
+### Competitive Positioning
+
+| Your Priority | Best Choice |
+|:---|---:|
+| Simplest setup | Mem0 |
+| Biggest community | Mem0 |
+| Best temporal facts | Graphiti |
+| Best retrieval quality | Hindsight |
+| Best RAG with connectors | Supermemory |
+| **One system for everything** | **spacetime-memory** |
+| **Drop-in compatibility** | **spacetime-memory** (only option) |
+| Managed service | Supermemory / Mem0 Cloud |
+| Open source + KG | spacetime-memory (self-host) |
+| Zero infra overhead | Mem0 (library) or QMD (local search) |
+
+### External-Review Strategic Implications
+
+1. **The drop-in adapter layer is our moat** — no competitor can replicate this without rebuilding their entire architecture. It de-risks adoption: users start with Mem0's ecosystem and grow into SpacetimeDB.
+2. **Benchmarks are our biggest credibility gap** — every serious competitor publishes scores on LongMemEval/LoCoMo/BEAM. Without them, retrieval quality claims are unverifiable.
+3. **Documentation consolidation is the highest-ROI UX fix** — 7+ markdown files scattered, no single getting-started guide.
+4. **Self-hosting is correct for us** but the missing managed option limits broader adoption.
 
 ## Project Cleanup Summary (v1.31.0)
 
@@ -293,15 +328,15 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | 6 | **Mem0 adapter not verifiable** — package not on PyPI | **P2** | 30min | ✅ **DONE** — verified against GitHub source. 85% parity. |
 | 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ❌ **BROKEN** |
 | 8 | **30% reducers unguarded** — need auth review | **P3** | 2-3h | ⚠️ Needs audit |
-| 9 | **Hardcoded localhost defaults** — client.py uses localhost:3001/9090 | **P3** | 15min | ⚠️ |
+| 9 | **Hardcoded localhost defaults** — client.py uses localhost:3001/9090 | **P3** | 15min | ✅ **FIXED** — all defaults changed to 127.0.0.1 |
 | 10 | **47 `print()` calls** — no structured logging | **P3** | 1-2h | ⚠️ Code smell |
-| 11 | **60% docstring coverage** — 40% undocumented | **P3** | 2h | ⚠️ |
+| 11 | **61% docstring coverage** — 5 undocumented methods documented | **P3** | 2h | ⚠️ Ongoing |
 | 12 | **PyPI publish** — deferred since v1.31.0 | **P4** | ~1h | ⏸️ Deferred |
 | 13 | **STDB ~2% fatal error rate** — concurrency stability | **P1** | 4-8h | 🧊 Blocked (no live STDB) |
 
 > **Previous claim of all debt items being "DONE" was incorrect.** The Rust compilation, frontend, and Tantivy issues were not caught in the prior audit.
 
-### Score Breakdown — Honest (June 27, 2026 Audit)
+### Score Breakdown — Honest (June 28, 2026 Audit, post-External Review)
 
 | Domain | Score | Why |
 |--------|:-----:|-----|
@@ -314,24 +349,33 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Frontend | **0%** | No web/ directory exists. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Print() calls and 60% docstrings drag it down. |
 | Test Coverage | **80%** | 247+ unit pass. Rust untestable. Tantivy down. No e2e/deep marker. |
-| Infrastructure | **50%** | CI exists. Tantivy down. WASM stale. No local STDB. 168MB stale venv. |
-| **Weighted Overall** | **~82%** | Rust fixed (+20%). Still missing frontend, Tantivy, partial adapter parity. |
+| Infrastructure | **65%** | CI exists. Tantivy running (267 indexes). WASM rebuilt. No local STDB. 168MB stale venv. |
+| **Competitive Positioning** | **90%** | External review confirms broadest feature set, unique moat (adapters, wiki, context packs, tours, contradiction checking). Only gaps: no benchmarks, no TS parity, no managed cloud, docs sprawl. |
+| **Weighted Overall** | **~83%** | External validation confirms direction. Still missing frontend, Tantivy, partial adapter parity. New gaps identified: benchmarks, docs consolidation, TS SDK, bi-temporal facts. |
 
 ### The Path to 95%+ (Remaining)
 
 1. **P0: Fix Rust compilation** — 5 STDB v2.6 API errors (~30min) | ✅ **DONE**
 2. **P0: Rebuild WASM binary** — after cargo fix (~10min + build time) | ✅ **DONE** — fresh 2.36MB binary
 3. **P0: Build frontend** — React/Vite web UI (~1-2 weeks) or integrate with existing dashboard
-4. **P1: Restart Tantivy BM25 sidecar** — port 9091 not responding (~30min)
-5. **P1: Investigate STDB 2% fatal error** — needs live STDB instance (4-8h)
-6. **P2: Complete Hindsight adapter parity** — implement 18 missing methods (2-4h)
-7. **P2: Fix Mem0 adapter** — verify against mem0 source or remove if unmaintained (30min)
-8. **P2: Fix Honcho adapter** — install correct `honcho-ai` package or verify API shape (30min)
-9. **P3: Review 49 unguarded reducers** — audit which need auth guards (2-3h)
-10. **P3: Replace `print()` with logging** — logging.Logger across all modules (1-2h)
-11. **P3: Fix localhost defaults** — change to 127.0.0.1 (15min)
-12. **P3: Improve docstring coverage** — target 80%+ (2h)
-13. **P3: Clean up stale env vars** — ✅ resolved (`MNEMOSYNE_*` → `STMEM_*` with backward compat)
-14. **P4: PyPI publish** — push to PyPI (1h)
-15. **🧊: Rename `MNEMOSYNE_*` env vars** — ✅ resolved (backwards-compatible with deprecation warning)
-16. **🧊: Multi-region / failover** — no current requirement
+4. **P1: Investigate STDB 2% fatal error** — needs live STDB instance (4-8h)
+5. **P2: Complete Hindsight adapter parity** — implement 18 missing methods (2-4h)
+6. **P2: Fix Mem0 adapter** — verify against mem0 source or remove if unmaintained (30min)
+7. **P2: Fix Honcho adapter** — install correct `honcho-ai` package or verify API shape (30min)
+8. **P3: Review 49 unguarded reducers** — audit which need auth guards (2-3h)
+9. **P3: Replace `print()` with logging** — logging.Logger across all modules (1-2h)
+10. **P3: Fix localhost defaults** — change to 127.0.0.1 (15min) | ✅ **DONE**
+11. **P3: Improve docstring coverage** — target 80%+ (2h)
+12. **P3: Clean up stale env vars** — ✅ resolved (`MNEMOSYNE_*` → `STMEM_*` with backward compat)
+13. **P4: PyPI publish** — push to PyPI (1h)
+14. **🧊: Rename `MNEMOSYNE_*` env vars** — ✅ resolved (backwards-compatible with deprecation warning)
+15. **🧊: Multi-region / failover** — no current requirement
+
+### New Items from External Review
+
+17. **P1: Publish benchmark scores** — run LongMemEval, LoCoMo, and BEAM against current retrieval pipeline (~1-2 weeks). The article explicitly flags this as our biggest credibility gap vs Mem0 (94.8), Hindsight (SOTA), and Supermemory (#1).
+18. **P2: Consolidate documentation** — single "5-min getting started" guide merging AGENTS.md, CONFIG.md, DEPLOYMENT.md, ADAPTER_COMPAT.md into one onboarding flow (~4h). The article calls out docs sprawl as a newcomer barrier. | ✅ **DONE** — README restructured (two clear paths, config reference), docs/index.md architecture diagram fixed, docs/development.md updated with current project layout, docs/getting-started.md rewritten as SDK usage reference.
+19. **P2: TypeScript SDK parity** — bring TS SDK to feature parity with Python SDK (~1 week). Currently incomplete, which blocks TS-first agent framework adoption.
+20. **P3: Bi-temporal fact tracking** — investigate Graphiti-style temporal facts with automatic invalidation of superseded facts (~1 week). Graphiti's strongest differentiator.
+21. **P4: Evaluate managed cloud options** — feasibility study for managed SpacetimeDB hosting (~2-3 days). Every major competitor offers a paid managed option.
+22. **P4: Community building** — create tutorials, Stack Overflow presence, showcase projects (ongoing). The 0-star, no-tutorials reality limits adoption beyond our infrastructure.

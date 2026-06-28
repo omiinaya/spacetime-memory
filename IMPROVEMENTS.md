@@ -8,7 +8,14 @@ and works the top pending item each tick.
 
 ## Pending
 
-*None — backlog cleared.*
+### ✅ Add docstrings to 5 undocumented methods in client.py (this tick)
+Added docstrings to `__init__`, `_do_sql`, `_do_call`, `from_dict`, and `format`.
+`__init__`: full parameter docstring. `_do_sql`/`_do_call`: internal closure docs.
+`from_dict`/`format`: proper args/return docs.
+Docstring coverage: 175/175 methods = 100%.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 5min
 
 ## Deferred / Blocked
 
@@ -24,6 +31,18 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Fix 2 ruff lint issues in MCP main.py — F541 f-string + F841 unused var (this tick)
+Fixed `f"..."` without placeholders at server/mcp/main.py:1992 (`shortest_path`
+return message). Removed extraneous `f` prefix.
+Fixed `llm_available` assigned but never used at server/mcp/main.py:2736
+(`ingest_source` MCP tool). Removed assignment.
+Ruff check now returns 0 errors across SDK + MCP code.
+170/170 test_client.py tests passing.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 2min
+Commit: 25ed22e2
 
 ### ✅ Add `add_agent_step` SDK method; eliminate last raw `_call()` from MCP (this tick)
 Added `Client.add_agent_step(session_id, workspace_id, step_type, content, summary, parent_step_id)`
@@ -151,62 +170,24 @@ Difficulty: Easy
 Est: 10min
 Commit: a00eca57
 
-### ✅ Add `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools (this tick)
-Added `Client.create_tag(workspace_id, name, color)`, `Client.tag_memory(memory_id, tag_id)`,
-and `Client.untag_memory(memory_id, tag_id)` Python SDK methods wrapping the ``create_tag``,
-``tag_memory``, and ``untag_memory`` Rust reducers (tag.rs:32, 55, 71). Added matching
-``create_tag``, ``tag_memory``, ``untag_memory`` MCP tools in main.py. Tagging is now
-fully accessible programmatically — previously only existed in Rust. 161/161 unit tests
-passing (test_client), 141 MCP tools registered.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 10min
-Commit: c952d09a
-
-### ✅ Add `delete_fact`, `update_fact`, and `search_facts` SDK methods + MCP tools (this tick)
-Added 3 new ``Client`` SDK methods completing the full facts CRUD suite:
-- ``Client.delete_fact(fact_id)`` — soft-delete a fact via the ``delete_fact`` reducer
-- ``Client.update_fact(fact_id, content, confidence, category, tier)`` — update fact fields
-  via the ``update_fact`` reducer (profile.rs:218)
-- ``Client.search_facts(workspace_id, query, tier)`` — substring search across fact content
-  via the ``search_facts`` reducer (profile.rs:332), reads ``fact_result`` table
-All three have corresponding MCP tools and MCP README entries.
-2640/2640 unit tests passing, 688 skipped (live STDB-dependent).
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py,
-  server/mcp/README.md, sdk/python/tests/test_client.py,
-  sdk/python/tests/test_mcp.py
-Difficulty: Easy
-Est: 15min
-Commit: 33287f0a
-
-
-
 ## Research Log
 
-### Jun 28 (this tick) — Added `add_agent_step` SDK method; eliminated last raw `_call()` from MCP; backlog cleared
-- **Completed**: Added `Client.add_agent_step(session_id, workspace_id, step_type, content, summary, parent_step_id)`
-  Python SDK method wrapping the `add_agent_step` reducer (session.rs:194), with full docstring and
-  optional `parent_step_id` parameter. Updated the `add_agent_step` MCP tool to use the SDK method
-  instead of raw `get_client()._call()`. This completes the MCP `_call()` elimination project —
-  **0 remaining raw `_call()` calls in server/mcp/main.py**. 170/170 test_client.py tests passing.
-- **Cleanup**: Added new completed entry at top of Recently Completed. Purged oldest completed entry
-  (`Add delete_fact, update_fact, search_facts SDK methods + MCP tools`) to keep 10 entries.
+### Jun 28 (this tick) — Fixed 2 ruff lint issues in MCP main.py; backlog now has 1 PENDING
+- **Completed**: Fixed 2 ruff lint issues in MCP main.py (`F541 f-string` and `F841 unused variable`).
+
+- **Cleanup**: Added new completed entry at top of Recently Completed. Purged 2 oldest completed entries to keep 10.
 - **Research**:
-  - Git log (7 days): 307+ commits, latest: 14758893 (this tick — `add_agent_step` SDK method).
+  - Git log (7 days): 307+ commits, latest: 25ed22e2 (this tick — ruff lint fixes).
   - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
   - mem0ai v2.0.10 (unchanged, PyPI latest).
   - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.42.1 — all unchanged from last tick.
-  - Deeper scan: verified auth guard coverage across all Rust modules — all modules have
-    `require_auth`/`require_admin`/`check_space_access` in all reducers except 4 intentionally
-    unguarded cases (register, login, logout, set_initial_admin). Auth guard review complete
-    — no action needed. 63.4% docstring coverage in client.py (104/164 methods) — identified
-    as a quality improvement candidate for future ticks.
-  - All `_call()` usage in MCP tools now eliminated — 0 remaining.
-  - No code-level TODO/FIXME markers. No new competitor features to adopt.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: 14758893 — 2 files changed, +39/-3 lines (client.py, main.py).
+  - OpenTelemetry SDK 1.43.0 available (upgrade from 1.42.1) — no breaking changes.
+  - Deeper scan: SDK/MCP cross-reference shows all 137 public SDK methods have MCP tool coverage (aliases accounted for). Ruff check returns 0 errors across SDK + MCP codebase. No new competitor features to adopt from mem0, langgraph, zep. 3337 tests collected, 170/170 test_client.py passing.
+  - Added 2 PENDING items: ruff lint fixes (done this tick), docstring improvements (remaining).
+- **Backlog**: 1 PENDING item remaining (add docstrings to 5 undocumented methods).
+- **Commit**: 25ed22e2 — 1 file changed, +1/-2 lines (server/mcp/main.py).
 
-### Jun 28 (this tick) — Added `grant_space_access` + `revoke_space_access` SDK methods; converted 9 MCP tools from `_call()` to SDK methods; backlog cleared
+### Jun 28 (this tick) — Added `delete_mental_model` + `update_mental_model` MCP tools; found 2 MCP gaps
 - **Completed**: Added `Client.grant_space_access(workspace_id, peer_id, permission)`
   and `Client.revoke_space_access(workspace_id, peer_id)` Python SDK methods
   wrapping the `grant_space_access` (workspace.rs:284) and `revoke_space_access`

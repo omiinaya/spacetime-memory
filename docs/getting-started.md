@@ -1,104 +1,11 @@
 # Getting Started
 
-## Prerequisites
+This guide covers SDK usage examples. For setup instructions (installing SpacetimeDB, building the module, configuring embeddings), see the **[Setup section in README.md](../README.md#setup)** which has two paths:
 
-- Rust toolchain (`cargo`, `rustup`)
-- SpacetimeDB CLI v2.6+ (`spacetime version upgrade`)
-- Node.js 18+ and npm
-- Python 3.10+ (for SDK/CLI/MCP)
+- [Quick Start (I have a running SpacetimeDB)](../README.md#quick-start-i-have-a-running-spacetimedb) — just `pip install` and go
+- [Full Stack Setup (from scratch)](../README.md#full-stack-setup-from-scratch--need-to-run-stdb) — set up STDB for the first time
 
-## 1. Clone & Setup
-
-```bash
-git clone https://github.com/omiinaya/spacetime-memory.git
-cd spacetime-memory
-```
-
-## 2. Start SpacetimeDB
-
-```bash
-spacetime start --listen-addr 0.0.0.0:3001 &
-
-# Or via Make:
-make start-stdb
-```
-
-## 3. Build & Publish Module
-
-The conftest auto-publishes via HTTP API, but you can also build manually:
-
-```bash
-cd server/spacetimedb
-cargo build --target wasm32-unknown-unknown --release
-
-# Or via Make:
-make build-module
-```
-
-The test suite publishes automatically when it detects a running SpacetimeDB.
-
-## 4. Install Python SDK & CLI
-
-```bash
-cd sdk/python
-pip install -e .
-
-# Or via Make:
-make install-sdk
-
-# CLI available as `stmem`:
-stmem --help
-```
-
-## 5. Start Embedder Sidecar (optional — needed for semantic search)
-
-```bash
-# The embedder is a compiled Rust binary (tract + all-MiniLM-L6-v2)
-# It's pre-built at server/embedder/target/release/embedder
-# Or build from source:
-cd server/embedder && cargo build --release
-./target/release/embedder   # Listens on :9090
-```
-
-## 6. Start MCP Server (optional)
-
-```bash
-python server/mcp/main.py  # stdio transport for LLM agents
-```
-
-## 7. Start Frontend (optional)
-
-```bash
-cd client
-npm install
-cp .env.example .env       # configure host/db
-npm run dev                 # opens on localhost:5173
-```
-
-## 8. Login (First Run)
-
-Open the frontend. On first launch, register as the admin user. Subsequent launches will prompt for login. All note operations are auth-gated.
-
-## Running Tests
-
-The test suite has two tiers:
-
-```bash
-# Unit tests only — no SpacetimeDB needed (~30s)
-cd sdk/python && python -m pytest tests/ -m unit -v
-
-# Full suite (unit + integration) — needs SpacetimeDB on :3001
-make test
-
-# Integration tests only — auto-builds module, auto-publishes
-make test-integration
-```
-
-The integration tests auto-publish the module via HTTP API. If no SpacetimeDB is running, they skip cleanly.
-
-## Quick Start Using the Python SDK
-
-### Using the Low-Level Client
+## Using the Low-Level Client
 
 ```python
 from spacetime_memory import Client
@@ -117,7 +24,7 @@ results = client.search(ws_id, "food preferences", semantic=True)
 print(results)
 ```
 
-### Using the Mem0 Adapter
+## Using the Mem0 Adapter
 
 ```python
 from spacetime_memory.sdks import Mem0Memory
@@ -127,7 +34,7 @@ m.add("I like pizza", user_id="alice")
 results = m.search("food preferences", user_id="alice")
 ```
 
-### Using the Hindsight Adapter
+## Using the Hindsight Adapter
 
 ```python
 from spacetime_memory.sdks import Hindsight
@@ -137,7 +44,7 @@ h.retain("my_bank", "I like pizza")
 results = h.recall("my_bank", "food preferences")
 ```
 
-### Using the Honcho Adapter
+## Using the Honcho Adapter
 
 ```python
 from spacetime_memory.sdks import Honcho
@@ -150,7 +57,7 @@ results = honcho.search("pizza")
 print(results)
 ```
 
-### Using the LangGraph Adapter
+## Using the LangGraph Adapter
 
 ```python
 from spacetime_memory.sdks import StmemStore
@@ -158,4 +65,33 @@ from spacetime_memory.sdks import StmemStore
 store = StmemStore(host="localhost", port="3001")
 store.put(("memories", "alice"), {"data": "I like pizza"})
 items = store.search(("memories", "alice"), query="pizza")
+```
+
+## Using the CLI
+
+```bash
+# stmem is installed via pip install -e sdk/python
+stmem --help
+
+# Store a memory
+stmem store --workspace <ws_id> --content "I like pizza" --peer alice
+
+# Search
+stmem search --workspace <ws_id> --query "food"
+
+# See all CLI commands
+stmem --help
+```
+
+## Running Tests
+
+```bash
+# Unit tests only — no STDB needed (~30s)
+cd sdk/python && python -m pytest tests/ -m unit -v
+
+# Full suite (unit + integration) — needs STDB on :3001
+make test
+
+# Integration tests only — auto-builds module, auto-publishes
+make test-integration
 ```

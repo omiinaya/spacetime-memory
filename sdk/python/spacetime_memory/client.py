@@ -97,6 +97,11 @@ class JSONFormatter(logging.Formatter):
     """JSON log formatter. Outputs structured log records as newline-delimited JSON."""
 
     def format(self, record: logging.LogRecord) -> str:
+        """Format a log record as newline-delimited JSON.
+
+        Produces structured JSON output with timestamp, level, logger name,
+        message, and optional exception info / extra fields.
+        """
         log_entry = {
             "ts": self.formatTime(record, self.datefmt or "%Y-%m-%dT%H:%M:%S"),
             "level": record.levelname,
@@ -186,7 +191,22 @@ class Client:
         query_cache: Any | None = None,
         local_llm: Any | None = None,
     ):
-        self.host = host or os.environ.get("SPACETIMEDB_HOST", "localhost")
+        """Initialise a SpacetimeDB client connection.
+
+        Args:
+            host: STDB hostname (default: env ``SPACETIMEDB_HOST`` or ``127.0.0.1``).
+            port: STDB port (default: env ``SPACETIMEDB_PORT`` or ``3001``).
+            database: STDB database hash (default: env ``SPACETIMEDB_DB``).
+            embedder_url: Embedding service URL (default: env ``EMBEDDER_URL``).
+            timeout: HTTP request timeout in seconds.
+            verbose: Enable verbose logging.
+            token: Auth token (default: env ``SPACETIMEDB_TOKEN``).
+            plugin_manager: Optional plugin manager instance.
+            event_bus: Optional event bus instance.
+            query_cache: Optional query cache instance.
+            local_llm: Optional local LLM instance.
+        """
+        self.host = host or os.environ.get("SPACETIMEDB_HOST", "127.0.0.1")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
         self.database = database or os.environ.get(
             "SPACETIMEDB_DB", "c20082e7643347e8d36302b550bb98c7343f9ea2a268f3bee58ee58d3c3dcbf1"
@@ -194,8 +214,8 @@ class Client:
         # Bypass HTTP proxy for localhost — the system http_proxy
         # routes through isp.decodo.com which blocks STDB reducer calls.
         os.environ.setdefault("no_proxy", "localhost,127.0.0.1,127.0.0.1,.local")
-        self.embedder_url = embedder_url or os.environ.get("EMBEDDER_URL", "http://localhost:9090")
-        self.tantivy_url = os.environ.get("TANTIVY_URL", "http://localhost:9091")
+        self.embedder_url = embedder_url or os.environ.get("EMBEDDER_URL", "http://127.0.0.1:9090")
+        self.tantivy_url = os.environ.get("TANTIVY_URL", "http://127.0.0.1:9091")
         self.verbose = verbose
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
         self.max_retries = int(os.environ.get("STMEM_MAX_RETRIES", "3"))
@@ -500,6 +520,7 @@ class Client:
             headers["Content-Type"] = "text/plain"
 
             def _do_sql() -> httpx.Response:
+                """Execute a raw SQL query via HTTP POST with retry."""
                 return self._request_with_retry(
                     "POST",
                     self.sql_url,
@@ -585,6 +606,7 @@ class Client:
             headers["Content-Type"] = "application/json"
 
             def _do_call() -> httpx.Response:
+                """Invoke a STDB reducer via HTTP POST with retry."""
                 return self._request_with_retry(
                     "POST",
                     f"{self.reducer_url}/{reducer}",
@@ -612,7 +634,7 @@ class Client:
 
         return {"status": "ok"}
 
-    _DEFAULT_EMBEDDER_URL = "http://localhost:9090"
+    _DEFAULT_EMBEDDER_URL = "http://127.0.0.1:9090"
 
     def _embed(self, text: str) -> list[float]:
         """Get an embedding vector via the configured embedding API.
@@ -968,6 +990,14 @@ class Client:
 
         @classmethod
         def from_dict(cls, d: dict) -> "Client.MemoryRecord":
+            """Create a MemoryRecord from a dictionary, filtering to field names only.
+
+            Args:
+                d: Dictionary of memory record fields.
+
+            Returns:
+                A MemoryRecord instance with only recognised fields populated.
+            """
             return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
     def store(
@@ -4562,7 +4592,7 @@ def llm_rerank(
         query: The original search query.
         results: Search result dicts (must have ``content`` key).
         endpoint: OpenAI-compatible base URL (default: env ``LLM_RERANK_ENDPOINT``
-                  or ``http://localhost:4000/v1``).
+                  or ``http://127.0.0.1:4000/v1``).
         model: Model name (default: env ``LLM_RERANK_MODEL`` or ``gpt-4o-mini``).
         api_key: API key (default: env ``LLM_RERANK_API_KEY`` or ``OPENAI_API_KEY``).
         top_k: Number of results to send for reranking (default 10).
@@ -4572,7 +4602,7 @@ def llm_rerank(
         return results
 
     # Resolve config
-    endpoint = endpoint or os.getenv("LLM_RERANK_ENDPOINT", "http://localhost:4000/v1")
+    endpoint = endpoint or os.getenv("LLM_RERANK_ENDPOINT", "http://127.0.0.1:4000/v1")
     model = model or os.getenv("LLM_RERANK_MODEL", "ds-deepseek-v4-flash")
     api_key = api_key or os.getenv("LLM_RERANK_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 

@@ -5,30 +5,21 @@
 ```
 spacetime-memory/
 ├── server/
-│   ├── spacetimedb/          # SpacetimeDB Rust module
-│   ├── embedder/             # Rust ONNX embedder sidecar
-│   └── mcp/                  # MCP server (Python)
+│   ├── spacetimedb/          # SpacetimeDB Rust module (~28 tables, ~162 reducers)
+│   ├── tantivy-sidecar/      # BM25 full-text search sidecar (port 9091)
+│   ├── embedder/             # Rust ONNX embedder sidecar (secondary, port 9090)
+│   └── mcp/                  # MCP server (Python, 133+ tools, main.py)
 ├── sdk/
-│   └── python/               # Python SDK
+│   └── python/               # Python SDK + CLI + MCP server
 │       ├── spacetime_memory/
-│       │   ├── client.py     # Low-level Client
-│       │   ├── sdks/         # Drop-in adapters
-│       │   │   ├── mem0.py
-│       │   │   ├── honcho.py
-│       │   │   ├── hindsight.py
-│       │   │   ├── graphiti.py
-│       │   │   ├── langchain.py
-│       │   │   └── zep.py
+│       │   ├── client.py     # Low-level Client (247 unit tests)
+│       │   ├── sdks/         # 6 drop-in adapters
 │       │   └── ...
-│       └── tests/            # Python test suite
-├── cli/                      # Python CLI (stmem)
-├── client/                   # React frontend
-├── scripts/                  # Utility scripts (replication_daemon, mental_model_synthesis, etc.)
-├── plugins/                  # Plugin system
-└── docs/                     # Documentation
-    ├── development.md        # This file
-    ├── replication.md        # Replication setup guide
-    └── adapter-authoring-guide.md  # How to write drop-in adapters
+│       └── tests/            # Python test suite (~3,319 tests collected)
+├── client/                   # React frontend (optional)
+├── scripts/                  # Utility scripts (eval, benchmark, replication, etc.)
+├── docs/                     # Documentation
+└── data/                     # Runtime data (tantivy indexes, eval data, etc.)
 ```
 
 ## Prerequisites for Development
@@ -59,7 +50,7 @@ cd sdk/python
 # Run unit tests (no SpacetimeDB required)
 pytest -m unit
 
-# Run integration tests (requires SpacetimeDB)
+# Run integration tests (requires running SpacetimeDB)
 pytest -m integration
 
 # Run all tests
@@ -90,12 +81,15 @@ cargo build --target wasm32-unknown-unknown
 spacetime publish spacetime-memory -p ./ --yes
 ```
 
-## Building the Embedder
+## Running the Tantivy BM25 Sidecar
 
 ```bash
-cd server/embedder
-cargo build --release
-./target/release/embedder  # Listens on :9090
+# Pre-built binary at:
+./server/tantivy-sidecar/target/release/tantivy-sidecar
+
+# Configure via env:
+#   TANTIVY_INDEX_DIR=data/tantivy  (default)
+#   TANTIVY_PORT=9091               (default)
 ```
 
 ## Building the Frontend
@@ -111,11 +105,9 @@ npm run dev
 
 - **Python:** Follow [PEP 8](https://peps.python.org/pep-0008/) with type hints.
   The SDK uses `from __future__ import annotations` throughout.
-- **Rust:** Follow standard Rust formatting (`rustfmt`).  Run `cargo fmt`
-  before committing.
+- **Rust:** Follow standard Rust formatting (`rustfmt`).  Run `cargo fmt` before committing.
 - **Frontend:** TypeScript with React and shadcn/ui components.
-- **Documentation:** Markdown files in `docs/`.  Use `mkdocs` for the
-  rendered site (see below).
+- **Documentation:** Markdown files in `docs/`.
 
 ### Python Style Conventions
 
@@ -127,8 +119,7 @@ npm run dev
 
 ## Adding a New Adapter
 
-See the **[Adapter Authoring Guide](adapter-authoring-guide.md)** for a
-detailed walkthrough.
+See the **[Adapter Authoring Guide](adapter-authoring-guide.md)** for a detailed walkthrough.
 
 Quick checklist:
 1. Create `sdk/python/spacetime_memory/sdks/<name>.py`
@@ -146,25 +137,6 @@ Quick checklist:
    (`sdk/python/spacetime_memory/client.py`).
 4. Wire up a CLI command in `cli/stmem.py` using `client._call()`.
 5. Test via `pytest` (unit mock for the reducer call).
-
-## Building Documentation
-
-```bash
-pip install mkdocs mkdocs-material mkdocstrings
-
-# Preview
-mkdocs serve    # http://localhost:8000
-
-# Build static site
-mkdocs build    # Output to site/
-```
-
-### Documentation Conventions
-
-- Each major subsystem gets its own `.md` file in `docs/`.
-- CLI commands are documented with their full `stmem` invocation.
-- Reducer tables and methods use Markdown tables for quick reference.
-- Code examples use fenced code blocks with language tags.
 
 ## Pull Request Process
 
@@ -203,7 +175,7 @@ The project uses GitHub Actions for:
 
 ## Release Process
 
-1. Update version in `sdk/python/pyproject.toml` and `cli/stmem.py`
+1. Update version in `sdk/python/pyproject.toml`
 2. Run full test suite
 3. Tag the release: `git tag v0.x.x`
 4. Push tag: `git push origin v0.x.x`
