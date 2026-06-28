@@ -1127,7 +1127,7 @@ def rate_memory(memory_id: str, rating: str, peer_id: str) -> dict[str, Any]:
 
     Trust score is recomputed as the average of all feedback scores / 5.
     """
-    return get_client()._call("rate_memory", [memory_id, rating, peer_id])
+    return get_client().rate_memory(memory_id, rating, peer_id)
 
 
 @mcp.tool()
@@ -1169,9 +1169,8 @@ def consolidate_memories(
     Returns:
         Confirmation message.
     """
-    get_client()._call(
-        "consolidate_memories",
-        [workspace_id, source_ids_json, target_content, target_summary],
+    get_client().consolidate_memories(
+        workspace_id, json.loads(source_ids_json), target_content, target_summary
     )
     return (
         f"Consolidation complete for workspace {workspace_id[:16]}... "
@@ -1244,7 +1243,7 @@ def set_memory_scope(memory_id: str, user_scope: str) -> str:
         set_memory_scope("abc-123", "alice")   # Scope to alice only
         set_memory_scope("abc-123", "")         # Make shared
     """
-    get_client()._call("set_memory_scope", [memory_id, user_scope])
+    get_client().set_memory_scope(memory_id, user_scope)
     return f"Memory {memory_id[:16]}... scoped to '{user_scope or 'shared'}'."
 
 
@@ -2130,7 +2129,7 @@ def synthesize_mental_models(workspace_id: str, memory_ids_json: str) -> str:
     to generate actual LLM content.
     """
     client = get_client()
-    client._call("synthesize_mental_models", [workspace_id, memory_ids_json])
+    client.synthesize_mental_models(workspace_id, json.loads(memory_ids_json))
     return f"Mental model synthesis requested for workspace {workspace_id[:16]}..."
 
 
@@ -2178,7 +2177,7 @@ def add_fact(
     tier: str = "L1",
 ) -> str:
     """Add a fact about a peer. Returns the fact ID."""
-    get_client()._call("add_fact", [workspace_id, peer_id, fact_type, category, content, confidence, source, tier])
+    get_client().add_fact(workspace_id, peer_id, content, fact_type, category, confidence, source, tier)
     return f"Fact added for peer {peer_id[:16]}... in workspace {workspace_id[:16]}..."
 
 
@@ -2193,11 +2192,7 @@ def list_facts(
 ) -> list[dict[str, Any]]:
     """List facts for a workspace with optional filters (peer_id, fact_type, tier, category)."""
     client = get_client()
-    client._call("list_facts", [workspace_id, peer_id, fact_type, tier, category])
-    query_hash = f"{workspace_id}:{peer_id}:{fact_type}:{tier}:{category}"
-    rows = client._sql(
-        f"SELECT * FROM fact_result WHERE query_hash = '{query_hash}' ORDER BY created_at DESC"
-    )
+    rows = client.list_facts(workspace_id, peer_id, fact_type, tier, category)
     if rows:
         try:
             return json.loads(rows[0].get("json_data", "[]"))
@@ -2210,7 +2205,7 @@ def list_facts(
 @require_api_key
 def delete_fact(fact_id: str) -> str:
     """Deactivate a fact (soft delete)."""
-    get_client()._call("delete_fact", [fact_id])
+    get_client().delete_fact(fact_id)
     return f"Fact {fact_id[:16]}... deactivated."
 
 
@@ -2228,7 +2223,7 @@ def update_fact(
     Empty string parameters leave the corresponding field unchanged.
     A confidence of 0.0 leaves confidence unchanged.
     """
-    get_client()._call("update_fact", [fact_id, content, confidence, category, tier])
+    get_client().update_fact(fact_id, content, confidence, category, tier)
     return f"Fact {fact_id[:16]}... updated."
 
 
@@ -2241,11 +2236,7 @@ def search_facts(
 ) -> list[dict[str, Any]]:
     """Search facts by content text (substring / case-insensitive match)."""
     client = get_client()
-    client._call("search_facts", [workspace_id, query, tier])
-    query_hash = f"search:{query}:{tier}"
-    rows = client._sql(
-        f"SELECT * FROM fact_result WHERE query_hash = '{query_hash}' ORDER BY created_at DESC"
-    )
+    rows = client.search_facts(workspace_id, query, tier)
     if rows:
         try:
             return json.loads(rows[0].get("json_data", "[]"))
@@ -2430,7 +2421,7 @@ def grant_space_access(workspace_id: str, peer_id: str, permission: str) -> str:
     Returns:
         Confirmation message.
     """
-    get_client()._call("grant_space_access", [workspace_id, peer_id, permission])
+    get_client().grant_space_access(workspace_id, peer_id, permission)
     return f"Granted '{permission}' access to peer '{peer_id[:16]}...' for workspace '{workspace_id[:16]}...'."
 
 
@@ -2448,7 +2439,7 @@ def revoke_space_access(workspace_id: str, peer_id: str) -> str:
     Returns:
         Confirmation message.
     """
-    get_client()._call("revoke_space_access", [workspace_id, peer_id])
+    get_client().revoke_space_access(workspace_id, peer_id)
     return f"Revoked access for peer '{peer_id[:16]}...' from workspace '{workspace_id[:16]}...'."
 
 

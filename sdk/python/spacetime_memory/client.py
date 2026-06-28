@@ -907,6 +907,38 @@ class Client:
         rows.sort(key=lambda r: r.get("created_at", 0))
         return rows
 
+    def grant_space_access(
+        self, workspace_id: str, peer_id: str, permission: str
+    ) -> dict[str, Any]:
+        """Grant a peer access to a workspace with a specific permission level.
+
+        Only an existing owner or admin can grant access.
+
+        Args:
+            workspace_id: The workspace (space) ID.
+            peer_id: The peer ID to grant access to.
+            permission: One of ``'owner'``, ``'editor'``, or ``'viewer'``.
+
+        Returns:
+            Reducer status.
+        """
+        return self._call("grant_space_access", [workspace_id, peer_id, permission])
+
+    def revoke_space_access(self, workspace_id: str, peer_id: str) -> dict[str, Any]:
+        """Revoke a peer's access to a workspace.
+
+        Only an existing owner or admin can revoke access. Owners cannot
+        revoke their own access (use a separate escalation process).
+
+        Args:
+            workspace_id: The workspace (space) ID.
+            peer_id: The peer ID to revoke access from.
+
+        Returns:
+            Reducer status.
+        """
+        return self._call("revoke_space_access", [workspace_id, peer_id])
+
     # -----------------------------------------------------------------------
     # Memory
     # -----------------------------------------------------------------------

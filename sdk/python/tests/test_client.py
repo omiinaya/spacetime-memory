@@ -2587,3 +2587,40 @@ class TestMakeSnippet:
         result = _make_snippet(text, max_chars=20)
         # The space at pos 10 is the last space within first 20 chars
         assert result == "hello world..."
+
+
+class TestGrantRevokeSpaceAccess:
+    """Tests for grant_space_access and revoke_space_access SDK methods."""
+
+    @pytest.fixture
+    def client(self):
+        c = Client(host="localhost", port="3001", database="test-db")
+        c._call = Mock()
+        c._query = Mock(return_value=[])
+        return c
+
+    def test_grant_space_access_calls_reducer(self, client):
+        """grant_space_access calls the grant_space_access reducer."""
+        client.grant_space_access("ws-1", "peer-1", "editor")
+        client._call.assert_called_once_with(
+            "grant_space_access", ["ws-1", "peer-1", "editor"]
+        )
+
+    def test_grant_space_access_returns_status(self, client):
+        """grant_space_access returns the reducer result dict."""
+        client._call.return_value = {"status": "ok"}
+        result = client.grant_space_access("ws-1", "peer-2", "viewer")
+        assert result == {"status": "ok"}
+
+    def test_revoke_space_access_calls_reducer(self, client):
+        """revoke_space_access calls the revoke_space_access reducer."""
+        client.revoke_space_access("ws-1", "peer-1")
+        client._call.assert_called_once_with(
+            "revoke_space_access", ["ws-1", "peer-1"]
+        )
+
+    def test_revoke_space_access_returns_status(self, client):
+        """revoke_space_access returns the reducer result dict."""
+        client._call.return_value = {"status": "ok"}
+        result = client.revoke_space_access("ws-1", "peer-2")
+        assert result == {"status": "ok"}
