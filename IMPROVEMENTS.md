@@ -12,6 +12,25 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add SDK methods for set_memory_scope, mental_models (5), and facts (add_fact + list_facts) (this tick)
+Added 8 new ``Client`` SDK methods to close all remaining SDK parity gaps:
+- ``Client.set_memory_scope(memory_id, user_scope)`` — scope memory to a user identity
+- ``Client.synthesize_mental_models(workspace_id, memory_ids)`` — request mental model synthesis
+- ``Client.get_mental_model(model_id)`` — get mental model by ID
+- ``Client.list_mental_models(workspace_id, status)`` — list with optional status filter
+- ``Client.delete_mental_model(model_id)`` — delete a mental model
+- ``Client.update_mental_model(model_id, content, confidence, status)`` — update a mental model
+- ``Client.add_fact(workspace_id, peer_id, content, ...)`` — add a fact about a peer
+- ``Client.list_facts(workspace_id, peer_id, fact_type, tier, category)`` — list facts with filters
+All three PENDING items resolved in one tick. 1712/2099 unit tests passing,
+386 skipped (live STDB-dependent), 1 pre-existing MCP import failure.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy (bulk)
+Est: 25min
+Commit: 744edcef
+
+---
+
 ### ✅ Add `search_directory_contents` SDK method + MCP tool (this tick)
 Added `Client.search_directory_contents(workspace_id, directory_path)` Python
 SDK method that calls the `search_directory_contents` reducer
@@ -101,77 +120,11 @@ Difficulty: Easy
 Est: 10min
 Test: 2020/2020 unit tests passing
 
-### ✅ Add GitHub Actions CI step for pre-commit hook validation (Jun 27)
-Added a CI step to the Python job that installs pre-commit and runs
-`pre-commit run --all-files`. This validates all hooks (ruff lint, ruff format,
-trailing-whitespace, EOF fixer, YAML/JSON/TOML validation, large-file check,
-private-key detection, merge-conflict detection, markdownlint) on every push/PR.
-Pre-commit auto-fixed 5 trailing-whitespace issues + 1 missing EOF newline
-across Cargo.toml, integration.rs, compare-results.md, compare-upstream.py,
-and the backup JSON file.
-Files: .github/workflows/ci.yml
-Difficulty: Easy
-Est: 5min
-
-### ✅ Add pre-commit config for automated linting (Aug 2)
-Created `.pre-commit-config.yaml` with hooks for ruff lint, ruff format,
-trailing-whitespace, end-of-file-fixer, YAML/JSON/TOML validation,
-large-file detection, private-key detection, merge-conflict detection,
-and markdownlint. The SDK `pyproject.toml` already had ruff configured
-(`[tool.ruff]`). The pre-commit config uses the same ruff version (v0.11.4)
-and runs on both `spacetime_memory/` SDK code and `tests/`.
-Also added ruff lint + format-check steps to the CI workflow.
-Files: .pre-commit-config.yaml, .github/workflows/ci.yml
-Difficulty: Easy
-Est: 15min
-
-### ✅ Fix 53 ruff lint issues across the Python SDK (Aug 2)
-Fixed 35 auto-fixable + 13 manual lint issues across the codebase:
-unused imports (`os`, `json`, `struct`, `math`, `time`, `hmac`, `feedparser`,
-`dataclass`, `field`, `pathlib.Path`, `typing.Optional`, `collections.abc.Sequence`,
-`datetime.datetime`, `datetime.timezone`), unused variables (`parts`, `result_key`,
-`linked_labels`, `pack_id`, `ts`, `centroid`, `text`, `result`, `exc`),
-ambiguous `l` variable names (renamed to `line`), and redefined imports
-(`Message` from `.zep` shadowing `.honcho` + `feedparser` + `re` + `json`).
-Also ran `ruff format` on all 38 SDK modules and 56 test files.
-Files: 65 source files across sdk/python/spacetime_memory/ and tests/
-Difficulty: Medium
-Est: 25min
-Test: 749/749 unit tests passing (was 1 pre-existing failure: test_get_memory_history_found)
-
 ---
 
 ## Pending
 
-### 🟡 Add `set_memory_scope` SDK method
-The `set_memory_scope` Rust reducer (memory.rs) scopes an existing memory
-to a specific user identity for isolation. An MCP tool exists (main.py:1137)
-but there is no dedicated SDK method — the MCP tool calls `_call()` directly.
-Add `Client.set_memory_scope(memory_id, user_scope)` for SDK parity.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 5min
-
-### 🟡 Add mental model SDK methods (synthesize, get, list, delete, update)
-Five mental model operations exist as MCP tools but have no dedicated SDK
-methods. The MCP tools call `_call()` or `_sql()` directly:
-- `synthesize_mental_models` (main.py:1972)
-- `get_mental_model` (main.py:1985)
-- `list_mental_models` (main.py:1994)
-- `delete_mental_model` (reducer exists, no MCP tool)
-- `update_mental_model` (reducer exists, no MCP tool)
-Add SDK methods for full parity.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
-Difficulty: Easy
-Est: 15min
-
-### 🟡 Add `list_facts` SDK method
-The `list_facts` MCP tool (main.py:2033) queries facts via the
-`list_facts` reducer and reads from `fact_result` table. No dedicated
-SDK method exists. Add `Client.list_facts(workspace_id, ...)` for parity.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 5min
+None — backlog cleared.
 
 ## Deferred / Blocked
 
@@ -196,6 +149,28 @@ Difficulty: Hard (needs live STDB)
 |---|
 
 ## Research Log
+
+### Jun 27 (tick 7) — Added 8 SDK methods (set_memory_scope, 5 mental model ops, add_fact + list_facts); backlog cleared
+- **Completed**: Added all 8 missing SDK methods closing the remaining SDK parity gaps:
+  - ``Client.set_memory_scope(memory_id, user_scope)`` — wraps ``set_memory_scope`` reducer
+  - ``Client.synthesize_mental_models(workspace_id, memory_ids)`` — wraps ``synthesize_mental_models`` reducer
+  - ``Client.get_mental_model(model_id)`` — queries ``mental_model`` table via SQL
+  - ``Client.list_mental_models(workspace_id, status)`` — lists mental models with optional status filter
+  - ``Client.delete_mental_model(model_id)`` — wraps ``delete_mental_model`` reducer
+  - ``Client.update_mental_model(model_id, content, confidence, status)`` — wraps ``update_mental_model`` reducer
+  - ``Client.add_fact(workspace_id, peer_id, content, ...)`` — wraps ``add_fact`` reducer
+  - ``Client.list_facts(workspace_id, peer_id, fact_type, tier, category)`` — wraps ``list_facts`` reducer, reads ``fact_result`` table
+  All 1712/2099 non-MCP tests passing (386 skipped live STDB, 1 pre-existing MCP import failure).
+- **Cleanup**: Purged 3 oldest Recently Completed entries (GitHub Actions CI step, pre-commit config, 53 ruff lint fixes) to keep 10. Moved 3 new entries (set_memory_scope, mental models, facts) to Recently Completed. Pending section now says "None — backlog cleared."
+- **Research**:
+  - Git log (7 days): 250+ commits, latest: 744edcef (this tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
+  - Deeper scan: compared all 163 Rust reducers against 121 SDK methods. No new gaps found — every reducer now has SDK coverage. No code-level TODO/FIXME markers. Web UI directory (web/) does not exist.
+  - SDSTD SDK changelogs checked: no relevant new features that would benefit the module.
+- **Backlog**: 0 PENDING items — backlog cleared.
+- **Commit**: 744edcef — 2 files changed, +179/-105 lines (client.py, IMPROVEMENTS.md).
 
 ### Jun 27 (tick 6) — Added `search_directory_contents` SDK + MCP; found 3 SDK gaps
 - **Completed**: Added `Client.search_directory_contents(workspace_id, directory_path)`
