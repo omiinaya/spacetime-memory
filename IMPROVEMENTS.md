@@ -205,7 +205,7 @@ Test: 2020/2020 unit tests passing
     as future candidates. No new competitor features to adopt. No code-level TODO/FIXME
     markers.
 - **Backlog**: 1 PENDING item remaining (expire_memories).
-- **Commit**: TBD (this tick).
+- **Commit**: c952d09a — 3 files changed, +145/-50 lines (client.py, main.py, IMPROVEMENTS.md).
 
 ### Jun 27 (tick 8) — Added `delete_node` + `delete_edge` SDK methods and MCP tools; found 3 new gaps
 - **Completed**: Added `Client.delete_node(node_id)` and `Client.delete_edge(edge_id)`
