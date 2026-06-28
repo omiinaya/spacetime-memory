@@ -2139,6 +2139,28 @@ def unlink_memory_from_directory(directory_id: str, memory_id: str) -> str:
     return f"Memory {memory_id[:16]}... unlinked from directory {directory_id[:16]}..."
 
 
+@mcp.tool()
+@require_api_key
+def search_directory_contents(workspace_id: str, directory_path: str) -> str:
+    """Recursively search directory contents.
+
+    Finds a directory by path, recursively collects all subdirectories
+    and memory entries within the tree, and returns the complete listing.
+    Useful for discovering all memories organized under a directory branch.
+
+    Args:
+        workspace_id: Target workspace.
+        directory_path: Path of the root directory to search (e.g. "/projects/ai").
+
+    Returns:
+        JSON string with the DirectoryContentResult containing:
+        directory_id, subdirectory_ids_json, memory_ids_json, directory_path,
+        workspace_id, id, created_at.
+    """
+    rows = get_client().search_directory_contents(workspace_id, directory_path)
+    return json.dumps(rows, default=str)
+
+
 # ---------------------------------------------------------------------------
 # Org-mode sync tool
 # ---------------------------------------------------------------------------

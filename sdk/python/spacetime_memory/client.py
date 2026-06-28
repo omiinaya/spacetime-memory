@@ -2351,6 +2351,33 @@ class Client:
         """Unlink a memory from a directory."""
         return self._call("unlink_memory_from_directory", [directory_id, memory_id])
 
+    def search_directory_contents(
+        self, workspace_id: str, directory_path: str
+    ) -> list[dict[str, Any]]:
+        """Recursively search directory contents.
+
+        Finds a directory by path, recursively collects all subdirectories
+        and memory entries within the tree, and returns the result.
+
+        Args:
+            workspace_id: Target workspace.
+            directory_path: Path of the root directory to search.
+
+        Returns:
+            List with a single DirectoryContentResult dict containing:
+            id, workspace_id, directory_path, directory_id,
+            subdirectory_ids_json (JSON array of sub-directory IDs),
+            memory_ids_json (JSON array of contained memory IDs),
+            created_at.
+        """
+        self._call("search_directory_contents", [workspace_id, directory_path])
+        return self._sql(
+            f"SELECT * FROM directory_content_result "
+            f"WHERE workspace_id = '{_esc(workspace_id)}' "
+            f"AND directory_path = '{_esc(directory_path)}' "
+            f"ORDER BY created_at DESC LIMIT 1"
+        )
+
     # -----------------------------------------------------------------------
     # Batch update & history (Mem0 parity)
     # -----------------------------------------------------------------------

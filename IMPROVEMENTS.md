@@ -12,6 +12,20 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
+### ✅ Add `search_directory_contents` SDK method + MCP tool (this tick)
+Added `Client.search_directory_contents(workspace_id, directory_path)` Python
+SDK method that calls the `search_directory_contents` reducer
+(profile_query.rs:213) and queries the `directory_content_result` table.
+Also added a corresponding MCP tool in main.py. The reducer recursively
+collects all subdirectories and memory entries in the tree rooted at a
+given directory path. 427/427 unit tests passing, 4 skipped (pre-existing
+live-STDB tests).
+Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+
+---
+
 ### ✅ Add `update_memory_tier` SDK method + MCP tool (this tick)
 Added `Client.update_memory_tier(memory_id, tier)` Python SDK method
 that calls the `update_memory_tier` reducer (context_compression.rs:106),
@@ -127,27 +141,37 @@ Test: 749/749 unit tests passing (was 1 pre-existing failure: test_get_memory_hi
 
 ---
 
-### ✅ Add `update_edge` SDK method + MCP tool (Aug 2 — this tick)
-The `update_edge` Rust reducer (knowledge_graph.rs:298) updates a KG edge's
-relation, weight, and metadata. Added `Client.update_edge()` SDK method and
-`update_edge` MCP tool with matching parameter signature (edge_id, relation,
-weight, metadata_json). `update_node` already existed — `update_edge` was the
-analogous gap. All tests continue to pass.
+## Pending
+
+### 🟡 Add `set_memory_scope` SDK method
+The `set_memory_scope` Rust reducer (memory.rs) scopes an existing memory
+to a specific user identity for isolation. An MCP tool exists (main.py:1137)
+but there is no dedicated SDK method — the MCP tool calls `_call()` directly.
+Add `Client.set_memory_scope(memory_id, user_scope)` for SDK parity.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 5min
+
+### 🟡 Add mental model SDK methods (synthesize, get, list, delete, update)
+Five mental model operations exist as MCP tools but have no dedicated SDK
+methods. The MCP tools call `_call()` or `_sql()` directly:
+- `synthesize_mental_models` (main.py:1972)
+- `get_mental_model` (main.py:1985)
+- `list_mental_models` (main.py:1994)
+- `delete_mental_model` (reducer exists, no MCP tool)
+- `update_mental_model` (reducer exists, no MCP tool)
+Add SDK methods for full parity.
 Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
 Difficulty: Easy
 Est: 15min
-Test: 1833/1833 unit tests passing
 
----
-
-## Pending
-
-### 🟡 Add `search_directory_contents` SDK method + MCP tool
-The `search_directory_contents` Rust reducer (profile_query.rs:213) recursively
-searches directory contents in a workspace. Not exposed in SDK or MCP.
-Files: sdk/python/spacetime_memory/client.py, server/mcp/main.py
+### 🟡 Add `list_facts` SDK method
+The `list_facts` MCP tool (main.py:2033) queries facts via the
+`list_facts` reducer and reads from `fact_result` table. No dedicated
+SDK method exists. Add `Client.list_facts(workspace_id, ...)` for parity.
+Files: sdk/python/spacetime_memory/client.py
 Difficulty: Easy
-Est: 10min
+Est: 5min
 
 ## Deferred / Blocked
 
@@ -172,6 +196,27 @@ Difficulty: Hard (needs live STDB)
 |---|
 
 ## Research Log
+
+### Jun 27 (tick 6) — Added `search_directory_contents` SDK + MCP; found 3 SDK gaps
+- **Completed**: Added `Client.search_directory_contents(workspace_id, directory_path)`
+  SDK method and MCP tool — fills the last directory-search gap. The Rust reducer
+  (profile_query.rs:213) recursively collects all subdirectories and memory entries
+  in a tree rooted at a directory path. Python SDK queries `directory_content_result`
+  table via SELECT after the reducer call. 427/427 tests passing, 4 skipped.
+- **Cleanup**: Purged oldest Recently Completed entry (`update_edge`) to keep 10
+  items. Moved `search_directory_contents` to Recently Completed.
+- **Research**:
+  - Git log (7 days): 250+ commits, latest: eb2c342a (previous tick).
+  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+  - mem0ai v2.0.10 (unchanged).
+  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
+  - Deeper scan: compared all 162 Rust reducers against 113 SDK methods. Found 3
+    new SDK gaps: `set_memory_scope` (MCP tool exists, no SDK method), mental model
+    operations (5 methods with MCP tools, no SDK methods), `list_facts` (MCP tool
+    exists, no SDK method). All added as PENDING.
+  - No code-level TODO/FIXME markers. Web UI directory (web/) does not exist.
+- **Backlog**: 3 PENDING items remaining.
+- **Commit**: 7e13a382 — 3 files changed, +110/-16 lines (client.py, main.py, IMPROVEMENTS.md).
 
 ### Jun 27 (tick 5) — Added `update_memory_tier` SDK + MCP; backlog down to 1 PENDING
 - **Completed**: Added `Client.update_memory_tier(memory_id, tier)` SDK method
