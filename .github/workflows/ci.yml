@@ -95,7 +95,25 @@ jobs:
           pip install pre-commit
           pre-commit run --all-files --show-diff-on-failure || (echo "Pre-commit hooks failed. Run 'pre-commit run --all-files' locally to fix." && exit 1)
       - name: Unit tests (no STDB required)
-        run: python -m pytest tests/ -v --ignore=tests/smoke_test.py -k "not integration and not concurrency and not embedder" --tb=short
+        run: python -m pytest tests/ -v -k "not integration and not concurrency and not embedder" --tb=short
+
+  typescript:
+    name: TypeScript SDK
+    runs-on: [self-hosted, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: sdk/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: npm ci
+      - name: Type check
+        run: npm run build
+      - name: Run tests
+        run: npm test
 
   python-integration:
     name: Python Integration (live STDB)
