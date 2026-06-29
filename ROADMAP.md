@@ -36,6 +36,7 @@ A comprehensive external review was published as [Spacetime Memory: An Honest Re
 | Simplest setup | Mem0 |
 | Biggest community | Mem0 |
 | Best temporal facts | Graphiti |
+| Best codebase KG | **Graphify** (74K⭐, MCP-native) |
 | Best retrieval quality | Hindsight |
 | Best RAG with connectors | Supermemory |
 | **One system for everything** | **spacetime-memory** |
@@ -258,12 +259,12 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 
 | Dimension | Status | Detail |
 |-----------|:------:|--------|
-| **LOC** | 817 | Single `client.ts` file |
+| **LOC** | 900 | Single `client.ts` file |
 | **Build** | ✅ **CLEAN** | `tsc` compiles with 0 errors, outputs `dist/client.js` + `.d.ts` |
-| **Feature coverage** | ~65% of Python SDK | Full CRUD across all domains: workspace, memory, KG (create/update/delete node+edge, BFS, shortest path), notes/wiki, profiles/facts, tours, sessions, tags, context packs, compounder (cross-link, lint, overview, export). Missing: `store_answer`/`ingest_source` (need LLM client), MCP client, adapter stubs. |
+| **Feature coverage** | ~78% of Python SDK | Full CRUD across all domains plus mental models (5 methods), workspace management (9 methods), memory (11 methods), simplified `storeAnswer`. Missing: `ingest_source` (needs LLM), MCP client, adapter stubs. |
 | **Embedder URL** | ✅ **FIXED** | Default changed from `localhost:9090` (removed ONNX sidecar) to `127.0.0.1:4000` (proxy) |
 | **Host defaults** | ✅ **FIXED** | Changed from `localhost:3001` to `127.0.0.1:3001` (matching Python SDK) |
-| **Tests** | ✅ **50 vitest tests** — all passing (381ms). Full coverage across all domains. |
+| **Tests** | ✅ **58 vitest tests** — all passing (406ms). Full coverage across all domains. |
 | **npm publish** | ⚠️ **CONFIGURED** — `.github/workflows/npm-publish.yml` exists (trigger: `ts-v*` tag), `files: ["dist/"]` set in package.json. Needs `NPM_TOKEN` secret added to GitHub. |
 | **SQL injection** | ⚠️ **VULNERABLE** | Uses raw SQL via `esc()` helper for reads instead of reducers. Name from 2022-era STDB SQL API |
 | **Dependencies** | Minimal | Only `@types/node` + `typescript` dev deps. No runtime dependencies. |
@@ -398,9 +399,9 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | Frontend | **0%** | No web/ directory exists. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Docstring coverage at **93.9%** (1043/1111). |
 | Test Coverage | **80%** | 247+ unit pass. Tantivy healthy (269 indexes). No e2e/deep marker. |
-| Infrastructure | **75%** | CI exists (Rust, Python, TypeScript SDK). Tantivy healthy (269 indexes). Embedder health check fixed (9090→4000). WASM rebuilt (2.36MB). Benchmark confirmed (81.3% P@5). 168MB stale venv. `stmem health` returns "All systems healthy". CLI `localhost` defaults fixed. **npm publish workflow configured**. |
-| **Competitive Positioning** | **90%** | External review confirms broadest feature set, unique moat (adapters, wiki, context packs, tours, contradiction checking). Only gaps: no benchmarks, no TS parity, no managed cloud, docs sprawl. |
-| **Weighted Overall** | **~88%** | Adapters at 92%, docstrings 93.9%, auth 97.5%, TS SDK at 55% with test suite, all debt items closed except frontend, benchmarks, and bi-temporal facts. |
+| Infrastructure | **78%** | CI exists (Rust, Python, TypeScript SDK). Tantivy healthy (269 indexes). Embedder health check fixed (9090→4000). WASM rebuilt (2.36MB). Benchmark confirmed (81.3% P@5). 168MB stale venv. `stmem health` returns "All systems healthy". CLI `localhost` defaults fixed. **npm publish workflow configured**. **TS SDK now 58 tests, ~78% Python parity**. |
+| **Competitive Positioning** | **92%** | External review confirms broadest feature set, unique moat (adapters, wiki, context packs, tours, contradiction checking). Only gaps: no published benchmarks, TS SDK at 78% parity (up from 55%), no managed cloud, docs sprawl (consolidated). |
+| **Weighted Overall** | **~89%** | Adapters at 92%, docstrings 93.9%, auth 97.5%, TS SDK at **78%** (up from 55%, 58 tests, memory methods parity), all debt items closed except frontend, benchmarks, and bi-temporal facts. |
 
 ### The Path to 95%+ (Remaining)
 
@@ -410,7 +411,8 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 4. **P2: TypeScript SDK parity** — add MCP client, adapter stubs, compounder, context packs (~3 days)
 5. **P3: Bi-temporal fact tracking** — Graphiti-style temporal facts (~1 week)
 6. **P3: Improve remaining connector docstrings** — discord/notion/rss/slack/twitter (30min)
-7. **P4: PyPI publish** — push to PyPI (1h)
+7. **P3: Graphify codebase KG bridge** — import Graphify knowledge graph into STMEM notes + KG nodes for agent codebase awareness (~2 days)
+8. **P4: PyPI publish** — push to PyPI (1h)
 
 ### New Items from External Review — Adoption Prescription (June 28, 2026 Article)
 
@@ -422,13 +424,14 @@ The article's "How to Make It Easier — A Prescription for Adoption" section pr
 | **P1** | **`stmem doctor` health check** — verifies STDB reachability, module version, embedding proxy, adapter imports | First thing users try after install | 2-4h | ✅ **DONE** — `stmem doctor` implemented June 28. Checks STDB, embedder, module publish status, SDK version, and all 6 adapter imports. |
 | **P1** | **Publish benchmark scores** — run LongMemEval, LoCoMo, and BEAM | Biggest credibility gap vs Mem0, Hindsight, Supermemory | 1-2 weeks | ❌ **TODO** |
 | **P2** | **Consolidate documentation** — single "5-min getting started" guide | Article calls out docs sprawl | ~4h | ✅ **DONE** |
-| **P2** | **TypeScript SDK parity** — bring TS SDK to Python parity | Blocks TS-first agent framework adoption | ~1 week | ⚠️ **P2** — 817 LOC, builds cleanly (0 errors), **~65% Python parity** (full CRUD across all domains + compounder basics), **50 vitest tests passing**, CI configured, npm publish workflow ready. Missing: `store_answer`/`ingest_source` (need LLM client), MCP client, adapter stubs. |
+| **P2** | **TypeScript SDK parity** — bring TS SDK to Python parity | Blocks TS-first agent framework adoption | ~1 week | ⚠️ **P2** — 900+ LOC, builds cleanly (0 errors), **~78% Python parity** (full CRUD + mental models + workspace management + memory methods + compounder basics + simplified `storeAnswer`), **58 vitest tests passing**, CI + npm publish configured. Missing: `ingest_source` (needs LLM), MCP client, adapter stubs. |
 | **P2** | **Self-test / health check command** → merged into P1 `stmem doctor` | — | — | — |
 | **P2** | **Better error messages** — every error path suggests a fix command | Reduces support burden | 4-8h | ✅ **DONE** — SDK error map updated with fix suggestions (not found, unauthorized, validation, rate limit). Circuit breaker and connection errors now suggest `stmem doctor`. 8 CLI error paths improved with actionable fix commands. |
 | **P2** | **Web-based connection wizard** — React form: enter STDB host+port, test connection, generate config | Removes "what do I put in config?" question | 1-2 days | ⚠️ **P2** — Built at `web/`: Vite + React + Tailwind SPA. Form with STDB host/port/db + embedder URL. "Test Connection" pings STDB health + module check. Generates downloadable YAML config + env vars. Served via `npm run dev` on port 5187 or `npx vite preview` on port 5188. **Note:** STDB HTTP API may lack CORS headers — works best for local dev. |
 | **P3** | **pip install that works OOTB** — meaningful error if STDB not available, `spacetime-memory init` downloads + starts | Clean first experience | 1-2 days | ✅ **DONE** — `stmem init` command implemented. Detects STDB (Docker or running), starts via Docker if needed, creates `.spacetime-memory.env` config, locates WASM binary for module publish, runs `stmem doctor` to verify. `pip install spacetime-memory[cli]` gives both `stmem` and `spacetime-memory` CLI commands. OTel warning noise silenced. Entry points in both setup.py and pyproject.toml. Still needs: PyPI publish. |
 | **P3** | **Example projects / cookbook** — `examples/mem0-switch/`, `examples/rag-chatbot/`, `examples/kg-explorer/`, `examples/llm-wiki/` | Newcomers need runnable code | 1-2 days | ✅ **DONE** — 4 examples created June 28: `mem0-switch/` (README + drop-in adapter docs), `rag-chatbot/` (hybrid search, verified working), `kg-explorer/` (KG nodes + edges, verified working), `llm-wiki/` (wiki pattern with memory storage, verified working). Each self-contained, creates/deletes own workspace. |
 | **P3** | **Bi-temporal fact tracking** — Graphiti-style temporal facts with auto-invalidation | Graphiti's strongest differentiator | ~1 week | ❌ **TODO** |
+| **P3** | **Graphify codebase KG bridge** — import Graphify's code-structure graph into STMEM notes + KG nodes for agent codebase awareness | No memory system offers codebase intelligence — unique differentiator | ~2 days | ❌ **TODO** |
 | **P4** | **Managed cloud free tier** — 1 workspace, 100MB, 1K ops/day | Every competitor has a managed option | 2-3 days eval | ❌ **TODO** |
 | **P4** | **Community building** — tutorials, Stack Overflow, showcase projects | Zero-star reality limits adoption | Ongoing | ❌ **TODO** |
 
@@ -479,6 +482,7 @@ The article identifies 10 concrete problems and 7 feature gaps vs. competitors:
 | **Reasoning-first memory** — extract conclusions, not just raw text | **Honcho** — peer-centric reasoning | Low (search finds raw text; conclusions need LLM) | P4 |
 | **Connector ecosystem** — Google Drive, Gmail, Notion, OneDrive | **Supermemory** — 10+ connectors | Low (GitHub + Notion connectors exist) | P3 |
 | **Multi-modal RAG** — PDF, OCR, video, AST-aware code chunking | **Supermemory** — best-in-class | Low (some parsing exists, less mature) | P3 |
+| **Codebase-aware KG** — import code structure graphs for agent codebase queries | **Graphify** — 74K⭐, MCP-native | Medium (no codebase intelligence in any memory system) | P3 |
 | **Benchmark scores** — LongMemEval, LoCoMo, BEAM | **Mem0, Hindsight, Supermemory** — all publish | High (biggest credibility gap) | P1 |
 | **TypeScript SDK maturity** — full npm package | **Mem0, Honcho** — mature TS SDKs | Medium (blocks TS-first adoption) | P2 |
 | **Managed service** — "just add a key" | **Mem0 Cloud, Honcho Cloud, Supermemory Cloud** | Medium (self-hosting only) | P4 |
@@ -490,3 +494,4 @@ The article identifies 10 concrete problems and 7 feature gaps vs. competitors:
 3. **Documentation consolidation is the highest-ROI UX fix** — article calls out 7+ scattered files, no single getting-started guide. ✅ Now resolved.
 4. **Self-hosting is correct for us** but the missing managed option limits broader adoption.
 5. **Breadth ≠ depth** — we win on feature count, but each competitor beats us in their niche (Graphiti on temporal, Hindsight on retrieval, Honcho on reasoning). Don't try to beat them at their game; lean into the integrated platform story.
+6. **Graphify codebase KG bridge is a low-effort, high-differentiation feature** — no memory system offers codebase intelligence. Importing Graphify's code-structure graph (call graphs, imports, entity relationships) into STMEM notes + KG nodes would give agents codebase awareness alongside personal memory, at roughly 2 days of work.

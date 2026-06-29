@@ -27,7 +27,7 @@ Difficulty: Hard (needs live STDB)
 
 ## Recently Completed
 
-### ✅ TS SDK parity: add 6 missing memory methods + 7 tests (commit pending)
+### ✅ TS SDK parity: add 6 missing memory methods + 7 tests (commit 83e7da8e)
 Added `updateMemory`, `rateMemory`, `consolidateMemories`, `expireMemories`, `getMemoryHistory`, and `searchDirectoryContents` to the TypeScript SDK client.ts. All follow existing patterns: 4 simple reducer calls, 1 SQL query, 1 reducer+SQL combo. Tests cover: correct reducer URLs, arg structures, 5-arg updateMemory with expiresAt, consolidate with JSON-stringified sourceIds, SQL query shapes, and reducer+SQL chaining for directory search. 58/58 TS tests passing (51 existing + 7 new). TS compiles with 0 errors. Build file updated to match.
 Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
 Difficulty: Medium
