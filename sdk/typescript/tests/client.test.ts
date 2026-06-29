@@ -605,5 +605,35 @@ describe("Client", () => {
       expect(md).toContain("Note 1");
       expect(md).toContain("Hello world");
     });
+
+    it("storeAnswer creates note + extracts entities", async () => {
+      let callCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+        callCount++;
+        if (url.includes("embed")) {
+          return { ok: true, json: vi.fn().mockResolvedValue({ embedding: [0.1] }) };
+        }
+        if (url.includes("sql")) {
+          return {
+            ok: true,
+            text: vi.fn().mockResolvedValue(
+              JSON.stringify([
+                {
+                  schema: { elements: [{ name: { some: "id" } }, { name: { some: "title" } }] },
+                  rows: [["n1", "Test Note"]],
+                },
+              ])
+            ),
+          };
+        }
+        return { ok: true, text: vi.fn().mockResolvedValue("") };
+      });
+
+      const result = await client.storeAnswer("What is AI?", "Artificial Intelligence is a field of Computer Science.");
+      expect(result).toHaveProperty("note");
+      expect(result).toHaveProperty("entities");
+      expect(result.entities.length).toBeGreaterThan(0);
+      expect(result.entities).toContain("Artificial Intelligence");
+    });
   });
 });
