@@ -100,14 +100,14 @@ export class Client {
   private readonly baseUrl: string;
 
   constructor(opts: ClientOptions = {}) {
-    this.host = opts.host ?? process.env.SPACETIMEDB_HOST ?? "localhost";
+    this.host = opts.host ?? process.env.SPACETIMEDB_HOST ?? "127.0.0.1";
     this.port = String(opts.port ?? process.env.SPACETIMEDB_PORT ?? "3001");
     this.database =
       opts.database ??
       process.env.SPACETIMEDB_DB ??
       "spacetime-memory";
     this.embedderUrl =
-      opts.embedderUrl ?? process.env.EMBEDDER_URL ?? "http://localhost:9090";
+      opts.embedderUrl ?? process.env.EMBEDDER_URL ?? "http://127.0.0.1:4000";
     this.baseUrl = `http://${this.host}:${this.port}`;
   }
 

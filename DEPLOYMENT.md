@@ -103,7 +103,7 @@ spacetime version
 Embeddings are routed through the spacetime-llm proxy (localhost:4000) which forwards to NVIDIA NIM. No local model download needed.
 
 ```bash
-# Ensure the spacetime-llm proxy is running with baai/bge-m3 registered
+# Ensure the spacetime-llm proxy is running with bge-m3 registered
 curl http://localhost:4000/health
 ```
 
@@ -124,10 +124,10 @@ pip install -e cli
 
 ```bash
 # Embeddings are routed through the spacetime-llm proxy (:4000).
-# Ensure the proxy is running and baai/bge-m3 is registered.
+# Ensure the proxy is running and bge-m3 is registered.
 # Set env vars:
 export OPENAI_BASE_URL=http://localhost:4000/v1
-export EMBEDDING_MODEL=baai/bge-m3
+export EMBEDDING_MODEL=bge-m3
 ```
 
 ### 5. Build and serve the frontend
@@ -166,7 +166,7 @@ All configuration uses environment variables. See [CONFIG.md](CONFIG.md) for the
 Embeddings are routed through the spacetime-llm proxy (localhost:4000) → NVIDIA NIM (bge-m3, 1024-dim).
 
 ```env
-EMBEDDING_MODEL=baai/bge-m3
+EMBEDDING_MODEL=bge-m3
 OPENAI_BASE_URL=http://localhost:4000/v1
 OPENAI_API_KEY=sk-...
 ```
@@ -357,6 +357,6 @@ The embedder exposes `/health` (GET) — returns `{"status": "ok"}` when ready.
 │  facts · notes · directories · auth          │
 ├──────────────────────────────────────────────┤
 │     spacetime-llm proxy (:4000)              │
-│     baai/bge-m3 → NVIDIA NIM (1024d)         │
+│     bge-m3 → NVIDIA NIM (1024d)         │
 └──────────────────────────────────────────────┘
 ```

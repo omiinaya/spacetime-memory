@@ -29,6 +29,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+cli = [
+    "click>=8.1",
+    "rich>=13.0",
+]
 otel = [
     "opentelemetry-api>=1.28",
     "opentelemetry-sdk>=1.28",
@@ -66,6 +70,10 @@ quote-style = "double"
 Homepage = "https://github.com/omiinaya/spacetime-memory"
 Documentation = "https://omiinaya.github.io/spacetime-memory/"
 Repository = "https://github.com/omiinaya/spacetime-memory"
+
+[project.scripts]
+stmem = "spacetime_memory.cli:cli"
+spacetime-memory = "spacetime_memory.cli:cli"
 
 [tool.pytest.ini_options]
 markers = [

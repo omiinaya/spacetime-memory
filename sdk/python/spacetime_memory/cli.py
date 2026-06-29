@@ -17,6 +17,7 @@ import io
 import json
 import os
 import subprocess
+import shutil
 import sys
 import time
 from typing import Any
@@ -3530,6 +3531,214 @@ def doctor(token: str | None) -> None:
         if not all_adapters_ok:
             console.print("  [red]  → Fix: pip install upstream packages (mem0, graphiti-core, etc.)[/red]")
     console.print()
+
+
+@cli.command()
+@click.option("--host", default=None, help="SpacetimeDB host (default: 127.0.0.1)")
+@click.option("--port", default=None, help="SpacetimeDB port (default: 3001)")
+@click.option("--db", default=None, help="Database name (default: spacetime-memory)")
+def init(host: str | None, port: str | None, db: str | None) -> None:
+    """One-command setup: check prerequisites, start STDB, publish module.
+
+    Performs the full setup flow:
+    \b
+      1. Check prerequisites (Docker or spacetime CLI)
+      2. Start SpacetimeDB via Docker if not running
+      3. Publish the Rust module
+      4. Create .env config (doesn't overwrite existing)
+      5. Run `stmem doctor` to verify
+      6. Print test commands
+    """
+    console.print("\n[bold cyan]╔══════════════════════════════════════════════╗[/]")
+    console.print("[bold cyan]║   Spacetime Memory — One-Command Setup      ║[/]")
+    console.print("[bold cyan]╚══════════════════════════════════════════════╝[/]")
+
+    # ── Resolve paths ──────────────────────────────────────────────────
+    # When run via pip install, the module is inside the package.
+    # Try to locate the repo root (where server/ and scripts/ live).
+    _mod_dir = os.path.dirname(__file__)
+    _repo_root = None
+    for candidate in [
+        os.path.join(_mod_dir, "..", "..", "..", ".."),  # from site-packages
+        os.path.join(_mod_dir, "..", ".."),  # from sdk/python/spacetime_memory
+        os.path.join(_mod_dir, ".."),  # from sdk/python
+        os.getcwd(),
+    ]:
+        test_path = os.path.abspath(candidate)
+        if os.path.isdir(os.path.join(test_path, "server")):
+            _repo_root = test_path
+            break
+
+    if _repo_root and os.path.isdir(os.path.join(_repo_root, "server", "spacetimedb")):
+        module_dir = os.path.join(_repo_root, "server")
+    else:
+        module_dir = None
+
+    errs = 0
+
+    # ── Step 1: Check prerequisites ────────────────────────────────────
+    console.print("[bold]1. Prerequisites[/bold]")
+    spacetime_bin = _find_spacetime_bin()
+    docker_available = False
+    if shutil.which("docker") is not None:
+        docker_available = True
+        console.print("  [green]✅[/green] Docker found")
+    if spacetime_bin:
+        console.print(f"  [green]✅[/green] spacetime CLI: {spacetime_bin}")
+    if not spacetime_bin and not docker_available:
+        console.print("  [red]❌[/red] Neither Docker nor spacetime CLI found.")
+        console.print("  [dim]→ Install Docker: https://docs.docker.com/engine/install/[/dim]")
+        console.print("  [dim]→ Or install SpacetimeDB: https://spacetimedb.com/install[/dim]")
+        errs += 1
+    console.print()
+
+    # ── Step 2: Start SpacetimeDB ──────────────────────────────────────
+    console.print("[bold]2. SpacetimeDB[/bold]")
+    stdb_host = host or os.environ.get("STMEM_HOST", os.environ.get("SPACETIMEDB_HOST", "127.0.0.1"))
+    stdb_port = port or os.environ.get("STMEM_PORT", os.environ.get("SPACETIMEDB_PORT", "3001"))
+    db_name = db or os.environ.get("STMEM_DB", os.environ.get("SPACETIMEDB_DB", "spacetime-memory"))
+
+    # Quick connectivity test
+    stdb_running = False
+    try:
+        import httpx
+        r = httpx.get(f"http://{stdb_host}:{stdb_port}/health", timeout=2.0)
+        # STDB returns 200 (health endpoint) or 404 (no health endpoint) when running
+        if r.status_code in (200, 404):
+            stdb_running = True
+    except Exception:
+        pass
+
+    # Also try localhost if target host isn't reachable
+    if not stdb_running and stdb_host != "localhost" and stdb_host != "127.0.0.1":
+        try:
+            import httpx
+            r = httpx.get("http://localhost:3001/health", timeout=2.0)
+            if r.status_code in (200, 404):
+                stdb_host = "localhost"
+                stdb_port = "3001"
+                stdb_running = True
+                console.print("  [yellow]⚠️[/yellow] Found STDB on localhost:3001 (not {})".format(host or os.environ.get("STMEM_HOST", "127.0.0.1")))
+        except Exception:
+            pass
+
+    if stdb_running:
+        console.print(f"  [green]✅[/green] SpacetimeDB is running ({stdb_host}:{stdb_port})")
+    elif docker_available:
+        console.print("  [yellow]→[/yellow] Starting SpacetimeDB via Docker...")
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "--filter", "name=spacetimedb", "--format", "{{.Names}}"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if "spacetimedb" not in result.stdout:
+                console.print("  [yellow]→[/yellow] Pulling clockworklabs/spacetimedb:latest...")
+                subprocess.run(
+                    ["docker", "pull", "clockworklabs/spacetimedb:latest"],
+                    capture_output=True, text=True, timeout=120,
+                )
+                subprocess.Popen(
+                    ["docker", "run", "-d", "--name", "spacetimedb",
+                     "-p", f"{stdb_port}:3001",
+                     "clockworklabs/spacetimedb:latest",
+                     "start"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+                # Wait for startup
+                for _ in range(15):
+                    import time as _time
+                    _time.sleep(2)
+                    try:
+                        r = httpx.get(f"http://{stdb_host}:{stdb_port}/health", timeout=2.0)
+                        if r.status_code in (200, 404):
+                            stdb_running = True
+                            break
+                    except Exception:
+                        continue
+            else:
+                stdb_running = True
+
+            if stdb_running:
+                console.print("  [green]✅[/green] SpacetimeDB started")
+            else:
+                console.print("  [red]❌[/red] SpacetimeDB failed to start (check `docker logs spacetimedb`)")
+                errs += 1
+        except subprocess.TimeoutExpired:
+            console.print("  [red]❌[/red] Docker pull timed out")
+            errs += 1
+        except FileNotFoundError:
+            console.print("  [red]❌[/red] Docker not found (shouldn't happen — checked above)")
+            errs += 1
+    else:
+        console.print("  [red]❌[/red] SpacetimeDB not running and Docker unavailable")
+        console.print("  [dim]→ Start STDB manually: docker run clockworklabs/spacetimedb:latest -p 3001:3001[/dim]")
+        errs += 1
+    console.print()
+
+    # ── Step 3: Create .env config ──────────────────────────────────────
+    console.print("[bold]3. Configuration[/bold]")
+    env_path = os.path.join(os.path.expanduser("~"), ".spacetime-memory.env")
+    if not os.path.isfile(env_path):
+        try:
+            with open(env_path, "w") as f:
+                f.write(f"# Spacetime Memory — generated by `stmem init`\n")
+                f.write(f"SPACETIMEDB_HOST={stdb_host}\n")
+                f.write(f"SPACETIMEDB_PORT={stdb_port}\n")
+                f.write(f"SPACETIMEDB_DB={db_name}\n")
+                f.write(f"EMBEDDER_URL=http://127.0.0.1:4000\n")
+            console.print(f"  [green]✅[/green] Created {env_path}")
+        except OSError as e:
+            console.print(f"  [yellow]⚠️[/yellow] Could not create {env_path}: {e}")
+    else:
+        console.print(f"  [yellow]⚠️[/yellow] {env_path} already exists — not overwriting")
+    console.print()
+
+    # ── Step 4: Publish module ─────────────────────────────────────────
+    console.print("[bold]4. Publish Module[/bold]")
+    if module_dir:
+        wasm_path = os.path.join(module_dir, "target", "wasm32-wasip1", "release", "spacetime_memory.wasm")
+        if os.path.isfile(wasm_path):
+            console.print(f"  [green]✅[/green] WASM binary found: {wasm_path}")
+            if spacetime_bin:
+                console.print("  [yellow]→[/yellow] Publishing module...")
+                proc = subprocess.run(
+                    [spacetime_bin, "publish", "--server", f"http://{stdb_host}:{stdb_port}",
+                     "-y", db_name, "--project-path", module_dir],
+                    capture_output=True, text=True, timeout=120,
+                )
+                if proc.returncode == 0:
+                    console.print("  [green]✅[/green] Module published")
+                else:
+                    stderr_clean = proc.stderr.strip()
+                    if "already exists" in stderr_clean or "already" in proc.stdout:
+                        console.print("  [yellow]⚠️[/yellow] Module already published (ok)")
+                    else:
+                        console.print(f"  [yellow]⚠️[/yellow] Publish may have issues: {stderr_clean[:200]}")
+            else:
+                console.print("  [yellow]⚠️[/yellow] `spacetime` CLI not found — cannot auto-publish")
+                console.print("  [dim]  → Publish manually: spacetime publish ...[/dim]")
+        else:
+            console.print(f"  [yellow]⚠️[/yellow] WASM binary not found at {wasm_path}")
+            console.print("  [dim]  → Build first: cd server && cargo build --release --target wasm32-wasip1[/dim]")
+    else:
+        console.print("  [yellow]⚠️[/yellow] Module source not found (running from pip install?)")
+        console.print("  [dim]  → Set STMEM_DB env var and publish manually[/dim]")
+    console.print()
+
+    # ── Step 5: Run doctor ────────────────────────────────────────────────
+    console.print("[bold]5. Verification[/bold]")
+    doctor("")
+    console.print()
+
+    # ── Summary ────────────────────────────────────────────────────────────
+    console.print("[bold cyan]─── Summary ───[/]")
+    if errs == 0:
+        console.print("  [green]✅ Setup complete![/green]")
+        console.print("  [dim]→ stmem store \"hello world\"[/dim]")
+        console.print("  [dim]→ stmem search \"hello\"[/dim]")
+        console.print("  [dim]→ stmem doctor[/dim]")
+    else:
+        console.print(f"  [yellow]⚠️ Setup completed with {errs} error(s)[/yellow]")
 
 
 def _find_spacetime_bin() -> str | None:

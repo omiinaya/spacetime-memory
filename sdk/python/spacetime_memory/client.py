@@ -58,11 +58,11 @@ _SQL_ERROR_MAP: dict[str, str] = {
 }
 
 _REDUCER_ERROR_MAP: dict[str, str] = {
-    "not found": "Record not found. Check the ID.",
-    "unauthorized": "Authentication required. Please login first.",
-    "already exists": "Record already exists with this identifier.",
-    "validation error": "Invalid input. Check the format of your data.",
-    "rate limit": "Too many requests. Please wait before trying again.",
+    "not found": "Record not found. Check the ID. Try: stmem list-memories --workspace <id>",
+    "unauthorized": "Authentication required. Login first: stmem login --username <user> --password <pass>",
+    "already exists": "Record already exists with this identifier. Use a different ID or delete the existing one: stmem delete-memory <id>",
+    "validation error": "Invalid input. Check the format of your data. Run 'stmem <command> --help' for usage.",
+    "rate limit": "Too many requests. Wait before retrying, or reduce concurrency with --max-concurrent N",
 }
 
 
@@ -214,7 +214,7 @@ class Client:
         # Bypass HTTP proxy for localhost — the system http_proxy
         # routes through isp.decodo.com which blocks STDB reducer calls.
         os.environ.setdefault("no_proxy", "localhost,127.0.0.1,127.0.0.1,.local")
-        self.embedder_url = embedder_url or os.environ.get("EMBEDDER_URL", "http://127.0.0.1:9090")
+        self.embedder_url = embedder_url or os.environ.get("EMBEDDER_URL", "http://127.0.0.1:4000")
         self.tantivy_url = os.environ.get("TANTIVY_URL", "http://127.0.0.1:9091")
         self.verbose = verbose
         self.token = token or os.environ.get("SPACETIMEDB_TOKEN")
@@ -441,7 +441,8 @@ class Client:
                 f"SpacetimeDB circuit breaker is open "
                 f"(retry in {self._circuit_open_until - now:.0f}s). "
                 f"Circuit resets at STMEM_CIRCUIT_RESET_SECS="
-                f"{self._circuit_breaker_reset_secs}."
+                f"{self._circuit_breaker_reset_secs}.\n"
+                f"  → Is STDB overloaded? Reduce concurrency. Check: stmem doctor"
             )
 
         last_exc: Exception | None = None
@@ -504,7 +505,8 @@ class Client:
                 self._consecutive_failures,
             )
         raise RuntimeError(
-            f"Request failed after {self.max_retries + 1} attempts: {last_exc}"
+            f"Request failed after {self.max_retries + 1} attempts: {last_exc}\n"
+            f"  → Is SpacetimeDB running? Check: stmem doctor"
         ) from last_exc
 
     def _sql(self, query: str) -> list[dict[str, Any]]:
@@ -634,7 +636,7 @@ class Client:
 
         return {"status": "ok"}
 
-    _DEFAULT_EMBEDDER_URL = "http://127.0.0.1:9090"
+    _DEFAULT_EMBEDDER_URL = "http://127.0.0.1:4000"
 
     def _embed(self, text: str) -> list[float]:
         """Get an embedding vector via the configured embedding API.

@@ -1,20 +1,17 @@
-"""
-OpenTelemetry tracing integration for spacetime-memory.
+"""OpenTelemetry tracing integration for spacetime-memory.
 
 Provides a lightweight ``Tracer`` wrapper that sets up OpenTelemetry's
-``TracerProvider`` with optional OTLP HTTP export and integrates with the
-existing ``MetricsCollector``.
+``TracerProvider`` with optional OTLP export.  Everything in this module
+is optional — if OpenTelemetry packages aren't installed, all calls are
+no-ops.
 
 Usage::
 
-    from spacetime_memory.tracer import Tracer
+    from .tracer import get_tracer, start_span
 
-    tracer = Tracer(service_name="spacetime-memory")
-    tracer.setup()
-
-    with tracer.start_span("store_memory") as span:
-        span.set_attribute("workspace_id", ws_id)
-        result = client.store(...)
+    tracer = get_tracer()
+    with start_span("my_operation"):
+        do_work()
 
 Environment variables:
 
@@ -26,193 +23,149 @@ Environment variables:
 
 from __future__ import annotations
 
-import os
 import logging
-from contextlib import contextmanager
-from functools import wraps
-from typing import Any, Callable, Iterator
+import os
+from typing import Any
 
-logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Lazy imports — OpenTelemetry is an optional dependency
-# ---------------------------------------------------------------------------
-
-_OTEL_AVAILABLE: bool | None = None
+logger = logging.getLogger("spacetime-memory")
 
 
-def _check_otel_available() -> bool:
-    """Check if OpenTelemetry packages are importable (cached)."""
-    global _OTEL_AVAILABLE
-    if _OTEL_AVAILABLE is not None:
-        return _OTEL_AVAILABLE
+def _get_version() -> str:
+    """Try to read the package version from metadata, or return unknown."""
     try:
-        import opentelemetry  # noqa: F401
-        from opentelemetry import trace  # noqa: F401
-        from opentelemetry.sdk.trace import TracerProvider  # noqa: F401
+        from importlib.metadata import version
 
-        _OTEL_AVAILABLE = True
-    except ImportError:
-        _OTEL_AVAILABLE = False
-    return _OTEL_AVAILABLE
+        return version("spacetime-memory")
+    except Exception:
+        return "unknown"
 
 
-# ---------------------------------------------------------------------------
-# Fallback no-op span (when OTel is not available)
-# ---------------------------------------------------------------------------
+_TRACER: Any = None
 
 
-class _NoOpSpan:
-    """Drop-in no-op span that does nothing."""
+def get_tracer(setup: bool = False) -> Any:
+    """Get the global ``Tracer`` singleton.
 
-    def add_event(self, name: str, attributes: dict[str, Any] | None = None, timestamp: int | None = None) -> None:
-        pass
-
-    def is_recording(self) -> bool:
-        return False
-
-    def set_attribute(self, key: str, value: Any) -> None:
-        pass
-
-    def set_attributes(self, attributes: dict[str, Any]) -> None:
-        pass
-
-    def record_exception(self, exc: Exception) -> None:
-        pass
-
-    def set_status(self, status: Any) -> None:
-        pass
-
-    def update_name(self, name: str) -> None:
-        pass
-
-    def end(self) -> None:
-        pass
-
-    def __enter__(self) -> _NoOpSpan:
-        return self
-
-    def __exit__(self, *args: Any) -> None:
-        pass
-
-
-_NOOP_SPAN = _NoOpSpan()
-
-# ---------------------------------------------------------------------------
-# Tracer wrapper
-# ---------------------------------------------------------------------------
-
-
-class Tracer:
-    """Wraps OpenTelemetry tracer with optional OTLP export.
-
-    When OpenTelemetry packages are not installed, all methods degrade to
-    no-ops without raising errors.
+    Args:
+        setup: When True, initialise the tracer (one-shot).
     """
+    global _TRACER
+    if setup and _TRACER is None:
+        _TRACER = _Tracer()
+    return _TRACER
 
-    def __init__(
-        self,
-        service_name: str | None = None,
-        otlp_endpoint: str | None = None,
-        enabled: bool | None = None,
-        sampling_ratio: float | None = None,
-    ) -> None:
-        self._service_name = (
-            service_name or os.environ.get("OTEL_SERVICE_NAME") or "spacetime-memory"
-        )
-        self._otlp_endpoint = otlp_endpoint or os.environ.get(
-            "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
-        )
-        enabled_env = os.environ.get("OTEL_ENABLED", "true").lower()
-        self._enabled = enabled if enabled is not None else enabled_env not in ("false", "0", "no")
-        self._sampling_ratio = sampling_ratio or float(os.environ.get("OTEL_SAMPLING_RATIO", "1.0"))
-        self._tracer = None
-        self._provider = None
+
+def start_span(name: str, attributes: dict[str, Any] | None = None) -> Any:
+    """Start a new span.  Returns a no-op context manager if tracing
+    is not available."""
+    if _TRACER is not None:
+        return _TRACER.start_span(name, attributes)
+    from contextlib import nullcontext
+
+    return nullcontext()
+
+
+# -----------------------------------------------------------------------
+# Internal
+# -----------------------------------------------------------------------
+
+
+class _Tracer:
+    """Lazy one-shot OTel initializer."""
+
+    def __init__(self) -> None:
         self._setup_done = False
+        self._provider = None
+        self._otlp_endpoint: str = (
+            os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").rstrip("/")
+            or "http://localhost:4318"
+        )
+        self._sampling_ratio = float(os.environ.get("OTEL_SAMPLING_RATIO", "1.0"))
+        self._service_name = (
+            os.environ.get("OTEL_SERVICE_NAME") or "spacetime-memory"
+        )
+        self._setup()
 
-    @property
-    def is_enabled(self) -> bool:
-        return self._enabled and _check_otel_available()
-
-    def setup(self) -> None:
-        """Initialize the OpenTelemetry tracer provider and exporter.
-
-        Safe to call multiple times — only runs once.
-        """
+    def _setup(self) -> None:
+        """One-shot initialisation — called once from ``__init__``."""
         if self._setup_done:
             return
-        if not self._enabled:
-            logger.info("OpenTelemetry tracing is disabled via OTEL_ENABLED")
+
+        # Respect explicit disable
+        otel_enabled = os.environ.get("OTEL_ENABLED", "true").lower()
+        if otel_enabled in ("false", "0", "no"):
+            logger.info("OpenTelemetry disabled via OTEL_ENABLED=%s", otel_enabled)
             self._setup_done = True
             return
-        if not _check_otel_available():
-            logger.warning(
-                "OpenTelemetry packages not installed. "
-                "Install with: pip install spacetime-memory[otel]"
+
+        try:
+            from opentelemetry import trace as _oteltrace
+            from opentelemetry.sdk.resources import Resource
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+            from opentelemetry.sdk.trace.sampling import ParentBasedTraceIdRatio
+
+            resource = Resource.create(
+                attributes={
+                    "service.name": self._service_name,
+                    "service.version": _get_version(),
+                }
             )
-            self._setup_done = True
-            return
 
-        from opentelemetry import trace
-        from opentelemetry.sdk.resources import Resource
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import (
-            BatchSpanProcessor,
-            ConsoleSpanExporter,
-        )
-        from opentelemetry.sdk.trace.sampling import (
-            ParentBasedTraceIdRatio,
-        )
+            sampler = ParentBasedTraceIdRatio(self._sampling_ratio)
 
-        resource = Resource.create(
-            {
-                "service.name": self._service_name,
-                "service.version": self._get_version(),
-            }
-        )
+            self._provider = TracerProvider(resource=resource, sampler=sampler)
+            _oteltrace.set_tracer_provider(self._provider)
 
-        sampler = ParentBasedTraceIdRatio(self._sampling_ratio)
+            # Console exporter
+            if (
+                os.environ.get("OTEL_TRACES_EXPORTER", "otlp").lower()
+                == "console"
+            ):
+                from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 
-        self._provider = TracerProvider(resource=resource, sampler=sampler)
-        trace.set_tracer_provider(self._provider)
+                span_processor = BatchSpanProcessor(ConsoleSpanExporter())
+                self._provider.add_span_processor(span_processor)
+                logger.info("OpenTelemetry tracing: console exporter")
+            else:
+                self._try_otlp_exporter()
 
-        # --- Exporters ---
-        if os.environ.get("OTEL_TRACES_EXPORTER", "otlp").lower() == "console":
-            span_processor = BatchSpanProcessor(ConsoleSpanExporter())
-            self._provider.add_span_processor(span_processor)
-            logger.info("OpenTelemetry tracing: console exporter")
+        except ImportError:
+            logger.info(
+                "OpenTelemetry packages not installed. "
+                "Install with: pip install 'spacetime-memory[otel]'"
+            )
 
+        self._setup_done = True
+
+    def _try_otlp_exporter(self) -> None:
+        """Try to wire up the OTLP HTTP exporter.
+
+        This method is only called when OpenTelemetry SDK packages are
+        already imported successfully.  If the collector is not reachable
+        we fall through silently (info-level log) rather than logging a
+        warning on every CLI invocation.
+        """
         try:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
                 OTLPSpanExporter,
             )
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-            # ── Connectivity check ──────────────────────────────────────
-            # Test if the OTLP collector is reachable before wiring up the
-            # BatchSpanProcessor.  A background thread that retries forever
-            # on ConnectionError pollutes logs and confuses users.
-            _collector_reachable = False
+            # Quick connectivity probe
+            collector_reachable = False
             try:
                 import httpx as _httpx
 
-                _probe = _httpx.get(
+                probe = _httpx.get(
                     self._otlp_endpoint.rstrip("/v1") + "/",
                     timeout=2.0,
                 )
-                _collector_reachable = _probe.status_code < 500
+                collector_reachable = probe.status_code < 500
             except Exception:
-                # Any error (connection refused, DNS fail, timeout) means
-                # the collector is not available — fall through gracefully.
                 pass
 
-            if not _collector_reachable:
-                logger.warning(
-                    "OTLP collector at %s is not reachable — "
-                    "skipping OTLP trace exporter. "
-                    "Set OTEL_ENABLED=false to silence this warning.",
-                    self._otlp_endpoint,
-                )
-            else:
+            if collector_reachable:
                 otlp_exporter = OTLPSpanExporter(
                     endpoint=f"{self._otlp_endpoint}/v1/traces",
                 )
@@ -222,128 +175,31 @@ class Tracer:
                     "OpenTelemetry tracing: OTLP exporter -> %s",
                     self._otlp_endpoint,
                 )
+            else:
+                logger.info(
+                    "OTLP collector at %s not reachable — "
+                    "skipping OTLP trace exporter. "
+                    "Set OTEL_ENABLED=false to silence.",
+                    self._otlp_endpoint,
+                )
+
         except ImportError:
             logger.info(
                 "OpenTelemetry OTLP exporter not installed. "
                 "Install with: pip install opentelemetry-exporter-otlp-proto-http"
             )
 
-        self._tracer = trace.get_tracer(self._service_name, self._get_version())
-        self._setup_done = True
-        logger.info(
-            "OpenTelemetry tracing initialised for %s (sampling=%s)",
-            self._service_name,
-            self._sampling_ratio,
-        )
-
-    def _get_version(self) -> str:
-        try:
-            from spacetime_memory import __version__
-
-            return __version__
-        except ImportError:
-            return "0.0.0"
-
-    @contextmanager
     def start_span(
-        self,
-        name: str,
-        attributes: dict[str, Any] | None = None,
-        kind: Any = None,
-    ) -> Iterator[Any]:  # type: ignore[return]
-        """Start an OpenTelemetry span. Degrades to no-op if unavailable.
+        self, name: str, attributes: dict[str, Any] | None = None
+    ) -> Any:
+        """Start a new span if the provider is configured."""
+        if self._provider is None:
+            from contextlib import nullcontext
 
-        Usage::
-
-            with tracer.start_span("store_memory", {"ws_id": "ws1"}):
-                ...
-        """
-        if not self.is_enabled:
-            yield _NOOP_SPAN
-            return
-
-        from opentelemetry import trace
-
-        tracer = self._tracer or trace.get_tracer(self._service_name)
-        kind = kind or trace.SpanKind.INTERNAL
-
-        with tracer.start_as_current_span(name, kind=kind, attributes=attributes or {}) as span:
-            yield span
-
-    def instrument_method(
-        self,
-        method: Callable[..., Any],
-        span_name: str | None = None,
-        attr_fn: Callable[..., dict[str, Any]] | None = None,
-    ) -> Callable[..., Any]:
-        """Decorator that wraps a method with an OpenTelemetry span.
-
-        Arguments:
-            method: The function/method to instrument.
-            span_name: Override the span name (default: method's ``__qualname__``).
-            attr_fn: Optional callable ``(*args, **kwargs) -> dict`` that
-                     extracts attributes from the method's arguments.
-
-        Returns:
-            Wrapped function that captures timing and errors in a span.
-        """
-        span_name = span_name or method.__qualname__
-
-        @wraps(method)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            if not self.is_enabled:
-                return method(*args, **kwargs)
-
-            attributes = attr_fn(*args, **kwargs) if attr_fn else {}
-            with self.start_span(span_name, attributes=attributes):
-                try:
-                    return method(*args, **kwargs)
-                except Exception:
-                    # Span will be marked as error automatically
-                    raise
-
-        return wrapper
+            return nullcontext()
+        tracer = self._provider.get_tracer("spacetime-memory")
+        return tracer.start_as_current_span(name, attributes=attributes)
 
 
-# ---------------------------------------------------------------------------
-# Module-level singleton
-# ---------------------------------------------------------------------------
-
-_tracer: Tracer | None = None
-
-
-def get_tracer(
-    service_name: str | None = None,
-    setup: bool = True,
-) -> Tracer:
-    """Get or create the module-level ``Tracer`` singleton.
-
-    Arguments:
-        service_name: Override the service name (only used on first call).
-        setup: If True (default), call ``tracer.setup()`` automatically.
-
-    Returns:
-        The shared ``Tracer`` instance.
-    """
-    global _tracer
-    if _tracer is None:
-        _tracer = Tracer(service_name=service_name)
-        if setup:
-            _tracer.setup()
-    return _tracer
-
-
-def start_span(
-    name: str,
-    attributes: dict[str, Any] | None = None,
-) -> Iterator[Any]:
-    """Convenience: start a span on the module-level tracer.
-
-    Usage::
-
-        from spacetime_memory.tracer import start_span
-
-        with start_span("search", {"query": q}):
-            results = client.search(...)
-    """
-    return get_tracer().start_span(name, attributes)
+# Public alias for backward compatibility
+Tracer = _Tracer

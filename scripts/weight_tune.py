@@ -10,7 +10,7 @@ for prefix in (".", "..", "/home/user/spacetime-memory"):
 os.environ.pop("OPENAI_API_KEY", None)
 os.environ["OPENAI_API_KEY"] = "REDACTED"
 os.environ["OPENAI_BASE_URL"] = "http://localhost:4000/v1"
-os.environ["EMBEDDING_MODEL"] = "baai/bge-m3"
+os.environ["EMBEDDING_MODEL"] = "bge-m3"
 os.environ["EMBEDDER_URL"] = "http://localhost:4000"
 os.environ["SPACETIMEDB_DB"] = "c200930d9c2938fa3e86e672e3c5577ac98c6637d078e7d9ebfc6791c7112e3b"
 os.environ["STMEM_MAX_RETRIES"] = "1"

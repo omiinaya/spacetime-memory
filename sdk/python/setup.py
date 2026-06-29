@@ -15,6 +15,10 @@ setup(
         "httpx>=0.27",
     ],
     extras_require={
+        "cli": [
+            "click>=8.1",
+            "rich>=13.0",
+        ],
         "dev": [
             "pytest>=7",
             "pytest-asyncio>=0.21",
@@ -30,11 +34,15 @@ setup(
             "langchain-core>=0.3",
             "langgraph>=0.2",
             "feedparser>=6",
+            "click>=8.1",
+            "rich>=13.0",
         ],
     },
     python_requires=">=3.10",
     entry_points={
         "console_scripts": [
+            "stmem=spacetime_memory.cli:cli",
+            "spacetime-memory=spacetime_memory.cli:cli",
             "spacetime-benchmark = scripts.benchmark:main",
         ],
     },

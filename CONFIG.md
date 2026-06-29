@@ -30,10 +30,10 @@ Without a token, SpacetimeDB assigns ephemeral HTTP identities per request
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `EMBEDDER_URL` | `http://localhost:4000` | URL of the spacetime-llm proxy (health check) |
+| `EMBEDDER_URL` | `http://127.0.0.1:4000` | Embedding proxy URL (spacetime-llm → NVIDIA NIM) |
 | `OPENAI_API_KEY` | *(none)* | API key for proxy embedding and LLM calls |
 | `OPENAI_BASE_URL` | `http://localhost:4000/v1` | OpenAI-compatible API endpoint (local proxy) |
-| `EMBEDDING_MODEL` | `baai/bge-m3` | Embedding model name (routed through proxy → NVIDIA NIM) |
+| `EMBEDDING_MODEL` | `bge-m3` | Embedding model name (routed through proxy → NVIDIA NIM) |
 
 The proxy at `localhost:4000` forwards embedding requests to NVIDIA NIM (bge-m3, 1024-dim).
 Set `OPENAI_API_KEY` to authenticate with the proxy.

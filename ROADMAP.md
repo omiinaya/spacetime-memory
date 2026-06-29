@@ -9,9 +9,10 @@
 | Python tests | 47,453 | 52 .py | 3,319 collected | **3,318/3,319** ✓ (1 mem0 skipped, 0 runtime failures) |
 | CLI | 3,509 | 1 .py | 37 subcommands | — |
 | MCP server | 1,275 | 1 .py | 133 tools | — |
+| TypeScript SDK | 446 | 1 .ts | 0 tests | Builds cleanly (0 errors), no test suite |
 | AGENTS.md | ~178 | 1 .md | — | — |
 | Adapter tests | ~15,000 | 6 files | 843 collected | **837/843** ✓ (1 fail, 5 skipped) |
-| **Total** | **~90,000** | **~134** | **~4,162** | **varies by layer** |
+| **Total** | **~90,446** | **~135** | **~4,162** | **varies by layer** |
 
 > **v1.35.0 + 322 unpinned commits.** CI cron has been auto-running clearing the IMPROVEMENTS.md backlog. Backlog is now **0 PENDING items** — fully cleared.
 
@@ -49,6 +50,26 @@ A comprehensive external review was published as [Spacetime Memory: An Honest Re
 2. **Benchmarks are our biggest credibility gap** — every serious competitor publishes scores on LongMemEval/LoCoMo/BEAM. Without them, retrieval quality claims are unverifiable.
 3. **Documentation consolidation is the highest-ROI UX fix** — 7+ markdown files scattered, no single getting-started guide.
 4. **Self-hosting is correct for us** but the missing managed option limits broader adoption.
+
+### Embedding Pipeline — Fixed (June 28, 2026)
+
+| Issue | Status | Detail |
+|-------|--------|--------|
+| bge-m3 not registered in proxy | ✅ **FIXED** | Registered via `create_model_bypass` — model `bge-m3` (1024-dim) via NVIDIA NIM |
+| Proxy double `/v1/` path in URL | ✅ **FIXED** | Registered with api_base without `/v1` suffix |
+| No `remote_model_name` injection in embedding handler | ✅ **FIXED** | Patched `handle_embeddings` in proxy `inference.rs` — inserts `remote_model_name` into upstream body |
+| Proxy recompiled & deployed | ✅ **DONE** | Fresh binary at 17:34 Jun 28 |
+| Embedding endpoint returning 200/1024d | ✅ **VERIFIED** | `curl /v1/embeddings -d '{"model":"bge-m3","input":"test"}'` → 1024-dim embedding |
+
+Note: The legacy `baai/bge-m3` model entry has a wrong api_base (`/v1` suffix causes double path). It cannot be updated without admin auth (STDB JWT). Use `bge-m3` as the model name instead. The `bge-m3` entry has correct api_base + `remote_model_name: "baai/bge-m3"` for upstream mapping.
+
+### Additional Defaults Cleanup (June 28, 2026)
+
+| Issue | Location | Before | After |
+|-------|----------|--------|-------|
+| TS SDK embedder URL | `sdk/typescript/client.ts:110` | `localhost:9090` (removed ONNX sidecar) | `127.0.0.1:4000` (proxy) |
+| TS SDK host default | `sdk/typescript/client.ts:103` | `localhost` | `127.0.0.1` |
+| Python `_DEFAULT_EMBEDDER_URL` | `client.py:639` | `http://127.0.0.1:9090` (stale constant, unused) | `http://127.0.0.1:4000` |
 
 ## Project Cleanup Summary (v1.31.0)
 
@@ -190,12 +211,14 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 
 ### The Embedding Reality (June 27, 2026)
 
-- **Primary path**: bge-m3 via `spacetime-llm` proxy → NVIDIA NIM (1024-dim). Model `baai/bge-m3` registered in proxy.
-- **Config**: `EMBEDDER_URL=http://127.0.0.1:4000`, `OPENAI_BASE_URL=http://127.0.0.1:4000/v1`, `EMBEDDING_MODEL=baai/bge-m3`
+- **Primary path**: bge-m3 via `spacetime-llm` proxy → NVIDIA NIM (1024-dim). Model `bge-m3` registered in proxy (with `remote_model_name: baai/bge-m3` for upstream).
+- **Config**: `EMBEDDER_URL=http://127.0.0.1:4000`, `OPENAI_BASE_URL=http://127.0.0.1:4000/v1`, `EMBEDDING_MODEL=bge-m3`
 - **ONNX sidecar**: Removed. Proxy is the only path.
 - **81.3% P@5, 0.960 MRR** — measured with real embeddings. 247 unit tests pass (embedder not needed for unit).
 - **Limitation**: Embedder-dependent tests (5) are skipped when `OPENAI_API_KEY` not set. Tests exercise the HTTP path, not real embedding quality.
-- **Proxy host**: Uses `localhost:4000` in defaults — should be `127.0.0.1:4000`.
+- **Proxy host**: Uses `127.0.0.1:4000` in defaults.
+- **Health check**: `stmem health` now confirms embedder reachable ✅ — embedder URL default fixed (9090→4000).
+- **Benchmark**: `scripts/retrieval_benchmark.py` confirms hybrid search quality matches reference (81.3% P@5, 0.960 MRR).
 
 ## Feature Matrix — What Really Works (Verified June 27)
 
@@ -212,7 +235,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | CLI (37 subcommands) | ✓ | `cli/stmem.py` |
 | 6 competitor drop-in adapters | **~70% parity** | 3 full, 1 partial, 2 broken |
 | CDC / delta sync | ✓ | ChangeEvent table + DeltaSync polling |
-| BM25 via Tantivy | ? | Sidecar on :9091 — **not responding** |
+| BM25 via Tantivy | ✅ | Sidecar on :9091 — **269 indexes, healthy** |
 | Knowledge graph | ✓ | Typed edges, community detection, citations |
 | Notes with wikilinks | ✓ | 4 backlink/auth/CRUD tools via MCP |
 | LLM Wiki / Knowledge Compounder | ✓ | 14 compounder methods, 62 tests |
@@ -226,8 +249,34 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Retrieval MRR | **0.960** | Good ranking quality |
 | Graph ops latency | <20ms | Verified |
 | Semantic embeddings | **Working** | Via proxy, 5 tests skipped without key |
-| Rust compilation | **✅ FIXED** | cargo check passes cleanly. WASM rebuilt Jun 28. |
-| Tantivy BM25 | **?** | Port 9091 not responding — may be down |
+| Rust compilation | **✅ FIXED** | cargo check passes cleanly. WASM rebuilt Jun 28 (2.36MB). `server/spacetimedb/` compiles in 0.17s — 0 warnings, 0 errors. |
+| Tantivy BM25 | **✅** | Port 9091 healthy — 269 indexes |
+
+### TypeScript SDK — Current Assessment
+
+The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG operations, and hybrid search. Current state:
+
+| Dimension | Status | Detail |
+|-----------|:------:|--------|
+| **LOC** | 446 | Single `client.ts` file |
+| **Build** | ✅ **CLEAN** | `tsc` compiles with 0 errors, outputs `dist/client.js` + `.d.ts` |
+| **Feature coverage** | ~30% of Python SDK | Workspace CRUD, memory store/search, KG nodes/edges/neighbors, community detection, maintenance. Missing: notes/wiki, context packs, guided tours, LLM reranking, MCP client, all 6 adapters, compounder |
+| **Embedder URL** | ✅ **FIXED** | Default changed from `localhost:9090` (removed ONNX sidecar) to `127.0.0.1:4000` (proxy) |
+| **Host defaults** | ✅ **FIXED** | Changed from `localhost:3001` to `127.0.0.1:3001` (matching Python SDK) |
+| **Tests** | ❌ **NONE** | 0 test files exist |
+| **npm publish** | ❌ **NOT PUBLISHED** | Package.json is configured but no `.npmrc` or auth setup |
+| **SQL injection** | ⚠️ **VULNERABLE** | Uses raw SQL via `esc()` helper for reads instead of reducers. Name from 2022-era STDB SQL API |
+| **Dependencies** | Minimal | Only `@types/node` + `typescript` dev deps. No runtime dependencies. |
+
+**Gap vs Python SDK:** Python has 25,495 LOC across 41 files, 247 unit tests, 6 drop-in adapters, MCP server (133 tools), CLI (37 subcommands), notes/wiki, context packs, contradiction checking, trust system, knowledge compounder. TS SDK is 446 LOC with none of these.
+
+**Path to parity:** ~1 week of focused work:
+1. Fix host defaults to `127.0.0.1` (30min)
+2. Add test suite with vitest (~2h)
+3. Implement notes/wiki CRUD (~1 day)
+4. Port MCP client bindings (~1 day)
+5. Add adapter stubs (~1 day)
+6. Set up GitHub Actions CI + npm publish (~2h)
 
 ### What's Actually Tested vs Not (June 27)
 
@@ -258,8 +307,8 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Adapter Parity | **70%** | LangGraph/Zep/Graphiti solid. Hindsight 54%. Mem0/Honcho broken. |
 | Frontend / Web UI | **0%** | No code exists. Previous claim of "23 pages" was incorrect. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. 60% docstrings. ~47 print() calls. |
-| Test Coverage | **80%** | 247+ unit tests passing. Rust untestable. Tantivy down. |
-| Infrastructure | **50%** | CI exists. Tantivy down. WASM stale. STDB not running locally. |
+| Test Coverage | **80%** | 247+ unit tests passing. Rust builds cleanly. Tantivy healthy (269 indexes). |
+| Infrastructure | **70%** | CI exists. Tantivy healthy (269 indexes). Embedder default fixed (9090→4000). WASM rebuilt (2.36MB). 168MB stale venv. |
 | **Weighted Overall** | **~75%** | **-22% from prior inflated score** |
 
 ### What Changed Since June 22 (v1.32.0 → v1.35.0+322)
@@ -304,13 +353,13 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 
 ### What's Real But Not Ideal
 
-- **Rust doesn't compile** — 5 STDB v2.6 API drift errors
+- **Rust builds cleanly** — WASM rebuilt Jun 28 (2.36MB, 0 warnings)
 - **Frontend doesn't exist** — zero web UI code
 - **Adapter parity incomplete** — 4/6 verified, 1 partial (Hindsight 54%)
-- **Tantivy BM25 not responding** — sidecar may be down
+- **Tantivy BM25 healthy** — 269 indexes, port 9091 responding
 - **47 `print()` calls in production** — ✅ **FIXED** — all converted to structured logging. 0 remaining.
 - **60% docstring coverage** — 40% undocumented
-- **Hardcoded `localhost` defaults** — ✅ **FIXED** — all changed to 127.0.0.1 (commit 92415ced)
+- **Embedder URL default fixed** — CLI had stale `localhost:9090` (removed ONNX sidecar). Changed to `127.0.0.1:4000` (proxy). `stmem health` now reports "All systems healthy".
 - **168MB stale upstream venv** — `.upstream-venv/`
 - **Stale `MNEMOSYNE_*` env vars** — ✅ resolved (→ `STMEM_*`)
 - **49 reducers without explicit auth** — needs review (though some are intentional)
@@ -323,7 +372,7 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | 1 | **Rust compilation broken** — 5 STDB v2.6 API errors | **P0** | 30min | ✅ **FIXED** — WASM rebuilt Jun 28 |
 | 2 | **Frontend doesn't exist** — zero web UI code | **P0** | 1-2 weeks | ❌ **MISSING** |
 | 3 | **WASM binary stale** — can't rebuild until P1 fixed | **P0** | — | ✅ **FIXED** — fresh binary 2.36MB |
-| 4 | **Tantivy BM25 sidecar not responding** — port 9091 down | **P1** | 30min | ❌ **DOWN** |
+| 4 | **Tantivy BM25 sidecar** — was not responding | **P1** | 30min | ✅ **RUNNING** (269 indexes, port 9091 healthy) |
 | 5 | **Hindsight adapter 54% parity** — missing 18 methods | **P2** | 2-4h | ⚠️ Partial |
 | 6 | **Mem0 adapter not verifiable** — package not on PyPI | **P2** | 30min | ✅ **DONE** — verified against GitHub source. 85% parity. |
 | 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ✅ **FIXED** — `honcho` v2.0.0 is the correct package. Adapter verified. |
@@ -348,8 +397,8 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 | Adapter Parity | **78%** | LangGraph 100%, Mem0 85%, Zep 90%, Graphiti 85%, Honcho 85%. Hindsight 54%. |
 | Frontend | **0%** | No web/ directory exists. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Print() calls and 60% docstrings drag it down. |
-| Test Coverage | **80%** | 247+ unit pass. Rust untestable. Tantivy down. No e2e/deep marker. |
-| Infrastructure | **65%** | CI exists. Tantivy running (267 indexes). WASM rebuilt. No local STDB. 168MB stale venv. |
+| Test Coverage | **80%** | 247+ unit pass. Tantivy healthy (269 indexes). No e2e/deep marker. |
+| Infrastructure | **70%** | CI exists. Tantivy healthy (269 indexes). Embedder health check fixed (9090→4000). WASM rebuilt (2.36MB). Benchmark confirmed (81.3% P@5). 168MB stale venv. `stmem health` returns "All systems healthy". CLI `localhost` defaults fixed. |
 | **Competitive Positioning** | **90%** | External review confirms broadest feature set, unique moat (adapters, wiki, context packs, tours, contradiction checking). Only gaps: no benchmarks, no TS parity, no managed cloud, docs sprawl. |
 | **Weighted Overall** | **~83%** | External validation confirms direction. Still missing frontend, Tantivy, partial adapter parity. New gaps identified: benchmarks, docs consolidation, TS SDK, bi-temporal facts. |
 
@@ -371,11 +420,81 @@ The Python SDK itself is well-tested and stable. The Rust module is the weak poi
 14. **🧊: Rename `MNEMOSYNE_*` env vars** — ✅ resolved (backwards-compatible with deprecation warning)
 15. **🧊: Multi-region / failover** — no current requirement
 
-### New Items from External Review
+### New Items from External Review — Adoption Prescription (June 28, 2026 Article)
 
-17. **P1: Publish benchmark scores** — run LongMemEval, LoCoMo, and BEAM against current retrieval pipeline (~1-2 weeks). The article explicitly flags this as our biggest credibility gap vs Mem0 (94.8), Hindsight (SOTA), and Supermemory (#1).
-18. **P2: Consolidate documentation** — single "5-min getting started" guide merging AGENTS.md, CONFIG.md, DEPLOYMENT.md, ADAPTER_COMPAT.md into one onboarding flow (~4h). The article calls out docs sprawl as a newcomer barrier. | ✅ **DONE** — README restructured (two clear paths, config reference), docs/index.md architecture diagram fixed, docs/development.md updated with current project layout, docs/getting-started.md rewritten as SDK usage reference.
-19. **P2: TypeScript SDK parity** — bring TS SDK to feature parity with Python SDK (~1 week). Currently incomplete, which blocks TS-first agent framework adoption.
-20. **P3: Bi-temporal fact tracking** — investigate Graphiti-style temporal facts with automatic invalidation of superseded facts (~1 week). Graphiti's strongest differentiator.
-21. **P4: Evaluate managed cloud options** — feasibility study for managed SpacetimeDB hosting (~2-3 days). Every major competitor offers a paid managed option.
-22. **P4: Community building** — create tutorials, Stack Overflow presence, showcase projects (ongoing). The 0-star, no-tutorials reality limits adoption beyond our infrastructure.
+The article's "How to Make It Easier — A Prescription for Adoption" section provides a concrete, prioritized list of changes. These are separate from the technical debt items above.
+
+| Priority | Item | Why | Est. Effort | Status |
+|:--------:|------|-----|:-----------:|:------:|
+| **P0** | **One-command setup script** — `curl ... | bash` that checks Docker/STDB, publishes module, creates config, prints test command | Biggest adoption blocker | 1-2 days | ✅ **DONE** — `scripts/setup.sh` created June 28. Checks prerequisites, auto-starts STDB via Docker if needed, publishes module, creates `.env` config, installs Python deps, runs `stmem doctor` to verify, prints test commands. |
+| **P1** | **`stmem doctor` health check** — verifies STDB reachability, module version, embedding proxy, adapter imports | First thing users try after install | 2-4h | ✅ **DONE** — `stmem doctor` implemented June 28. Checks STDB, embedder, module publish status, SDK version, and all 6 adapter imports. |
+| **P1** | **Publish benchmark scores** — run LongMemEval, LoCoMo, and BEAM | Biggest credibility gap vs Mem0, Hindsight, Supermemory | 1-2 weeks | ❌ **TODO** |
+| **P2** | **Consolidate documentation** — single "5-min getting started" guide | Article calls out docs sprawl | ~4h | ✅ **DONE** |
+| **P2** | **TypeScript SDK parity** — bring TS SDK to Python parity | Blocks TS-first agent framework adoption | ~1 week | ⚠️ **P2** — 446 LOC, builds cleanly (0 errors), core CRUD/KG/search, **stale embedder URL fixed** (9090→4000), no test suite, no npm publish |
+| **P2** | **Self-test / health check command** → merged into P1 `stmem doctor` | — | — | — |
+| **P2** | **Better error messages** — every error path suggests a fix command | Reduces support burden | 4-8h | ✅ **DONE** — SDK error map updated with fix suggestions (not found, unauthorized, validation, rate limit). Circuit breaker and connection errors now suggest `stmem doctor`. 8 CLI error paths improved with actionable fix commands. |
+| **P2** | **Web-based connection wizard** — React form: enter STDB host+port, test connection, generate config | Removes "what do I put in config?" question | 1-2 days | ❌ **TODO** |
+| **P3** | **pip install that works OOTB** — meaningful error if STDB not available, `spacetime-memory init` downloads + starts | Clean first experience | 1-2 days | ✅ **DONE** — `stmem init` command implemented. Detects STDB (Docker or running), starts via Docker if needed, creates `.spacetime-memory.env` config, locates WASM binary for module publish, runs `stmem doctor` to verify. `pip install spacetime-memory[cli]` gives both `stmem` and `spacetime-memory` CLI commands. OTel warning noise silenced. Entry points in both setup.py and pyproject.toml. Still needs: PyPI publish. |
+| **P3** | **Example projects / cookbook** — `examples/mem0-switch/`, `examples/rag-chatbot/`, `examples/kg-explorer/`, `examples/llm-wiki/` | Newcomers need runnable code | 1-2 days | ✅ **DONE** — 4 examples created June 28: `mem0-switch/` (README + drop-in adapter docs), `rag-chatbot/` (hybrid search, verified working), `kg-explorer/` (KG nodes + edges, verified working), `llm-wiki/` (wiki pattern with memory storage, verified working). Each self-contained, creates/deletes own workspace. |
+| **P3** | **Bi-temporal fact tracking** — Graphiti-style temporal facts with auto-invalidation | Graphiti's strongest differentiator | ~1 week | ❌ **TODO** |
+| **P4** | **Managed cloud free tier** — 1 workspace, 100MB, 1K ops/day | Every competitor has a managed option | 2-3 days eval | ❌ **TODO** |
+| **P4** | **Community building** — tutorials, Stack Overflow, showcase projects | Zero-star reality limits adoption | Ongoing | ❌ **TODO** |
+
+### What NOT to Do (per article)
+
+- **Don't remove the Rust module** — the SpacetimeDB architecture IS the differentiator
+- **Don't oversimplify the config** — complex setups deserve complex configs; just make defaults work for 80%
+- **Don't deprioritize the adapters** — they're the killer feature
+
+### Unique Differentiators (confirmed by External Review)
+
+The article identifies these 7 capabilities as genuinely unique — no competitor offers them:
+
+| # | Capability | Why It's Unique |
+|---|------------|-----------------|
+| 1 | **Drop-in adapter layer** | Only project allowing transparent backend swap by changing import paths. Commercially significant: de-risks adoption |
+| 2 | **Note/Wiki system** | Full Logseq-compatible markdown notes with `[[wiki-links]]`, block-level content, backlinks, transclusions. Turns memory into a living wiki |
+| 3 | **Context packs** | Compressed context representations for LLM context windows. Direct solution to the "memories fill the window" problem |
+| 4 | **Guided tours** | Curated walks through KG nodes (Tour table). No competitor has anything like onboarding flows for agents |
+| 5 | **Cross-knowledge contradiction checking** | `compounder.lint_workspace()` flags semantic contradictions between memories. Article calls this "unique" |
+| 6 | **Memory trust system** | Tiers + feedback scores + reinforcement + decay. More granular than any competitor's approach |
+| 7 | **7-strategy search fusion** | Semantic + BM25 + graph BFS + temporal + MMR + cross-encoder + LLM reranking. Competitors do 2-3 max |
+
+### Competitive Risks & Technical Gaps (per External Review)
+
+The article identifies 10 concrete problems and 7 feature gaps vs. competitors:
+
+#### The 10 Problems
+
+| # | Problem | Severity | Mitigation |
+|---|---------|:--------:|------------|
+| 1 | **Setup requires SpacetimeDB** — not a pip library, full infra decision | P0 | One-command setup script (P0 in prescription) |
+| 2 | **STM is still maturing** — limited query capabilities vs PostgreSQL, no SQL/GraphQL | P2 | SDK abstractions mitigate this; workspace model isolates complexity |
+| 3 | **No native vector index** — embeddings stored as `Vec<f32>`, searched via brute-force Rust reducer. Fine <100K, degrades beyond | P2 | Works with proxy (NVIDIA NIM); consider HNSW index in future |
+| 4 | **TypeScript SDK incomplete** — only Python SDK is mature, blocks TS-first agent frameworks | P2 | TS parity tracked in prescription |
+| 5 | **No managed cloud** — every competitor offers a managed option (Mem0 Cloud, Honcho Cloud, Supermemory Cloud) | P4 | Self-hosting correct for us; managed option deferred |
+| 6 | **Documentation sprawl** — 7+ markdown files scattered, no single 5-min getting-started guide | P2 | ✅ **CONSOLIDATED** — docs consolidation complete |
+| 7 | **Adapter tests require live STDB** — 54 test files can't run in CI without standalone SpacetimeDB server | P3 | By design (e2e against real infra); consider mock layer |
+| 8 | **Unclear cross-adapter data sharing** — 6 adapters mapping different API semantics against same 28 tables. Workspaces isolate, but cross-adapter querying undocumented | P3 | Document cross-adapter patterns |
+| 9 | **Small community** — no public stars, no Stack Overflow presence, no tutorials, no commercial backing | P4 | Community building tracked in prescription |
+| 10 | **Adapter maintenance burden** — tracking 6 upstream API changes. Mem0 v2.0.5→v2.0.8, Graphiti v0.29.2→v0.30.0 can break adapters | P2 | CI tests with pinned upstream versions |
+
+#### Feature Gaps vs. Competitors
+
+| Gap | Competitor Has | Impact | Timeline |
+|-----|---------------|--------|:--------:|
+| **Bi-temporal fact tracking** — when a fact was true + when learned, with auto-invalidation | **Graphiti** — best-in-class | Medium (temporal search exists, no bi-temporal resolution) | P3 |
+| **Reasoning-first memory** — extract conclusions, not just raw text | **Honcho** — peer-centric reasoning | Low (search finds raw text; conclusions need LLM) | P4 |
+| **Connector ecosystem** — Google Drive, Gmail, Notion, OneDrive | **Supermemory** — 10+ connectors | Low (GitHub + Notion connectors exist) | P3 |
+| **Multi-modal RAG** — PDF, OCR, video, AST-aware code chunking | **Supermemory** — best-in-class | Low (some parsing exists, less mature) | P3 |
+| **Benchmark scores** — LongMemEval, LoCoMo, BEAM | **Mem0, Hindsight, Supermemory** — all publish | High (biggest credibility gap) | P1 |
+| **TypeScript SDK maturity** — full npm package | **Mem0, Honcho** — mature TS SDKs | Medium (blocks TS-first adoption) | P2 |
+| **Managed service** — "just add a key" | **Mem0 Cloud, Honcho Cloud, Supermemory Cloud** | Medium (self-hosting only) | P4 |
+
+### Strategic Implications (from External Review)
+
+1. **The drop-in adapter layer is our moat** — no competitor can replicate this without rebuilding their entire architecture. It de-risks adoption: users start with Mem0's ecosystem and grow into SpacetimeDB.
+2. **Benchmarks are our biggest credibility gap** — every serious competitor publishes scores on LongMemEval/LoCoMo/BEAM. Without them, retrieval quality claims are unverifiable.
+3. **Documentation consolidation is the highest-ROI UX fix** — article calls out 7+ scattered files, no single getting-started guide. ✅ Now resolved.
+4. **Self-hosting is correct for us** but the missing managed option limits broader adoption.
+5. **Breadth ≠ depth** — we win on feature count, but each competitor beats us in their niche (Graphiti on temporal, Hindsight on retrieval, Honcho on reasoning). Don't try to beat them at their game; lean into the integrated platform story.

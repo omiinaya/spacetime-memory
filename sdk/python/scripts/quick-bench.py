@@ -5,7 +5,10 @@ Runs 13 operations against a live SpacetimeDB, outputs markdown.
 Usage:
   SPACETIMEDB_DB=<identity> python3 scripts/quick-bench.py
 """
-import json, os, statistics, sys, time
+import os
+import statistics
+import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "sdk" / "python"))
@@ -60,7 +63,7 @@ def measure(label, fn, n=N):
         try:
             fn()
             lats.append((time.perf_counter() - t0) * 1000)
-        except Exception as e:
+        except Exception:
             fails += 1
     if not lats:
         return {"label": label, "n": 0, "fails": fails,
@@ -119,7 +122,7 @@ print(f"\n**Failures:** {fails}/{sum(r['n'] for r in results)} ({round(fails/max
 out = os.environ.get("BENCH_OUTPUT", "")
 if out:
     with open(out, "w") as f:
-        f.write(f"# Performance Benchmarks\n\n")
+        f.write("# Performance Benchmarks\n\n")
         f.write(f"Results from {time.strftime('%Y-%m-%d %H:%M UTC')}\n\n")
         f.write("## Reference Results\n\n")
         f.write("| # | Operation | p50 (ms) | p90 (ms) | p99 (ms) | Mean (ms) | Min (ms) | Max (ms)\n")

@@ -13,6 +13,19 @@
 
 **Spacetime Memory** is a unified memory layer for AI agents with **drop-in adapters** for the most popular memory library APIs.
 
+## Documentation
+
+| Guide | What It Covers |
+|-------|----------------|
+| **[AGENTS.md](AGENTS.md)** | **Agent wiki schema + development guide.** Tells agents how to use the memory system (ingestion workflows, CLI commands, MCP tools) AND how to develop the project (workspace layout, build/test commands, code conventions, task-to-file mapping). Start here. |
+| **[CLAUDE.md](CLAUDE.md)** | Signpost for AI agent IDE/tooling integration. One-line setup, critical rules, key file references. |
+| **[CONTRIBUTING.md](CONTRIBUTING.md)** | Contribution guide with AI Agent Contributors section. PR process, coding standards, what agents should/shouldn't do. |
+| **[README.md](README.md)** | This file — project overview, quick start, architecture, setup, features. |
+| **[ROADMAP.md](ROADMAP.md)** | Honest project assessment, competitive positioning, strategic priorities. |
+| **[CONFIG.md](CONFIG.md)** | Full environment variable reference. |
+| **`docs/development.md`** | Developer setup guide (legacy, maintained for consistency with AGENTS.md). |
+| **`docs/getting-started.md`** | Python SDK examples and walkthroughs. |
+
 ## Quick Start
 
 If you already have a SpacetimeDB instance with the memory module published (see [Setup](#setup) if you don't):
@@ -92,7 +105,7 @@ Additional features inspired by many projects (data model, schedules, CLI design
 │                                                                     │
 │  ┌──────────────────────────────────────────────┐                   │
 │  │  spacetime-llm proxy (:4000) — Embeddings     │                   │
-│  │  (baai/bge-m3 → NVIDIA NIM, 1024d)             │                   │
+│  │  (bge-m3 → NVIDIA NIM, 1024d)             │                   │
 │  └──────────────────────────────────────────────┘                   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -278,7 +291,7 @@ stmem --help
 ```bash
 export OPENAI_API_KEY=<your-key>
 export OPENAI_BASE_URL=http://127.0.0.1:4000/v1
-export EMBEDDING_MODEL=baai/bge-m3
+export EMBEDDING_MODEL=bge-m3
 ```
 The embedding proxy at `127.0.0.1:4000` forwards to NVIDIA NIM (bge-m3, 1024-dim). See [CONFIG.md](CONFIG.md) for all env vars.
 
@@ -323,7 +336,7 @@ All env vars are documented in [CONFIG.md](CONFIG.md). Key ones:
 | `SPACETIMEDB_DB` | `spacetime-memory` | Database identity hex |
 | `OPENAI_API_KEY` | *(none)* | API key for embeddings + LLM |
 | `OPENAI_BASE_URL` | `http://127.0.0.1:4000/v1` | OpenAI-compatible endpoint |
-| `EMBEDDING_MODEL` | `baai/bge-m3` | Embedding model name |
+| `EMBEDDING_MODEL` | `bge-m3` | Embedding model name |
 
 ## Features
 
