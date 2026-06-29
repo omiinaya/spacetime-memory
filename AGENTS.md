@@ -182,3 +182,187 @@ automatically available without importing the SDK:
 ---
 
 > *The tedious part of maintaining a knowledge base is the bookkeeping. LLMs don't get bored, don't forget to update a cross-reference, and can touch 15 files in one pass. The wiki stays maintained because the cost of maintenance is near zero.*
+
+---
+
+# Development Guide for Agent Contributors
+
+> *This section tells AI agents how to develop, build, test, and contribute to the Spacetime Memory project itself — not how to use the wiki.*
+
+## Workspace Layout
+
+```
+spacetime-memory/
+├── server/
+│   ├── spacetimedb/              # SpacetimeDB Rust WASM module
+│   │   ├── src/lib.rs            # Module entrypoint, ~162 reducers
+│   │   ├── src/memory.rs         # Memory CRUD reducers
+│   │   ├── src/knowledge_graph.rs # KG node/edge/community reducers
+│   │   ├── src/note.rs           # Note/wikilink reducers
+│   │   ├── src/query.rs          # Search and query reducers
+│   │   ├── src/hybrid_query.rs   # Multi-strategy search fusion
+│   │   ├── src/replication.rs    # CDC / delta sync
+│   │   ├── src/consolidation.rs  # Dedup, decay, maintenance
+│   │   ├── src/change_event.rs   # Change tracking
+│   │   ├── src/retrieval.rs      # Retrieval helpers
+│   │   └── Cargo.toml            # Rust deps (spacetimedb v2.6, serde, sha2, etc.)
+│   ├── tantivy-sidecar/          # BM25 full-text search sidecar (Rust, port 9091)
+│   └── mcp/                      # MCP server (Python, 133+ tools)
+├── sdk/
+│   └── python/                   # Python SDK + CLI + MCP
+│       ├── spacetime_memory/
+│       │   ├── client.py         # Core Client (~247 unit tests, 2488+ lines)
+│       │   ├── compounder.py     # Knowledge Compounder (LLM Wiki ingestion)
+│       │   ├── sdks/             # 6 drop-in adapters (mem0, zep, graphiti, etc.)
+│       │   ├── agent_orchestrator.py
+│       │   └── metrics.py / tracer.py  # Observability
+│       ├── tests/                # ~3,319 collected tests
+│       ├── pyproject.toml        # Build config, ruff/pytest settings
+│       └── setup.py              # Legacy setup (kept for compat)
+├── cli/
+│   └── stmem.py                  # CLI tool (37 subcommands, 3509 lines)
+├── client/                       # React frontend (optional)
+├── scripts/                      # Benchmarks, eval, replication daemon
+├── docs/                         # Documentation (development.md, api/, usage/)
+├── tests/                        # Top-level integration tests
+└── data/                         # Runtime data (tantivy indexes, eval data)
+```
+
+## Build Commands
+
+| Command | What | When |
+|---------|------|------|
+| `make build-module` | Build Rust WASM module (release) | After changing `server/spacetimedb/src/` |
+| `make install-sdk` | `pip install -e sdk/python` | First setup, after pulling new deps |
+| `make setup` | install-sdk + build-module | Fresh clone setup |
+| `spacetime publish <name> -p server/spacetimedb/ --yes` | Deploy module to STDB | After a successful build |
+| `cd server/spacetimedb && cargo build --target wasm32-unknown-unknown --release` | Raw cargo build | Debugging Rust compilation |
+| `cd sdk/python && pip install -e ".[dev]"` | Install dev extras (pytest, ruff) | Before running tests/lint |
+
+## Test Commands
+
+| Command | Scope | Requires STDB? |
+|---------|-------|:--------------:|
+| `make test-unit` | Python unit tests (`-m unit`) | ❌ No |
+| `make test` | Full suite (unit + integration) | ✅ Yes (:3001) |
+| `make test-integration` | Integration tests only | ✅ Yes (:3001) |
+| `make test-rust` | Rust `cargo test --lib` | ❌ No (host target) |
+| `make test-all` | ALL Python tests (no filter) | ✅ Yes |
+| `make test-frontend` | Frontend vitest | ❌ No |
+| `make test-e2e` | Playwright E2E | ✅ Yes |
+| `make smoke` | E2E smoke test | ✅ Yes (:3001) |
+| `make ci` | Full local CI (Rust + Python + TS) | Varies |
+| `make bench` | Performance benchmark | ✅ Yes (+ embedder) |
+| `pytest -m unit -v` | Quick unit test pass | ❌ No |
+
+**Test markers** (defined in `sdk/python/pyproject.toml`):
+- `unit` — Mocks HTTP, no SpacetimeDB needed
+- `integration` — Requires a running SpacetimeDB on `localhost:3001`
+- `embedder` — Also needs the embedding sidecar on `:9090`
+
+## Code Conventions
+
+### Python
+- **PEP 8** with ruff formatter (line length 100, double quotes)
+- **Type hints** on every function signature (`from __future__ import annotations`)
+- **Google-style docstrings** with `Args:`, `Returns:`, `Raises:`, `Example:` sections
+- **Imports**: stdlib → third-party → local, one blank line between groups
+- **Prefer** `pathlib.Path` over `os.path`
+- **Private helpers** use `def _name()` convention
+- **No bare `except:`** — catch specific exceptions or use `except Exception:`
+- **No `print()`** in production — use `logger` from `configure_logging()`
+
+### Rust
+- Standard `rustfmt` formatting — run `cargo fmt` before committing
+- Run `cargo clippy` for lint
+- Writes through reducers only (no raw SQL DML)
+- Reads through `query_table` reducer for private tables
+- Use `ctx.timestamp` (not `SystemTime::now()`), `ctx.rng()` (not `OsRng`)
+- Return `Result<(), String>` from all reducers
+
+### Commit Messages
+```
+<area>: <short imperative description>
+
+<optional body explaining what and why, not how>
+```
+Examples: `cli: add replication add-peer command`, `sdk(client): add get_memory_history method`, `server(replication): handle conflict resolution on insert`
+
+## Developer Workflow
+
+### Adding a New Reducer (Server-Side)
+1. Define the `#[reducer]` function in the appropriate Rust file (e.g. `memory.rs`)
+2. Build: `make build-module`
+3. Publish: `spacetime publish <name> -p server/spacetimedb/ --yes`
+4. Add a corresponding Python method in `client.py` using `self._call()`
+5. Wire a CLI command in `stmem.py` if user-facing
+6. Write pytest unit test (mock the HTTP call) and integration test
+
+### Adding a New Python SDK Method
+1. Add method to `Client` class in `client.py`
+2. If it's an LLM Wiki operation, also add to `Compounder` in `compounder.py`
+3. Add unit test in `tests/test_client.py` or `tests/test_compounder.py`
+4. Add CLI command in `cli/stmem.py`
+5. Verify via `make test-unit`
+
+### Adding a New Drop-in Adapter
+1. Create `sdk/python/spacetime_memory/sdks/<name>.py`
+2. Subclass or wrap the target library's API surface
+3. Export in `sdk/python/spacetime_memory/sdks/__init__.py`
+4. Add tests in `sdk/python/tests/`
+5. Run `compare-upstream.py` to verify signature parity
+
+### Before Opening a PR
+- [ ] `make test-unit` passes
+- [ ] `cd sdk/python && ruff check .` passes (no errors)
+- [ ] `cd server/spacetimedb && cargo fmt --check && cargo clippy` (no new warnings)
+- [ ] `cd sdk/python && python -m compileall spacetime_memory/` (no syntax errors)
+- [ ] Documentation updated (AGENTS.md, docs/development.md, or README.md as appropriate)
+- [ ] Run `make smoke` if a live STDB is available
+
+## Task-to-File Mapping
+
+| What you want to change | Files to edit |
+|-------------------------|--------------|
+| **SpacetimeDB schema / new table** | `server/spacetimedb/src/lib.rs` (table struct + reducer), plus relevant domain file (`memory.rs`, `note.rs`, etc.) |
+| **Rust reducer logic** | `server/spacetimedb/src/<domain>.rs` (e.g. `memory.rs` for store/update/delete memories) |
+| **Search behavior** | `server/spacetimedb/src/hybrid_query.rs` (fusion logic), `server/spacetimedb/src/query.rs` (query routing), `server/spacetimedb/src/retrieval.rs` (helpers) |
+| **Python SDK client API** | `sdk/python/spacetime_memory/client.py` |
+| **Knowledge Compounder / LLM Wiki** | `sdk/python/spacetime_memory/compounder.py` |
+| **Drop-in adapter** | `sdk/python/spacetime_memory/sdks/<name>.py` |
+| **CLI command** | `cli/stmem.py` |
+| **MCP tool** | `server/mcp/main.py` |
+| **Agent wiki schema / workflow** | `AGENTS.md` |
+| **Documentation** | `docs/development.md`, `docs/usage/*.md`, or `README.md` |
+| **CI / GitHub Actions** | `.github/workflows/ci.yml`, `.github/workflows/publish.yml` |
+| **Docker / deployment** | `Dockerfile`, `docker-compose.yml`, `DEPLOYMENT.md` |
+| **Python dependencies** | `sdk/python/pyproject.toml` |
+| **Rust dependencies** | `server/spacetimedb/Cargo.toml` |
+| **Benchmarks** | `scripts/retrieval_benchmark.py`, `scripts/weight_tune.py` |
+| **Smoke test** | `sdk/python/tests/smoke_test.py` |
+
+## CI Pipeline
+
+The project runs **4 CI workflows** on every PR/push to `main`:
+
+| Workflow | What it does | Runs on |
+|----------|-------------|---------|
+| **Rust** | `cargo build --release` + `cargo test` | Host target (x86_64) |
+| **Rust Integration** | Build WASM + integration tests against live in-memory STDB | wasm32 + x86_64 |
+| **Python SDK** | Ruff lint + format check + compileall + unit tests on Python 3.11/3.12 | No STDB needed |
+| **Python Integration** | Build WASM + run `-m integration` and concurrency tests | Live STDB |
+
+To simulate CI locally: `make ci`
+
+## Quick Start for New Contributors
+
+```bash
+git clone https://github.com/omiinaya/spacetime-memory.git
+cd spacetime-memory
+make setup                                            # install SDK + build module
+spacetime start --listen-addr 0.0.0.0:3001 &         # start STDB
+spacetime publish spacetime-memory -p server/spacetimedb/ --yes  # deploy module
+make test-unit                                        # verify setup (no STDB needed)
+pip install -e "sdk/python[dev]"                      # dev deps (ruff, pytest)
+cd sdk/python && ruff check .                         # lint check
+```
