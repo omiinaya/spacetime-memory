@@ -172,6 +172,7 @@ class SessionContext(BaseModel):
     peer_card: list[str] | None = None
 
     def __len__(self) -> int:
+        """Return the number of items."""
         return len(self.messages)
 
 
@@ -210,6 +211,7 @@ class Conclusion:
         session_id: str | None = None,
         created_at: datetime.datetime | None = None,
     ):
+        """Initialize the store/reference."""
         self.id = id
         self.content = content
         self.observer_id = observer_id
@@ -219,6 +221,7 @@ class Conclusion:
 
     @classmethod
     def from_api_response(cls, data: ConclusionResponse) -> Conclusion:
+        """Create an instance from an API response dict."""
         return cls(
             id=data.id,
             content=data.content,
@@ -229,6 +232,7 @@ class Conclusion:
         )
 
     def __repr__(self) -> str:
+        """String representation for debugging."""
         return (
             f"Conclusion(id='{self.id[:8]}...', observer='{self.observer_id}', "
             f"observed='{self.observed_id}', content='{self.content[:50]}...')"
@@ -281,6 +285,7 @@ class SyncPage(Generic[T, U]):
         size: int | None = None,
         pages: int | None = None,
     ):
+        """Initialize the store/reference."""
         if data is not None:
             self.items = data.get("items", [])
             self.total = data.get("total")
@@ -295,15 +300,19 @@ class SyncPage(Generic[T, U]):
             self.pages = pages
 
     def __iter__(self):
+        """Iterate over items."""
         return iter(self.items)
 
     def __getitem__(self, index):
+        """Get an item by index or key."""
         return self.items[index]
 
     def __len__(self) -> int:
+        """Return the number of items."""
         return len(self.items)
 
     def has_next_page(self) -> bool:
+        """Check if there are more results to paginate."""
         if self.page is not None and self.pages is not None:
             return self.page < self.pages
         return False
@@ -328,6 +337,7 @@ class Message:
         created_at: datetime.datetime | None = None,
         token_count: int = 0,
     ):
+        """Initialize the store/reference."""
         self.id = id
         self.content = content
         self.peer_id = peer_id
@@ -339,6 +349,7 @@ class Message:
 
     @classmethod
     def from_api_response(cls, data: MessageResponse) -> Message:
+        """Create an instance from an API response dict."""
         return cls(
             id=data.id,
             content=data.content,
@@ -351,6 +362,7 @@ class Message:
         )
 
     def __repr__(self) -> str:
+        """String representation for debugging."""
         return f"Message(id='{self.id[:8]}...', peer='{self.peer_id}', content='{self.content[:50]}...')"
 
 
@@ -371,6 +383,7 @@ class Peer:
         configuration: PeerConfig | None = None,
         created_at: datetime.datetime | None = None,
     ):
+        """Initialize the store/reference."""
         self._id = peer_id
         self._honcho = honcho
         self._ws_id = honcho._ws_id
@@ -380,18 +393,22 @@ class Peer:
 
     @property
     def id(self) -> str:  # noqa: A003
+        """The unique identifier."""
         return self._id
 
     @property
     def metadata(self) -> dict[str, object] | None:
+        """The resource metadata."""
         return self._metadata
 
     @property
     def configuration(self) -> PeerConfig | None:
+        """Get the current configuration."""
         return self._configuration
 
     @property
     def created_at(self) -> datetime.datetime | None:
+        """The creation timestamp."""
         return self._created_at
 
     def message(
@@ -468,6 +485,7 @@ class Peer:
         )
 
         def _generator():
+            """Generator."""
             if response:
                 yield response
 
@@ -683,22 +701,28 @@ class Peer:
     # -- Metadata / Config / Refresh ------------------------------------------
 
     def get_metadata(self) -> dict[str, object]:
+        """Get metadata associated with this resource."""
         return self._metadata
 
     def set_metadata(self, metadata: dict[str, object]) -> None:
+        """Set metadata for this resource."""
         self._metadata = metadata
 
     def get_configuration(self) -> PeerConfig:
+        """Get the configuration for this resource."""
         return self._configuration or PeerConfig()
 
     def set_configuration(self, configuration: PeerConfig) -> None:
+        """Set the configuration for this resource."""
         self._configuration = configuration
 
     def refresh(self) -> None:
+        """Refresh the resource data from the server."""
         pass
 
     @property
     def aio(self) -> PeerAio:
+        """Get the async I/O session for async operations."""
         return PeerAio(self)
 
     # -- Conclusions -----------------------------------------------------------
@@ -738,6 +762,7 @@ class PeerAio:
     """Async wrapper for Peer — uses asyncio.to_thread for sync SpacetimeDB calls."""
 
     def __init__(self, peer: Peer) -> None:
+        """Initialize the store/reference."""
         self._peer = peer
 
     async def message(
@@ -748,6 +773,7 @@ class PeerAio:
         configuration: dict[str, Any] | None = None,
         created_at: datetime.datetime | str | None = None,
     ) -> MessageCreateParams:
+        """Access the Message sub-resource."""
         return await asyncio.to_thread(
             self._peer.message,
             content,
@@ -764,6 +790,7 @@ class PeerAio:
         session: Session | str | None = None,
         reasoning_level: Literal["minimal", "low", "medium", "high", "max"] | None = None,
     ) -> str | None:
+        """Send a chat message."""
         return await asyncio.to_thread(
             self._peer.chat,
             query,
@@ -778,6 +805,7 @@ class PeerAio:
         filters: dict[str, object] | None = None,
         limit: int = 10,
     ) -> list[Message]:
+        """Search across resources."""
         return await asyncio.to_thread(
             self._peer.search,
             query,
@@ -793,6 +821,7 @@ class PeerAio:
         size: int = 50,
         reverse: bool = False,
     ) -> SyncPage[SessionResponse, Session]:
+        """Access the Sessions sub-resource."""
         return await asyncio.to_thread(
             self._peer.sessions,
             filters=filters,
@@ -802,18 +831,23 @@ class PeerAio:
         )
 
     async def get_metadata(self) -> dict[str, object]:
+        """Get metadata associated with this resource."""
         return await asyncio.to_thread(self._peer.get_metadata)
 
     async def set_metadata(self, metadata: dict[str, object]) -> None:
+        """Set metadata for this resource."""
         return await asyncio.to_thread(self._peer.set_metadata, metadata)
 
     async def get_configuration(self) -> PeerConfig:
+        """Get the configuration for this resource."""
         return await asyncio.to_thread(self._peer.get_configuration)
 
     async def set_configuration(self, configuration: PeerConfig) -> None:
+        """Set the configuration for this resource."""
         return await asyncio.to_thread(self._peer.set_configuration, configuration)
 
     async def refresh(self) -> None:
+        """Refresh the resource data from the server."""
         return await asyncio.to_thread(self._peer.refresh)
 
     async def chat_stream(
@@ -824,6 +858,7 @@ class PeerAio:
         session: Session | str | None = None,
         reasoning_level: Literal["minimal", "low", "medium", "high", "max"] | None = None,
     ):
+        """Send a chat message and stream the response."""
         return await asyncio.to_thread(
             self._peer.chat_stream,
             query,
@@ -833,6 +868,7 @@ class PeerAio:
         )
 
     async def get_card(self, target: str | None = None) -> dict:
+        """Get the card/display info."""
         return await asyncio.to_thread(self._peer.get_card, target=target)
 
     async def representation(
@@ -845,6 +881,7 @@ class PeerAio:
         include_most_frequent: int | None = None,
         max_conclusions: int | None = None,
     ) -> str:
+        """Get the data representation."""
         return await asyncio.to_thread(
             self._peer.representation,
             session=session,
@@ -867,6 +904,7 @@ class PeerAio:
         include_most_frequent: int | None = None,
         max_conclusions: int | None = None,
     ) -> PeerContextResponse:
+        """Access the context sub-resource."""
         return await asyncio.to_thread(
             self._peer.context,
             target=target,
@@ -891,6 +929,7 @@ class ConclusionScope:
     """
 
     def __init__(self, honcho: Honcho, observer: Peer, observed: Peer) -> None:
+        """Initialize the store/reference."""
         self._honcho = honcho
         self.observer = observer
         self.observed = observed
@@ -1074,6 +1113,7 @@ class ConclusionScope:
 
     @property
     def aio(self) -> ConclusionScopeAio:
+        """Get the async I/O session for async operations."""
         return ConclusionScopeAio(self)
 
 
@@ -1081,6 +1121,7 @@ class ConclusionScopeAio:
     """Async wrapper for ConclusionScope."""
 
     def __init__(self, scope: ConclusionScope) -> None:
+        """Initialize the store/reference."""
         self._scope = scope
 
     async def list(
@@ -1091,6 +1132,7 @@ class ConclusionScopeAio:
         *,
         reverse: bool = False,
     ) -> SyncPage:
+        """List all items."""
         return await asyncio.to_thread(
             self._scope.list,
             page=page,
@@ -1105,6 +1147,7 @@ class ConclusionScopeAio:
         top_k: int = 10,
         distance: float | None = None,
     ) -> list[Conclusion]:
+        """Query items by criteria."""
         return await asyncio.to_thread(
             self._scope.query,
             query,
@@ -1113,12 +1156,14 @@ class ConclusionScopeAio:
         )
 
     async def delete(self, conclusion_id: str) -> None:
+        """Delete this resource."""
         return await asyncio.to_thread(self._scope.delete, conclusion_id)
 
     async def create(
         self,
         conclusions: list[ConclusionCreateParams | dict],
     ) -> list[Conclusion]:
+        """Create a new resource."""
         return await asyncio.to_thread(self._scope.create, conclusions)
 
     async def representation(
@@ -1129,6 +1174,7 @@ class ConclusionScopeAio:
         include_most_frequent: int | None = None,
         max_conclusions: int | None = None,
     ) -> str:
+        """Get the data representation."""
         return await asyncio.to_thread(
             self._scope.representation,
             search_query=search_query,
@@ -1157,6 +1203,7 @@ class Session:
         created_at: datetime.datetime | None = None,
         is_active: bool | None = None,
     ):
+        """Initialize the store/reference."""
         self._id = session_id
         self._honcho = honcho
         self._ws_id = honcho._ws_id
@@ -1169,22 +1216,27 @@ class Session:
 
     @property
     def id(self) -> str:  # noqa: A003
+        """The unique identifier."""
         return self._id
 
     @property
     def metadata(self) -> dict[str, object] | None:
+        """The resource metadata."""
         return self._metadata
 
     @property
     def configuration(self) -> SessionConfiguration | None:
+        """Get the current configuration."""
         return self._configuration
 
     @property
     def created_at(self) -> datetime.datetime | None:
+        """The creation timestamp."""
         return self._created_at
 
     @property
     def is_active(self) -> bool | None:
+        """Is active."""
         return self._is_active
 
     def add_peers(self, peers: Any | list[Any]) -> None:
@@ -1388,15 +1440,19 @@ class Session:
     # -- Metadata / Config ----------------------------------------------------
 
     def get_metadata(self) -> dict[str, object]:
+        """Get metadata associated with this resource."""
         return self._metadata
 
     def set_metadata(self, metadata: dict[str, object]) -> None:
+        """Set metadata for this resource."""
         self._metadata = metadata
 
     def get_configuration(self) -> SessionConfiguration:
+        """Get the configuration for this resource."""
         return self._configuration or SessionConfiguration()
 
     def set_configuration(self, configuration: SessionConfiguration) -> None:
+        """Set the configuration for this resource."""
         self._configuration = configuration
 
     # -- Peer management ------------------------------------------------------
@@ -1527,6 +1583,7 @@ class Session:
 
     @property
     def aio(self) -> SessionAio:
+        """Get the async I/O session for async operations."""
         return SessionAio(self)
 
 
@@ -1534,18 +1591,22 @@ class SessionAio:
     """Async wrapper for Session — uses asyncio.to_thread for sync SpacetimeDB calls."""
 
     def __init__(self, session: Session) -> None:
+        """Initialize the store/reference."""
         self._session = session
 
     async def add_peers(self, peers: Any | list[Any]) -> None:
+        """Add peers."""
         return await asyncio.to_thread(self._session.add_peers, peers)
 
     async def peers(self) -> list[Peer]:
+        """Access the Peers sub-resource."""
         return await asyncio.to_thread(self._session.peers)
 
     async def add_messages(
         self,
         messages: MessageCreateParams | list[MessageCreateParams],
     ) -> list[Message]:
+        """Add messages."""
         return await asyncio.to_thread(self._session.add_messages, messages)
 
     async def messages(
@@ -1556,6 +1617,7 @@ class SessionAio:
         size: int = 50,
         reverse: bool = False,
     ) -> SyncPage[MessageResponse, Message]:
+        """Messages."""
         return await asyncio.to_thread(
             self._session.messages,
             filters=filters,
@@ -1570,6 +1632,7 @@ class SessionAio:
         filters: dict[str, object] | None = None,
         limit: int = 10,
     ) -> list[Message]:
+        """Search across resources."""
         return await asyncio.to_thread(
             self._session.search,
             query,
@@ -1584,6 +1647,7 @@ class SessionAio:
         tokens: int | None = None,
         **kwargs: Any,
     ) -> SessionContext:
+        """Access the context sub-resource."""
         return await asyncio.to_thread(
             self._session.context,
             summary=summary,
@@ -1592,45 +1656,59 @@ class SessionAio:
         )
 
     async def summaries(self) -> SessionSummaries:
+        """Summaries."""
         return await asyncio.to_thread(self._session.summaries)
 
     async def delete(self) -> None:
+        """Delete this resource."""
         return await asyncio.to_thread(self._session.delete)
 
     async def clone(self, *, message_id: str | None = None) -> Session:
+        """Clone."""
         return await asyncio.to_thread(self._session.clone, message_id=message_id)
 
     async def refresh(self) -> None:
+        """Refresh the resource data from the server."""
         return await asyncio.to_thread(self._session.refresh)
 
     async def get_metadata(self) -> dict[str, object]:
+        """Get metadata associated with this resource."""
         return await asyncio.to_thread(self._session.get_metadata)
 
     async def set_metadata(self, metadata: dict[str, object]) -> None:
+        """Set metadata for this resource."""
         return await asyncio.to_thread(self._session.set_metadata, metadata)
 
     async def get_configuration(self) -> SessionConfiguration:
+        """Get the configuration for this resource."""
         return await asyncio.to_thread(self._session.get_configuration)
 
     async def set_configuration(self, configuration: SessionConfiguration) -> None:
+        """Set the configuration for this resource."""
         return await asyncio.to_thread(self._session.set_configuration, configuration)
 
     async def set_peers(self, peers: Any | list[Any]) -> None:
+        """Set peers."""
         return await asyncio.to_thread(self._session.set_peers, peers)
 
     async def remove_peers(self, peers: Any | list[Any]) -> None:
+        """Remove peers."""
         return await asyncio.to_thread(self._session.remove_peers, peers)
 
     async def get_peer_configuration(self, peer: Peer | str) -> SessionPeerConfig:
+        """Get peer configuration."""
         return await asyncio.to_thread(self._session.get_peer_configuration, peer)
 
     async def set_peer_configuration(self, peer: Peer | str, config: SessionPeerConfig) -> None:
+        """Set peer configuration."""
         return await asyncio.to_thread(self._session.set_peer_configuration, peer, config)
 
     async def get_message(self, message_id: str) -> Message | None:
+        """Get message."""
         return await asyncio.to_thread(self._session.get_message, message_id)
 
     async def update_message(self, message_id: str, metadata: dict[str, object]) -> None:
+        """Update message."""
         return await asyncio.to_thread(self._session.update_message, message_id, metadata)
 
 
@@ -1670,6 +1748,7 @@ class Honcho:
         stdb_port: int | None = None,
         stdb_database: str | None = None,
     ):
+        """Initialize the store/reference."""
         import hashlib
 
         self._ws_id = workspace_id or os.environ.get("HONCHO_WORKSPACE_ID", "default")
@@ -1700,10 +1779,12 @@ class Honcho:
 
     @property
     def configuration(self) -> WorkspaceConfiguration | None:
+        """Get the current configuration."""
         return WorkspaceConfiguration()
 
     @property
     def base_url(self) -> str:
+        """Base url."""
         return self._base_url
 
     # -- Peer methods ---------------------------------------------------------
@@ -1986,18 +2067,23 @@ class Honcho:
     # -- Metadata / Config / Refresh ------------------------------------------
 
     def get_metadata(self) -> dict[str, object]:
+        """Get metadata associated with this resource."""
         return self._metadata
 
     def set_metadata(self, metadata: dict[str, object]) -> None:
+        """Set metadata for this resource."""
         self._metadata = metadata
 
     def get_configuration(self) -> WorkspaceConfiguration:
+        """Get the configuration for this resource."""
         return self._configuration
 
     def set_configuration(self, configuration: WorkspaceConfiguration) -> None:
+        """Set the configuration for this resource."""
         self._configuration = configuration
 
     def refresh(self) -> None:
+        """Refresh the resource data from the server."""
         pass
 
     # -- Close ----------------------------------------------------------------
@@ -2010,6 +2096,7 @@ class Honcho:
 
     @property
     def aio(self) -> HonchoAio:
+        """Get the async I/O session for async operations."""
         return HonchoAio(self)
 
 
@@ -2017,6 +2104,7 @@ class HonchoAio:
     """Async wrapper for Honcho — uses asyncio.to_thread for sync SpacetimeDB calls."""
 
     def __init__(self, honcho: Honcho) -> None:
+        """Initialize the store/reference."""
         self._honcho = honcho
 
     async def peer(
@@ -2026,6 +2114,7 @@ class HonchoAio:
         metadata: dict[str, object] | None = None,
         configuration: PeerConfig | None = None,
     ) -> Peer:
+        """Peer."""
         return await asyncio.to_thread(
             self._honcho.peer,
             id,
@@ -2041,6 +2130,7 @@ class HonchoAio:
         size: int = 50,
         reverse: bool = False,
     ) -> SyncPage[PeerResponse, Peer]:
+        """Access the Peers sub-resource."""
         return await asyncio.to_thread(
             self._honcho.peers,
             filters=filters,
@@ -2057,6 +2147,7 @@ class HonchoAio:
         configuration: SessionConfiguration | None = None,
         peers: Any = None,
     ) -> Session:
+        """Session."""
         return await asyncio.to_thread(
             self._honcho.session,
             id,
@@ -2073,6 +2164,7 @@ class HonchoAio:
         size: int = 50,
         reverse: bool = False,
     ) -> SyncPage[SessionResponse, Session]:
+        """Access the Sessions sub-resource."""
         return await asyncio.to_thread(
             self._honcho.sessions,
             filters=filters,
@@ -2087,6 +2179,7 @@ class HonchoAio:
         filters: dict[str, object] | None = None,
         limit: int = 10,
     ) -> list[Message]:
+        """Search across resources."""
         return await asyncio.to_thread(
             self._honcho.search,
             query,
@@ -2102,6 +2195,7 @@ class HonchoAio:
         size: int = 50,
         reverse: bool = False,
     ) -> SyncPage[WorkspaceResponse, str]:
+        """Workspaces."""
         return await asyncio.to_thread(
             self._honcho.workspaces,
             filters=filters,
@@ -2111,6 +2205,7 @@ class HonchoAio:
         )
 
     async def delete_workspace(self, workspace_id: str | None = None) -> None:
+        """Delete workspace."""
         return await asyncio.to_thread(self._honcho.delete_workspace, workspace_id)
 
     async def queue_status(
@@ -2119,6 +2214,7 @@ class HonchoAio:
         sender: Any = None,
         session: Any = None,
     ) -> QueueStatusResponse:
+        """Queue status."""
         return await asyncio.to_thread(
             self._honcho.queue_status,
             observer=observer,
@@ -2132,6 +2228,7 @@ class HonchoAio:
         session: Any | None = None,
         observed: Any | None = None,
     ) -> None:
+        """Schedule dream."""
         return await asyncio.to_thread(
             self._honcho.schedule_dream,
             observer,
@@ -2140,21 +2237,27 @@ class HonchoAio:
         )
 
     async def close(self) -> None:
+        """Close the connection and release resources."""
         return await asyncio.to_thread(self._honcho.close)
 
     async def get_metadata(self) -> dict[str, object]:
+        """Get metadata associated with this resource."""
         return await asyncio.to_thread(self._honcho.get_metadata)
 
     async def set_metadata(self, metadata: dict[str, object]) -> None:
+        """Set metadata for this resource."""
         return await asyncio.to_thread(self._honcho.set_metadata, metadata)
 
     async def get_configuration(self) -> WorkspaceConfiguration:
+        """Get the configuration for this resource."""
         return await asyncio.to_thread(self._honcho.get_configuration)
 
     async def set_configuration(self, configuration: WorkspaceConfiguration) -> None:
+        """Set the configuration for this resource."""
         return await asyncio.to_thread(self._honcho.set_configuration, configuration)
 
     async def refresh(self) -> None:
+        """Refresh the resource data from the server."""
         return await asyncio.to_thread(self._honcho.refresh)
 
 

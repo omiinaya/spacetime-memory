@@ -37,17 +37,20 @@ class EndpointStats:
 
     @property
     def avg_latency_ms(self) -> float:
+        """Average latency in milliseconds across all recorded calls."""
         if self.count == 0:
             return 0.0
         return round(self.total_latency_ms / self.count, 1)
 
     @property
     def error_rate(self) -> float:
+        """Error rate as a percentage of total calls."""
         if self.count == 0:
             return 0.0
         return round(self.errors / self.count * 100, 1)
 
     def record(self, latency_ms: float, is_error: bool = False) -> None:
+        """Record a single call's latency and error status."""
         self.count += 1
         self.total_latency_ms += latency_ms
         if latency_ms < self.min_latency_ms:
@@ -58,6 +61,7 @@ class EndpointStats:
             self.errors += 1
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize to a plain dict (JSON-serializable)."""
         return {
             "count": self.count,
             "errors": self.errors,
@@ -79,6 +83,7 @@ class MemoryStats:
     by_tier: dict[str, int] = field(default_factory=lambda: defaultdict(int))
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize to a plain dict (JSON-serializable)."""
         return {
             "total": self.total,
             "by_type": dict(self.by_type),
@@ -105,6 +110,7 @@ class MetricsCollector:
     """
 
     def __init__(self) -> None:
+        """Initialize an empty metrics collector."""
         self._endpoints: dict[str, EndpointStats] = defaultdict(EndpointStats)
         self._memory: MemoryStats = MemoryStats()
         self._start_time: float = time.monotonic()
@@ -165,9 +171,11 @@ class MetricsCollector:
     # ------------------------------------------------------------------
 
     def endpoint_stats(self, endpoint: str) -> EndpointStats:
+        """Get stats for a specific endpoint (or empty stats if not tracked)."""
         return self._endpoints.get(endpoint, EndpointStats())
 
     def uptime_seconds(self) -> float:
+        """Return seconds since this collector was created."""
         return time.monotonic() - self._start_time
 
     # ------------------------------------------------------------------
@@ -255,6 +263,7 @@ class MetricsCollector:
     # ------------------------------------------------------------------
 
     def _overall_error_rate(self) -> float:
+        """Compute error rate across all endpoints as a percentage."""
         total = sum(s.count for s in self._endpoints.values())
         errors = sum(s.errors for s in self._endpoints.values())
         if total == 0:
@@ -263,6 +272,7 @@ class MetricsCollector:
 
     @staticmethod
     def _format_duration(seconds: float) -> str:
+        """Format seconds as a human-readable duration string (e.g. '2d 3h 15m 30s')."""
         parts = []
         days, seconds = divmod(int(seconds), 86400)
         hours, seconds = divmod(seconds, 3600)
