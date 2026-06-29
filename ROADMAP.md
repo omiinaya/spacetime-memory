@@ -306,7 +306,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | LLM Wiki / Compounder | **97%** | 14 compounder methods, 62 tests, all MCP tools. |
 | Adapter Parity | **70%** | LangGraph/Zep/Graphiti solid. Hindsight 54%. Mem0/Honcho broken. |
 | Frontend / Web UI | **0%** | No code exists. Previous claim of "23 pages" was incorrect. |
-| Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. 60% docstrings. ~47 print() calls. |
+| Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. **93.9% docstring coverage** (1043/1111). 0 production print() calls. |
 | Test Coverage | **80%** | 247+ unit tests passing. Rust builds cleanly. Tantivy healthy (269 indexes). |
 | Infrastructure | **70%** | CI exists. Tantivy healthy (269 indexes). Embedder default fixed (9090→4000). WASM rebuilt (2.36MB). 168MB stale venv. |
 | **Weighted Overall** | **~75%** | **-22% from prior inflated score** |
@@ -358,7 +358,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 - **Adapter parity incomplete** — 4/6 verified, 1 partial (Hindsight 54%)
 - **Tantivy BM25 healthy** — 269 indexes, port 9091 responding
 - **47 `print()` calls in production** — ✅ **FIXED** — all converted to structured logging. 0 remaining.
-- **60% docstring coverage** — 40% undocumented
+- **93.9% docstring coverage** — 1043/1111 functions documented. All adapter files at 100%.
 - **Embedder URL default fixed** — CLI had stale `localhost:9090` (removed ONNX sidecar). Changed to `127.0.0.1:4000` (proxy). `stmem health` now reports "All systems healthy".
 - **168MB stale upstream venv** — `.upstream-venv/`
 - **Stale `MNEMOSYNE_*` env vars** — ✅ resolved (→ `STMEM_*`)
@@ -378,8 +378,8 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ✅ **FIXED** — `honcho` v2.0.0 is the correct package. Adapter verified. |
 | 8 | **30% reducers unguarded** — need auth review | **P3** | 2-3h | ⚠️ Needs audit |
 | 9 | **Hardcoded localhost defaults** — client.py uses localhost:3001/9090 | **P3** | 15min | ✅ **FIXED** — all defaults changed to 127.0.0.1 |
-| 10 | **47 `print()` calls** — no structured logging | **P3** | 1-2h | ⚠️ Code smell |
-| 11 | **61% docstring coverage** — 5 undocumented methods documented | **P3** | 2h | ⚠️ Ongoing |
+| 10 | **47 `print()` calls** — no structured logging | **P3** | 1-2h | ✅ **DONE** — all converted to structured logging |
+| 11 | **Docstring coverage 60%→93.9%** — 282 new docstrings added across 5 files. All adapters at 100%. | **P3** | 2h | ✅ **DONE** |
 | 12 | **PyPI publish** — deferred since v1.31.0 | **P4** | ~1h | ⏸️ Deferred |
 | 13 | **STDB ~2% fatal error rate** — concurrency stability | **P1** | 4-8h | 🧊 Blocked (no live STDB) |
 
@@ -396,7 +396,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | LLM Wiki / Compounder | **97%** | All 14 methods, 62 tests, full MCP coverage. |
 | Adapter Parity | **92%** | LangGraph 100%, Mem0 85%, Zep 90%, Graphiti 85%, Honcho 85%. **Hindsight 100%** (up from 54%). |
 | Frontend | **0%** | No web/ directory exists. |
-| Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Print() calls and 60% docstrings drag it down. |
+| Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Docstring coverage at **93.9%** (1043/1111). |
 | Test Coverage | **80%** | 247+ unit pass. Tantivy healthy (269 indexes). No e2e/deep marker. |
 | Infrastructure | **70%** | CI exists. Tantivy healthy (269 indexes). Embedder health check fixed (9090→4000). WASM rebuilt (2.36MB). Benchmark confirmed (81.3% P@5). 168MB stale venv. `stmem health` returns "All systems healthy". CLI `localhost` defaults fixed. |
 | **Competitive Positioning** | **90%** | External review confirms broadest feature set, unique moat (adapters, wiki, context packs, tours, contradiction checking). Only gaps: no benchmarks, no TS parity, no managed cloud, docs sprawl. |
@@ -414,7 +414,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 8. **P3: Review 49 unguarded reducers** — audit which need auth guards (2-3h)
 9. **P3: Replace `print()` with logging** — logging.Logger across all modules (1-2h) | ✅ **DONE** — all production print() calls converted to structured logging. 0 remaining.
 10. **P3: Fix localhost defaults** — change to 127.0.0.1 (15min) | ✅ **DONE**
-11. **P3: Improve docstring coverage** — target 80%+ (2h)
+11. **P3: Improve docstring coverage** — 60%→93.9% ✅ DONE (282 new docstrings)
 12. **P3: Clean up stale env vars** — ✅ resolved (`MNEMOSYNE_*` → `STMEM_*` with backward compat)
 13. **P4: PyPI publish** — push to PyPI (1h)
 14. **🧊: Rename `MNEMOSYNE_*` env vars** — ✅ resolved (backwards-compatible with deprecation warning)

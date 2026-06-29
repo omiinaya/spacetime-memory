@@ -8,13 +8,7 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Improve docstring coverage from 60% to 80%
-ROADMAP.md (June 28 audit) shows 545/900 functions have docstrings — 40%
-undocumented. Target 720/900 (80%) by adding docstrings to the most-used
-public methods first.
-Files: sdk/python/spacetime_memory/
-Difficulty: Medium
-Est: 1-2h
+*No PENDING items — all identified gaps addressed.*
 
 ## Deferred / Blocked
 
@@ -30,6 +24,15 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Improve docstring coverage from 60% to 93.9% (commit 86480360)
+Added 282 new docstrings across 5 files: graphiti.py (73), honcho.py (103), zep.py (88),
+ingest.py (8), metrics.py (10). Overall SDK coverage: 1043/1111 functions documented.
+All adapter files (graphiti/honcho/zep) now at 100%. Only small connector files below
+80% remain (discord/notion/rss/slack/twitter — under 7 functions each).
+Files: sdk/python/spacetime_memory/sdks/graphiti.py, honcho.py, zep.py, ingest.py, metrics.py
+Difficulty: Medium
+Est: 2h
 
 ### ✅ Fix 85 ruff lint errors in test files (this tick, commit 897af61d)
 Resolved 85 ruff lint errors across sdk/python/tests/ — 50 unused-variable (F841),
