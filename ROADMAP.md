@@ -264,7 +264,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | **Embedder URL** | ✅ **FIXED** | Default changed from `localhost:9090` (removed ONNX sidecar) to `127.0.0.1:4000` (proxy) |
 | **Host defaults** | ✅ **FIXED** | Changed from `localhost:3001` to `127.0.0.1:3001` (matching Python SDK) |
 | **Tests** | ✅ **44 vitest tests** — all passing (561ms). Full coverage: constructor, workspace, memory CRUD, KG, notes/wiki, profiles/facts, tours, sessions, tags, maintenance, error handling. |
-| **npm publish** | ❌ **NOT PUBLISHED** | Package.json is configured but no `.npmrc` or auth setup |
+| **npm publish** | ⚠️ **CONFIGURED** — `.github/workflows/npm-publish.yml` exists (trigger: `ts-v*` tag), `files: ["dist/"]` set in package.json. Needs `NPM_TOKEN` secret added to GitHub. |
 | **SQL injection** | ⚠️ **VULNERABLE** | Uses raw SQL via `esc()` helper for reads instead of reducers. Name from 2022-era STDB SQL API |
 | **Dependencies** | Minimal | Only `@types/node` + `typescript` dev deps. No runtime dependencies. |
 
@@ -308,7 +308,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | Frontend / Web UI | **0%** | No code exists. Previous claim of "23 pages" was incorrect. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. **93.9% docstring coverage** (1043/1111). 0 production print() calls. |
 | Test Coverage | **80%** | 247+ unit tests passing. Rust builds cleanly. Tantivy healthy (269 indexes). |
-| Infrastructure | **70%** | CI exists. Tantivy healthy (269 indexes). Embedder default fixed (9090→4000). WASM rebuilt (2.36MB). 168MB stale venv. |
+| Infrastructure | **70%** | CI exists (Rust, Python, TypeScript SDK). Tantivy healthy (269 indexes). Embedder default fixed (9090→4000). WASM rebuilt (2.36MB). 168MB stale venv. |
 | **Weighted Overall** | **~75%** | **-22% from prior inflated score** |
 
 ### What Changed Since June 22 (v1.32.0 → v1.35.0+322)
@@ -398,7 +398,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | Frontend | **0%** | No web/ directory exists. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Docstring coverage at **93.9%** (1043/1111). |
 | Test Coverage | **80%** | 247+ unit pass. Tantivy healthy (269 indexes). No e2e/deep marker. |
-| Infrastructure | **70%** | CI exists. Tantivy healthy (269 indexes). Embedder health check fixed (9090→4000). WASM rebuilt (2.36MB). Benchmark confirmed (81.3% P@5). 168MB stale venv. `stmem health` returns "All systems healthy". CLI `localhost` defaults fixed. |
+| Infrastructure | **75%** | CI exists (Rust, Python, TypeScript SDK). Tantivy healthy (269 indexes). Embedder health check fixed (9090→4000). WASM rebuilt (2.36MB). Benchmark confirmed (81.3% P@5). 168MB stale venv. `stmem health` returns "All systems healthy". CLI `localhost` defaults fixed. **npm publish workflow configured**. |
 | **Competitive Positioning** | **90%** | External review confirms broadest feature set, unique moat (adapters, wiki, context packs, tours, contradiction checking). Only gaps: no benchmarks, no TS parity, no managed cloud, docs sprawl. |
 | **Weighted Overall** | **~88%** | Adapters at 92%, docstrings 93.9%, auth 97.5%, TS SDK at 55% with test suite, all debt items closed except frontend, benchmarks, and bi-temporal facts. |
 
