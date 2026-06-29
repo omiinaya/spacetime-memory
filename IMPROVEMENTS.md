@@ -8,15 +8,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### Fix 85 ruff lint errors in test files (F841, E402, E731, E741)
-50 unused-variable (F841), 22 import-not-at-top (E402), 9 lambda-assignment (E731),
-6 ambiguous-variable-name (E741), 1 multiple-statements-on-one-line (E702) across
-sdk/python/tests/. Most are safe style fixes; unused variables should be reviewed
-for actual logic bugs before removal.
-Files: sdk/python/tests/
-Difficulty: Medium
-Est: 30min
-
 ### Improve docstring coverage from 60% to 80%
 ROADMAP.md (June 28 audit) shows 545/900 functions have docstrings — 40%
 undocumented. Target 720/900 (80%) by adding docstrings to the most-used
@@ -24,15 +15,6 @@ public methods first.
 Files: sdk/python/spacetime_memory/
 Difficulty: Medium
 Est: 1-2h
-
-### Update ROADMAP.md stale claims
-ROADMAP.md (June 28) says "0 ruff errors" (line 351) — but ruff check finds
-90 errors (85 in tests, 2 in MCP). Also says "~47 print() calls" (line 311)
-but all production print() calls have been converted to logging. Score/Python
-Quality section references resolved issues.
-Files: ROADMAP.md
-Difficulty: Easy
-Est: 10min
 
 ## Deferred / Blocked
 
@@ -48,6 +30,25 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ Fix 85 ruff lint errors in test files (this tick, commit 897af61d)
+Resolved 85 ruff lint errors across sdk/python/tests/ — 50 unused-variable (F841),
+22 import-not-at-top (E402), 9 lambda-assignment (E731), 6 ambiguous-variable-name (E741),
+1 multiple-statements-on-one-line (E702). 58 auto-fixed by ruff, 27 manual. All test
+suites passing.
+Files: sdk/python/tests/
+Difficulty: Medium
+Est: 30min
+
+### ✅ Complete Hindsight adapter parity (46/46 = 100%, commit 88bdb275)
+Added 18 missing methods: list_mental_models, get_mental_model, get_mental_model_history,
+update_mental_model, delete_mental_model, clear_mental_model, refresh_mental_model,
+list_directives, get_directive, update_directive, delete_directive, set_mission,
+set_reflect_mission, get_bank_config, update_bank_config, reset_bank_config + all async
+variants. Adapter parity 54%→100%.
+Files: sdk/python/spacetime_memory/sdks/hindsight.py
+Difficulty: Medium
+Est: 2-4h
 
 ### ✅ Fix 2 ruff E402 errors in MCP main.py (this tick)
 Moved `from mcp.server.fastmcp import FastMCP` and `from spacetime_memory import Client`
