@@ -10,8 +10,6 @@ and works the top pending item each tick.
 
 No pending TS SDK items — all memory methods, workspace management, mental models, and remaining gaps are now at parity with Python SDK for core CRUD operations.
 
-- **TS SDK: add `storeBatch` for batch memory storage** — Python SDK's `store_batch()` batch-embeds via proxy then calls `store_memory_batch` reducer. TS SDK `_embed()` exists but batch flow needs embedder URL config. Low priority — single `store()` works for 99% of use cases.
-
 ## Deferred / Blocked
 
 ### STDB 2% fatal error under heavy concurrent load
@@ -26,6 +24,17 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ TS SDK: add `storeBatch` for batch memory storage (this tick, commit a96cdd91)
+Added `storeBatch(workspaceId, items)` to TypeScript SDK client.ts — batch-embeds all
+items in one embedder call (``{texts: contents}``), then sends a single
+``store_memory_batch`` reducer with JSON-serialized payload. Indexes each stored
+memory with its embedding for hybrid search. Filters out empty items gracefully.
+4 new vitest tests: reducer call with correct payload, empty-item filtering,
+all-empty early return, index_entity after batch store. 58→62 TS tests passing.
+Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
+Difficulty: Medium
+Est: 20min
 
 ### ✅ TS SDK parity: add 6 missing memory methods + 7 tests (commit 83e7da8e)
 Added `updateMemory`, `rateMemory`, `consolidateMemories`, `expireMemories`, `getMemoryHistory`, and `searchDirectoryContents` to the TypeScript SDK client.ts. All follow existing patterns: 4 simple reducer calls, 1 SQL query, 1 reducer+SQL combo. Tests cover: correct reducer URLs, arg structures, 5-arg updateMemory with expiresAt, consolidate with JSON-stringified sourceIds, SQL query shapes, and reducer+SQL chaining for directory search. 58/58 TS tests passing (51 existing + 7 new). TS compiles with 0 errors. Build file updated to match.
@@ -798,5 +807,27 @@ Est: 5min
     internal helpers, differently-named equivalents like `health`/`health_check`,
     `reinforce`/`reinforce_memory`, `search`/`hybrid_search`). No new competitor
     features to adopt. No code-level TODO/FIXME markers.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: f1434645 — 3 files changed, +70/-1 lines.<｜end▁of▁thinking｜>
+|- **Backlog**: 0 PENDING items — backlog cleared.
+|- **Commit**: f1434645 — 3 files changed, +70/-1 lines.
+
+### Jun 29 (this tick) — Added TS SDK storeBatch for batch memory storage; backlog cleared
+|- **Completed**:
+|  - Added `storeBatch(workspaceId, items)` to TypeScript SDK client.ts — batch-embeds
+|    all items in one embedder call ({texts: contents}), sends store_memory_batch
+|    reducer, indexes each with its embedding. 4 vitest tests. 58→62 TS tests passing.
+|  - Committed + pushed as a96cdd91.
+|- **Cleanup**: Moved TS SDK storeBatch item from Pending → Recently Completed.
+|  Kept 10 items in Recently Completed (within 5-10 limit, no purge needed).
+|- **Research**:
+|  - Git log (7 days): 264+ commits, latest: a96cdd91 (this tick).
+|  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
+|  - mem0ai v2.0.8 (installed, not 2.0.10), zep-python v2.0.2, opentelemetry-sdk v1.43.0
+|    — all unchanged from last tick. langgraph not installed.
+|  - Deeper scan: ROADMAP score at Python Quality 96% / Infrastructure 78%. TS SDK now at
+|    62 tests covering all memory CRUD + compounder methods. Web UI exists as connection
+|    wizard only (App.tsx), no pages/ directory. No new competitor features to adopt.
+|    No new gaps identified beyond existing Deferred items.
+|  - Python deep tests: 1 pre-existing failure (test_batch_update_memories — mock
+|    assertion), unrelated to TS SDK changes.
+|- **Backlog**: 0 PENDING items — backlog cleared.
+|- **Commit**: a96cdd91 — 2 files changed, +234/-0 lines (client.ts, client.test.ts).
