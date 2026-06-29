@@ -108,6 +108,7 @@ class MemoryMessage:
         uuid: str | None = None,
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.role = role
         self.content = content
         self.created_at = created_at
@@ -119,6 +120,7 @@ class MemoryMessage:
         self.__dict__.update(kwargs)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the model to a plain dict."""
         d: dict[str, Any] = {"role": self.role, "content": self.content}
         if self.created_at is not None:
             d["created_at"] = self.created_at
@@ -167,6 +169,7 @@ class Memory:
         relevant_facts: list["Fact"] | None = None,
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.session_id = session_id
         self.messages = messages or []
         self.metadata = metadata or {}
@@ -175,6 +178,7 @@ class Memory:
         self.__dict__.update(kwargs)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the model to a plain dict."""
         return {
             "session_id": self.session_id,
             "messages": [m.to_dict() for m in self.messages],
@@ -206,6 +210,7 @@ class Session:
         uuid: str | None = None,
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.session_id = session_id
         self.metadata = metadata or {}
         self.created_at = created_at or ""
@@ -221,6 +226,7 @@ class Session:
         self.__dict__.update(kwargs)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the model to a plain dict."""
         d: dict[str, Any] = {
             "session_id": self.session_id,
             "metadata": self.metadata,
@@ -280,12 +286,14 @@ class MemorySearchResult:
         metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.message = message
         self.score = score
         self.metadata = metadata or {}
         self.__dict__.update(kwargs)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the model to a plain dict."""
         return {
             "message": self.message.to_dict() if self.message else None,
             "score": self.score,
@@ -309,6 +317,7 @@ class Fact:
         rating: float | None = None,
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.uuid = uuid
         self.fact = fact
         self.created_at = created_at or ""
@@ -316,6 +325,7 @@ class Fact:
         self.__dict__.update(kwargs)
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the model to a plain dict."""
         d: dict[str, Any] = {
             "uuid": self.uuid,
             "fact": self.fact,
@@ -373,6 +383,7 @@ class ZepClient:
         config: dict[str, Any] | None = None,
         token: str | None = None,
     ):
+        """Initialize the API resource wrapper."""
         self._client = Client(
             host=host,
             port=port,
@@ -1303,6 +1314,7 @@ class UserClient:
     """
 
     def __init__(self, client: Client):
+        """Initialize the API resource wrapper."""
         self._client = client
 
     def add(
@@ -1529,6 +1541,7 @@ class _MemoryProxy:
     """
 
     def __init__(self, client: "ZepClient") -> None:
+        """Initialize the API resource wrapper."""
         self._c = client  # owning ZepClient / Zep
 
     # -- Memory CRUD --------------------------------------------------------
@@ -1543,6 +1556,7 @@ class _MemoryProxy:
         fact_instruction: str | None = None,
         summary_instruction: str | None = None,
     ) -> dict[str, Any]:
+        """Add a new record."""
         return self._c.add_memory(
             session_id,
             messages,
@@ -1558,9 +1572,11 @@ class _MemoryProxy:
         limit: int = 10,
         min_rating: float = 0.0,
     ) -> dict[str, Any] | None:
+        """Get a single record by ID."""
         return self._c.get_memory(session_id, limit=limit, min_rating=min_rating)
 
     def delete(self, session_id: str) -> dict[str, Any]:
+        """Delete a record by ID."""
         return self._c.delete_memory(session_id)
 
     def search(
@@ -1573,6 +1589,7 @@ class _MemoryProxy:
         min_score: float | None = None,
         search_type: str = "similarity",
     ) -> list[MemorySearchResult]:
+        """Search memory/search results."""
         return self._c.search_memory(
             session_id,
             query,
@@ -1591,12 +1608,15 @@ class _MemoryProxy:
         *,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Add a fact to a user/session."""
         return self._c.add_fact(session_id, fact, metadata=metadata)
 
     def get_fact(self, fact_uuid: str) -> Fact:
+        """Get a fact by ID."""
         return self._c.get_fact(fact_uuid)
 
     def delete_fact(self, fact_uuid: str, **kwargs: Any) -> dict[str, Any]:
+        """Delete a fact by ID."""
         return self._c.delete_fact(fact_uuid, **kwargs)
 
     # -- Session management --------------------------------------------------
@@ -1607,9 +1627,11 @@ class _MemoryProxy:
         *,
         metadata: dict[str, Any] | None = None,
     ) -> Session:
+        """Create a new session."""
         return self._c.add_session(session_id, metadata=metadata)
 
     def get_session(self, session_id: str) -> Session | None:
+        """Get a session by ID."""
         return self._c.get_session(session_id)
 
     def list_sessions(
@@ -1622,6 +1644,7 @@ class _MemoryProxy:
         order_by: str = "created_at",
         asc: bool = False,
     ) -> list[Session]:
+        """List all sessions for a user."""
         return self._c.list_sessions(
             limit=limit,
             offset=offset,
@@ -1637,6 +1660,7 @@ class _MemoryProxy:
         *,
         limit: int = 10,
     ) -> list[Session]:
+        """Search sessions by criteria."""
         return self._c.search_sessions(query, limit=limit)
 
     def update_session(
@@ -1646,6 +1670,7 @@ class _MemoryProxy:
         metadata: dict[str, Any] | None = None,
         fact_rating_instruction: str | None = None,
     ) -> Session:
+        """Update session metadata."""
         return self._c.update_session(
             session_id,
             metadata=metadata,
@@ -1661,6 +1686,7 @@ class _MemoryProxy:
         limit: int | None = None,
         cursor: int | None = None,
     ) -> dict[str, Any]:
+        """Get messages for a session."""
         return self._c.get_session_messages(session_id, limit=limit, cursor=cursor)
 
     def get_session_message(
@@ -1668,6 +1694,7 @@ class _MemoryProxy:
         session_id: str,
         message_uuid: str,
     ) -> dict[str, Any]:
+        """Get a single message from a session."""
         return self._c.get_session_message(session_id, message_uuid)
 
     def update_message_metadata(
@@ -1676,6 +1703,7 @@ class _MemoryProxy:
         message_uuid: str,
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
+        """Update metadata on a message."""
         return self._c.update_message_metadata(session_id, message_uuid, metadata)
 
 
@@ -1683,6 +1711,7 @@ class _UserProxy:
     """Proxy for ``Zep.user`` — wraps UserClient methods."""
 
     def __init__(self, client: Client) -> None:
+        """Initialize the API resource wrapper."""
         self._inner = UserClient(client)
 
     def add(
@@ -1694,6 +1723,7 @@ class _UserProxy:
         last_name: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Add a new record."""
         return self._inner.add(
             user_id=user_id,
             email=email,
@@ -1703,6 +1733,7 @@ class _UserProxy:
         )
 
     def get(self, user_id: str) -> dict[str, Any]:
+        """Get a single record by ID."""
         return self._inner.get(user_id)
 
     def update(
@@ -1714,6 +1745,7 @@ class _UserProxy:
         last_name: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Update an existing record."""
         return self._inner.update(
             user_id,
             email=email,
@@ -1723,6 +1755,7 @@ class _UserProxy:
         )
 
     def delete(self, user_id: str) -> dict[str, Any]:
+        """Delete a record by ID."""
         return self._inner.delete(user_id)
 
     def list_ordered(
@@ -1731,12 +1764,14 @@ class _UserProxy:
         page_number: int = 1,
         page_size: int = 50,
     ) -> dict[str, Any]:
+        """List items in order."""
         return self._inner.list_ordered(
             page_number=page_number,
             page_size=page_size,
         )
 
     def get_sessions(self, user_id: str) -> list[dict[str, Any]]:
+        """Get all sessions for a user."""
         return self._inner.get_sessions(user_id)
 
 
@@ -1778,6 +1813,7 @@ class Zep(ZepClient):
         config: dict[str, Any] | None = None,
         token: str | None = None,
     ) -> None:
+        """Initialize the API resource wrapper."""
         super().__init__(host=host, port=port, config=config, token=token)
         self.memory = _MemoryProxy(self)
         self.user = _UserProxy(self._client)
@@ -1811,6 +1847,7 @@ class AsyncZepClient:
         config: dict[str, Any] | None = None,
         token: str | None = None,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self._sync = ZepClient(
             host=host,
             port=port,
@@ -1830,6 +1867,7 @@ class AsyncZepClient:
         fact_instruction: str | None = None,
         summary_instruction: str | None = None,
     ) -> dict[str, Any]:
+        """Add a memory to a session."""
         return await asyncio.to_thread(
             self._sync.add_memory,
             session_id,
@@ -1845,11 +1883,13 @@ class AsyncZepClient:
         limit: int = 10,
         min_rating: float = 0.0,
     ) -> dict[str, Any] | None:
+        """Get a memory by ID."""
         return await asyncio.to_thread(
             self._sync.get_memory, session_id, limit=limit, min_rating=min_rating
         )
 
     async def delete_memory(self, session_id: str) -> dict[str, Any]:
+        """Delete a memory by ID."""
         return await asyncio.to_thread(self._sync.delete_memory, session_id)
 
     async def search_memory(
@@ -1861,6 +1901,7 @@ class AsyncZepClient:
         min_score: float | None = None,
         search_type: str = "similarity",
     ) -> list[MemorySearchResult]:
+        """Search memories by query."""
         return await asyncio.to_thread(
             self._sync.search_memory,
             session_id,
@@ -1881,6 +1922,7 @@ class AsyncZepClient:
         fact: str,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Add a fact to a user/session."""
         return await asyncio.to_thread(self._sync.add_fact, session_id, fact, metadata=metadata)
 
     async def list_facts(
@@ -1888,12 +1930,15 @@ class AsyncZepClient:
         session_id: str,
         limit: int = 100,
     ) -> list[Fact]:
+        """List all facts for a user."""
         return await asyncio.to_thread(self._sync.list_facts, session_id, limit=limit)
 
     async def delete_fact(self, fact_uuid: str, **kwargs: Any) -> dict[str, Any]:
+        """Delete a fact by ID."""
         return await asyncio.to_thread(self._sync.delete_fact, fact_uuid, **kwargs)
 
     async def get_fact(self, fact_uuid: str) -> Fact:
+        """Get a fact by ID."""
         return await asyncio.to_thread(self._sync.get_fact, fact_uuid)
 
     # ------------------------------------------------------------------
@@ -1907,6 +1952,7 @@ class AsyncZepClient:
         messages: list[dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Update an existing memory."""
         return await asyncio.to_thread(
             self._sync.update_memory,
             session_id,
@@ -1925,6 +1971,7 @@ class AsyncZepClient:
         limit: int | None = None,
         cursor: int | None = None,
     ) -> dict[str, Any]:
+        """Get messages for a session."""
         return await asyncio.to_thread(
             self._sync.get_session_messages,
             session_id,
@@ -1937,6 +1984,7 @@ class AsyncZepClient:
         session_id: str,
         message_uuid: str,
     ) -> dict[str, Any]:
+        """Get a single message from a session."""
         return await asyncio.to_thread(self._sync.get_session_message, session_id, message_uuid)
 
     async def update_message_metadata(
@@ -1945,6 +1993,7 @@ class AsyncZepClient:
         message_uuid: str,
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
+        """Update metadata on a message."""
         return await asyncio.to_thread(
             self._sync.update_message_metadata,
             session_id,
@@ -1965,6 +2014,7 @@ class AsyncZepClient:
         order_by: str = "created_at",
         asc: bool = False,
     ) -> list[Session]:
+        """List all sessions for a user."""
         return await asyncio.to_thread(
             self._sync.list_sessions,
             limit=limit,
@@ -1976,6 +2026,7 @@ class AsyncZepClient:
         )
 
     async def get_session(self, session_id: str) -> Session | None:
+        """Get a session by ID."""
         return await asyncio.to_thread(self._sync.get_session, session_id)
 
     async def add_session(
@@ -1983,6 +2034,7 @@ class AsyncZepClient:
         session_id: str,
         metadata: dict[str, Any] | None = None,
     ) -> Session:
+        """Create a new session."""
         return await asyncio.to_thread(self._sync.add_session, session_id, metadata=metadata)
 
     async def update_session(
@@ -1991,6 +2043,7 @@ class AsyncZepClient:
         metadata: dict[str, Any] | None = None,
         fact_rating_instruction: str | None = None,
     ) -> Session:
+        """Update session metadata."""
         return await asyncio.to_thread(
             self._sync.update_session,
             session_id,
@@ -2003,12 +2056,15 @@ class AsyncZepClient:
         query: str,
         limit: int = 10,
     ) -> list[Session]:
+        """Search sessions by criteria."""
         return await asyncio.to_thread(self._sync.search_sessions, query, limit=limit)
 
     async def close(self) -> None:
+        """Close the client connection."""
         return await asyncio.to_thread(self._sync.close)
 
     async def summarize_memory(self, session_id: str) -> str | None:
+        """Summarize a memory using the session context."""
         return await asyncio.to_thread(self._sync.summarize_memory, session_id)
 
     # ------------------------------------------------------------------
@@ -2016,9 +2072,11 @@ class AsyncZepClient:
     # ------------------------------------------------------------------
 
     async def __aenter__(self) -> "AsyncZepClient":
+        """Enter async context manager."""
         return self
 
     async def __aexit__(self, *args: Any) -> None:
+        """Exit async context manager."""
         await self.close()
 
 
@@ -2031,6 +2089,7 @@ class _AsyncMemoryProxy:
     """Async proxy for ``AsyncZep.memory``."""
 
     def __init__(self, client: "AsyncZepClient") -> None:
+        """Initialize the API resource wrapper."""
         self._c = client
 
     async def add(
@@ -2042,6 +2101,7 @@ class _AsyncMemoryProxy:
         fact_instruction: str | None = None,
         summary_instruction: str | None = None,
     ) -> dict[str, Any]:
+        """Add a new record."""
         return await self._c.add_memory(
             session_id,
             messages,
@@ -2057,9 +2117,11 @@ class _AsyncMemoryProxy:
         limit: int = 10,
         min_rating: float = 0.0,
     ) -> dict[str, Any] | None:
+        """Get a single record by ID."""
         return await self._c.get_memory(session_id, limit=limit, min_rating=min_rating)
 
     async def delete(self, session_id: str) -> dict[str, Any]:
+        """Delete a record by ID."""
         return await self._c.delete_memory(session_id)
 
     async def search(
@@ -2072,6 +2134,7 @@ class _AsyncMemoryProxy:
         min_score: float | None = None,
         search_type: str = "similarity",
     ) -> list[MemorySearchResult]:
+        """Search memory/search results."""
         return await self._c.search_memory(
             session_id,
             query,
@@ -2088,12 +2151,15 @@ class _AsyncMemoryProxy:
         *,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Add a fact to a user/session."""
         return await self._c.add_fact(session_id, fact, metadata=metadata)
 
     async def get_fact(self, fact_uuid: str) -> Fact:
+        """Get a fact by ID."""
         return await self._c.get_fact(fact_uuid)
 
     async def delete_fact(self, fact_uuid: str, **kwargs: Any) -> dict[str, Any]:
+        """Delete a fact by ID."""
         return await self._c.delete_fact(fact_uuid, **kwargs)
 
     async def add_session(
@@ -2102,9 +2168,11 @@ class _AsyncMemoryProxy:
         *,
         metadata: dict[str, Any] | None = None,
     ) -> Session:
+        """Create a new session."""
         return await self._c.add_session(session_id, metadata=metadata)
 
     async def get_session(self, session_id: str) -> Session | None:
+        """Get a session by ID."""
         return await self._c.get_session(session_id)
 
     async def list_sessions(
@@ -2117,6 +2185,7 @@ class _AsyncMemoryProxy:
         order_by: str = "created_at",
         asc: bool = False,
     ) -> list[Session]:
+        """List all sessions for a user."""
         return await self._c.list_sessions(
             limit=limit,
             offset=offset,
@@ -2132,6 +2201,7 @@ class _AsyncMemoryProxy:
         *,
         limit: int = 10,
     ) -> list[Session]:
+        """Search sessions by criteria."""
         return await self._c.search_sessions(query, limit=limit)
 
     async def update_session(
@@ -2141,6 +2211,7 @@ class _AsyncMemoryProxy:
         metadata: dict[str, Any] | None = None,
         fact_rating_instruction: str | None = None,
     ) -> Session:
+        """Update session metadata."""
         return await self._c.update_session(
             session_id,
             metadata=metadata,
@@ -2154,6 +2225,7 @@ class _AsyncMemoryProxy:
         limit: int | None = None,
         cursor: int | None = None,
     ) -> dict[str, Any]:
+        """Get messages for a session."""
         return await self._c.get_session_messages(session_id, limit=limit, cursor=cursor)
 
     async def get_session_message(
@@ -2161,6 +2233,7 @@ class _AsyncMemoryProxy:
         session_id: str,
         message_uuid: str,
     ) -> dict[str, Any]:
+        """Get a single message from a session."""
         return await self._c.get_session_message(session_id, message_uuid)
 
     async def update_message_metadata(
@@ -2169,6 +2242,7 @@ class _AsyncMemoryProxy:
         message_uuid: str,
         metadata: dict[str, Any],
     ) -> dict[str, Any]:
+        """Update metadata on a message."""
         return await self._c.update_message_metadata(session_id, message_uuid, metadata)
 
 
@@ -2176,6 +2250,7 @@ class _AsyncUserProxy:
     """Async proxy for ``AsyncZep.user``."""
 
     def __init__(self, client: "AsyncZepClient") -> None:
+        """Initialize the API resource wrapper."""
         self._inner = UserClient(client._sync._client)
 
     async def add(
@@ -2187,6 +2262,7 @@ class _AsyncUserProxy:
         last_name: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Add a new record."""
         return await asyncio.to_thread(
             self._inner.add,
             user_id=user_id,
@@ -2197,6 +2273,7 @@ class _AsyncUserProxy:
         )
 
     async def get(self, user_id: str) -> dict[str, Any]:
+        """Get a single record by ID."""
         return await asyncio.to_thread(self._inner.get, user_id)
 
     async def update(
@@ -2208,6 +2285,7 @@ class _AsyncUserProxy:
         last_name: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Update an existing record."""
         return await asyncio.to_thread(
             self._inner.update,
             user_id,
@@ -2218,6 +2296,7 @@ class _AsyncUserProxy:
         )
 
     async def delete(self, user_id: str) -> dict[str, Any]:
+        """Delete a record by ID."""
         return await asyncio.to_thread(self._inner.delete, user_id)
 
     async def list_ordered(
@@ -2226,6 +2305,7 @@ class _AsyncUserProxy:
         page_number: int = 1,
         page_size: int = 50,
     ) -> dict[str, Any]:
+        """List items in order."""
         return await asyncio.to_thread(
             self._inner.list_ordered,
             page_number=page_number,
@@ -2233,6 +2313,7 @@ class _AsyncUserProxy:
         )
 
     async def get_sessions(self, user_id: str) -> list[dict[str, Any]]:
+        """Get all sessions for a user."""
         return await asyncio.to_thread(self._inner.get_sessions, user_id)
 
 
@@ -2264,6 +2345,7 @@ class AsyncZep(AsyncZepClient):
         config: dict[str, Any] | None = None,
         token: str | None = None,
     ) -> None:
+        """Initialize the API resource wrapper."""
         super().__init__(host=host, port=port, config=config, token=token)
         self.memory = _AsyncMemoryProxy(self)
         self.user = _AsyncUserProxy(self)
@@ -2299,6 +2381,7 @@ class Summary:
         token_count: int = 0,
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.uuid = uuid
         self.created_at = created_at
         self.content = content
@@ -2362,6 +2445,7 @@ class SuccessResponse:
     """
 
     def __init__(self, message: str = "", **kwargs: Any) -> None:
+        """Initialize the API resource wrapper."""
         self.message = message
         self.__dict__.update(kwargs)
 
@@ -2384,6 +2468,7 @@ class FactRatingExamples:
         low: str = "",
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.high = high
         self.medium = medium
         self.low = low
@@ -2402,6 +2487,7 @@ class FactRatingInstruction:
         examples: FactRatingExamples | None = None,
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.instruction = instruction
         self.examples = examples
         self.__dict__.update(kwargs)
@@ -2420,6 +2506,7 @@ class SessionFactRatingExamples:
         low: str = "",
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.high = high
         self.medium = medium
         self.low = low
@@ -2438,6 +2525,7 @@ class SessionFactRatingInstruction:
         examples: SessionFactRatingExamples | None = None,
         **kwargs: Any,
     ) -> None:
+        """Initialize the API resource wrapper."""
         self.instruction = instruction
         self.examples = examples
         self.__dict__.update(kwargs)

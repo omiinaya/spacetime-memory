@@ -32,12 +32,14 @@ class _LangConfig:
     """Tree-sitter query patterns per language."""
 
     def __init__(self, name: str):
+        """Initialize parser config for a tree-sitter language."""
         self.name = name
         self.lang = get_language(name)
         self.parser = TSParser(self.lang)
         self._compile_queries()
 
     def _compile_queries(self) -> None:
+        """Compile tree-sitter queries for this language, skipping broken ones."""
         qs = _LANG_QUERIES.get(self.name, {})
         ok: dict[str, Any] = {}
         for key, src in qs.items():
@@ -206,6 +208,7 @@ class CodebaseIngester:
     }
 
     def __init__(self, client: Any):
+        """Initialize ingester with a spacetime-memory Client."""
         self.client = client
         self._parsers: dict[str, _LangConfig] = {}
         self._stats: dict[str, int] = {
@@ -216,6 +219,7 @@ class CodebaseIngester:
         }
 
     def _parser(self, lang: str) -> _LangConfig | None:
+        """Get or create a cached parser for the given language."""
         if lang not in self._parsers:
             try:
                 self._parsers[lang] = _LangConfig(lang)
@@ -305,6 +309,7 @@ class CodebaseIngester:
         file_nodes: dict[Path, str],
         def_nodes: dict[str, list[dict]],
     ) -> None:
+        """Parse a single source file and create KG nodes for it."""
         rel = fpath.relative_to(root)
         lang_name = self.EXT_LANG.get(fpath.suffix, "")
         if not lang_name:
@@ -359,6 +364,7 @@ class CodebaseIngester:
         file_node_id: str,
         def_nodes: dict[str, list[dict]],
     ) -> None:
+        """Extract definitions and call sites from a parsed tree, creating KG nodes and edges."""
         defs: list[dict] = []
         root = tree.root_node
 
@@ -440,6 +446,7 @@ class CodebaseIngester:
         workspace_id: str,
         def_nodes: dict[str, list[dict]],
     ) -> None:
+        """Resolve cross-file call references and create KG edges."""
         for rel_str, defs in def_nodes.items():
             for d in defs:
                 call_name = d.get("call")
@@ -471,6 +478,10 @@ class CodebaseIngester:
                             break
 
     def _resolve_node(self, workspace_id: str, label: str) -> str:
+        """Resolve a KG node ID from its label via graph query.
+        
+        Returns an empty string if the node is not found.
+        """
         try:
             rows = self.client.query_graph(workspace_id, label)
             for r in rows:

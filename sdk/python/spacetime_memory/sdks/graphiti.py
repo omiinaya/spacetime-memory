@@ -117,10 +117,12 @@ class EntityNode:
         )
 
     def model_dump(self, **kwargs) -> dict:
+        """Serialize to a plain dict (Pydantic compatibility)."""
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
+        """Create instance from a dict (Pydantic compatibility)."""
         return cls(
             **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
         )
@@ -198,10 +200,12 @@ class EntityEdge:
         )
 
     def model_dump(self, **kwargs) -> dict:
+        """Serialize to a plain dict (Pydantic compatibility)."""
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
+        """Create instance from a dict (Pydantic compatibility)."""
         return cls(
             **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
         )
@@ -227,10 +231,12 @@ class EpisodicNode:
     valid_at: datetime | None = None
 
     def model_dump(self, **kwargs) -> dict:
+        """Serialize to a plain dict (Pydantic compatibility)."""
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
+        """Create instance from a dict (Pydantic compatibility)."""
         return cls(
             **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
         )
@@ -250,10 +256,12 @@ class CommunityNode:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def model_dump(self, **kwargs) -> dict:
+        """Serialize to a plain dict (Pydantic compatibility)."""
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
+        """Create instance from a dict (Pydantic compatibility)."""
         return cls(
             **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
         )
@@ -322,10 +330,12 @@ class SagaNode:
     last_summarized_episode_valid_at: datetime | None = None
 
     def model_dump(self, **kwargs) -> dict:
+        """Serialize to a plain dict (Pydantic compatibility)."""
         return {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
 
     @classmethod
     def model_validate(cls: type["Self"], data: dict) -> Self:
+        """Create instance from a dict (Pydantic compatibility)."""
         return cls(
             **{k: v for k, v in data.items() if k in [f.name for f in dataclasses.fields(cls)]}
         )
@@ -1158,6 +1168,7 @@ class Graphiti:
 
         # Sort by score if available, then by name
         def _sort_key(e: EntityEdge) -> tuple[float, str]:
+            """Sort key for ordering entities."""
             score = getattr(e, "_score", None)
             try:
                 return (0 - float(score)) if score is not None else (1, e.name)
@@ -1841,9 +1852,11 @@ class EntityNodeNamespace:
     """Namespace for entity node operations. Accessed as ``graphiti.nodes.entity``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, node: EntityNode) -> EntityNode:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(node.group_id)
         existing = self._g._client._query(
             "kg_node", workspace_id=ws_id, filter_dict={"id": node.uuid}, columns=["id"]
@@ -1860,18 +1873,21 @@ class EntityNodeNamespace:
         return node
 
     def delete(self, node: EntityNode) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("delete_node", [node.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> EntityNode:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("kg_node", filter_dict={"id": uuid})
         if not rows:
             raise KeyError(f"EntityNode '{uuid}' not found")
         return EntityNode.from_stmem(rows[0])
 
     def get_by_uuids(self, uuids: list[str]) -> list[EntityNode]:
+        """Look up multiple records by UUIDs."""
         results: list[EntityNode] = []
         for uid in uuids:
             rows = self._g._client._query("kg_node", filter_dict={"id": uid})
@@ -1885,6 +1901,7 @@ class EntityNodeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[EntityNode]:
+        """List records filtered by group IDs."""
         all_nodes: list[EntityNode] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -1902,9 +1919,11 @@ class EpisodeNodeNamespace:
     """Namespace for episode node operations. Accessed as ``graphiti.nodes.episode``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, node: EpisodicNode) -> EpisodicNode:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(node.group_id)
         self._g._client._call(
             "store_memory",
@@ -1922,18 +1941,21 @@ class EpisodeNodeNamespace:
         return node
 
     def delete(self, node: EpisodicNode) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("deactivate_memory", [node.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> EpisodicNode:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("memory", filter_dict={"source_session_id": uuid})
         if not rows:
             raise KeyError(f"EpisodicNode '{uuid}' not found")
         return self._row_to_episode(rows[0])
 
     def get_by_uuids(self, uuids: list[str]) -> list[EpisodicNode]:
+        """Look up multiple records by UUIDs."""
         results: list[EpisodicNode] = []
         for uid in uuids:
             rows = self._g._client._query("memory", filter_dict={"source_session_id": uid})
@@ -1947,6 +1969,7 @@ class EpisodeNodeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[EpisodicNode]:
+        """List records filtered by group IDs."""
         episodes: list[EpisodicNode] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -1967,6 +1990,7 @@ class EpisodeNodeNamespace:
         source: str | None = None,
         saga: str | None = None,
     ) -> list[EpisodicNode]:
+        """Retrieve episode memories for a time window."""
         return self._g.retrieve_episodes(
             reference_time=reference_time,
             last_n=last_n,
@@ -1976,6 +2000,7 @@ class EpisodeNodeNamespace:
 
     @staticmethod
     def _row_to_episode(row: dict[str, Any]) -> EpisodicNode:
+        """Convert a STDB row dict to an Episode dataclass."""
         created = row.get("created_at", 0)
         return EpisodicNode(
             uuid=row.get("source_session_id", row.get("id", "")),
@@ -1996,9 +2021,11 @@ class CommunityNodeNamespace:
     """Namespace for community node operations. Accessed as ``graphiti.nodes.community``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, node: CommunityNode) -> CommunityNode:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(node.group_id)
         existing = self._g._client._query(
             "kg_node", workspace_id=ws_id, filter_dict={"id": node.uuid}, columns=["id"]
@@ -2015,18 +2042,21 @@ class CommunityNodeNamespace:
         return node
 
     def delete(self, node: CommunityNode) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("delete_node", [node.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> CommunityNode:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("kg_node", filter_dict={"id": uuid})
         if not rows:
             raise KeyError(f"CommunityNode '{uuid}' not found")
         return self._row_to_community(rows[0])
 
     def get_by_uuids(self, uuids: list[str]) -> list[CommunityNode]:
+        """Look up multiple records by UUIDs."""
         results: list[CommunityNode] = []
         for uid in uuids:
             rows = self._g._client._query("kg_node", filter_dict={"id": uid})
@@ -2040,6 +2070,7 @@ class CommunityNodeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[CommunityNode]:
+        """List records filtered by group IDs."""
         communities: list[CommunityNode] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -2054,6 +2085,7 @@ class CommunityNodeNamespace:
 
     @staticmethod
     def _row_to_community(row: dict[str, Any]) -> CommunityNode:
+        """Convert a STDB row dict to a Community dataclass."""
         created = row.get("created_at", 0)
         return CommunityNode(
             uuid=row.get("id", ""),
@@ -2075,9 +2107,11 @@ class SagaNodeNamespace:
     """Namespace for saga node operations. Accessed as ``graphiti.nodes.saga``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, node: SagaNode) -> SagaNode:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(node.group_id)
         existing = self._g._client._query(
             "kg_node", workspace_id=ws_id, filter_dict={"id": node.uuid}, columns=["id"]
@@ -2094,18 +2128,21 @@ class SagaNodeNamespace:
         return node
 
     def delete(self, node: SagaNode) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("delete_node", [node.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> SagaNode:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("kg_node", filter_dict={"id": uuid})
         if not rows:
             raise KeyError(f"SagaNode '{uuid}' not found")
         return self._row_to_saga(rows[0])
 
     def get_by_uuids(self, uuids: list[str]) -> list[SagaNode]:
+        """Look up multiple records by UUIDs."""
         results: list[SagaNode] = []
         for uid in uuids:
             rows = self._g._client._query("kg_node", filter_dict={"id": uid})
@@ -2119,6 +2156,7 @@ class SagaNodeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[SagaNode]:
+        """List records filtered by group IDs."""
         sagas: list[SagaNode] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -2133,6 +2171,7 @@ class SagaNodeNamespace:
 
     @staticmethod
     def _row_to_saga(row: dict[str, Any]) -> SagaNode:
+        """Convert a STDB row dict to a Saga dataclass."""
         created = row.get("created_at", 0)
         return SagaNode(
             uuid=row.get("id", ""),
@@ -2159,6 +2198,7 @@ class NodeNamespace:
     saga: SagaNodeNamespace
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self.entity = EntityNodeNamespace(graphiti)
         self.episode = EpisodeNodeNamespace(graphiti)
         self.community = CommunityNodeNamespace(graphiti)
@@ -2169,9 +2209,11 @@ class EntityEdgeNamespace:
     """Namespace for entity edge operations. Accessed as ``graphiti.edges.entity``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, edge: EntityEdge) -> EntityEdge:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(edge.group_id)
         self._g._client.create_edge(
             workspace_id=ws_id,
@@ -2189,18 +2231,21 @@ class EntityEdgeNamespace:
         return edge
 
     def delete(self, edge: EntityEdge) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> EntityEdge:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
         if not rows:
             raise KeyError(f"EntityEdge '{uuid}' not found")
         return EntityEdge.from_stmem(rows[0])
 
     def get_by_uuids(self, uuids: list[str]) -> list[EntityEdge]:
+        """Look up multiple records by UUIDs."""
         results: list[EntityEdge] = []
         for uid in uuids:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
@@ -2214,6 +2259,7 @@ class EntityEdgeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[EntityEdge]:
+        """List records filtered by group IDs."""
         edges: list[EntityEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -2231,6 +2277,7 @@ class EntityEdgeNamespace:
         source_node_uuid: str,
         target_node_uuid: str,
     ) -> list[EntityEdge]:
+        """Get edges between two nodes by their UUIDs."""
         rows = self._g._client._query(
             "kg_edge",
             filter_dict={
@@ -2241,6 +2288,7 @@ class EntityEdgeNamespace:
         return [EntityEdge.from_stmem(r) for r in rows]
 
     def get_by_node_uuid(self, node_uuid: str) -> list[EntityEdge]:
+        """Get all edges connected to a node."""
         rows_src = self._g._client._query("kg_edge", filter_dict={"source_node_id": node_uuid})
         rows_tgt = self._g._client._query("kg_edge", filter_dict={"target_node_id": node_uuid})
         seen: set[str] = set()
@@ -2257,9 +2305,11 @@ class EpisodicEdgeNamespace:
     """Namespace for episodic edge operations. Accessed as ``graphiti.edges.episodic``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, edge: EpisodicEdge) -> EpisodicEdge:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(edge.group_id)
         self._g._client.create_edge(
             workspace_id=ws_id,
@@ -2272,12 +2322,14 @@ class EpisodicEdgeNamespace:
         return edge
 
     def delete(self, edge: EpisodicEdge) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> EpisodicEdge:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
         if not rows:
             raise KeyError(f"EpisodicEdge '{uuid}' not found")
@@ -2289,6 +2341,7 @@ class EpisodicEdgeNamespace:
         )
 
     def get_by_uuids(self, uuids: list[str]) -> list[EpisodicEdge]:
+        """Look up multiple records by UUIDs."""
         results: list[EpisodicEdge] = []
         for uid in uuids:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
@@ -2310,6 +2363,7 @@ class EpisodicEdgeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[EpisodicEdge]:
+        """List records filtered by group IDs."""
         edges: list[EpisodicEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -2334,9 +2388,11 @@ class CommunityEdgeNamespace:
     """Namespace for community edge operations. Accessed as ``graphiti.edges.community``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, edge: CommunityEdge) -> CommunityEdge:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(edge.group_id)
         self._g._client.create_edge(
             workspace_id=ws_id,
@@ -2349,12 +2405,14 @@ class CommunityEdgeNamespace:
         return edge
 
     def delete(self, edge: CommunityEdge) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> CommunityEdge:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
         if not rows:
             raise KeyError(f"CommunityEdge '{uuid}' not found")
@@ -2366,6 +2424,7 @@ class CommunityEdgeNamespace:
         )
 
     def get_by_uuids(self, uuids: list[str]) -> list[CommunityEdge]:
+        """Look up multiple records by UUIDs."""
         results: list[CommunityEdge] = []
         for uid in uuids:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
@@ -2387,6 +2446,7 @@ class CommunityEdgeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[CommunityEdge]:
+        """List records filtered by group IDs."""
         edges: list[CommunityEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -2411,9 +2471,11 @@ class HasEpisodeEdgeNamespace:
     """Namespace for has_episode edge operations. Accessed as ``graphiti.edges.has_episode``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, edge: HasEpisodeEdge) -> HasEpisodeEdge:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(edge.group_id)
         self._g._client.create_edge(
             workspace_id=ws_id,
@@ -2426,12 +2488,14 @@ class HasEpisodeEdgeNamespace:
         return edge
 
     def delete(self, edge: HasEpisodeEdge) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> HasEpisodeEdge:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
         if not rows:
             raise KeyError(f"HasEpisodeEdge '{uuid}' not found")
@@ -2443,6 +2507,7 @@ class HasEpisodeEdgeNamespace:
         )
 
     def get_by_uuids(self, uuids: list[str]) -> list[HasEpisodeEdge]:
+        """Look up multiple records by UUIDs."""
         results: list[HasEpisodeEdge] = []
         for uid in uuids:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
@@ -2464,6 +2529,7 @@ class HasEpisodeEdgeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[HasEpisodeEdge]:
+        """List records filtered by group IDs."""
         edges: list[HasEpisodeEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -2488,9 +2554,11 @@ class NextEpisodeEdgeNamespace:
     """Namespace for next_episode edge operations. Accessed as ``graphiti.edges.next_episode``."""
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self._g = graphiti
 
     def save(self, edge: NextEpisodeEdge) -> NextEpisodeEdge:
+        """Persist the record to SpacetimeDB."""
         ws_id = self._g._resolve_workspace(edge.group_id)
         self._g._client.create_edge(
             workspace_id=ws_id,
@@ -2503,12 +2571,14 @@ class NextEpisodeEdgeNamespace:
         return edge
 
     def delete(self, edge: NextEpisodeEdge) -> None:
+        """Remove the record from SpacetimeDB."""
         try:
             self._g._client._call("delete_edge", [edge.uuid])
         except RuntimeError:
             pass  # non-fatal — operation may fail under concurrent load or missing data
 
     def get_by_uuid(self, uuid: str) -> NextEpisodeEdge:
+        """Look up a single record by UUID."""
         rows = self._g._client._query("kg_edge", filter_dict={"id": uuid})
         if not rows:
             raise KeyError(f"NextEpisodeEdge '{uuid}' not found")
@@ -2520,6 +2590,7 @@ class NextEpisodeEdgeNamespace:
         )
 
     def get_by_uuids(self, uuids: list[str]) -> list[NextEpisodeEdge]:
+        """Look up multiple records by UUIDs."""
         results: list[NextEpisodeEdge] = []
         for uid in uuids:
             rows = self._g._client._query("kg_edge", filter_dict={"id": uid})
@@ -2541,6 +2612,7 @@ class NextEpisodeEdgeNamespace:
         limit: int | None = None,
         uuid_cursor: str | None = None,
     ) -> list[NextEpisodeEdge]:
+        """List records filtered by group IDs."""
         edges: list[NextEpisodeEdge] = []
         for gid in group_ids:
             ws_id = self._g._resolve_workspace(gid)
@@ -2571,6 +2643,7 @@ class EdgeNamespace:
     next_episode: NextEpisodeEdgeNamespace
 
     def __init__(self, graphiti: "Graphiti") -> None:
+        """Initialize the store with a reference to the parent Graphiti instance."""
         self.entity = EntityEdgeNamespace(graphiti)
         self.episodic = EpisodicEdgeNamespace(graphiti)
         self.community = CommunityEdgeNamespace(graphiti)
