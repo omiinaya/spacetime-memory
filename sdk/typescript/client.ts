@@ -813,4 +813,88 @@ export class Client {
       .map((n: any) => `# ${n.title}\n\n${n.content ?? ""}`)
       .join("\n\n---\n\n");
   }
+
+  // -----------------------------------------------------------------------
+  // Store Answer (simplified compounder — no LLM needed)
+  // -----------------------------------------------------------------------
+
+  async storeAnswer(
+    query: string,
+    answer: string,
+    opts?: {
+      workspaceId?: string;
+      title?: string;
+      sourceMemoryIds?: string[];
+      embed?: boolean;
+    }
+  ): Promise<{ note: any; entities: string[]; links: number }> {
+    const wsId = opts?.workspaceId ?? "default";
+    const title = opts?.title ?? `Q: ${query.slice(0, 60)}`;
+
+    if (!answer.trim()) return { note: {}, entities: [], links: 0 };
+
+    // 1. Create the note
+    await this._call("create_note", [wsId, title, answer, opts?.embed ?? true]);
+
+    // Get the note we just created
+    const notes = await this._sql(
+      `SELECT id FROM note WHERE workspace_id = '${esc(wsId)}' AND title = '${esc(title)}' ORDER BY created_at DESC LIMIT 1`
+    );
+    if (notes.length === 0) return { note: {}, entities: [], links: 0 };
+    const noteId = notes[0].id;
+
+    // 2. Extract entities via regex (capitalized multi-word phrases)
+    const entityRegex = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g;
+    const matches = answer.match(entityRegex) ?? [];
+    const seen = new Set<string>();
+    const entities: string[] = [];
+    for (const m of matches) {
+      const clean = m.trim();
+      if (clean.length < 3 || clean.length > 60) continue;
+      if (seen.has(clean.toLowerCase())) continue;
+      seen.add(clean.toLowerCase());
+      entities.push(clean);
+    }
+
+    // 3. Create KG nodes + link to note
+    let links = 0;
+    for (const entity of entities.slice(0, 10)) {
+      try {
+        await this._call("create_node", [wsId, entity, "concept", "", "{}"]);
+        const nodes = await this._sql(
+          `SELECT id FROM kg_node WHERE workspace_id = '${esc(wsId)}' AND label = '${esc(entity)}'`
+        );
+        if (nodes.length > 0) {
+          await this._call("create_edge", [
+            wsId,
+            nodes[nodes.length - 1].id,
+            noteId,
+            "informed_by",
+            1.0,
+            "EXTRACTED",
+            "{}",
+          ]);
+          links++;
+        }
+      } catch {}
+    }
+
+    // 4. Link to source memories
+    const sourceIds = opts?.sourceMemoryIds ?? [];
+    for (const sid of sourceIds) {
+      try {
+        await this._call("create_edge", [
+          wsId,
+          sid,
+          noteId,
+          "informed_by",
+          0.8,
+          "EXTRACTED",
+          "{}",
+        ]);
+      } catch {}
+    }
+
+    return { note: { id: noteId, title }, entities, links };
+  }
 }
