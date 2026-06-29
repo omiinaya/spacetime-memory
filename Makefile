@@ -113,3 +113,59 @@ clean:  ## Clean build artifacts
 	cd sdk/python && rm -rf build/ dist/ *.egg-info
 	cd server/spacetimedb && cargo clean
 	@echo "Cleaned"
+
+# ── Agent-Friendly Targets ────────────────────────────────────────────────
+.PHONY: test-quick coverage check-ports deps-check health setup-git-hooks
+
+test-quick:  ## Quick Python import check
+	@python3 -c "import spacetime_memory; print('spacetime_memory:', spacetime_memory.__version__)" 2>/dev/null || \
+		echo "spacetime_memory not installed — run 'make install-sdk'"
+
+coverage:  ## Run Python tests with coverage
+	@echo "=== Coverage ==="
+	@cd sdk/python && python3 -m pytest tests/ -m unit --cov=spacetime_memory --cov-report=term --cov-report=html
+	@echo "HTML report: sdk/python/htmlcov/index.html"
+
+check-ports:  ## Verify required ports are free
+	@echo "Checking ports 3001 (STDB), 9090 (prometheus)..."
+	@for port in 3001 9090; do \
+		if ss -tlnp "sport = :$$port" 2>/dev/null | grep -q .; then \
+			echo "  Port $$port: IN USE"; \
+		else \
+			echo "  Port $$port: free"; \
+		fi; \
+	done
+
+deps-check:  ## Verify required tools are installed
+	@echo "=== Dependency Check ==="
+	@for cmd in rustup cargo python3 spacetime; do \
+		if command -v $$cmd >/dev/null 2>&1; then \
+			echo "  $$cmd: found"; \
+		else \
+			echo "  $$cmd: MISSING"; \
+		fi; \
+	done
+	@echo "Checking wasm32 target..."
+	@rustup target list --installed 2>/dev/null | grep -q wasm32-unknown-unknown && \
+		echo "  wasm32 target: found" || echo "  wasm32 target: MISSING (run: rustup target add wasm32-unknown-unknown)"
+	@echo "Checking Python package..."
+	@python3 -c "import spacetime_memory" 2>/dev/null && \
+		echo "  spacetime_memory package: found" || echo "  spacetime_memory package: not installed"
+
+health:  ## Check STDB health
+	@echo "=== STDB Health ==="
+	@if curl -sf http://localhost:3001/health 2>/dev/null || curl -sf http://localhost:3001/ 2>/dev/null; then \
+		echo "  STDB on :3001 — OK"; \
+	else \
+		echo "  STDB on :3001 — not reachable"; \
+	fi
+
+setup-git-hooks:  ## Configure git hooks from .githooks/
+	@if [ -d .githooks ]; then \
+		git config core.hooksPath .githooks; \
+		echo "Git hooks configured to use .githooks/"; \
+	else \
+		mkdir -p .githooks; \
+		git config core.hooksPath .githooks; \
+		echo "Created .githooks/ and configured git to use it"; \
+	fi

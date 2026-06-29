@@ -1,0 +1,27 @@
+{
+  "name": "SpacetimeMemory",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ]
+    }
+  },
+  "postCreateCommand": "rustup target add wasm32-unknown-unknown && cd sdk/python && pip install -e .",
+  "forwardPorts": [
+    3001,
+    9090
+  ],
+  "remoteUser": "vscode"
+}
