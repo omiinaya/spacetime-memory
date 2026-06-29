@@ -397,7 +397,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | LLM Wiki / Compounder | **97%** | All 14 methods, 62 tests, full MCP coverage. |
 | Adapter Parity | **92%** | LangGraph 100%, Mem0 85%, Zep 90%, Graphiti 85%, Honcho 85%. **Hindsight 100%** (up from 54%). |
 | Frontend | **0%** | No web/ directory exists. |
-| Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Docstring coverage at **93.9%** (1043/1111). |
+| Python Quality | **96%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Docstring coverage at **100%** on all connector files (discord, notion, rss, slack, twitter, github, webhook, orgmode). |
 | Test Coverage | **80%** | 247+ unit pass. Tantivy healthy (269 indexes). No e2e/deep marker. |
 | Infrastructure | **78%** | CI exists (Rust, Python, TypeScript SDK). Tantivy healthy (269 indexes). Embedder health check fixed (9090→4000). WASM rebuilt (2.36MB). Benchmark confirmed (81.3% P@5). 168MB stale venv. `stmem health` returns "All systems healthy". CLI `localhost` defaults fixed. **npm publish workflow configured**. **TS SDK now 58 tests, ~78% Python parity**. |
 | **Competitive Positioning** | **92%** | External review confirms broadest feature set, unique moat (adapters, wiki, context packs, tours, contradiction checking). Only gaps: no published benchmarks, TS SDK at 78% parity (up from 55%), no managed cloud, docs sprawl (consolidated). |
@@ -410,7 +410,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 3. **P1: Publish benchmark scores** — LongMemEval, LoCoMo, BEAM (1-2 weeks)
 4. **P2: TypeScript SDK parity** — add MCP client, adapter stubs, compounder, context packs (~3 days)
 5. **P3: Bi-temporal fact tracking** — Graphiti-style temporal facts (~1 week)
-6. **P3: Improve remaining connector docstrings** — discord/notion/rss/slack/twitter (30min)
+6. **P3: Improve remaining connector docstrings** — discord/notion/rss/slack/twitter — ✅ **DONE** (commit `d970e6d7`). All connector files now at 100% docstring coverage.
 7. **P3: Graphify codebase KG bridge** — import Graphify knowledge graph into STMEM notes + KG nodes for agent codebase awareness (~2 days)
 8. **P4: PyPI publish** — push to PyPI (1h)
 
