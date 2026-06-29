@@ -36,6 +36,16 @@ class SlackConnector(Connector):
         include_threads: bool = False,
         max_pages: int = 10,
     ):
+        """Initialise the Slack connector.
+
+        Args:
+            token: Slack bot token (``xoxb-...``).
+            channel_ids: List of Slack channel IDs to poll.
+            workspace_id: Target workspace UUID.
+            peer_id: Name for the memory source (default ``"slack-bot"``).
+            include_threads: Whether to fetch thread replies per message.
+            max_pages: Maximum pages per channel per poll (default ``10``).
+        """
         self.token = token
         self.channel_ids = list(channel_ids)
         self.workspace_id = workspace_id
@@ -154,6 +164,17 @@ class SlackConnector(Connector):
     # ------------------------------------------------------------------
 
     def poll(self) -> list[Event]:
+        """Poll configured Slack channels for new messages.
+
+        Iterates over all configured channel IDs, fetches message
+        history with cursor-based pagination (up to ``max_pages``
+        per channel), and optionally fetches thread replies when
+        ``include_threads`` is set.  Skips bot messages and
+        channel join/leave noise.  Deduplicates by message timestamp.
+
+        Returns:
+            List of new ``Event`` objects since the last poll.
+        """
         self._refresh_token()
         events: list[Event] = []
 
