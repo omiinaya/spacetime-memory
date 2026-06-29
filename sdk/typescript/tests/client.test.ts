@@ -481,4 +481,129 @@ describe("Client", () => {
       );
     });
   });
+
+  describe("context packs", () => {
+    it("storeContextPack calls store_context_pack reducer", async () => {
+      mockReducerOk();
+      await client.storeContextPack("ws-1", "pack1", ["mem-1", "mem-2"], "context");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/store_context_pack");
+      expect(JSON.parse(req.body)).toEqual(["ws-1", "pack1", '["mem-1","mem-2"]', "context"]);
+    });
+
+    it("updateMemoryTier calls update_memory_tier reducer", async () => {
+      mockReducerOk();
+      await client.updateMemoryTier("mem-1", "L1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/update_memory_tier");
+    });
+  });
+
+  describe("compounder", () => {
+    it("crossLink queries memories and creates edges", async () => {
+      let callCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+        callCount++;
+        if (url.includes("sql")) {
+          return {
+            ok: true,
+            text: vi.fn().mockResolvedValue(
+              JSON.stringify([
+                {
+                  schema: {
+                    elements: [
+                      { name: { some: "id" } },
+                      { name: { some: "content" } },
+                    ],
+                  },
+                  rows: [["m1", "This is a longer piece of content for testing"], ["m2", "Another piece of test content here"]],
+                },
+              ])
+            ),
+          };
+        }
+        return { ok: true, text: vi.fn().mockResolvedValue("") };
+      });
+      const result = await client.crossLink("ws-1");
+      expect(result).toHaveProperty("linksCreated");
+      expect(result).toHaveProperty("pairsChecked");
+    });
+
+    it("generateOverview returns workspace stats", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: vi.fn().mockResolvedValue(
+          JSON.stringify([
+            {
+              schema: { elements: [{ name: { some: "c" } }] },
+              rows: [[42]],
+            },
+          ])
+        ),
+      });
+      const overview = await client.generateOverview("ws-1");
+      expect(overview.memories).toBe(42);
+      expect(overview.workspaceId).toBe("ws-1");
+    });
+
+    it("lintWorkspace checks for orphan nodes", async () => {
+      let sqlCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+        sqlCount++;
+        if (url.includes("sql")) {
+          if (sqlCount === 1) {
+            // Return 2 nodes
+            return {
+              ok: true,
+              text: vi.fn().mockResolvedValue(
+                JSON.stringify([
+                  {
+                    schema: { elements: [{ name: { some: "id" } }] },
+                    rows: [["n1"], ["n2"]],
+                  },
+                ])
+              ),
+            };
+          }
+          // Subsequent calls: no edges (orphan)
+          return {
+            ok: true,
+            text: vi.fn().mockResolvedValue(
+              JSON.stringify([
+                {
+                  schema: { elements: [{ name: { some: "id" } }] },
+                  rows: [],
+                },
+              ])
+            ),
+          };
+        }
+        return { ok: true, text: vi.fn().mockResolvedValue("") };
+      });
+      const result = await client.lintWorkspace("ws-1");
+      expect(result.orphans).toBe(2);
+      expect(result.total).toBe(2);
+    });
+
+    it("exportWorkspace returns markdown", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: vi.fn().mockResolvedValue(
+          JSON.stringify([
+            {
+              schema: {
+                elements: [
+                  { name: { some: "title" } },
+                  { name: { some: "content" } },
+                ],
+              },
+              rows: [["Note 1", "Hello world"]],
+            },
+          ])
+        ),
+      });
+      const md = await client.exportWorkspace("ws-1");
+      expect(md).toContain("Note 1");
+      expect(md).toContain("Hello world");
+    });
+  });
 });

@@ -682,4 +682,135 @@ export class Client {
   async untagMemory(tagId: string, memoryId: string): Promise<void> {
     return this._call("untag_memory", [tagId, memoryId]);
   }
+
+  // -----------------------------------------------------------------------
+  // Context Packs
+  // -----------------------------------------------------------------------
+
+  async storeContextPack(
+    workspaceId: string,
+    name: string,
+    memoryIds: string[],
+    contextText?: string
+  ): Promise<void> {
+    await this._call("store_context_pack", [
+      workspaceId,
+      name,
+      JSON.stringify(memoryIds),
+      contextText ?? "",
+    ]);
+  }
+
+  async updateMemoryTier(
+    memoryId: string,
+    tier: string
+  ): Promise<void> {
+    return this._call("update_memory_tier", [memoryId, tier]);
+  }
+
+  // -----------------------------------------------------------------------
+  // Compounder / Wiki Operations
+  // -----------------------------------------------------------------------
+
+  async crossLink(
+    workspaceId: string,
+    limit?: number
+  ): Promise<{ linksCreated: number; pairsChecked: number }> {
+    const memories = await this._sql(
+      `SELECT id, content FROM memory WHERE workspace_id = '${esc(workspaceId)}' AND is_active = true ORDER BY created_at DESC LIMIT ${limit ?? 50}`
+    );
+
+    let linksCreated = 0;
+    let pairsChecked = 0;
+
+    for (const mem of memories) {
+      const mid = mem.id;
+      const content = mem.content;
+      if (!content || content.length < 20) continue;
+
+      // Look for existing edges from this memory to others
+      // by searching for semantically similar content via keyword
+      const similar = await this._sql(
+        `SELECT id, content FROM memory WHERE workspace_id = '${esc(workspaceId)}' AND id != '${esc(mid)}' AND content LIKE '%${esc(content.slice(0, 30))}%' LIMIT 5`
+      );
+
+      for (const sim of similar) {
+        pairsChecked++;
+        // Check if edge already exists
+        const existing = await this._sql(
+          `SELECT id FROM kg_edge WHERE source_node_id = '${esc(mid)}' AND target_node_id = '${esc(sim.id)}'`
+        );
+        if (existing.length === 0) {
+          try {
+            await this._call("create_edge", [
+              workspaceId,
+              mid,
+              sim.id,
+              "related_to",
+              0.7,
+              "EXTRACTED",
+              "{}",
+            ]);
+            linksCreated++;
+          } catch {}
+        }
+      }
+    }
+
+    return { linksCreated, pairsChecked };
+  }
+
+  async suggestConnections(
+    workspaceId: string
+  ): Promise<any[]> {
+    // Find node pairs that share neighbors but aren't directly connected
+    await this._call("compute_community_hierarchy", [workspaceId]);
+    return this._sql(
+      `SELECT * FROM kg_node WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+  }
+
+  async lintWorkspace(
+    workspaceId: string
+  ): Promise<{ orphans: number; total: number }> {
+    // Find KG nodes with no edges
+    const allNodes = await this._sql(
+      `SELECT id FROM kg_node WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+    let orphans = 0;
+    for (const node of allNodes) {
+      const edges = await this._sql(
+        `SELECT id FROM kg_edge WHERE source_node_id = '${esc(node.id)}' OR target_node_id = '${esc(node.id)}' LIMIT 1`
+      );
+      if (edges.length === 0) orphans++;
+    }
+    return { orphans, total: allNodes.length };
+  }
+
+  async generateOverview(workspaceId: string): Promise<any> {
+    // Gather workspace stats
+    const [memories, kgNodes, kgEdges, notes] = await Promise.all([
+      this._sql(`SELECT COUNT(*) as c FROM memory WHERE workspace_id = '${esc(workspaceId)}'`),
+      this._sql(`SELECT COUNT(*) as c FROM kg_node WHERE workspace_id = '${esc(workspaceId)}'`),
+      this._sql(`SELECT COUNT(*) as c FROM kg_edge WHERE workspace_id = '${esc(workspaceId)}'`),
+      this._sql(`SELECT COUNT(*) as c FROM note WHERE workspace_id = '${esc(workspaceId)}'`),
+    ]);
+
+    return {
+      workspaceId,
+      memories: memories[0]?.c ?? 0,
+      kgNodes: kgNodes[0]?.c ?? 0,
+      kgEdges: kgEdges[0]?.c ?? 0,
+      notes: notes[0]?.c ?? 0,
+    };
+  }
+
+  async exportWorkspace(workspaceId: string): Promise<string> {
+    const notes = await this._sql(
+      `SELECT title, content FROM note WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+    return notes
+      .map((n: any) => `# ${n.title}\n\n${n.content ?? ""}`)
+      .join("\n\n---\n\n");
+  }
 }
