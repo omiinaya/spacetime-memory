@@ -9,7 +9,7 @@ on:
 jobs:
   rust:
     name: Rust (host target)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ubuntu-latest]
     defaults:
       run:
         working-directory: server/spacetimedb
@@ -21,7 +21,7 @@ jobs:
 
   rust-integration:
     name: Rust (integration — live STDB)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ubuntu-latest]
     defaults:
       run:
         working-directory: server/spacetimedb
@@ -68,7 +68,7 @@ jobs:
 
   python:
     name: Python (${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ubuntu-latest]
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -99,7 +99,7 @@ jobs:
 
   python-integration:
     name: Python Integration (live STDB)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ubuntu-latest]
     timeout-minutes: 15
     defaults:
       run:
