@@ -258,12 +258,12 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 
 | Dimension | Status | Detail |
 |-----------|:------:|--------|
-| **LOC** | 446 | Single `client.ts` file |
+| **LOC** | 486 | Single `client.ts` file |
 | **Build** | ✅ **CLEAN** | `tsc` compiles with 0 errors, outputs `dist/client.js` + `.d.ts` |
-| **Feature coverage** | ~30% of Python SDK | Workspace CRUD, memory store/search, KG nodes/edges/neighbors, community detection, maintenance. Missing: notes/wiki, context packs, guided tours, LLM reranking, MCP client, all 6 adapters, compounder |
+| **Feature coverage** | ~35% of Python SDK | Workspace CRUD, memory store/search, KG nodes/edges/neighbors, community detection, maintenance. **Notes/wiki CRUD added**. Missing: context packs, guided tours, LLM reranking, MCP client, all 6 adapters, compounder |
 | **Embedder URL** | ✅ **FIXED** | Default changed from `localhost:9090` (removed ONNX sidecar) to `127.0.0.1:4000` (proxy) |
 | **Host defaults** | ✅ **FIXED** | Changed from `localhost:3001` to `127.0.0.1:3001` (matching Python SDK) |
-| **Tests** | ❌ **NONE** | 0 test files exist |
+| **Tests** | ✅ **23 vitest tests** — all passing (331ms). Covers Client constructor, workspace, memory CRUD, KG, notes/wiki, maintenance, error handling. |
 | **npm publish** | ❌ **NOT PUBLISHED** | Package.json is configured but no `.npmrc` or auth setup |
 | **SQL injection** | ⚠️ **VULNERABLE** | Uses raw SQL via `esc()` helper for reads instead of reducers. Name from 2022-era STDB SQL API |
 | **Dependencies** | Minimal | Only `@types/node` + `typescript` dev deps. No runtime dependencies. |
@@ -430,7 +430,7 @@ The article's "How to Make It Easier — A Prescription for Adoption" section pr
 | **P1** | **`stmem doctor` health check** — verifies STDB reachability, module version, embedding proxy, adapter imports | First thing users try after install | 2-4h | ✅ **DONE** — `stmem doctor` implemented June 28. Checks STDB, embedder, module publish status, SDK version, and all 6 adapter imports. |
 | **P1** | **Publish benchmark scores** — run LongMemEval, LoCoMo, and BEAM | Biggest credibility gap vs Mem0, Hindsight, Supermemory | 1-2 weeks | ❌ **TODO** |
 | **P2** | **Consolidate documentation** — single "5-min getting started" guide | Article calls out docs sprawl | ~4h | ✅ **DONE** |
-| **P2** | **TypeScript SDK parity** — bring TS SDK to Python parity | Blocks TS-first agent framework adoption | ~1 week | ⚠️ **P2** — 446 LOC, builds cleanly (0 errors), core CRUD/KG/search, **stale embedder URL fixed** (9090→4000), no test suite, no npm publish |
+| **P2** | **TypeScript SDK parity** — bring TS SDK to Python parity | Blocks TS-first agent framework adoption | ~1 week | ⚠️ **P2** — 486 LOC (+40 notes CRUD), builds cleanly (0 errors), core CRUD/KG/search, **notes/wiki CRUD added**, **23 vitest tests passing**, stale embedder URL fixed (9090→4000), no npm publish |
 | **P2** | **Self-test / health check command** → merged into P1 `stmem doctor` | — | — | — |
 | **P2** | **Better error messages** — every error path suggests a fix command | Reduces support burden | 4-8h | ✅ **DONE** — SDK error map updated with fix suggestions (not found, unauthorized, validation, rate limit). Circuit breaker and connection errors now suggest `stmem doctor`. 8 CLI error paths improved with actionable fix commands. |
 | **P2** | **Web-based connection wizard** — React form: enter STDB host+port, test connection, generate config | Removes "what do I put in config?" question | 1-2 days | ⚠️ **P2** — Built at `web/`: Vite + React + Tailwind SPA. Form with STDB host/port/db + embedder URL. "Test Connection" pings STDB health + module check. Generates downloadable YAML config + env vars. Served via `npm run dev` on port 5187 or `npx vite preview` on port 5188. **Note:** STDB HTTP API may lack CORS headers — works best for local dev. |
