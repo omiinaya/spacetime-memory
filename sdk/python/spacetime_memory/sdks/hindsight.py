@@ -1282,6 +1282,514 @@ class Hindsight:
             success=True,
         )
 
+    # -- list_mental_models ---------------------------------------------------
+
+    def list_mental_models(
+        self,
+        bank_id: str,
+        **params: Any,
+    ) -> list[CreateMentalModelResponse]:
+        """List all mental models in a bank."""
+        return _run_async(self.alist_mental_models(bank_id=bank_id, **params))
+
+    async def alist_mental_models(
+        self,
+        bank_id: str,
+        **params: Any,
+    ) -> list[CreateMentalModelResponse]:
+        """List all mental models in a bank."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        models: list[CreateMentalModelResponse] = []
+        try:
+            memories = self._client.list_memories(ws_id, memory_type="mental_model")
+            for m in memories:
+                models.append(CreateMentalModelResponse(
+                    id=m.get("id", ""),
+                    name=m.get("summary", "").replace("Mental model: ", ""),
+                    content=m.get("content", ""),
+                    success=True,
+                ))
+        except RuntimeError as exc:
+            logger.warning("list_mental_models() failed: %s", exc)
+        return models
+
+    # -- get_mental_model ------------------------------------------------------
+
+    def get_mental_model(
+        self,
+        bank_id: str,
+        model_id: str,
+        **params: Any,
+    ) -> CreateMentalModelResponse:
+        """Get a specific mental model by ID."""
+        return _run_async(self.aget_mental_model(bank_id=bank_id, model_id=model_id, **params))
+
+    async def aget_mental_model(
+        self,
+        bank_id: str,
+        model_id: str,
+        **params: Any,
+    ) -> CreateMentalModelResponse:
+        """Get a specific mental model by ID."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        try:
+            mems = self._client.get_memory(model_id)
+            if isinstance(mems, list) and len(mems) > 0:
+                mem = mems[0]
+                return CreateMentalModelResponse(
+                    id=mem.get("id", ""),
+                    name=mem.get("summary", "").replace("Mental model: ", ""),
+                    content=mem.get("content", ""),
+                    success=True,
+                )
+        except RuntimeError:
+            pass
+        return CreateMentalModelResponse(id=model_id, name="", content="", success=False)
+
+    # -- get_mental_model_history ----------------------------------------------
+
+    def get_mental_model_history(
+        self,
+        bank_id: str,
+        model_id: str,
+        **params: Any,
+    ) -> list[dict[str, Any]]:
+        """Get the revision history of a mental model."""
+        return _run_async(self.aget_mental_model_history(bank_id=bank_id, model_id=model_id, **params))
+
+    async def aget_mental_model_history(
+        self,
+        bank_id: str,
+        model_id: str,
+        **params: Any,
+    ) -> list[dict[str, Any]]:
+        """Get the revision history of a mental model."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        try:
+            history = self._client.get_memory_history(model_id)
+            return history if isinstance(history, list) else []
+        except RuntimeError:
+            return []
+
+    # -- update_mental_model ---------------------------------------------------
+
+    def update_mental_model(
+        self,
+        bank_id: str,
+        model_id: str,
+        name: str | None = None,
+        content: str | None = None,
+        **params: Any,
+    ) -> CreateMentalModelResponse:
+        """Update a mental model's name and/or content."""
+        return _run_async(self.aupdate_mental_model(
+            bank_id=bank_id, model_id=model_id, name=name, content=content, **params,
+        ))
+
+    async def aupdate_mental_model(
+        self,
+        bank_id: str,
+        model_id: str,
+        name: str | None = None,
+        content: str | None = None,
+        **params: Any,
+    ) -> CreateMentalModelResponse:
+        """Update a mental model's name and/or content."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        try:
+            summary = f"Mental model: {name}" if name else ""
+            self._client.update_memory(
+                model_id,
+                content=content or "",
+                summary=summary,
+            )
+            return CreateMentalModelResponse(
+                id=model_id,
+                name=name or "",
+                content=content or "",
+                success=True,
+            )
+        except RuntimeError as exc:
+            logger.warning("update_mental_model() failed: %s", exc)
+            return CreateMentalModelResponse(id=model_id, name=name or "", content=content or "", success=False)
+
+    # -- delete_mental_model ---------------------------------------------------
+
+    def delete_mental_model(
+        self,
+        bank_id: str,
+        model_id: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Delete (deactivate) a mental model."""
+        return _run_async(self.adelete_mental_model(bank_id=bank_id, model_id=model_id, **params))
+
+    async def adelete_mental_model(
+        self,
+        bank_id: str,
+        model_id: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Delete (deactivate) a mental model."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        try:
+            self._client.delete_memory(model_id)
+            return {"success": True}
+        except RuntimeError as exc:
+            logger.warning("delete_mental_model() failed: %s", exc)
+            return {"success": False}
+
+    # -- clear_mental_model ----------------------------------------------------
+
+    def clear_mental_model(
+        self,
+        bank_id: str,
+        name: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Clear a mental model by name (delete all with matching name)."""
+        return _run_async(self.aclear_mental_model(bank_id=bank_id, name=name, **params))
+
+    async def aclear_mental_model(
+        self,
+        bank_id: str,
+        name: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Clear a mental model by name."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        try:
+            memories = self._client.list_memories(ws_id, memory_type="mental_model")
+            deleted = 0
+            for m in memories:
+                summary = m.get("summary", "")
+                mid = m.get("id", "")
+                if name in summary and mid:
+                    self._client.delete_memory(mid)
+                    deleted += 1
+            return {"success": True, "deleted": deleted}
+        except RuntimeError as exc:
+            logger.warning("clear_mental_model() failed: %s", exc)
+            return {"success": False}
+
+    # -- refresh_mental_model --------------------------------------------------
+
+    def refresh_mental_model(
+        self,
+        bank_id: str,
+        model_id: str,
+        **params: Any,
+    ) -> CreateMentalModelResponse:
+        """Re-synthesize a mental model from current bank knowledge."""
+        return _run_async(self.arefresh_mental_model(bank_id=bank_id, model_id=model_id, **params))
+
+    async def arefresh_mental_model(
+        self,
+        bank_id: str,
+        model_id: str,
+        **params: Any,
+    ) -> CreateMentalModelResponse:
+        """Re-synthesize a mental model from current bank knowledge."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        # Get existing model for context
+        existing: CreateMentalModelResponse = CreateMentalModelResponse(id=model_id, name="", content="", success=False)
+        try:
+            mems = self._client.get_memory(model_id)
+            if isinstance(mems, list) and len(mems) > 0:
+                mem = mems[0]
+                existing = CreateMentalModelResponse(
+                    id=mem.get("id", ""),
+                    name=mem.get("summary", "").replace("Mental model: ", ""),
+                    content=mem.get("content", ""),
+                    success=True,
+                )
+        except RuntimeError:
+            pass
+        # Re-synthesize with same name
+        return await self.acreate_mental_model(
+            bank_id=bank_id, name=existing.name, query=existing.name,
+        )
+
+    # -- list_directives -------------------------------------------------------
+
+    def list_directives(
+        self,
+        bank_id: str,
+        **params: Any,
+    ) -> list[CreateDirectiveResponse]:
+        """List all directives in a bank."""
+        return _run_async(self.alist_directives(bank_id=bank_id, **params))
+
+    async def alist_directives(
+        self,
+        bank_id: str,
+        **params: Any,
+    ) -> list[CreateDirectiveResponse]:
+        """List all directives in a bank."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        directives: list[CreateDirectiveResponse] = []
+        try:
+            memories = self._client.list_memories(ws_id, memory_type="directive")
+            for m in memories:
+                directives.append(CreateDirectiveResponse(
+                    id=m.get("id", ""),
+                    name=m.get("summary", "").replace("Directive: ", ""),
+                    content=m.get("content", ""),
+                    success=True,
+                ))
+        except RuntimeError as exc:
+            logger.warning("list_directives() failed: %s", exc)
+        return directives
+
+    # -- get_directive ---------------------------------------------------------
+
+    def get_directive(
+        self,
+        bank_id: str,
+        directive_id: str,
+        **params: Any,
+    ) -> CreateDirectiveResponse:
+        """Get a specific directive by ID."""
+        return _run_async(self.aget_directive(bank_id=bank_id, directive_id=directive_id, **params))
+
+    async def aget_directive(
+        self,
+        bank_id: str,
+        directive_id: str,
+        **params: Any,
+    ) -> CreateDirectiveResponse:
+        """Get a specific directive by ID."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        try:
+            mems = self._client.get_memory(directive_id)
+            if isinstance(mems, list) and len(mems) > 0:
+                mem = mems[0]
+                return CreateDirectiveResponse(
+                    id=mem.get("id", ""),
+                    name=mem.get("summary", "").replace("Directive: ", ""),
+                    content=mem.get("content", ""),
+                    success=True,
+                )
+        except RuntimeError:
+            pass
+        return CreateDirectiveResponse(id=directive_id, name="", content="", success=False)
+
+    # -- update_directive ------------------------------------------------------
+
+    def update_directive(
+        self,
+        bank_id: str,
+        directive_id: str,
+        name: str | None = None,
+        prompt: str | None = None,
+        **params: Any,
+    ) -> CreateDirectiveResponse:
+        """Update a directive's name and/or prompt."""
+        return _run_async(self.aupdate_directive(
+            bank_id=bank_id, directive_id=directive_id, name=name, prompt=prompt, **params,
+        ))
+
+    async def aupdate_directive(
+        self,
+        bank_id: str,
+        directive_id: str,
+        name: str | None = None,
+        prompt: str | None = None,
+        **params: Any,
+    ) -> CreateDirectiveResponse:
+        """Update a directive's name and/or prompt."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        try:
+            summary = f"Directive: {name}" if name else ""
+            self._client.update_memory(
+                directive_id,
+                content=prompt or "",
+                summary=summary,
+            )
+            return CreateDirectiveResponse(
+                id=directive_id,
+                name=name or "",
+                content=prompt or "",
+                success=True,
+            )
+        except RuntimeError as exc:
+            logger.warning("update_directive() failed: %s", exc)
+            return CreateDirectiveResponse(id=directive_id, name=name or "", content=prompt or "", success=False)
+
+    # -- delete_directive ------------------------------------------------------
+
+    def delete_directive(
+        self,
+        bank_id: str,
+        directive_id: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Delete (deactivate) a directive."""
+        return _run_async(self.adelete_directive(bank_id=bank_id, directive_id=directive_id, **params))
+
+    async def adelete_directive(
+        self,
+        bank_id: str,
+        directive_id: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Delete (deactivate) a directive."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        try:
+            self._client.delete_memory(directive_id)
+            return {"success": True}
+        except RuntimeError as exc:
+            logger.warning("delete_directive() failed: %s", exc)
+            return {"success": False}
+
+    # -- set_mission -----------------------------------------------------------
+
+    def set_mission(
+        self,
+        bank_id: str,
+        mission: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Set the mission/purpose for a bank (stored as workspace context)."""
+        return _run_async(self.aset_mission(bank_id=bank_id, mission=mission, **params))
+
+    async def aset_mission(
+        self,
+        bank_id: str,
+        mission: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Set the mission/purpose for a bank."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        try:
+            self._client.set_workspace_context(ws_id, context=json.dumps({"mission": mission, **params}))
+            return {"success": True}
+        except RuntimeError as exc:
+            logger.warning("set_mission() failed: %s", exc)
+            return {"success": False}
+
+    def set_reflect_mission(
+        self,
+        bank_id: str,
+        mission: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Set the reflection mission for a bank (stored as workspace context)."""
+        return _run_async(self.aset_reflect_mission(bank_id=bank_id, mission=mission, **params))
+
+    async def aset_reflect_mission(
+        self,
+        bank_id: str,
+        mission: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Set the reflection mission for a bank."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        try:
+            self._client.set_workspace_context(ws_id, context=json.dumps({"reflect_mission": mission, **params}))
+            return {"success": True}
+        except RuntimeError as exc:
+            logger.warning("set_reflect_mission() failed: %s", exc)
+            return {"success": False}
+
+    # -- bank config -----------------------------------------------------------
+
+    def get_bank_config(
+        self,
+        bank_id: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Get the bank configuration (workspace metadata)."""
+        return _run_async(self.aget_bank_config(bank_id=bank_id, **params))
+
+    async def aget_bank_config(
+        self,
+        bank_id: str,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Get the bank configuration."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        try:
+            ctx = self._client.get_workspace_context(ws_id)
+            return {"id": ws_id, "config": ctx, "success": True}
+        except RuntimeError as exc:
+            logger.warning("get_bank_config() failed: %s", exc)
+            return {"id": ws_id, "config": {}, "success": False}
+
+    def update_bank_config(
+        self,
+        bank_id: str,
+        config: dict[str, Any],
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Update the bank configuration."""
+        return _run_async(self.aupdate_bank_config(bank_id=bank_id, config=config, **params))
+
+    async def aupdate_bank_config(
+        self,
+        bank_id: str,
+        config: dict[str, Any],
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Update the bank configuration."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        try:
+            self._client.set_workspace_context(ws_id, context=json.dumps(config))
+            return {"id": ws_id, "success": True}
+        except RuntimeError as exc:
+            logger.warning("update_bank_config() failed: %s", exc)
+            return {"id": ws_id, "success": False}
+
+    def reset_bank_config(
+        self,
+        bank_id: str,
+        config: dict[str, Any] | None = None,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Reset the bank configuration to defaults (or provided config)."""
+        return _run_async(self.areset_bank_config(bank_id=bank_id, config=config, **params))
+
+    async def areset_bank_config(
+        self,
+        bank_id: str,
+        config: dict[str, Any] | None = None,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Reset the bank configuration to defaults."""
+        if self._closed:
+            raise RuntimeError("Hindsight client is closed")
+        ws_id = self._ensure_bank(bank_id)
+        defaults = config or {"disposition": {"skepticism": 3, "literalism": 3, "empathy": 3}}
+        try:
+            self._client.set_workspace_context(ws_id, context=json.dumps(defaults))
+            return {"id": ws_id, "success": True}
+        except RuntimeError as exc:
+            logger.warning("reset_bank_config() failed: %s", exc)
+            return {"id": ws_id, "success": False}
+
 
 __all__ = [
     "Hindsight",

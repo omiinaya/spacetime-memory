@@ -373,7 +373,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | 2 | **Frontend doesn't exist** — zero web UI code | **P0** | 1-2 weeks | ❌ **MISSING** |
 | 3 | **WASM binary stale** — can't rebuild until P1 fixed | **P0** | — | ✅ **FIXED** — fresh binary 2.36MB |
 | 4 | **Tantivy BM25 sidecar** — was not responding | **P1** | 30min | ✅ **RUNNING** (269 indexes, port 9091 healthy) |
-| 5 | **Hindsight adapter 54% parity** — missing 18 methods | **P2** | 2-4h | ⚠️ Partial |
+| 5 | **Hindsight adapter** — parity improved from 54% to **100%** (46/46 methods). See prescription table for details | **P2** | 2-4h | ✅ **DONE** |
 | 6 | **Mem0 adapter not verifiable** — package not on PyPI | **P2** | 30min | ✅ **DONE** — verified against GitHub source. 85% parity. |
 | 7 | **Honcho adapter broken** — wrong pip package | **P2** | 30min | ✅ **FIXED** — `honcho` v2.0.0 is the correct package. Adapter verified. |
 | 8 | **30% reducers unguarded** — need auth review | **P3** | 2-3h | ⚠️ Needs audit |
@@ -394,7 +394,7 @@ The TS SDK (`sdk/typescript/`) provides a `Client` class with core CRUD, KG oper
 | Core CRUD + Search | **97%** | Complete, tested. search() refactored. |
 | Semantic Search | **94%** | bge-m3 via proxy. 5 E2E tests. Needs key. |
 | LLM Wiki / Compounder | **97%** | All 14 methods, 62 tests, full MCP coverage. |
-| Adapter Parity | **78%** | LangGraph 100%, Mem0 85%, Zep 90%, Graphiti 85%, Honcho 85%. Hindsight 54%. |
+| Adapter Parity | **92%** | LangGraph 100%, Mem0 85%, Zep 90%, Graphiti 85%, Honcho 85%. **Hindsight 100%** (up from 54%). |
 | Frontend | **0%** | No web/ directory exists. |
 | Python Quality | **95%** | 0 ruff errors, 0 bare excepts, 0 TODOs. Print() calls and 60% docstrings drag it down. |
 | Test Coverage | **80%** | 247+ unit pass. Tantivy healthy (269 indexes). No e2e/deep marker. |
@@ -433,7 +433,7 @@ The article's "How to Make It Easier — A Prescription for Adoption" section pr
 | **P2** | **TypeScript SDK parity** — bring TS SDK to Python parity | Blocks TS-first agent framework adoption | ~1 week | ⚠️ **P2** — 446 LOC, builds cleanly (0 errors), core CRUD/KG/search, **stale embedder URL fixed** (9090→4000), no test suite, no npm publish |
 | **P2** | **Self-test / health check command** → merged into P1 `stmem doctor` | — | — | — |
 | **P2** | **Better error messages** — every error path suggests a fix command | Reduces support burden | 4-8h | ✅ **DONE** — SDK error map updated with fix suggestions (not found, unauthorized, validation, rate limit). Circuit breaker and connection errors now suggest `stmem doctor`. 8 CLI error paths improved with actionable fix commands. |
-| **P2** | **Web-based connection wizard** — React form: enter STDB host+port, test connection, generate config | Removes "what do I put in config?" question | 1-2 days | ❌ **TODO** |
+| **P2** | **Web-based connection wizard** — React form: enter STDB host+port, test connection, generate config | Removes "what do I put in config?" question | 1-2 days | ⚠️ **P2** — Built at `web/`: Vite + React + Tailwind SPA. Form with STDB host/port/db + embedder URL. "Test Connection" pings STDB health + module check. Generates downloadable YAML config + env vars. Served via `npm run dev` on port 5187 or `npx vite preview` on port 5188. **Note:** STDB HTTP API may lack CORS headers — works best for local dev. |
 | **P3** | **pip install that works OOTB** — meaningful error if STDB not available, `spacetime-memory init` downloads + starts | Clean first experience | 1-2 days | ✅ **DONE** — `stmem init` command implemented. Detects STDB (Docker or running), starts via Docker if needed, creates `.spacetime-memory.env` config, locates WASM binary for module publish, runs `stmem doctor` to verify. `pip install spacetime-memory[cli]` gives both `stmem` and `spacetime-memory` CLI commands. OTel warning noise silenced. Entry points in both setup.py and pyproject.toml. Still needs: PyPI publish. |
 | **P3** | **Example projects / cookbook** — `examples/mem0-switch/`, `examples/rag-chatbot/`, `examples/kg-explorer/`, `examples/llm-wiki/` | Newcomers need runnable code | 1-2 days | ✅ **DONE** — 4 examples created June 28: `mem0-switch/` (README + drop-in adapter docs), `rag-chatbot/` (hybrid search, verified working), `kg-explorer/` (KG nodes + edges, verified working), `llm-wiki/` (wiki pattern with memory storage, verified working). Each self-contained, creates/deletes own workspace. |
 | **P3** | **Bi-temporal fact tracking** — Graphiti-style temporal facts with auto-invalidation | Graphiti's strongest differentiator | ~1 week | ❌ **TODO** |
