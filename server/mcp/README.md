@@ -22,7 +22,7 @@ Set these environment variables (or accept defaults):
 
 | Variable | Default | Description |
 |---|---|---|
-| `SPACETIMEDB_HOST` | `localhost` | SpacetimeDB hostname |
+| `SPACETIMEDB_HOST` | `127.0.0.1` | SpacetimeDB hostname |
 | `SPACETIMEDB_PORT` | `3001` | SpacetimeDB HTTP port |
 | `SPACETIMEDB_DB` | `spacetime-memory` | Database name |
 

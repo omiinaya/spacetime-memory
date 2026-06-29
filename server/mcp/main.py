@@ -4,10 +4,10 @@ MCP (Model Context Protocol) server for spacetime-memory.
 Uses the spacetime-memory Python SDK client. No raw SQL.
 
 Configuration via environment variables:
-  SPACETIMEDB_HOST (default: localhost)
+  SPACETIMEDB_HOST (default: 127.0.0.1)
   SPACETIMEDB_PORT (default: 3001)
   SPACETIMEDB_DB (default: spacetime-memory)
-  EMBEDDER_URL (default: http://localhost:9090)
+  EMBEDDER_URL (default: http://127.0.0.1:4000)
   MCP_API_KEY (optional) — if set, tools require this key for HTTP/SSE transport.
     Stdio transport (local agent) does not use token auth; rely on filesystem
     permissions instead.  For HTTP/SSE access, it is recommended to pair this
@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
+HOST = os.environ.get("SPACETIMEDB_HOST", "127.0.0.1")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
 DB = os.environ.get("SPACETIMEDB_DB", "spacetime-memory")
-EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://localhost:9090")
+EMBEDDER_URL = os.environ.get("EMBEDDER_URL", "http://127.0.0.1:4000")
 MCP_API_KEY = os.environ.get("MCP_API_KEY", "")
 
 # Load reranker credentials from Hermes .env (same pattern as eval_harness.py)
