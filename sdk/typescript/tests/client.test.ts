@@ -713,4 +713,140 @@ describe("Client", () => {
       expect(result.entities).toContain("Artificial Intelligence");
     });
   });
+
+  describe("storeBatch", () => {
+    it("calls store_memory_batch reducer with batch payload", async () => {
+      let callUrls: string[] = [];
+      let batchPayloads: any[] = [];
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string, req?: any) => {
+        callUrls.push(url);
+        if (url.includes("embed")) {
+          return {
+            ok: true,
+            json: vi.fn().mockResolvedValue({
+              embeddings: [[0.1, 0.2], [0.3, 0.4]],
+            }),
+          };
+        }
+        // Capture batch reducer payload
+        if (url.includes("call/store_memory_batch") && req?.body) {
+          batchPayloads.push(JSON.parse(req.body));
+        }
+        // SQL query (find memories)
+        if (url.includes("sql")) {
+          return {
+            ok: true,
+            text: vi.fn().mockResolvedValue(
+              JSON.stringify([
+                {
+                  schema: { elements: [{ name: { some: "id" } }] },
+                  rows: [["mem-1"], ["mem-2"]],
+                },
+              ])
+            ),
+          };
+        }
+        // reducer call
+        return { ok: true, text: vi.fn().mockResolvedValue("") };
+      });
+
+      await client.storeBatch("ws-1", [
+        { content: "First memory", memoryType: "experience" },
+        { content: "Second memory", peerId: "peer-1", confidence: 0.9 },
+      ]);
+
+      // Should have called embedder with texts for batch embedding
+      const embedCall = callUrls.find((u) => u.includes("embed"));
+      expect(embedCall).toBeDefined();
+
+      // Should have called store_memory_batch reducer
+      const batchCall = callUrls.find((u) => u.includes("call/store_memory_batch"));
+      expect(batchCall).toBeDefined();
+
+      // Verify batch payload contains both items
+      expect(batchPayloads.length).toBeGreaterThanOrEqual(1);
+      // batchPayloads[0] is the array [jsonString] from _call([JSON.stringify(payload)])
+      const args = batchPayloads[0];
+      expect(Array.isArray(args)).toBe(true);
+      const payloadStr = args[0];
+      const parsed = JSON.parse(payloadStr);
+      expect(parsed.length).toBe(2);
+      expect(parsed[0].content).toBe("First memory");
+      expect(parsed[1].content).toBe("Second memory");
+      expect(parsed[1].peer_id).toBe("peer-1");
+      expect(parsed[1].confidence).toBe(0.9);
+    });
+
+    it("skips empty items", async () => {
+      let callUrls: string[] = [];
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+        callUrls.push(url);
+        if (url.includes("embed")) {
+          return { ok: true, json: vi.fn().mockResolvedValue({ embedding: [0.1] }) };
+        }
+        if (url.includes("sql")) {
+          return { ok: true, text: vi.fn().mockResolvedValue("[]") };
+        }
+        return { ok: true, text: vi.fn().mockResolvedValue("") };
+      });
+
+      await client.storeBatch("ws-1", [
+        { content: "  " },
+        { content: "" },
+        { content: "Valid memory" },
+      ]);
+
+      // Should still work with one valid item
+      const batchCall = callUrls.find((u) => u.includes("store_memory_batch"));
+      expect(batchCall).toBeDefined();
+    });
+
+    it("returns immediately if all items are empty", async () => {
+      let callCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
+        callCount++;
+        return { ok: true, text: vi.fn().mockResolvedValue("") };
+      });
+
+      await client.storeBatch("ws-1", [{ content: "" }, { content: "   " }]);
+
+      // No embedder or reducer calls should have been made
+      expect(callCount).toBe(0);
+    });
+
+    it("indexes entities with embeddings after batch store", async () => {
+      let callUrls: string[] = [];
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+        callUrls.push(url);
+        if (url.includes("embed")) {
+          return {
+            ok: true,
+            json: vi.fn().mockResolvedValue({
+              embeddings: [[0.1, 0.2, 0.3]],
+            }),
+          };
+        }
+        if (url.includes("sql")) {
+          return {
+            ok: true,
+            text: vi.fn().mockResolvedValue(
+              JSON.stringify([
+                {
+                  schema: { elements: [{ name: { some: "id" } }] },
+                  rows: [["mem-1"]],
+                },
+              ])
+            ),
+          };
+        }
+        return { ok: true, text: vi.fn().mockResolvedValue("") };
+      });
+
+      await client.storeBatch("ws-1", [{ content: "Memory with embedding" }]);
+
+      // Should have called index_entity with the embedding
+      const indexCalls = callUrls.filter((u) => u.includes("call/index_entity"));
+      expect(indexCalls.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 });

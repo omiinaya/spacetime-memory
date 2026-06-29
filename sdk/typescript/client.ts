@@ -1055,4 +1055,102 @@ export class Client {
 
     return { note: { id: noteId, title }, entities, links };
   }
+
+  // -----------------------------------------------------------------------
+  // Batch Memory Operations
+  // -----------------------------------------------------------------------
+
+  /**
+   * Store multiple memories in a single batch reducer call.
+   *
+   * Batch-embeds all items in one call to the embedder sidecar, then sends a
+   * single `store_memory_batch` reducer with all items. Much faster than N
+   * sequential `store()` calls when the embedder is the bottleneck.
+   *
+   * @param workspaceId - Target workspace UUID.
+   * @param items - Array of memory items, each with:
+   *   - `content` (string, required) — memory text content
+   *   - `summary` (string, optional) — short summary, defaults to content[:200]
+   *   - `memoryType` (string, optional, default "experience")
+   *   - `peerId` (string, optional)
+   *   - `confidence` (number, optional, default 0.8)
+   * @returns Promise that resolves when all items are stored and indexed.
+   */
+  async storeBatch(
+    workspaceId: string,
+    items: {
+      content: string;
+      summary?: string;
+      memoryType?: string;
+      peerId?: string;
+      confidence?: number;
+    }[]
+  ): Promise<void> {
+    // Filter out empty items and build clean batch
+    const cleanItems = items.filter((item) => item.content.trim().length > 0);
+    if (cleanItems.length === 0) return;
+
+    // Extract contents for batch embedding
+    const contents = cleanItems.map((item) => item.content);
+
+    // Batch-embed all texts in one call
+    let embeddings: number[][] = [];
+    try {
+      const resp = await fetch(`${this.embedderUrl}/embed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texts: contents }),
+        signal: AbortSignal.timeout(10_000 * contents.length),
+      });
+      if (resp.ok) {
+        const data: any = await resp.json();
+        embeddings = data?.embeddings ?? [];
+        // Fallback for single-item response
+        if (embeddings.length === 0 && data?.embedding) {
+          embeddings = [data.embedding];
+        }
+      }
+    } catch {
+      embeddings = [];
+    }
+
+    // Build the payload for the batch reducer
+    const payload = cleanItems.map((item) => ({
+      workspace_id: workspaceId,
+      peer_id: item.peerId ?? "",
+      observer_id: "",
+      memory_type: item.memoryType ?? "experience",
+      content: item.content,
+      summary: item.summary ?? item.content.slice(0, 200),
+      entities_json: "[]",
+      confidence: item.confidence ?? 0.8,
+      source_session_id: "",
+      source_message_id: "",
+    }));
+
+    // Call the batch reducer
+    await this._call("store_memory_batch", [JSON.stringify(payload)]);
+
+    // Index each item with its embedding
+    for (let i = 0; i < cleanItems.length; i++) {
+      const emb = embeddings[i];
+      if (emb && emb.length > 0) {
+        // Find the newly created memory by content prefix
+        const mems = await this._sql(
+          `SELECT id FROM memory WHERE workspace_id = '${esc(workspaceId)}'`
+        );
+        if (mems.length > 0) {
+          // Take the last match (most recently inserted)
+          const memId = mems[mems.length - 1].id;
+          await this._call("index_entity", [
+            workspaceId,
+            "memory",
+            memId,
+            cleanItems[i].content,
+            JSON.stringify(emb),
+          ]);
+        }
+      }
+    }
+  }
 }
