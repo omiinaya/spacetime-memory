@@ -205,6 +205,83 @@ describe("Client", () => {
       const callUrl = (globalThis.fetch as any).mock.calls[0][0];
       expect(callUrl).toContain("call/deactivate_memory");
     });
+
+    it("updateMemory calls update_memory reducer", async () => {
+      mockReducerOk();
+      await client.updateMemory("mem-1", "new content", "summary", 0.9);
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/update_memory");
+      expect(JSON.parse(req.body)).toEqual(["mem-1", "new content", "summary", 0.9]);
+    });
+
+    it("updateMemory with expiresAt sends 5 args", async () => {
+      mockReducerOk();
+      await client.updateMemory("mem-1", "content", "", 0.8, 9999999999);
+      const [, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(JSON.parse(req.body)).toEqual(["mem-1", "content", "", 0.8, 9999999999]);
+    });
+
+    it("rateMemory calls rate_memory reducer", async () => {
+      mockReducerOk();
+      await client.rateMemory("mem-1", "helpful", "peer-1");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/rate_memory");
+      expect(JSON.parse(req.body)).toEqual(["mem-1", "helpful", "peer-1"]);
+    });
+
+    it("consolidateMemories calls consolidate_memories reducer", async () => {
+      mockReducerOk();
+      await client.consolidateMemories("ws-1", ["m1", "m2"], "merged content", "merged summary");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/consolidate_memories");
+      const body = JSON.parse(req.body);
+      expect(body[0]).toBe("ws-1");
+      expect(JSON.parse(body[1])).toEqual(["m1", "m2"]);
+      expect(body[2]).toBe("merged content");
+      expect(body[3]).toBe("merged summary");
+    });
+
+    it("expireMemories calls expire_memories reducer", async () => {
+      mockReducerOk();
+      await client.expireMemories();
+      const callUrl = (globalThis.fetch as any).mock.calls[0][0];
+      expect(callUrl).toContain("call/expire_memories");
+    });
+
+    it("getMemoryHistory queries memory_revision", async () => {
+      mockSqlResponse([
+        { version: 1, memory_id: "mem-1", new_content: "v1", changed_at: 100 },
+      ]);
+      const history = await client.getMemoryHistory("mem-1");
+      expect(history).toHaveLength(1);
+      expect(history[0].new_content).toBe("v1");
+    });
+
+    it("searchDirectoryContents calls reducer + SQL", async () => {
+      const responses: any[] = [
+        { ok: true, text: vi.fn().mockResolvedValue("") },
+        {
+          ok: true,
+          text: vi.fn().mockResolvedValue(
+            JSON.stringify([
+              {
+                schema: {
+                  elements: [
+                    { name: { some: "directory_path" } },
+                    { name: { some: "memory_ids_json" } },
+                  ],
+                },
+                rows: [["/root", '["mem-1"]']],
+              },
+            ])
+          ),
+        },
+      ];
+      globalThis.fetch = vi.fn().mockImplementation(() => responses.shift()!);
+      const result = await client.searchDirectoryContents("ws-1", "/root");
+      expect(result).toHaveLength(1);
+      expect(result[0].memory_ids_json).toBe('["mem-1"]');
+    });
   });
 
   describe("knowledge graph", () => {
