@@ -429,6 +429,47 @@ export class Client {
   }
 
   // -----------------------------------------------------------------------
+  // Notes / Wiki
+  // -----------------------------------------------------------------------
+
+  async createNote(
+    workspaceId: string,
+    title: string,
+    content: string,
+    opts?: { embed?: boolean }
+  ): Promise<void> {
+    await this._call("create_note", [
+      workspaceId,
+      title,
+      content,
+      opts?.embed ?? true,
+    ]);
+  }
+
+  async updateNote(
+    noteId: string,
+    content: string
+  ): Promise<void> {
+    return this._call("update_note", [noteId, content]);
+  }
+
+  async deleteNote(noteId: string): Promise<void> {
+    return this._call("delete_note", [noteId]);
+  }
+
+  async listNotes(workspaceId: string): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM note WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+  }
+
+  async getNote(noteId: string): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM note WHERE id = '${esc(noteId)}'`
+    );
+  }
+
+  // -----------------------------------------------------------------------
   // Maintenance
   // -----------------------------------------------------------------------
 
