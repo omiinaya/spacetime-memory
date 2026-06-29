@@ -8,7 +8,9 @@ and works the top pending item each tick.
 
 ## Pending
 
-*No PENDING items — all identified gaps addressed.*
+No pending TS SDK items — all memory methods, workspace management, mental models, and remaining gaps are now at parity with Python SDK for core CRUD operations.
+
+- **TS SDK: add `storeBatch` for batch memory storage** — Python SDK's `store_batch()` batch-embeds via proxy then calls `store_memory_batch` reducer. TS SDK `_embed()` exists but batch flow needs embedder URL config. Low priority — single `store()` works for 99% of use cases.
 
 ## Deferred / Blocked
 
@@ -24,6 +26,12 @@ Difficulty: Hard (needs live STDB)
 |---
 
 ## Recently Completed
+
+### ✅ TS SDK parity: add 6 missing memory methods + 7 tests (commit pending)
+Added `updateMemory`, `rateMemory`, `consolidateMemories`, `expireMemories`, `getMemoryHistory`, and `searchDirectoryContents` to the TypeScript SDK client.ts. All follow existing patterns: 4 simple reducer calls, 1 SQL query, 1 reducer+SQL combo. Tests cover: correct reducer URLs, arg structures, 5-arg updateMemory with expiresAt, consolidate with JSON-stringified sourceIds, SQL query shapes, and reducer+SQL chaining for directory search. 58/58 TS tests passing (51 existing + 7 new). TS compiles with 0 errors. Build file updated to match.
+Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
+Difficulty: Medium
+Est: 20min
 
 ### ✅ Improve docstring coverage from 60% to 93.9% (commit 86480360)
 Added 282 new docstrings across 5 files: graphiti.py (73), honcho.py (103), zep.py (88),

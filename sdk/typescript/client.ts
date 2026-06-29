@@ -179,6 +179,108 @@ export class Client {
     return this._sql("SELECT * FROM workspace");
   }
 
+  async updateWorkspace(
+    id: string,
+    name: string,
+    description: string
+  ): Promise<void> {
+    return this._call("update_workspace", [id, name, description]);
+  }
+
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    return this._call("delete_workspace", [workspaceId]);
+  }
+
+  async setWorkspaceVisibility(
+    workspaceId: string,
+    isPublic: boolean
+  ): Promise<void> {
+    return this._call("set_workspace_visibility", [workspaceId, isPublic]);
+  }
+
+  async getWorkspaceContext(workspaceId: string): Promise<any> {
+    await this._call("get_workspace_context", [workspaceId]);
+    const rows = await this._sql(
+      `SELECT * FROM workspace_context_result WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  async listSpaceMembers(workspaceId: string): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM space_member WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+  }
+
+  async grantSpaceAccess(
+    workspaceId: string,
+    peerId: string,
+    permission: string
+  ): Promise<void> {
+    return this._call("grant_space_access", [workspaceId, peerId, permission]);
+  }
+
+  async revokeSpaceAccess(
+    workspaceId: string,
+    peerId: string
+  ): Promise<void> {
+    return this._call("revoke_space_access", [workspaceId, peerId]);
+  }
+
+  // -----------------------------------------------------------------------
+  // Mental Models
+  // -----------------------------------------------------------------------
+
+  async synthesizeMentalModels(
+    workspaceId: string,
+    memoryIds: string[]
+  ): Promise<any[]> {
+    await this._call("synthesize_mental_models", [
+      workspaceId,
+      JSON.stringify(memoryIds),
+    ]);
+    return this._sql(
+      `SELECT * FROM mental_model_result WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+  }
+
+  async getMentalModel(modelId: string): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM mental_model WHERE id = '${esc(modelId)}'`
+    );
+  }
+
+  async listMentalModels(
+    workspaceId: string,
+    status?: string
+  ): Promise<any[]> {
+    let where = `workspace_id = '${esc(workspaceId)}'`;
+    if (status) {
+      where += ` AND status = '${esc(status)}'`;
+    }
+    return this._sql(
+      `SELECT * FROM mental_model WHERE ${where} ORDER BY created_at DESC`
+    );
+  }
+
+  async deleteMentalModel(modelId: string): Promise<void> {
+    return this._call("delete_mental_model", [modelId]);
+  }
+
+  async updateMentalModel(
+    modelId: string,
+    content: string,
+    confidence?: number,
+    status?: string
+  ): Promise<void> {
+    return this._call("update_mental_model", [
+      modelId,
+      content,
+      confidence ?? 0.5,
+      status ?? "completed",
+    ]);
+  }
+
   // -----------------------------------------------------------------------
   // Memory
   // -----------------------------------------------------------------------
@@ -330,6 +432,62 @@ export class Client {
 
   async reinforce(memoryId: string): Promise<void> {
     return this._call("reinforce_memory", [memoryId]);
+  }
+
+  async updateMemory(
+    memoryId: string,
+    content: string,
+    summary?: string,
+    confidence?: number,
+    expiresAt?: number
+  ): Promise<void> {
+    const args: any[] = [memoryId, content, summary ?? "", confidence ?? 0.8];
+    if (expiresAt !== undefined) {
+      args.push(expiresAt);
+    }
+    return this._call("update_memory", args);
+  }
+
+  async rateMemory(
+    memoryId: string,
+    rating: string,
+    peerId: string
+  ): Promise<void> {
+    return this._call("rate_memory", [memoryId, rating, peerId]);
+  }
+
+  async consolidateMemories(
+    workspaceId: string,
+    sourceIds: string[],
+    targetContent: string,
+    targetSummary: string
+  ): Promise<void> {
+    return this._call("consolidate_memories", [
+      workspaceId,
+      JSON.stringify(sourceIds),
+      targetContent,
+      targetSummary,
+    ]);
+  }
+
+  async expireMemories(): Promise<void> {
+    return this._call("expire_memories", []);
+  }
+
+  async getMemoryHistory(memoryId: string): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM memory_revision WHERE memory_id = '${esc(memoryId)}' ORDER BY version ASC`
+    );
+  }
+
+  async searchDirectoryContents(
+    workspaceId: string,
+    directoryPath: string
+  ): Promise<any[]> {
+    await this._call("search_directory_contents", [workspaceId, directoryPath]);
+    return this._sql(
+      `SELECT * FROM directory_content_result WHERE workspace_id = '${esc(workspaceId)}' AND directory_path = '${esc(directoryPath)}' ORDER BY created_at DESC LIMIT 1`
+    );
   }
 
   async listMemories(
