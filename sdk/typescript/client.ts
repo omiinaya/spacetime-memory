@@ -484,4 +484,202 @@ export class Client {
   async dedup(workspaceId: string): Promise<void> {
     return this._call("dedup_memories", [workspaceId]);
   }
+
+  // -----------------------------------------------------------------------
+  // Profiles / Facts
+  // -----------------------------------------------------------------------
+
+  async addFact(
+    workspaceId: string,
+    peerId: string,
+    content: string,
+    opts?: { factType?: string; confidence?: number }
+  ): Promise<void> {
+    await this._call("add_fact", [
+      workspaceId,
+      peerId,
+      content,
+      opts?.factType ?? "",
+      opts?.confidence ?? 0.8,
+    ]);
+  }
+
+  async listFacts(workspaceId: string, peerId: string): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM fact_result WHERE workspace_id = '${esc(workspaceId)}' AND peer_id = '${esc(peerId)}'`
+    );
+  }
+
+  async deleteFact(factId: string): Promise<void> {
+    return this._call("delete_fact", [factId]);
+  }
+
+  async updateFact(
+    factId: string,
+    content: string,
+    confidence?: number
+  ): Promise<void> {
+    await this._call("update_fact", [factId, content, confidence ?? 0.8]);
+  }
+
+  async searchFacts(
+    workspaceId: string,
+    query: string
+  ): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM fact WHERE workspace_id = '${esc(workspaceId)}' AND content LIKE '%${esc(query)}%'`
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Tours
+  // -----------------------------------------------------------------------
+
+  async createTour(
+    workspaceId: string,
+    name: string,
+    description?: string
+  ): Promise<void> {
+    return this._call("create_tour", [workspaceId, name, description ?? ""]);
+  }
+
+  async addTourStop(
+    tourId: string,
+    nodeId: string,
+    sequence: number
+  ): Promise<void> {
+    return this._call("add_tour_stop", [tourId, nodeId, sequence]);
+  }
+
+  async removeTourStop(tourStopId: string): Promise<void> {
+    return this._call("remove_tour_stop", [tourStopId]);
+  }
+
+  async deleteTour(tourId: string): Promise<void> {
+    return this._call("delete_tour", [tourId]);
+  }
+
+  // -----------------------------------------------------------------------
+  // Advanced KG
+  // -----------------------------------------------------------------------
+
+  async updateNode(
+    nodeId: string,
+    summary?: string,
+    nodeType?: string
+  ): Promise<void> {
+    await this._call("update_node", [
+      nodeId,
+      summary ?? "",
+      nodeType ?? "",
+    ]);
+  }
+
+  async deleteNode(nodeId: string): Promise<void> {
+    return this._call("delete_node", [nodeId]);
+  }
+
+  async updateEdge(
+    edgeId: string,
+    weight?: number
+  ): Promise<void> {
+    await this._call("update_edge", [edgeId, weight ?? 1.0]);
+  }
+
+  async deleteEdge(edgeId: string): Promise<void> {
+    return this._call("delete_edge", [edgeId]);
+  }
+
+  async bfs(
+    workspaceId: string,
+    startNodeId: string,
+    maxDepth?: number
+  ): Promise<any[]> {
+    await this._call("graph_bfs", [
+      workspaceId,
+      startNodeId,
+      maxDepth ?? 5,
+    ]);
+    return this._sql(
+      `SELECT * FROM bfs_result WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+  }
+
+  async shortestPath(
+    workspaceId: string,
+    sourceId: string,
+    targetId: string
+  ): Promise<any[]> {
+    await this._call("shortest_path", [
+      workspaceId,
+      sourceId,
+      targetId,
+    ]);
+    return this._sql(
+      `SELECT * FROM bfs_result WHERE workspace_id = '${esc(workspaceId)}'`
+    );
+  }
+
+  async getEdgeHistory(edgeGroupId: string): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM edge_history_result WHERE edge_group_id = '${esc(edgeGroupId)}'`
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Sessions
+  // -----------------------------------------------------------------------
+
+  async createSession(
+    workspaceId: string,
+    name?: string
+  ): Promise<void> {
+    return this._call("create_session", [workspaceId, name ?? ""]);
+  }
+
+  async joinSession(sessionId: string): Promise<void> {
+    return this._call("join_session", [sessionId]);
+  }
+
+  async leaveSession(sessionId: string): Promise<void> {
+    return this._call("leave_session", [sessionId]);
+  }
+
+  async addAgentStep(
+    sessionId: string,
+    step: string,
+    stepType?: string
+  ): Promise<void> {
+    return this._call("add_agent_step", [
+      sessionId,
+      step,
+      stepType ?? "action",
+    ]);
+  }
+
+  async getSessionSteps(sessionId: string): Promise<any[]> {
+    return this._sql(
+      `SELECT * FROM session_step WHERE session_id = '${esc(sessionId)}'`
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Tags
+  // -----------------------------------------------------------------------
+
+  async createTag(
+    workspaceId: string,
+    name: string,
+    color?: string
+  ): Promise<void> {
+    return this._call("create_tag", [workspaceId, name, color ?? ""]);
+  }
+
+  async tagMemory(tagId: string, memoryId: string): Promise<void> {
+    return this._call("tag_memory", [tagId, memoryId]);
+  }
+
+  async untagMemory(tagId: string, memoryId: string): Promise<void> {
+    return this._call("untag_memory", [tagId, memoryId]);
+  }
 }

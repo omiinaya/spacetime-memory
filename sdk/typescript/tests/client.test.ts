@@ -306,6 +306,160 @@ describe("Client", () => {
     });
   });
 
+  describe("profiles / facts", () => {
+    it("addFact calls add_fact reducer", async () => {
+      mockReducerOk();
+      await client.addFact("ws-1", "peer-1", "Alice likes pizza");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/add_fact");
+      expect(JSON.parse(req.body)).toEqual(["ws-1", "peer-1", "Alice likes pizza", "", 0.8]);
+    });
+
+    it("listFacts queries SQL", async () => {
+      mockSqlResponse([{ fact_id: "f1", content: "fact" }]);
+      const facts = await client.listFacts("ws-1", "peer-1");
+      expect(facts).toHaveLength(1);
+    });
+
+    it("deleteFact calls delete_fact reducer", async () => {
+      mockReducerOk();
+      await client.deleteFact("f1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/delete_fact");
+    });
+
+    it("updateFact calls update_fact reducer", async () => {
+      mockReducerOk();
+      await client.updateFact("f1", "new content", 0.9);
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/update_fact");
+      expect(JSON.parse(req.body)).toEqual(["f1", "new content", 0.9]);
+    });
+
+    it("searchFacts queries SQL", async () => {
+      mockSqlResponse([{ content: "pizza" }]);
+      const results = await client.searchFacts("ws-1", "pizza");
+      expect(results).toHaveLength(1);
+    });
+  });
+
+  describe("tours", () => {
+    it("createTour calls create_tour reducer", async () => {
+      mockReducerOk();
+      await client.createTour("ws-1", "My Tour", "A guided walk");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/create_tour");
+      expect(JSON.parse(req.body)).toEqual(["ws-1", "My Tour", "A guided walk"]);
+    });
+
+    it("addTourStop calls add_tour_stop reducer", async () => {
+      mockReducerOk();
+      await client.addTourStop("tour-1", "node-1", 1);
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/add_tour_stop");
+      expect(JSON.parse(req.body)).toEqual(["tour-1", "node-1", 1]);
+    });
+
+    it("removeTourStop calls remove_tour_stop reducer", async () => {
+      mockReducerOk();
+      await client.removeTourStop("stop-1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/remove_tour_stop");
+    });
+
+    it("deleteTour calls delete_tour reducer", async () => {
+      mockReducerOk();
+      await client.deleteTour("tour-1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/delete_tour");
+    });
+  });
+
+  describe("advanced KG", () => {
+    it("updateNode calls update_node reducer", async () => {
+      mockReducerOk();
+      await client.updateNode("n1", "new summary", "person");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/update_node");
+      expect(JSON.parse(req.body)).toEqual(["n1", "new summary", "person"]);
+    });
+
+    it("deleteNode calls delete_node reducer", async () => {
+      mockReducerOk();
+      await client.deleteNode("n1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/delete_node");
+    });
+
+    it("updateEdge calls update_edge reducer", async () => {
+      mockReducerOk();
+      await client.updateEdge("e1", 0.5);
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/update_edge");
+      expect(JSON.parse(req.body)).toEqual(["e1", 0.5]);
+    });
+
+    it("deleteEdge calls delete_edge reducer", async () => {
+      mockReducerOk();
+      await client.deleteEdge("e1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/delete_edge");
+    });
+  });
+
+  describe("sessions", () => {
+    it("createSession calls create_session reducer", async () => {
+      mockReducerOk();
+      await client.createSession("ws-1", "my session");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/create_session");
+      expect(JSON.parse(req.body)).toEqual(["ws-1", "my session"]);
+    });
+
+    it("joinSession calls join_session reducer", async () => {
+      mockReducerOk();
+      await client.joinSession("sess-1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/join_session");
+    });
+
+    it("leaveSession calls leave_session reducer", async () => {
+      mockReducerOk();
+      await client.leaveSession("sess-1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/leave_session");
+    });
+
+    it("addAgentStep calls add_agent_step reducer", async () => {
+      mockReducerOk();
+      await client.addAgentStep("sess-1", "step text", "action");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/add_agent_step");
+      expect(JSON.parse(req.body)).toEqual(["sess-1", "step text", "action"]);
+    });
+
+    it("getSessionSteps queries SQL", async () => {
+      mockSqlResponse([{ step: "hello", step_type: "action" }]);
+      const steps = await client.getSessionSteps("sess-1");
+      expect(steps).toHaveLength(1);
+    });
+  });
+
+  describe("tags", () => {
+    it("createTag calls create_tag reducer", async () => {
+      mockReducerOk();
+      await client.createTag("ws-1", "important", "#ff0000");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/create_tag");
+      expect(JSON.parse(req.body)).toEqual(["ws-1", "important", "#ff0000"]);
+    });
+
+    it("tagMemory calls tag_memory reducer", async () => {
+      mockReducerOk();
+      await client.tagMemory("tag-1", "mem-1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/tag_memory");
+    });
+
+    it("untagMemory calls untag_memory reducer", async () => {
+      mockReducerOk();
+      await client.untagMemory("tag-1", "mem-1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/untag_memory");
+    });
+  });
+
   describe("error handling", () => {
     it("throws on SQL error", async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
