@@ -13,7 +13,7 @@ _conn_cursor_dir = _os.path.expanduser("~/.spacetime-memory/connectors")
 if _os.path.exists(_conn_cursor_dir):
     _shutil.rmtree(_conn_cursor_dir, ignore_errors=True)
 
-from spacetime_memory.connectors import SlackConnector
+from spacetime_memory.connectors import SlackConnector  # noqa: E402 — intentional: after cursor dir setup
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ pytestmark = [
 ]
 
 
-from spacetime_memory.sdks.graphiti import (
+from spacetime_memory.sdks.graphiti import (  # noqa: E402 — intentional: after pytestmark
     AddBulkEpisodeResults,
     AddEpisodeResults,
     AddTripletResults,
@@ -38,7 +38,7 @@ from spacetime_memory.sdks.graphiti import (
     SearchResults,
     _esc,
 )
-from spacetime_memory.auth import generate_token
+from spacetime_memory.auth import generate_token  # noqa: E402 — intentional: after pytestmark
 
 HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
@@ -1664,7 +1664,7 @@ class TestGraphitiMocked:
         with patch("spacetime_memory.sdks.graphiti.Client") as MockClient:
             mock_instance = MagicMock()
             MockClient.return_value = mock_instance
-            g = Graphiti(host="testhost", port="9999", token="test-token")
+            Graphiti(host="testhost", port="9999", token="test-token")
             MockClient.assert_called_once()
             # Check it was called with the right params
             call_kwargs = MockClient.call_args.kwargs
@@ -1785,7 +1785,7 @@ class TestGraphitiInit:
         with patch("spacetime_memory.sdks.graphiti.Client") as MockClient:
             mock_instance = MagicMock()
             MockClient.return_value = mock_instance
-            g = Graphiti()
+            Graphiti()
             MockClient.assert_called_once()
 
 

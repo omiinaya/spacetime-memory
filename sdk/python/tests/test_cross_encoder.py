@@ -162,7 +162,7 @@ class TestRerank:
         """Uses content_key param to extract text."""
         with patch.object(reranker, "_score_pair", return_value=0.8):
             candidates = [{"id": "k", "body": "the content"}]
-            result = reranker.rerank("q", candidates, content_key="body")
+            reranker.rerank("q", candidates, content_key="body")
             reranker._score_pair.assert_called_once_with("q", "the content")
 
 

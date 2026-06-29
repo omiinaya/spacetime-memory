@@ -15,7 +15,7 @@ sys.path.insert(0, str(REPO_ROOT / "sdk" / "python"))
 # Global fixture: reset OTel availability cache before each test to prevent
 # cross-test pollution from mock-OTel tests that set _OTEL_AVAILABLE = True.
 # ---------------------------------------------------------------------------
-import spacetime_memory.tracer as _tracer_mod
+import spacetime_memory.tracer as _tracer_mod  # noqa: E402 — intentional: after sys.path.insert
 
 
 @pytest.fixture(autouse=True)
@@ -27,8 +27,8 @@ def _reset_otel_available_cache() -> None:
     yield
 
 
-from spacetime_memory.client import Client, JSONFormatter, configure_logging
-from spacetime_memory.metrics import MetricsCollector
+from spacetime_memory.client import Client, JSONFormatter, configure_logging  # noqa: E402
+from spacetime_memory.metrics import MetricsCollector  # noqa: E402
 
 DB = os.environ.get(
     "SPACETIMEDB_DB", "c200e409f602c06527d0aa66dc2d05718a6b62c4c3317b5498951cea41782713"
@@ -124,8 +124,8 @@ class TestMetricsPrometheus:
         mc.record_latency("reducer:store", 200.0, is_error=True)
         text = mc.prometheus_text()
         lines = text.strip().split("\n")
-        latency_lines = [l for l in lines if "latency_ms" in l]
-        assert any("15.0" in l or "15" in l for l in latency_lines)
+        latency_lines = [line for line in lines if "latency_ms" in line]
+        assert any("15.0" in line or "15" in line for line in latency_lines)
         assert len(latency_lines) == 2  # one per endpoint
 
 
@@ -136,7 +136,7 @@ class TestConfigureLogging:
         logger.info("test json log", extra={"extra_fields": {"request_id": "r1"}})
         logger.handlers.clear()
         captured = capsys.readouterr()
-        lines = [l for l in captured.err.split("\n") if l.strip()]
+        lines = [line for line in captured.err.split("\n") if line.strip()]
         assert len(lines) >= 1
         parsed = json.loads(lines[0])
         assert parsed["message"] == "test json log"
@@ -335,7 +335,6 @@ class TestTracerSetup:
 
         t = Tracer()
         t._setup_done = True
-        calls = []
         monkeypatch.setattr(t, "_enabled", True)
         # Should return immediately without checking anything
         t.setup()
@@ -732,7 +731,7 @@ class TestGetTracer:
         monkeypatch.setattr("spacetime_memory.tracer._tracer", None)
         calls = []
         monkeypatch.setattr("spacetime_memory.tracer.Tracer.setup", lambda s: calls.append(1))
-        t = get_tracer(setup=True)
+        get_tracer(setup=True)
         assert len(calls) == 1
 
 
@@ -748,5 +747,5 @@ class TestStartSpanModuleLevel:
             mock_tracer, "start_span", lambda n, attributes=None: contextlib.nullcontext()
         )
         monkeypatch.setattr("spacetime_memory.tracer._tracer", mock_tracer)
-        with start_span("test") as span:
+        with start_span("test"):
             pass

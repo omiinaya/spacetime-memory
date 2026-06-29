@@ -1615,7 +1615,7 @@ class TestNoteSearchIndexing:
         c._emit_event = Mock()
         # Mock the boost method to track that it was called
         c._boost_with_entity_signal = Mock(wraps=c._boost_with_entity_signal)
-        results = c._keyword_fallback("ws-1", "RLHF", "", "", 10)
+        c._keyword_fallback("ws-1", "RLHF", "", "", 10)
         c._boost_with_entity_signal.assert_called_once()
         args, _ = c._boost_with_entity_signal.call_args
         assert args[0] == "RLHF"  # query
@@ -1796,7 +1796,6 @@ class TestGetMemoryHistory:
         # The second _query call (for current memory state) should return the latest
         client._query.side_effect = None  # Reset
         # Make repeated calls return different values based on the table name
-        orig_query = client._query
 
         def side_effect(table, **kw):
             if table == "memory_revision":

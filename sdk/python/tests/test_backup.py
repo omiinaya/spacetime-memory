@@ -12,7 +12,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "sdk" / "python"))
 
-from spacetime_memory import Client
+from spacetime_memory import Client  # noqa: E402 — intentional: after sys.path.insert
 
 pytestmark = [pytest.mark.integration]
 

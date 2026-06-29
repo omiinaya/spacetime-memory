@@ -266,8 +266,8 @@ class TestGraph:
         assert result["status"] == "ok"
 
     def test_create_edge(self, stdb_client, ws):
-        n1 = stdb_client.create_node(ws, "ConceptA", "concept")
-        n2 = stdb_client.create_node(ws, "ConceptB", "concept")
+        stdb_client.create_node(ws, "ConceptA", "concept")
+        stdb_client.create_node(ws, "ConceptB", "concept")
 
         # Find node IDs by label using _query
         def _node_id(label: str) -> str:

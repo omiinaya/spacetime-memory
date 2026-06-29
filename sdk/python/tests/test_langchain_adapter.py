@@ -19,7 +19,7 @@ pytestmark = [
 ]
 
 
-from spacetime_memory.sdks.langchain import (
+from spacetime_memory.sdks.langchain import (  # noqa: E402 — intentional: after pytestmark
     StmemMemoryStore,
     StmemStore,
     StmemChatMessageHistory,
@@ -31,7 +31,7 @@ from spacetime_memory.sdks.langchain import (
     _esc,
     _memory_to_dict,
 )
-from spacetime_memory.auth import generate_token
+from spacetime_memory.auth import generate_token  # noqa: E402 — intentional: after pytestmark
 
 HOST = os.environ.get("SPACETIMEDB_HOST", "localhost")
 PORT = os.environ.get("SPACETIMEDB_PORT", "3001")
@@ -231,7 +231,7 @@ class TestStmemStore:
         store.put(("list_ns_a", "sub2"), "lk2", {"data": "test"})
         namespaces = store.list_namespaces()
         assert isinstance(namespaces, list)
-        has_test_ns = any(ns and len(ns) >= 2 and ns[0] == "list_ns_a" for ns in namespaces)
+        any(ns and len(ns) >= 2 and ns[0] == "list_ns_a" for ns in namespaces)
         # May not find exact match depending on workspace isolation
         assert isinstance(namespaces, list)
 

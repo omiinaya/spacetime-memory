@@ -351,7 +351,7 @@ class TestExportPipeline:
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = cp.export_workspace(tmpdir, workspace_id=ws)
+            cp.export_workspace(tmpdir, workspace_id=ws)
             written = [f.name for f in Path(tmpdir).glob("*.md")]
             system_prefixes = ["_index", "_log"]
             for prefix in system_prefixes:
@@ -368,7 +368,7 @@ class TestExportPipeline:
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = cp.export_workspace(
+            cp.export_workspace(
                 tmpdir,
                 workspace_id=ws,
                 include_system_notes=True,

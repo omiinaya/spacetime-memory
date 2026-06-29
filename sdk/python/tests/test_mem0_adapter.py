@@ -27,7 +27,7 @@ pytestmark = [
 ]
 
 
-from spacetime_memory.sdks.mem0 import Memory
+from spacetime_memory.sdks.mem0 import Memory  # noqa: E402 — intentional: after pytestmark
 
 
 @pytest.fixture(scope="module")
@@ -1996,7 +1996,7 @@ class TestDeleteAllFilters:
             return_value={
                 "results": [{"id": "mem-d", "memory": "del", "user_id": uid, "metadata": {}}]
             },
-        ) as mock_get_all:
+        ):
             with patch.object(mem, "_call"):  # suppress delete_memory call
                 result = mem.delete_all(
                     filters={"user_id": uid, "agent_id": "agent1", "run_id": "run1"}

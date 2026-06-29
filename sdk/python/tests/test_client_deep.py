@@ -482,7 +482,7 @@ class TestGraphDeep:
         results = stdb_client.query_graph(ws_id, "SearchTarget")
         assert isinstance(results, list)
         labels = [r.get("label", "") for r in results]
-        assert any("GraphSearchTarget" in l for l in labels), f"Not found in {labels}"
+        assert any("GraphSearchTarget" in label for label in labels), f"Not found in {labels}"
 
     def test_get_neighbors(self, stdb_client):
         """Get edges connected to a node."""
@@ -2154,7 +2154,7 @@ class TestGraphTraversalDeep:
         results = stdb_client.query_graph(ws_id, "ExactMatchNode")
         assert isinstance(results, list)
         labels = [r.get("label", "") for r in results]
-        assert any("ExactMatchNode" in l for l in labels), f"ExactMatchNode not found in {labels}"
+        assert any("ExactMatchNode" in label for label in labels), f"ExactMatchNode not found in {labels}"
 
     def test_shortest_path_with_triangle(self, stdb_client):
         """shortest_path through an actual triangle graph."""
@@ -2376,7 +2376,7 @@ class TestBackupRestoreDeep:
         # Verify our node is in the backup
         nodes = tables.get("kg_node", [])
         labels = [n.get("label", "") for n in nodes]
-        assert any("BackupNode" in l for l in labels), f"BackupNode not in backup: {labels}"
+        assert any("BackupNode" in label for label in labels), f"BackupNode not in backup: {labels}"
 
     def test_backup_includes_memory_table(self, stdb_client, tmp_path):
         """backup() includes memory table when memories exist."""
@@ -4164,7 +4164,7 @@ class TestClientUnitCoverage:
         from unittest.mock import patch
 
         client = Client(host="localhost", port="3000", database="test")
-        with patch.object(client, "_query", return_value=[{"id": "m1", "content": "hi"}]) as m:
+        with patch.object(client, "_query", return_value=[{"id": "m1", "content": "hi"}]):
             result = client.list_memories(workspace_id="ws1", limit=5)
             assert result == [{"id": "m1", "content": "hi"}]
 
@@ -4197,7 +4197,7 @@ class TestClientUnitCoverage:
         from unittest.mock import patch
 
         client = Client(host="localhost", port="3000", database="test")
-        with patch.object(client, "_query", return_value=[{"id": "ws1", "name": "w1"}]) as m:
+        with patch.object(client, "_query", return_value=[{"id": "ws1", "name": "w1"}]):
             result = client.list_workspaces()
             assert result == [{"id": "ws1", "name": "w1"}]
 
@@ -5322,7 +5322,7 @@ class TestDirectoryOps:
 
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
-        result = c.link_memory_to_directory("dir1", "mem1", "ws")
+        c.link_memory_to_directory("dir1", "mem1", "ws")
         c._call.assert_called_with("link_memory_to_directory", ["dir1", "mem1", "ws"])
 
     def test_unlink_memory_from_directory(self):
@@ -5330,7 +5330,7 @@ class TestDirectoryOps:
 
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
-        result = c.unlink_memory_from_directory("dir1", "mem1")
+        c.unlink_memory_from_directory("dir1", "mem1")
         c._call.assert_called_with("unlink_memory_from_directory", ["dir1", "mem1"])
 
 
@@ -5351,7 +5351,7 @@ class TestNoteEmbedOps:
             side_effect=lambda name, *a: {"status": "ok"} if name == "create_note" else []
         )
         c._embed = Mock(return_value=[0.1, 0.2, 0.3])
-        result = c.create_note("ws", "Title", "Content here", embed=True)
+        c.create_note("ws", "Title", "Content here", embed=True)
         c._embed.assert_called_once()
         # First _call must be create_note; query_table/index calls are internal
         first_call_name = c._call.call_args_list[0][0][0]
@@ -5689,7 +5689,7 @@ class TestCreateEdge:
 
         c = Client(host="localhost", port=3001)
         c._call = Mock(return_value={"status": "ok"})
-        result = c.create_edge("ws", "src", "tgt", "related_to", source_memory_id="mem1")
+        c.create_edge("ws", "src", "tgt", "related_to", source_memory_id="mem1")
         args = c._call.call_args[0][1]
         assert (
             args[7] == "mem1"
@@ -5764,7 +5764,7 @@ class TestQueryCacheInvalidation:
         c = Client(host="localhost", port=3001, query_cache=mock_cache)
         c._call = Mock(return_value={"status": "ok"})
         c._sql = Mock(return_value=[])
-        result = c.store("ws", "p1", "p1", "experience", "test content")
+        c.store("ws", "p1", "p1", "experience", "test content")
         mock_cache.invalidate.assert_called_with(workspace_id="ws")
 
     def test_get_user_memories(self):

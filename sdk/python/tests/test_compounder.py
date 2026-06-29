@@ -102,7 +102,7 @@ class TestCompounderStoreAnswer:
         mock_llm.extract_entities_llm.return_value = None
 
         cp = Compounder(client, llm=mock_llm)
-        result = cp.store_answer(
+        cp.store_answer(
             query="q",
             answer="ans",
             source_memory_ids=["mem_1", "mem_2"],
@@ -356,7 +356,6 @@ class TestCompounderStoreAnswers:
 
         cp = Compounder(MagicMock())
         # Mock store_answer on the instance to raise on second call
-        original = cp.store_answer
         call_count = 0
 
         def mock_store(
@@ -947,7 +946,7 @@ class TestIngestSource:
         client.create_note.return_value = {"id": "note_1"}
         client._query.return_value = []  # No existing index/log
         cp = Compounder(client)
-        result = cp.ingest_source(
+        cp.ingest_source(
             source_text="Content here.",
             source_title="Log Test",
         )
@@ -1474,7 +1473,7 @@ class TestGenerateOverview:
         mock_llm.available = False
 
         cp = Compounder(client, llm=mock_llm)
-        result = cp.generate_overview_page(workspace_id="ws1")
+        cp.generate_overview_page(workspace_id="ws1")
         content = client.create_note.call_args_list[0][1]["content"]
         assert "orphan" in content.lower()
 
@@ -1796,7 +1795,7 @@ class TestCompounderEntityPageUpdate:
 
         cp = Compounder(client)
         # Don't pass tags — should preserve existing ones
-        result = cp.update_entity_page(
+        cp.update_entity_page(
             name="RLHF",
             workspace_id="ws1",
             description="Updated description.",

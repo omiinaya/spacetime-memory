@@ -26,9 +26,9 @@ pytestmark = [
     ),
 ]
 
-from unittest import mock
+from unittest import mock  # noqa: E402 — intentional: after pytestmark
 
-from spacetime_memory.sdks.hindsight import (
+from spacetime_memory.sdks.hindsight import (  # noqa: E402 — intentional: after pytestmark
     Hindsight,
     RetainResponse,
     RecallResponse,
@@ -384,7 +384,7 @@ class TestHindsightCore:
     def test_create_bank_duplicate(self, hindsight: Hindsight) -> None:
         """Creating a bank that already exists returns pre-existing."""
         bid = _bid("hs-test-dup-bank")
-        r1 = hindsight.create_bank(name=bid, description="First creation")
+        hindsight.create_bank(name=bid, description="First creation")
         r2 = hindsight.create_bank(name=bid, description="Second creation")
         assert r2.success is True
         assert r2.config.get("pre_existing") is True

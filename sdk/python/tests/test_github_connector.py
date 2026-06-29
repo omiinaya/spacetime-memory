@@ -18,7 +18,7 @@ def _clear_cursor():
 
 _clear_cursor()
 
-from spacetime_memory.connectors import GitHubConnector
+from spacetime_memory.connectors import GitHubConnector  # noqa: E402 — intentional: after cursor dir setup
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

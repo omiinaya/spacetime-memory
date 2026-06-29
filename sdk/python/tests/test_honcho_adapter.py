@@ -15,8 +15,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "sdk" / "python"))
 
-from spacetime_memory import Client
-from spacetime_memory.sdks import Honcho, Peer, Session
+from spacetime_memory import Client  # noqa: E402 — intentional: after sys.path.insert
+from spacetime_memory.sdks import Honcho, Peer, Session  # noqa: E402 — intentional: after sys.path.insert
 
 pytestmark = [
     pytest.mark.integration,
@@ -126,7 +126,7 @@ class TestHonchoCore:
     def test_session_messages(self, honcho: Honcho) -> None:
         """Session.messages() returns paginated results on empty session."""
         sid = _uid("session")
-        pid = _uid()
+        _uid()
         s = honcho.session(sid)
         pages = s.messages()
         assert pages is not None

@@ -31,7 +31,7 @@ _repo_root = Path(__file__).resolve().parent.parent.parent.parent
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
-from spacetime_memory import Client
+from spacetime_memory import Client  # noqa: E402 — intentional: after sys.path.insert
 
 # ---------------------------------------------------------------------------
 # Pytest marker registration

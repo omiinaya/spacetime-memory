@@ -323,7 +323,7 @@ class TestSynthesize:
         with patch.object(agent, "_call_llm_with_gaps", return_value=None):
             result = agent.synthesize("q", "ws1", aaak=True)
 
-        entry = result["entries"][0] if "entries" in result else None
+        result["entries"][0] if "entries" in result else None
         # If we didn't separate entries in result, check they were compressed
         # The synthesize method doesn't put entries in result dict directly
 

@@ -1968,7 +1968,6 @@ class TestBackupErrorPaths:
         """Backup skips a table when _query raises RuntimeError."""
         runner, mock_client = mocked_cli_runner
         # Make _query raise RuntimeError for the first table, succeed for others
-        real_query = mock_client._query
 
         def fake_query(table, workspace_id=None):
             if table == "memory":

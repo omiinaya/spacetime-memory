@@ -1828,7 +1828,7 @@ class TestGetDirectory:
     def test_gets_by_path(self, mock_mcp_client):
         from server.mcp.main import get_directory
 
-        result = get_directory(workspace_id="ws1", path_or_id="/projects/ai")
+        get_directory(workspace_id="ws1", path_or_id="/projects/ai")
         mock_mcp_client.get_directory.assert_called_once_with("ws1", "/projects/ai")
 
     def test_empty_result(self, mock_mcp_client):

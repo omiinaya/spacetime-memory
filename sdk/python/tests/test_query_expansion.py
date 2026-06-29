@@ -41,7 +41,7 @@ class TestExpandQuerySuccess:
     def test_custom_endpoint_and_model(self):
         mock_resp = self._mock_response("related terms")
         with patch("httpx.post", return_value=mock_resp) as mock_post:
-            result = expand_query(
+            expand_query(
                 "k8s",
                 endpoint="https://custom.api/v2",
                 model="claude-3",

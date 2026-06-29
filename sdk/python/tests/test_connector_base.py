@@ -625,7 +625,7 @@ class TestConnectorDaemon:
             "workspace_id": "ws-1",
         }
         with mock.patch("spacetime_memory.connectors.RssFeedConnector") as MockRSS:
-            result = daemon._build_connector(cfg)
+            daemon._build_connector(cfg)
             MockRSS.assert_called_once_with(feed_url="https://example.com/rss", workspace_id="ws-1")
 
     def test_build_connector_unknown_type(self):
@@ -762,7 +762,7 @@ class TestConnectorDaemon:
             mock.patch.object(daemon, "_load_configs", return_value=configs),
             mock.patch.object(daemon, "_build_connector", side_effect=RuntimeError("build fail")),
             mock.patch("time.sleep") as mock_sleep,
-            mock.patch("logging.getLogger") as mock_logger,
+            mock.patch("logging.getLogger"),
         ):
             mock_sleep.side_effect = [None, KeyboardInterrupt()]
             with pytest.raises(KeyboardInterrupt):
@@ -813,7 +813,6 @@ class TestConnectorDaemon:
 
         # Connector that returns events but raises in on_event
         conn = TestConnector(events=[Event(content="ev1")])
-        orig_on_event = conn.on_event
 
         def failing_on_event(ev, client):
             raise RuntimeError("handler fail")

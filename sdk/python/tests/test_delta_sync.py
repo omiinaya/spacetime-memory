@@ -159,7 +159,7 @@ class TestDeltaSyncOn:
         def cb(event):
             pass
 
-        token = ds.on("*", "insert", cb)
+        ds.on("*", "insert", cb)
         assert ("*", "insert") in ds._callbacks
 
     def test_register_wildcard_operation(self, mock_client):
@@ -169,7 +169,7 @@ class TestDeltaSyncOn:
         def cb(event):
             pass
 
-        token = ds.on("memory", "*", cb)
+        ds.on("memory", "*", cb)
         assert ("memory", "*") in ds._callbacks
 
     def test_register_raises_on_none_callback(self, mock_client):
@@ -181,8 +181,8 @@ class TestDeltaSyncOn:
     def test_multiple_callbacks_same_key(self, mock_client):
         """Multiple callbacks can be registered for the same table+op."""
         ds = DeltaSync(mock_client)
-        t1 = ds.on("memory", "insert", lambda e: None)
-        t2 = ds.on("memory", "insert", lambda e: None)
+        ds.on("memory", "insert", lambda e: None)
+        ds.on("memory", "insert", lambda e: None)
         key = ("memory", "insert")
         assert len(ds._callbacks[key]) == 2
 
@@ -192,7 +192,7 @@ class TestDeltaSyncOff:
         """off() removes the matching callback and keeps others."""
         ds = DeltaSync(mock_client)
         t1 = ds.on("memory", "insert", lambda e: None)
-        t2 = ds.on("memory", "update", lambda e: None)
+        ds.on("memory", "update", lambda e: None)
 
         ds.off(t1)
         key_insert = ("memory", "insert")

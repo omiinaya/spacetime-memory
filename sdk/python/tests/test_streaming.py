@@ -97,27 +97,32 @@ class TestEventBusSubscribeUnsubscribe:
 
     def test_subscribe(self):
         bus = EventBus()
-        cb = lambda e: None
+        def cb(e):
+            return None
         bus.subscribe("memory.created", cb)
         assert bus.subscriber_count == 1
 
     def test_subscribe_multiple(self):
         bus = EventBus()
-        cb1 = lambda e: None
-        cb2 = lambda e: None
+        def cb1(e):
+            return None
+        def cb2(e):
+            return None
         bus.subscribe("memory.created", cb1)
         bus.subscribe("memory.updated", cb2)
         assert bus.subscriber_count == 2
 
     def test_subscribe_wildcard(self):
         bus = EventBus()
-        cb = lambda e: None
+        def cb(e):
+            return None
         bus.subscribe("*", cb)
         assert bus.subscriber_count == 1
 
     def test_unsubscribe(self):
         bus = EventBus()
-        cb = lambda e: None
+        def cb(e):
+            return None
         bus.subscribe("memory.created", cb)
         assert bus.subscriber_count == 1
         bus.unsubscribe("memory.created", cb)
@@ -126,21 +131,25 @@ class TestEventBusSubscribeUnsubscribe:
     def test_unsubscribe_not_present(self):
         """Unsubscribing a callback not registered should not error."""
         bus = EventBus()
-        cb = lambda e: None
+        def cb(e):
+            return None
         bus.unsubscribe("memory.created", cb)  # no error
         assert bus.subscriber_count == 0
 
     def test_unsubscribe_wrong_event_type(self):
         bus = EventBus()
-        cb = lambda e: None
+        def cb(e):
+            return None
         bus.subscribe("memory.created", cb)
         bus.unsubscribe("memory.updated", cb)  # wrong type
         assert bus.subscriber_count == 1  # still there
 
     def test_subscribe_same_event_multiple_callbacks(self):
         bus = EventBus()
-        cb1 = lambda e: None
-        cb2 = lambda e: None
+        def cb1(e):
+            return None
+        def cb2(e):
+            return None
         bus.subscribe("memory.created", cb1)
         bus.subscribe("memory.created", cb2)
         assert bus.subscriber_count == 2

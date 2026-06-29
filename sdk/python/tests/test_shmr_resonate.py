@@ -518,7 +518,7 @@ class TestShmrResonate:
         """When no clusters are found, log_resonance_session is not called."""
         mock_client.search.return_value = []
 
-        result = shmr_resonate(mock_client, workspace_id="ws-empty")
+        shmr_resonate(mock_client, workspace_id="ws-empty")
 
         log_calls = [
             c for c in mock_client._call.call_args_list if c[0][0] == "log_resonance_session"

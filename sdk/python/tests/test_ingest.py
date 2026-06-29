@@ -14,7 +14,7 @@ _mock_ts_pack.get_language.return_value = MagicMock()
 sys.modules["tree_sitter"] = _mock_ts
 sys.modules["tree_sitter_language_pack"] = _mock_ts_pack
 
-from spacetime_memory.ingest import CodebaseIngester, _LangConfig, _LANG_QUERIES
+from spacetime_memory.ingest import CodebaseIngester, _LangConfig, _LANG_QUERIES  # noqa: E402
 
 
 # ── Helpers: mock tree-sitter nodes and captures ────────────────────────
@@ -74,7 +74,7 @@ class TestLangConfig:
         """A malformed query is skipped, not fatal."""
         with (
             patch("spacetime_memory.ingest.get_language") as mock_get_lang,
-            patch("spacetime_memory.ingest.TSParser") as mock_parser_cls,
+            patch("spacetime_memory.ingest.TSParser"),
             patch("spacetime_memory.ingest.Query") as mock_query_cls,
         ):
             mock_lang = Mock()
@@ -329,7 +329,7 @@ class TestProcessFile:
         file_nodes: dict = {}
         def_nodes: dict = {}
 
-        with patch("spacetime_memory.ingest._LangConfig") as mock_lc:
+        with patch("spacetime_memory.ingest._LangConfig"):
             mock_cfg = Mock()
             mock_cfg.name = "python"
             mock_cfg.parser = Mock()
@@ -414,7 +414,7 @@ class TestProcessFile:
         file_nodes: dict = {}
         def_nodes: dict = {}
 
-        with patch("spacetime_memory.ingest._LangConfig") as mock_lc:
+        with patch("spacetime_memory.ingest._LangConfig"):
             mock_cfg = Mock()
             mock_cfg.name = "python"
             mock_cfg.parser = Mock()

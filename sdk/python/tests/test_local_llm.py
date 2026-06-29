@@ -440,7 +440,7 @@ class TestDownloadModel:
             patch.object(Path, "home", return_value=tmp_path / "home"),
         ):
             mock_retrieve.side_effect = lambda url, path: Path(path).write_text("data")
-            result = LocalLLM.download_model("qwen2.5-0.5b")
+            LocalLLM.download_model("qwen2.5-0.5b")
             call_args = mock_retrieve.call_args[0]
             assert "models" in str(call_args[1])
 

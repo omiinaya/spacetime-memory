@@ -25,7 +25,7 @@ pytestmark = [
 ]
 
 
-from spacetime_memory.sdks.zep import (
+from spacetime_memory.sdks.zep import (  # noqa: E402 — intentional: after pytestmark
     ZepClient,
     MemoryMessage,
     Memory,

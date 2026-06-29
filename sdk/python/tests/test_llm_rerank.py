@@ -186,7 +186,7 @@ class TestLLMRerank:
 
         with _patch("spacetime_memory.client.llm_rerank") as mock_rerank:
             mock_rerank.return_value = results
-            out = mock_client.search(
+            mock_client.search(
                 "ws-1",
                 "auth",
                 rerank=True,
@@ -216,5 +216,5 @@ class TestLLMRerank:
         mock_client._embed.return_value = [0.1] * 384
 
         with _patch("spacetime_memory.client.llm_rerank") as mock_rerank:
-            out = mock_client.search("ws-1", "test", rerank=False)
+            mock_client.search("ws-1", "test", rerank=False)
             mock_rerank.assert_not_called()

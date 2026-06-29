@@ -245,7 +245,6 @@ def test_race_create_workspace(stdb_client: Client):
     """
     c = stdb_client
     ws_name = f"race-ws-{uuid.uuid4().hex[:8]}"
-    results: list = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
         futures = [

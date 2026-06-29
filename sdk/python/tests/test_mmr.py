@@ -272,7 +272,7 @@ class TestMMRRerank:
         # First pick: any (all score 0.5), it picks first after sort
         # After first picked, diverse content should come before similar
         # The winner's content determines what's "similar"
-        selected_content = output[0]["memory_content"]
+        output[0]["memory_content"]
         # Second and third should not both be near-duplicates of the first
         # Let's just verify all results are present
         contents = {r["memory_content"] for r in output}
