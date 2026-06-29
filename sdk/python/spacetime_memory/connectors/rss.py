@@ -20,6 +20,14 @@ class RssFeedConnector(Connector):
         *,
         cursor_dir: str | None = None,
     ):
+        """Initialise the RSS/Atom feed connector.
+
+        Args:
+            feed_url: URL of the RSS or Atom feed to poll.
+            workspace_id: Target workspace UUID.
+            peer_id: Name for the memory source (default ``"rss-bot"``).
+            cursor_dir: Optional directory for cursor persistence.
+        """
         super().__init__(cursor_dir=cursor_dir)
         self.feed_url = feed_url
         self.workspace_id = workspace_id

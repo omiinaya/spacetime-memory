@@ -39,6 +39,15 @@ class NotionConnector(Connector):
         peer_id: str = "notion-bot",
         max_pages: int = 100,
     ):
+        """Initialise the Notion connector.
+
+        Args:
+            token: Notion integration token (``secret_...``).
+            database_id: Notion database ID to poll.
+            workspace_id: Target workspace UUID.
+            peer_id: Name for the memory source (default ``"notion-bot"``).
+            max_pages: Maximum pages to fetch per poll (default ``100``).
+        """
         self.token = token
         self.database_id = database_id
         self.workspace_id = workspace_id
@@ -51,6 +60,17 @@ class NotionConnector(Connector):
     # ------------------------------------------------------------------
 
     def poll(self) -> list[Event]:
+        """Poll a Notion database for new or updated pages.
+
+        Queries the database with cursor-based pagination (up to
+        ``max_pages`` pages of 100 results each).  Extracts title,
+        body, and all property values from each page.  Skips pages
+        already seen (deduplication by page ID).  Handles rate
+        limits by honouring the ``Retry-After`` header.
+
+        Returns:
+            List of new ``Event`` objects since the last poll.
+        """
         events: list[Event] = []
         headers = {
             "Authorization": f"Bearer {self.token}",

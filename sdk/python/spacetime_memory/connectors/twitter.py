@@ -37,6 +37,21 @@ class TwitterConnector(Connector):
         list_id: str | None = None,
         peer_id: str = "twitter-bot",
     ):
+        """Initialise the Twitter/X API v2 connector.
+
+        Provide *either* ``user_id`` (for ``/2/users/{id}/tweets``)
+        *or* ``list_id`` (for ``/2/lists/{id}/tweets``).
+
+        Args:
+            bearer_token: Twitter API v2 bearer token.
+            workspace_id: Target workspace UUID.
+            user_id: Twitter user ID to fetch tweets from.
+            list_id: Twitter list ID to fetch tweets from.
+            peer_id: Name for the memory source (default ``"twitter-bot"``).
+
+        Raises:
+            ValueError: If neither ``user_id`` nor ``list_id`` is provided.
+        """
         if not user_id and not list_id:
             raise ValueError("Either user_id or list_id must be provided")
         self.bearer_token = bearer_token

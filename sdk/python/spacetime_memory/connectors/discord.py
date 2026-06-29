@@ -37,6 +37,16 @@ class DiscordConnector(Connector):
         include_threads: bool = False,
         decode_emoji: bool = True,
     ):
+        """Initialise the Discord connector.
+
+        Args:
+            token: Discord bot token.
+            channel_ids: List of Discord channel IDs to poll.
+            workspace_id: Target workspace UUID.
+            peer_id: Name for the memory source (default ``"discord-bot"``).
+            include_threads: Whether to fetch parent messages for thread channels.
+            decode_emoji: Whether to resolve ``:name:`` custom emoji.
+        """
         self.token = token
         self.channel_ids = list(channel_ids)
         self.workspace_id = workspace_id
@@ -64,6 +74,7 @@ class DiscordConnector(Connector):
         """
 
         def replace_emoji(match: re.Match) -> str:
+            """Replace a matched ``:name:`` pattern from cache or return as-is."""
             name = match.group(1)
             # Check cache first
             cached = self._emoji_cache.get(name)
@@ -122,6 +133,17 @@ class DiscordConnector(Connector):
     # ------------------------------------------------------------------
 
     def poll(self) -> list[Event]:
+        """Poll configured Discord channels for new messages.
+
+        Iterates over all configured channel IDs, fetches new messages
+        with pagination (up to 10 pages, 1000 messages max), and
+        converts them to ``Event`` objects.  Thread channels are handled
+        transparently when ``include_threads`` is set — parent messages
+        are fetched instead.
+
+        Returns:
+            List of new ``Event`` objects since the last poll.
+        """
         events: list[Event] = []
         headers = {
             "Authorization": f"Bot {self.token}",
