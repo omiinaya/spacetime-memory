@@ -85,7 +85,7 @@ pub fn resolve_entity(
     let existing = ctx
         .db
         .entity_link()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .find(|el| el.workspace_id == workspace_id && el.entity_name == name);
 
     if existing.is_none() {

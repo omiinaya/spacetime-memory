@@ -154,7 +154,7 @@ pub fn list_replication_peers(ctx: &ReducerContext, workspace_id: String) -> Res
     let old: Vec<_> = ctx
         .db
         .replication_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|r| r.workspace_id == workspace_id && r.query_type == "peers" && r.id != result_id)
         .collect();
     for r in old {
@@ -192,7 +192,7 @@ pub fn get_unsynced_entries(ctx: &ReducerContext, workspace_id: String, limit: i
     let entries: Vec<_> = ctx
         .db
         .replication_log()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|e| e.workspace_id == workspace_id && !e.synced)
         .take(limit as usize)
         .collect();
@@ -213,7 +213,7 @@ pub fn get_unsynced_entries(ctx: &ReducerContext, workspace_id: String, limit: i
     let old: Vec<_> = ctx
         .db
         .replication_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|r| r.workspace_id == workspace_id && r.query_type == "unsynced" && r.id != result_id)
         .collect();
     for r in old {
@@ -282,7 +282,7 @@ pub fn get_replication_status(ctx: &ReducerContext, workspace_id: String) -> Res
     let old: Vec<_> = ctx
         .db
         .replication_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|r| r.workspace_id == workspace_id && r.query_type == "status" && r.id != result_id)
         .collect();
     for r in old {
@@ -302,7 +302,7 @@ pub fn cleanup_replication_log(ctx: &ReducerContext, workspace_id: String) -> Re
     let old: Vec<_> = ctx
         .db
         .replication_log()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|e| {
             e.workspace_id == workspace_id && e.synced && e.created_at < seven_days_ago
         })
@@ -734,7 +734,7 @@ pub fn get_replication_peer_by_id(ctx: &ReducerContext, peer_id: String) -> Resu
     let old: Vec<_> = ctx
         .db
         .replication_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|r| r.query_type == "peer_by_id" && r.id != result_id)
         .collect();
     for r in old {

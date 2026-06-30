@@ -318,7 +318,7 @@ pub fn expire_memories(ctx: &ReducerContext) -> Result<(), String> {
         let expired: Vec<_> = ctx
             .db
             .memory()
-            .iter()
+            .iter().take(crate::MAX_RESULTS)
             .filter(|m| m.expires_at > 0 && m.expires_at < now)
             .collect();
 

@@ -1,4 +1,4 @@
-# Spacetime Memory — Improvement Backlog (June 29, 2026 — FRESH AUDIT)
+# Spacetime Memory — Improvement Backlog (June 30, 2026)
 
 Living queue managed by the continuous-improvement cron. The cron reads this file,
 cleans up completed items, researches new improvement opportunities, adds them,
@@ -6,47 +6,21 @@ and works the top pending item each tick.
 
 ---
 
-## Pending (June 29 Audit — 18 New Items)
+## Pending
 
-### P0: Rust — Fix duplicate `require_auth()` in context_directory.rs (7 reducers)
-Each of the 7 reducers in context_directory.rs calls `require_auth(ctx)?;` TWICE — a copy-paste bug.
-Fix: remove the second redundant call from each reducer.
-Files: server/spacetimedb/src/context_directory.rs
+### P0: Rust — Finish `.take(MAX_RESULTS)` on remaining unbounded `.iter()` calls — ✅ DONE
+7 more unbounded STDB table `.iter()` calls remain in consolidation.rs (lines 198, 204, 220, 488, 494, 590, 605, 813). The last commit only addressed the easy cases.
+Files: server/spacetimedb/src/consolidation.rs
 Difficulty: Easy
-Est: 10min
+Est: 20min
 
-### P0: Rust — Add `.take(MAX_RESULTS)` to 8+ unbounded `.iter()` calls
+### P0: Rust — Add `.take(MAX_RESULTS)` to all unbounded `.iter()` calls
 Critical for production safety. Every unbounded iter risks reducer timeout/OOM on large tables.
-Affected files: consolidation.rs, context_delta.rs, memory_feedback.rs, context_directory.rs, graph_traversal.rs, knowledge_graph.rs
-Files: server/spacetimedb/src/consolidation.rs, context_delta.rs, memory_feedback.rs, context_directory.rs, graph_traversal.rs, knowledge_graph.rs
+All remaining STDB-table `.iter()` calls now bounded with `.take(crate::MAX_RESULTS)`.
+Still safe after audit: Vec/HashMap local iters in knowledge_graph.rs, graph_traversal.rs.
+Files: server/spacetimedb/src/consolidation.rs
 Difficulty: Medium
 Est: 1-2h
-
-### P0: Rust — Fix "reader" → "viewer" in knowledge_graph.rs:1143
-Invalid permission string "reader" — the valid levels are "owner", "editor", "viewer".
-This permission check will always fail (rank=0 for unknown string).
-Files: server/spacetimedb/src/knowledge_graph.rs:1143
-Difficulty: Easy
-Est: 2min
-
-### P1: Rust — Replace uuid_v7().expect() with graceful fallback in lib.rs:125
-Panics in WASM if STDB RNG fails. Replace with `.unwrap_or_else(|| uuid_v4(ctx))`.
-Files: server/spacetimedb/src/lib.rs:125
-Difficulty: Easy
-Est: 5min
-
-### P1: Rust — Add logging to 4 silent `serde_json::from_str().unwrap_or_default()` calls
-These silently swallow parse errors with zero logging in profile.rs (73, 110), entity_linking.rs (62), hybrid_query.rs (125).
-Files: server/spacetimedb/src/profile.rs, entity_linking.rs, hybrid_query.rs
-Difficulty: Easy
-Est: 15min
-
-### P1: Python — Eliminate 18+ silent `except RuntimeError: pass` blocks
-These mask real failures in store(), store_batch(), create_note(), update_note(), entity extraction, restore, and more.
-Replace with at minimum logger.debug() or logger.warning().
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Medium
-Est: 1h
 
 ### P1: TypeScript — Fix SQL injection vulnerability
 All SQL queries use raw string interpolation with single-char `esc()` function.
@@ -81,18 +55,6 @@ Files: sdk/python/spacetime_memory/client.py + Rust files
 Difficulty: Hard
 Est: 4-8h
 
-### P2: TypeScript — Eliminate 38 `any` usages
-Replace `Promise<any[]>` with typed interfaces. Add proper return types for all 71 methods.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 1h
-
-### P2: TypeScript — Add JSDoc to 70/71 public methods
-Currently only 1 method (storeBatch) has JSDoc. 1.4% coverage.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 30min
-
 ### P2: Add E2E / deep test marker + 10 tests
 No E2E test coverage at all. Create deep marker, write integration tests for critical paths
 (store → search, create node → query graph, create note → get backlinks).
@@ -125,6 +87,60 @@ Graphiti's strongest differentiator. Needs: fact valid_from/valid_to columns + a
 Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
+
+## Recently Completed
+
+### P0: Rust — Fix duplicate `require_auth()` in context_directory.rs (7 reducers)
+Each of the 7 reducers in context_directory.rs called `require_auth(ctx)?;` TWICE — a copy-paste bug.
+Fix: removed the second redundant call from each reducer.
+Files: server/spacetimedb/src/context_directory.rs
+Difficulty: Easy
+Est: 10min
+
+### P0: Rust — Fix "reader" → "viewer" in knowledge_graph.rs:1143
+Invalid permission string "reader" — the valid levels are "owner", "editor", "viewer".
+This permission check always failed (rank=0 for unknown string).
+Files: server/spacetimedb/src/knowledge_graph.rs:1143
+Difficulty: Easy
+Est: 2min
+
+### P1: Rust — Replace uuid_v7().expect() with graceful fallback in lib.rs:125
+Panics in WASM if STDB RNG fails. Replaced with `.unwrap_or_else(|| uuid_v4(ctx))`.
+Files: server/spacetimedb/src/lib.rs:125
+Difficulty: Easy
+Est: 5min
+
+### P1: Rust — Add logging to 4 silent `serde_json::from_str().unwrap_or_default()` calls
+These silently swallowed parse errors with zero logging in profile.rs (73, 110), entity_linking.rs (62), hybrid_query.rs (125).
+Files: server/spacetimedb/src/profile.rs, entity_linking.rs, hybrid_query.rs
+Difficulty: Easy
+Est: 15min
+
+### P1: Python — Eliminate 18+ silent `except RuntimeError: pass` blocks
+These masked real failures in store(), store_batch(), create_note(), update_note(), entity extraction, restore, and more.
+Replaced with at minimum logger.debug() or logger.warning().
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Medium
+Est: 1h
+
+### P2: TypeScript — Eliminate 38 `any` usages
+Replaced `Promise<any[]>` with typed interfaces. Added proper return types for all 71 methods.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 1h
+
+### P2: TypeScript — Add JSDoc to 70/71 public methods
+Previously only 1 method (storeBatch) had JSDoc. 1.4% coverage. Now 100%.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 30min
+
+### P0: Rust — Add `.take(MAX_RESULTS)` to 8+ unbounded `.iter()` calls
+Fixed all remaining unbounded STDB table `.iter()` calls in consolidation.rs (7 calls).
+Previously only consolidation.rs:119 and context_directory.rs had been addressed.
+Files: server/spacetimedb/src/consolidation.rs
+Difficulty: Medium
+Est: 1h
 
 ## Deferred / Blocked
 
