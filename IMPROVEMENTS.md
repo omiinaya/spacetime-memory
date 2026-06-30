@@ -8,13 +8,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P1: TypeScript — Fix SQL injection vulnerability
-All SQL queries use raw string interpolation with single-char `esc()` function.
-Doesn't handle backslash escapes, Unicode attacks, or other injection vectors.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 30min
-
 ### P1: TypeScript — Publish to npm
 npm publish workflow exists but NPM_TOKEN hasn't been set in GitHub secrets.
 Files: sdk/typescript/package.json, .github/workflows/npm-publish.yml
@@ -75,6 +68,12 @@ Difficulty: Hard
 Est: 1 week
 
 ## Recently Completed
+
+### P1: TypeScript — Fix SQL injection vulnerability
+All SQL queries migrated from raw string interpolation (`${esc()}`) to parameterized `_sqlExec(':param')`. Fixed critical `esc()` backslash regex bug (`/\\\\/g` → `/\\/g`) that missed single backslashes. 46 queries converted, 44 `_sqlExec()` calls now serve all public methods.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 30min
 
 ### P0: Rust — Fix duplicate `require_auth()` in context_directory.rs (7 reducers)
 Each of the 7 reducers in context_directory.rs called `require_auth(ctx)?;` TWICE — a copy-paste bug.
