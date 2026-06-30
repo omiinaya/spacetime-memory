@@ -9,6 +9,10 @@ from __future__ import annotations
 
 import json
 import os
+import random
+import secrets
+import time
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -431,11 +435,8 @@ class Client:
         fails over to the next host in ``self._hosts`` (if configured via
         the ``SPACETIMEDB_HOSTS`` environment variable).
         """
-        import random as _random
-        import time as _time
-
         # Circuit breaker check
-        now = _time.time()
+        now = time.time()
         if self._circuit_open_until > now:
             raise RuntimeError(
                 f"SpacetimeDB circuit breaker is open "
@@ -468,7 +469,7 @@ class Client:
             except httpx.RemoteProtocolError as e:
                 last_exc = e
             if attempt < self.max_retries:
-                delay = 0.5 * (2**attempt) * (1 + _random.random())
+                delay = 0.5 * (2**attempt) * (1 + random.random())
                 logger.warning(
                     "Request failed (attempt %d/%d): %s. Retrying in %.1fs...",
                     attempt + 1,
@@ -476,7 +477,7 @@ class Client:
                     last_exc,
                     delay,
                 )
-                _time.sleep(delay)
+                time.sleep(delay)
 
         # All retries exhausted — try failover to next host before giving up
         if self._try_failover():
@@ -498,7 +499,7 @@ class Client:
         # No more hosts to try — trip circuit breaker
         self._consecutive_failures += 1
         if self._consecutive_failures >= self._circuit_breaker_threshold:
-            self._circuit_open_until = _time.time() + self._circuit_breaker_reset_secs
+            self._circuit_open_until = time.time() + self._circuit_breaker_reset_secs
             logger.warning(
                 "Circuit breaker opened for %.0fs after %d consecutive failures",
                 self._circuit_breaker_reset_secs,
@@ -555,8 +556,6 @@ class Client:
         The reducer checks auth + workspace access and stores results in
         the public query_result table, scoped by a random query_id.
         """
-        import secrets
-        import json
 
         query_id = secrets.token_hex(16)
         filter_json = json.dumps(filter_dict or {})
@@ -768,9 +767,6 @@ class Client:
         Used for external APIs (OpenAI) where failures should NOT trip the
         SpacetimeDB circuit breaker. Returns ``None`` if all retries fail.
         """
-        import random as _random
-        import time as _time
-
         last_exc: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
@@ -784,7 +780,7 @@ class Client:
             except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
                 last_exc = e
             if attempt < self.max_retries:
-                delay = 0.5 * (2**attempt) * (1 + _random.random())
+                delay = 0.5 * (2**attempt) * (1 + random.random())
                 logger.warning(
                     "Request failed (attempt %d/%d) — %s. Retrying in %.1fs...",
                     attempt + 1,
@@ -792,7 +788,7 @@ class Client:
                     last_exc,
                     delay,
                 )
-                _time.sleep(delay)
+                time.sleep(delay)
         logger.warning(
             "Request failed after %d attempts (no circuit): %s",
             self.max_retries + 1,
@@ -859,8 +855,6 @@ class Client:
 
         Hits the database info endpoint and reports latency.
         """
-        import time
-
         start = time.monotonic()
         try:
             resp = self._request_with_retry(
@@ -1308,7 +1302,6 @@ class Client:
 
         # Batch-embed
         try:
-            import json
 
             resp = self._http.post(
                 f"{self.embedder_url}/embed",
@@ -1327,12 +1320,11 @@ class Client:
             emb_list = []
 
         # Call batch reducer — pass items as JSON string
-        import json as _j
 
         with _tracing_span(
             "store_batch.call", workspace_id=workspace_id, batch_size=len(clean_items)
         ):
-            self._call("store_memory_batch", [_j.dumps(clean_items)])
+            self._call("store_memory_batch", [json.dumps(clean_items)])
 
         # Index each item with its embedding
         for i, item in enumerate(clean_items):
@@ -1347,7 +1339,6 @@ class Client:
                 if mems:
                     # Take most recent (server returns unsorted; sort client-side)
                     mems.sort(key=lambda m: m.get("created_at", 0), reverse=True)
-                    import json as _json
 
                     self._call(
                         "index_entity",
@@ -1356,7 +1347,7 @@ class Client:
                             "memory",
                             mems[0]["id"],
                             item["content"],
-                            _json.dumps(emb),
+                            json.dumps(emb),
                         ],
                     )
                     # Populate BM25 inverted index
@@ -1749,7 +1740,6 @@ class Client:
                 continue
 
         # --- Match against entity_link aliases ---
-        import json as _json
 
         for link in links:
             entity_name = (link.get("entity_name") or "").lower().strip()
@@ -1759,7 +1749,7 @@ class Client:
             # Parse aliases JSON
             raw_aliases = link.get("aliases_json") or "[]"
             try:
-                alias_list: list[str] = _json.loads(raw_aliases)
+                alias_list: list[str] = json.loads(raw_aliases)
             except (ValueError, TypeError):
                 logger.debug("get_graph_context: failed to parse aliases_json, treating as empty")
                 alias_list = []
@@ -2200,9 +2190,7 @@ class Client:
         if not emb:
             return []
 
-        import json as _json
-
-        emb_json = _json.dumps(emb)
+        emb_json = json.dumps(emb)
         self._call("search_sessions_semantic", [emb_json, limit])
 
         qhash = f"sessions:{limit}"
@@ -2854,8 +2842,6 @@ class Client:
             source_url: Optional source URL.
             metadata: Optional metadata dict (serialized to JSON).
         """
-        import json
-
         meta_json = json.dumps(metadata or {})
         return self._call(
             "create_document",
@@ -2949,7 +2935,6 @@ class Client:
         # For metadata/location filters, we do a keyword search first then filter in Python
         rows = self.search(workspace_id, query, memory_type, tier, limit, semantic=True)
         if metadata_filter:
-            import json
 
             mf = (
                 json.loads(metadata_filter) if isinstance(metadata_filter, str) else metadata_filter
@@ -3801,9 +3786,6 @@ class Client:
             Dict with ``status``, ``api_key`` (the secret), ``id`` (the
             key's database ID), and a warning note.
         """
-        import secrets
-        import hashlib
-
         raw = secrets.token_bytes(32)
         api_key = "sk-" + raw.hex()
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()
@@ -4675,8 +4657,6 @@ def llm_rerank(
 
     try:
         # Retry with backoff for rate limits
-        import time as _time
-
         resp = None
         for attempt in range(3):
             try:
@@ -4695,7 +4675,7 @@ def llm_rerank(
                 )
             except (httpx.ConnectError, httpx.TimeoutException):
                 if attempt < 2:
-                    _time.sleep(2**attempt)
+                    time.sleep(2**attempt)
                     continue
                 raise
             if resp.status_code == 429:
@@ -4703,7 +4683,7 @@ def llm_rerank(
                 logger.warning(
                     "LLM rerank rate-limited, retrying in %ds (attempt %d/3)", wait, attempt + 1
                 )
-                _time.sleep(wait)
+                time.sleep(wait)
                 continue
             resp.raise_for_status()
             break
