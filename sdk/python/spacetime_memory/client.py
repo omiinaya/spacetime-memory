@@ -658,7 +658,8 @@ class Client:
                 base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip(
                     "/"
                 )
-                resp = self._http.post(
+                resp = self._request_with_retry_simple(
+                    "POST",
                     f"{base_url}/embeddings",
                     headers={
                         "Authorization": f"Bearer {api_key}",
@@ -675,6 +676,9 @@ class Client:
                     ),
                     timeout=30,
                 )
+                if resp is None:
+                    logger.warning("OpenAI embedder failed for text (len=%d) — all retries exhausted", len(text))
+                    return []
                 resp.raise_for_status()
                 data = resp.json()
                 return data["data"][0]["embedding"]
@@ -708,7 +712,8 @@ class Client:
                 base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip(
                     "/"
                 )
-                resp = self._http.post(
+                resp = self._request_with_retry_simple(
+                    "POST",
                     f"{base_url}/embeddings",
                     headers={
                         "Authorization": f"Bearer {api_key}",
@@ -725,6 +730,9 @@ class Client:
                     ),
                     timeout=60,
                 )
+                if resp is None:
+                    logger.warning("OpenAI embedder failed for batch (count=%d) — all retries exhausted", len(texts))
+                    return []
                 resp.raise_for_status()
                 data = resp.json()
                 # OpenAI returns data in order matching input
@@ -741,14 +749,56 @@ class Client:
         """Check if the embedder sidecar is running. Returns status info."""
         with _tracing_span("embedder.health"):
             try:
-                resp = self._http.get(f"{self.embedder_url}/health", timeout=5.0)
+                resp = self._request_with_retry(
+                    "GET", f"{self.embedder_url}/health", timeout=5.0
+                )
                 if resp.status_code == 200:
                     embedder_status = resp.json()
                     embedder_status["reachable"] = True
                     return embedder_status
                 return {"status": "error", "code": resp.status_code, "reachable": True}
-            except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError, RuntimeError) as e:
                 return {"status": "error", "message": str(e), "reachable": False}
+
+    def _request_with_retry_simple(
+        self, method: str, url: str, **kwargs: Any
+    ) -> httpx.Response | None:
+        """Make an HTTP request with retry, WITHOUT touching the circuit breaker.
+
+        Used for external APIs (OpenAI) where failures should NOT trip the
+        SpacetimeDB circuit breaker. Returns ``None`` if all retries fail.
+        """
+        import random as _random
+        import time as _time
+
+        last_exc: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                if method == "POST":
+                    resp = self._http.post(url, **kwargs)
+                elif method == "GET":
+                    resp = self._http.get(url, **kwargs)
+                else:
+                    resp = self._http.request(method, url, **kwargs)
+                return resp
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+                last_exc = e
+            if attempt < self.max_retries:
+                delay = 0.5 * (2**attempt) * (1 + _random.random())
+                logger.warning(
+                    "Request failed (attempt %d/%d) — %s. Retrying in %.1fs...",
+                    attempt + 1,
+                    self.max_retries + 1,
+                    last_exc,
+                    delay,
+                )
+                _time.sleep(delay)
+        logger.warning(
+            "Request failed after %d attempts (no circuit): %s",
+            self.max_retries + 1,
+            last_exc,
+        )
+        return None
 
     # ── Tantivy BM25 keyword search sidecar ──
 
@@ -761,7 +811,8 @@ class Client:
     ) -> bool:
         """Index a document into the Tantivy BM25 sidecar."""
         try:
-            resp = self._http.post(
+            resp = self._request_with_retry(
+                "POST",
                 f"{self.tantivy_url}/index",
                 json={
                     "workspace_id": workspace_id,
@@ -772,7 +823,7 @@ class Client:
                 timeout=5.0,
             )
             return resp.status_code < 400
-        except (httpx.ConnectError, httpx.TimeoutException):
+        except (httpx.ConnectError, httpx.TimeoutException, RuntimeError):
             return False
 
     def _tantivy_search(
@@ -787,7 +838,8 @@ class Client:
         Scores are raw BM25 — already in a useful range (typically 0-20+).
         """
         try:
-            resp = self._http.post(
+            resp = self._request_with_retry(
+                "POST",
                 f"{self.tantivy_url}/search",
                 json={
                     "workspace_id": workspace_id,
@@ -799,7 +851,7 @@ class Client:
             if resp.status_code >= 400:
                 return []
             return resp.json()
-        except (httpx.ConnectError, httpx.TimeoutException):
+        except (httpx.ConnectError, httpx.TimeoutException, RuntimeError):
             return []
 
     def ping(self) -> dict[str, Any]:
@@ -811,7 +863,8 @@ class Client:
 
         start = time.monotonic()
         try:
-            resp = self._http.get(
+            resp = self._request_with_retry(
+                "GET",
                 f"http://{self.host}:{self.port}/v1/database/{self.database}",
                 headers=self._headers(),
                 timeout=5.0,
@@ -824,7 +877,7 @@ class Client:
                 "message": f"HTTP {resp.status_code}",
                 "latency_ms": round(elapsed * 1000, 1),
             }
-        except (httpx.ConnectError, httpx.TimeoutException) as e:
+        except (httpx.ConnectError, httpx.TimeoutException, RuntimeError) as e:
             elapsed = time.monotonic() - start
             return {"status": "error", "message": str(e), "latency_ms": round(elapsed * 1000, 1)}
 

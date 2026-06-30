@@ -20,13 +20,6 @@ Files: scripts/benchmark.py (exists, needs integration)
 Difficulty: Hard
 Est: 1-2 weeks
 
-### P2: Python — Route 5 direct-HTTP methods through retry circuit
-ping(), check_embedder_health(), _tantivy_index(), _tantivy_search(), _embed_openai()
-all use self._http.get/post directly instead of _request_with_retry().
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Medium
-Est: 30min
-
 ### P2: Python — Add 77 missing Rust reducers to SDK
 Auth (9), replication (10), sessions (5), peers (3), connectors (3), messages (2),
 harmonics (3), change events (3), context deltas (2), + ~37 miscellaneous.
@@ -69,6 +62,15 @@ Est: 1 week
 
 ## Recently Completed
 
+### P2: Python — Route 5 direct-HTTP methods through retry circuit
+All 5 methods (ping, check\_embedder\_health, \_tantivy\_index, \_tantivy\_search, \_embed\_openai)
+plus \_embed\_batch\_openai now use retry wrappers. Internal sidecar calls use \_request\_with\_retry()
+(STDB circuit breaker); external OpenAI calls use new \_request\_with\_retry\_simple() that retries
+without touching the circuit breaker. 170/170 client tests pass.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Medium
+Est: 30min
+
 ### P1: TypeScript — Fix SQL injection vulnerability
 All SQL queries migrated from raw string interpolation (`${esc()}`) to parameterized `_sqlExec(':param')`. Fixed critical `esc()` backslash regex bug (`/\\\\/g` → `/\\/g`) that missed single backslashes. 46 queries converted, 44 `_sqlExec()` calls now serve all public methods.
 Files: sdk/typescript/client.ts
@@ -105,27 +107,6 @@ Est: 15min
 These masked real failures in store(), store_batch(), create_note(), update_note(), entity extraction, restore, and more.
 Replaced with at minimum logger.debug() or logger.warning().
 Files: sdk/python/spacetime_memory/client.py
-Difficulty: Medium
-Est: 1h
-
-### P2: TypeScript — Eliminate 38 `any` usages
-Replaced `Promise<any[]>` with typed interfaces. Added proper return types for all 71 methods.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 1h
-
-### P2: TypeScript — Add JSDoc to 70/71 public methods
-Previously only 1 method (storeBatch) had JSDoc. 1.4% coverage. Now 100%.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 30min
-
-### P0: Rust — Add `.take(MAX_RESULTS)` to 8+ unbounded `.iter()` calls
-Fixed all remaining unbounded STDB table `.iter()` calls across the entire server module.
-7 calls in consolidation.rs + 1 in entity_linking.rs + 1 in memory.rs + 6 in replication.rs
-+ 1 in user.rs + 4 in workspace.rs = 20 total bounded calls in this pass.
-All STDB `.iter()` calls now have `.take(crate::MAX_RESULTS)`.
-Files: server/spacetimedb/src/*.rs
 Difficulty: Medium
 Est: 1h
 
