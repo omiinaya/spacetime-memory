@@ -172,8 +172,6 @@ pub fn hybrid_search(
     tier: String,
     limit: u32,
     strategies_json: String,
-    _polyphonic: bool,
-    mmr_lambda: f64,
 ) -> Result<(), String> {
     trace_span!(ctx, "hybrid_search", TracingSpanKind::Read, &workspace_id, {
         let _account = require_auth(ctx)?;
@@ -181,6 +179,10 @@ pub fn hybrid_search(
     let qhash = query_hash(&query);
     let query_lower = query.to_lowercase();
     let query_terms: Vec<&str> = query_lower.split_whitespace().collect();
+
+    // Internal defaults for advanced params
+    let _polyphonic = true;
+    let mmr_lambda: f64 = 0.7;
 
     // Parse the selected strategies (default: all four)
     let strategies: Vec<String> = if strategies_json.is_empty() {

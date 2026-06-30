@@ -53,7 +53,7 @@ def _running_stdb() -> bool:
         s.close()
 
 
-def _publish_module(delete_data: str = "on-conflict") -> str:
+def _publish_module(delete_data: str = "never") -> str:
     """Publish the WASM module via HTTP API and return the database identity.
 
     Uses anonymous HTTP API publish (same approach as updated conftest.py).
@@ -126,7 +126,7 @@ def _get_client() -> Client:
         )
         sys.exit(1)
 
-    db_identity = _publish_module(delete_data="always")
+    db_identity = _publish_module(delete_data="never")
 
     return Client(
         host=os.environ.get("SPACETIMEDB_HOST", "localhost"),

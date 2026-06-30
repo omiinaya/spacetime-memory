@@ -1904,8 +1904,6 @@ class Client:
                         tier,
                         fetch_limit,
                         strategies,
-                        polyphonic,
-                        mmr_lambda,
                     ],
                 )
             qhash = _query_hash(search_query)

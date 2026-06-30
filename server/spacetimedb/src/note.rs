@@ -27,7 +27,7 @@ pub struct Note {
     pub updated_at: i64,
     pub is_active: bool,
     /// Version number (incremented on updates for history tracking)
-    pub version: u32,
+    pub version: Option<u32>,
 }
 
 /// A snapshot of a note's state before an update.
@@ -63,7 +63,7 @@ pub fn record_note_revision(
         id,
         note_id: note.id.clone(),
         workspace_id: note.workspace_id.clone(),
-        version: note.version,
+        version: note.version.unwrap_or(0),
         previous_title: note.title.clone(),
         previous_content: note.content.clone(),
         new_title: new_title.to_string(),
@@ -180,7 +180,7 @@ pub fn create_note(
         created_at: now,
         updated_at: now,
         is_active: true,
-        version: 1,
+        version: Some(1),
     };
 
     ctx.db.note().insert(note);
@@ -224,7 +224,7 @@ pub fn update_note(
     note.title = final_title;
     note.content = content.clone();
     note.updated_at = now;
-    note.version += 1; // Increment version on each update
+    note.version = Some(note.version.unwrap_or(0) + 1); // Increment version on each update
     if !embedding_json.is_empty() {
         note.embedding_json = embedding_json;
     }

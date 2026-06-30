@@ -248,7 +248,8 @@ stdb: true
 237|| `make build-module` | Build Rust WASM module (release) | After changing `server/spacetimedb/src/` |
 238|| `make install-sdk` | `pip install -e sdk/python` | First setup, after pulling new deps |
 239|| `make setup` | install-sdk + build-module | Fresh clone setup |
-240|| `spacetime publish <name> -p server/spacetimedb/ --yes` | Deploy module to STDB | After a successful build |
+240|| `spacetime publish <name> -p server/spacetimedb/ --yes --delete-data=never` | Deploy module to STDB | After a successful build |
+> **⚠️ DATA SAFETY:** Always use `--delete-data=never`. The script `./scripts/publish.sh` enforces this automatically. Never use `--delete-data=on-conflict` — it silently wipes production data on schema changes. Never use `--delete-data=always` unless you've verified a backup exists and explicitly intend to reset.
 241|| `cd server/spacetimedb && cargo build --target wasm32-unknown-unknown --release` | Raw cargo build | Debugging Rust compilation |
 242|| `cd sdk/python && pip install -e ".[dev]"` | Install dev extras (pytest, ruff) | Before running tests/lint |
 243|
@@ -306,7 +307,7 @@ stdb: true
 295|### Adding a New Reducer (Server-Side)
 296|1. Define the `#[reducer]` function in the appropriate Rust file (e.g. `memory.rs`)
 297|2. Build: `make build-module`
-298|3. Publish: `spacetime publish <name> -p server/spacetimedb/ --yes`
+298|3. Publish: `spacetime publish <name> -p server/spacetimedb/ --yes --delete-data=never`
 299|4. Add a corresponding Python method in `client.py` using `self._call()`
 300|5. Wire a CLI command in `stmem.py` if user-facing
 301|6. Write pytest unit test (mock the HTTP call) and integration test
@@ -374,7 +375,7 @@ stdb: true
 363|cd spacetime-memory
 364|make setup                                            # install SDK + build module
 365|spacetime start --listen-addr 0.0.0.0:3001 &         # start STDB
-366|spacetime publish spacetime-memory -p server/spacetimedb/ --yes  # deploy module
+366|spacetime publish spacetime-memory -p server/spacetimedb/ --yes --delete-data=never  # deploy module (NEVER wipe data)
 367|make test-unit                                        # verify setup (no STDB needed)
 368|pip install -e "sdk/python[dev]"                      # dev deps (ruff, pytest)
 369|cd sdk/python && ruff check .                         # lint check

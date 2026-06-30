@@ -250,9 +250,8 @@ def main() -> None:
         "~/.spacetime-memory/connectors.yaml"
     )
     if not os.path.exists(config_path):
-        print(f"Config not found: {config_path}")
-        print("Create one with the format shown in the module docstring.")
-        sys.exit(1)
+        # No config = no connectors configured = nothing to do, silently
+        return
 
     with open(config_path) as f:
         config = yaml.safe_load(f)
