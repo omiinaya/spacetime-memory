@@ -261,14 +261,7 @@ export interface ClientOptions {
 // Helpers
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Escape a string for safe SQL usage (single-quote doubling).
- * @deprecated Use _query() reducer-based reads instead of raw SQL.
- */
+/** Escape a string for safe SQL usage (single-quote doubling for SQLite). */
 function esc(val: string): string {
   return val.replace(/'/g, "''");
 }

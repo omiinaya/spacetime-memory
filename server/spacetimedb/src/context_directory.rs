@@ -126,7 +126,7 @@ pub fn get_children(
     for child in ctx
         .db
         .context_directory()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|d| d.parent_id == directory_id)
     {
         let id = uuid_v7(ctx);
@@ -149,7 +149,7 @@ pub fn get_children(
         for link in ctx
             .db
             .directory_memory_link()
-            .iter()
+            .iter().take(crate::MAX_RESULTS)
             .filter(|l| l.directory_id == directory_id)
         {
             if let Some(mem) = ctx.db.memory().id().find(&link.memory_id) {
@@ -206,7 +206,7 @@ pub fn traverse_recursive(
         for child in ctx
             .db
             .context_directory()
-            .iter()
+            .iter().take(crate::MAX_RESULTS)
             .filter(|d| d.parent_id == current_id)
         {
             if !visited.contains(&child.id) {
@@ -265,7 +265,7 @@ pub fn get_directory(
     if let Some(dir) = ctx
         .db
         .context_directory()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .find(|d| d.path == path_or_id && d.workspace_id == workspace_id)
     {
         let id = uuid_v7(ctx);
@@ -317,7 +317,7 @@ pub fn link_memory_to_directory(
     if ctx
         .db
         .directory_memory_link()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .any(|l| l.directory_id == directory_id && l.memory_id == memory_id)
     {
         return Err(format!(
@@ -349,7 +349,7 @@ pub fn unlink_memory_from_directory(
     let link = ctx
         .db
         .directory_memory_link()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .find(|l| l.directory_id == directory_id && l.memory_id == memory_id)
         .ok_or_else(|| {
             format!(
