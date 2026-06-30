@@ -266,10 +266,12 @@ def stdb_session() -> dict:
             "Set SPACETIMEDB_HOST to force-enable integration tests."
         )
 
-    # Always publish the module with --delete-data=always so each test run
-    # starts with a clean database.  The WASM build is fast (0.1s when the
-    # artifact is current); the HTTP publish takes ~1s.
-    db_identity = _publish_module(delete_data="always")
+    # Publish the module — each test session creates its own anonymous
+    # database identity so it NEVER touches the production database.
+    # Use --delete-data=never to be safe (the anonymous identity is unique
+    # per session anyway, so deletion is a no-op, but this guards against
+    # any future code changes that could reuse the same identity).
+    db_identity = _publish_module(delete_data="never")
 
     return {
         "host": os.environ.get("SPACETIMEDB_HOST", "localhost"),

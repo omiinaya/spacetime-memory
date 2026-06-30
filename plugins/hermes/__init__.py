@@ -35,10 +35,10 @@ _BREAKER_COOLDOWN_SECS = 120
 
 def _load_config() -> dict:
     return {
-        "host": os.environ.get("SPACETIMEDB_HOST", "localhost"),
+        "host": os.environ.get("SPACETIMEDB_HOST", "127.0.0.1"),
         "port": os.environ.get("SPACETIMEDB_PORT", "3001"),
         "database": os.environ.get("SPACETIMEDB_DB", "spacetime-memory"),
-        "embedder_url": os.environ.get("EMBEDDER_URL", "http://localhost:9090"),
+        "embedder_url": os.environ.get("EMBEDDER_URL", "http://127.0.0.1:4000"),
     }
 
 
@@ -209,23 +209,37 @@ class _SpacetimeClient:
         try:
             if self._httpx:
                 resp = self._httpx.post(
-                    f"{self.embedder_url}/embed",
-                    content=json.dumps({"text": text}),
-                    headers={"Content-Type": "application/json"},
+                    f"{self.embedder_url}/v1/embeddings",
+                    content=json.dumps({"model": "bge-m3", "input": text}),
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer proxy-key",
+                    },
                     timeout=10.0,
                 )
                 if resp.status_code >= 400:
                     return []
-                return resp.json().get("embedding", [])
+                data = resp.json()
+                embeds = data.get("data", [])
+                if embeds:
+                    return embeds[0].get("embedding", [])
+                return []
             import urllib.request
-            data = json.dumps({"text": text}).encode()
+            data = json.dumps({"model": "bge-m3", "input": text}).encode()
             req = urllib.request.Request(
-                f"{self.embedder_url}/embed",
+                f"{self.embedder_url}/v1/embeddings",
                 data=data,
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer proxy-key",
+                },
             )
             resp = urllib.request.urlopen(req, timeout=10)
-            return json.loads(resp.read()).get("embedding", [])
+            body = json.loads(resp.read())
+            embeds = body.get("data", [])
+            if embeds:
+                return embeds[0].get("embedding", [])
+            return []
         except Exception:
             return []
 
@@ -525,7 +539,7 @@ class SpacetimeMemoryProvider(MemoryProvider):
             strategies = json.dumps(["semantic", "keyword", "temporal"])
             client._call("hybrid_search", [
                 self._workspace_id, query, emb_json,
-                "", "", limit, strategies,
+                "", "", limit, strategies, True, 0.7,
             ])
 
             # Read results from hybrid_result table
