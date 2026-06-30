@@ -132,7 +132,7 @@ pub fn rate_memory(
     let all_scores: Vec<f64> = ctx
         .db
         .memory_feedback()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|f| f.memory_id == memory_id)
         .map(|f| f.score)
         .collect();
@@ -224,7 +224,7 @@ pub fn apply_decay_inner(
     let memories: Vec<_> = ctx
         .db
         .memory()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|m| m.workspace_id == workspace_id && m.is_active)
         .collect();
 
@@ -341,7 +341,7 @@ pub fn manual_decay(ctx: &ReducerContext) -> Result<(), String> {
     let workspace_ids: Vec<String> = ctx
         .db
         .workspace()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .map(|ws| ws.id.clone())
         .collect();
 

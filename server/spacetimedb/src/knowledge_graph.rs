@@ -323,7 +323,7 @@ pub fn update_edge(
         // Find the latest version with invalid_at == 0
         ctx.db
             .kg_edge()
-            .iter()
+            .iter().take(crate::MAX_RESULTS)
             .filter(|e: &KgEdge| {
                 e.edge_group_id == initial.edge_group_id && e.invalid_at == 0
             })
@@ -416,7 +416,7 @@ pub fn get_edge_history(ctx: &ReducerContext, edge_group_id: String) -> Result<(
     for edge in ctx
         .db
         .kg_edge()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|e: &KgEdge| e.edge_group_id == edge_group_id)
     {
         ctx.db.edge_history_result().insert(EdgeHistoryResult {
@@ -509,7 +509,7 @@ pub fn detect_communities(
     let edge_pairs: Vec<(String, String)> = ctx
         .db
         .kg_edge()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|e| e.workspace_id == workspace_id)
         .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
         .collect();
@@ -520,7 +520,7 @@ pub fn detect_communities(
         let node_ids: Vec<String> = ctx
             .db
             .kg_node()
-            .iter()
+            .iter().take(crate::MAX_RESULTS * 5)
             .filter(|n| n.workspace_id == workspace_id && n.community_id > 0)
             .map(|n| n.id.clone())
             .collect();
@@ -588,7 +588,7 @@ pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<()
     let node_ids: Vec<(String, bool)> = ctx
         .db
         .kg_node()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|n| n.workspace_id == workspace_id && n.community_id == 0)
         .map(|n| {
             let has_edge = ctx.db.kg_edge().iter().take(crate::MAX_RESULTS).any(|e| {
@@ -617,7 +617,7 @@ pub fn seed_communities(ctx: &ReducerContext, workspace_id: String) -> Result<()
         let new_id = ctx
             .db
             .kg_community()
-            .iter()
+            .iter().take(crate::MAX_RESULTS)
             .filter(|c| c.workspace_id == workspace_id)
             .map(|c| c.id)
             .max()
@@ -683,7 +683,7 @@ pub fn compute_pagerank(
     let nodes: Vec<(String, String)> = ctx
         .db
         .kg_node()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|n| n.workspace_id == workspace_id)
         .map(|n| (n.id.clone(), n.label.clone()))
         .collect();
@@ -704,7 +704,7 @@ pub fn compute_pagerank(
     let edges: Vec<(String, String)> = ctx
         .db
         .kg_edge()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|e| e.workspace_id == workspace_id)
         .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
         .collect();
@@ -785,7 +785,7 @@ pub fn compute_pagerank(
     let old: Vec<_> = ctx
         .db
         .pagerank_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|p| p.workspace_id == workspace_id)
         .collect();
     for p in old {
@@ -853,7 +853,7 @@ pub fn compute_community_hierarchy(
     let communities: Vec<(u64, String)> = ctx
         .db
         .kg_community()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|c| c.workspace_id == workspace_id)
         .map(|c| (c.id, c.name.clone()))
         .collect();
@@ -883,7 +883,7 @@ pub fn compute_community_hierarchy(
     let old_clusters: Vec<_> = ctx
         .db
         .hierarchy_cluster()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|h| h.workspace_id == workspace_id)
         .collect();
     for h in old_clusters {
@@ -892,7 +892,7 @@ pub fn compute_community_hierarchy(
     let old_edges: Vec<_> = ctx
         .db
         .community_hierarchy()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|h| h.workspace_id == workspace_id)
         .collect();
     for h in old_edges {

@@ -87,6 +87,7 @@ fn build_full_pack(
         .db
         .memory()
         .iter()
+        .take(crate::MAX_RESULTS)
         .filter(|m| {
             m.workspace_id == workspace_id
                 && m.is_active
@@ -147,7 +148,7 @@ fn upsert_context_pack(
     let existing: Vec<_> = ctx
         .db
         .context_pack()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|p| p.workspace_id == workspace_id && p.query_hash == query_hash)
         .collect();
     for p in existing {
@@ -222,6 +223,7 @@ pub fn generate_context_pack(
             .db
             .memory()
             .iter()
+            .take(crate::MAX_RESULTS)
             .filter(|m| {
                 m.workspace_id == workspace_id && (peer_id.is_empty() || m.peer_id == peer_id)
             })
@@ -296,7 +298,7 @@ pub fn get_delta(ctx: &ReducerContext, previous_pack_id: String) -> Result<(), S
     let delta = ctx
         .db
         .delta_pack()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .find(|d| d.previous_context_pack_id == previous_pack_id)
         .ok_or_else(|| {
             format!(

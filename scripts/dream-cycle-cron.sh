@@ -6,6 +6,8 @@ set -euo pipefail
 # Designed for no_agent cron execution.
 # ────────────────────────────────────────────────────────────────────
 
+export PATH="/home/user/.local/share/hermes-cli-tools-venv/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
+
 cd /home/user/spacetime-memory
 
 export OPENAI_REDACTED

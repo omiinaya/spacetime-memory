@@ -56,7 +56,7 @@ pub fn graph_bfs(
     let edge_pairs: Vec<(String, String)> = ctx
         .db
         .kg_edge()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|e| e.workspace_id == workspace_id)
         .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
         .collect();
@@ -65,7 +65,7 @@ pub fn graph_bfs(
     let node_map: std::collections::HashMap<String, (String, String)> = ctx
         .db
         .kg_node()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|n| n.workspace_id == workspace_id)
         .map(|n| (n.id.clone(), (n.label.clone(), n.node_type.clone())))
         .collect();
@@ -140,7 +140,7 @@ pub fn shortest_path(
     let edge_pairs: Vec<(String, String)> = ctx
         .db
         .kg_edge()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|e| e.workspace_id == workspace_id)
         .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
         .collect();
@@ -149,7 +149,7 @@ pub fn shortest_path(
     let node_map: std::collections::HashMap<String, (String, String)> = ctx
         .db
         .kg_node()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|n| n.workspace_id == workspace_id)
         .map(|n| (n.id.clone(), (n.label.clone(), n.node_type.clone())))
         .collect();
@@ -226,7 +226,7 @@ pub fn get_neighbors(
     let node_map: std::collections::HashMap<String, (String, String)> = ctx
         .db
         .kg_node()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|n| n.workspace_id == workspace_id)
         .map(|n| (n.id.clone(), (n.label.clone(), n.node_type.clone())))
         .collect();
@@ -329,7 +329,7 @@ pub fn detect_bridge_nodes(
     let node_community: HashMap<String, u64> = ctx
         .db
         .kg_node()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|n| n.workspace_id == workspace_id)
         .map(|n| (n.id.clone(), n.community_id))
         .collect();
@@ -476,7 +476,7 @@ pub fn compute_kg_stats(
     let nodes: Vec<_> = ctx
         .db
         .kg_node()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|n| n.workspace_id == workspace_id)
         .collect();
 
@@ -497,7 +497,7 @@ pub fn compute_kg_stats(
     let edges: Vec<_> = ctx
         .db
         .kg_edge()
-        .iter()
+        .iter().take(crate::MAX_RESULTS * 5)
         .filter(|e| e.workspace_id == workspace_id)
         .collect();
 
