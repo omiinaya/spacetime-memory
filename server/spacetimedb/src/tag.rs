@@ -78,7 +78,7 @@ pub fn untag_memory(
     let to_delete: Vec<_> = ctx
         .db
         .memory_tag()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|mt| mt.memory_id == memory_id && mt.tag_id == tag_id)
         .collect();
     if to_delete.is_empty() {

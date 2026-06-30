@@ -261,7 +261,7 @@ pub fn delete_note(ctx: &ReducerContext, id: String) -> Result<(), String> {
     let refs_targeting: Vec<_> = ctx
         .db
         .block_reference()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|br: &BlockReference| br.target_note_id == id)
         .map(|br| br.id.clone())
         .collect();
@@ -603,7 +603,7 @@ fn clear_backlinks(ctx: &ReducerContext, note_id: &str) {
     let old_links: Vec<_> = ctx
         .db
         .note_backlink()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|bl: &NoteBacklink| bl.source_note_id == note_id)
         .map(|bl| (bl.id.clone(), bl.target_note_id.clone()))
         .collect();
@@ -621,7 +621,7 @@ fn clear_blocks(ctx: &ReducerContext, note_id: &str) {
     let block_ids: Vec<(String, Vec<String>)> = ctx
         .db
         .note_block()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|b: &NoteBlock| b.note_id == note_id)
         .map(|b| b.id.clone())
         .collect::<Vec<_>>()
@@ -631,7 +631,7 @@ fn clear_blocks(ctx: &ReducerContext, note_id: &str) {
             let refs: Vec<_> = ctx
                 .db
                 .block_reference()
-                .iter()
+                .iter().take(crate::MAX_RESULTS)
                 .filter(|br: &BlockReference| br.source_block_id == bid || br.target_block_id == bid)
                 .map(|br| br.id.clone())
                 .collect();
@@ -650,7 +650,7 @@ fn clear_blocks(ctx: &ReducerContext, note_id: &str) {
     let source_refs: Vec<_> = ctx
         .db
         .block_reference()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|br: &BlockReference| br.source_note_id == note_id)
         .map(|br| br.id.clone())
         .collect();
@@ -966,7 +966,7 @@ fn resolve_backlinks(ctx: &ReducerContext, source_id: &str, content: &str, now: 
         let matches: Vec<_> = ctx
             .db
             .note()
-            .iter()
+            .iter().take(crate::MAX_RESULTS)
             .take(crate::MAX_RESULTS)
             .filter(|n: &Note| n.title == target_title && n.id != source_id)
             .map(|n| n.id.clone())

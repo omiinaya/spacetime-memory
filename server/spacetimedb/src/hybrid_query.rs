@@ -206,7 +206,7 @@ pub fn hybrid_search(
     let old: Vec<_> = ctx
         .db
         .hybrid_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .take(MAX_RESULTS)
         .filter(|r| r.workspace_id == workspace_id && r.query_hash == qhash)
         .collect();
@@ -234,7 +234,7 @@ pub fn hybrid_search(
                     continue;
                 }
                 let mut _count: u32 = 0;
-                for si in ctx.db.search_index().iter()
+                for si in ctx.db.search_index().iter().take(crate::MAX_RESULTS)
                     .filter(|si| si.workspace_id == workspace_id)
                     .take(MAX_RESULTS)
                 {
@@ -326,7 +326,7 @@ pub fn hybrid_search(
                 let total_docs = ctx
                     .db
                     .term_index()
-                    .iter()
+                    .iter().take(crate::MAX_RESULTS)
                     .filter(|ti| ti.workspace_id == workspace_id && ti.entity_type == "memory")
                     .map(|ti| ti.entity_id.clone())
                     .collect::<std::collections::HashSet<_>>()
@@ -419,7 +419,7 @@ pub fn hybrid_search(
                 let matching_node_ids: Vec<String> = ctx
                     .db
                     .kg_node()
-                    .iter()
+                    .iter().take(crate::MAX_RESULTS)
                     .filter(|n| n.workspace_id == workspace_id)
                     .take(MAX_RESULTS)
                     .filter(|n| {
@@ -441,7 +441,7 @@ pub fn hybrid_search(
                     let edges: Vec<_> = ctx
                         .db
                         .kg_edge()
-                        .iter()
+                        .iter().take(crate::MAX_RESULTS)
                         .filter(|e| {
                             e.workspace_id == workspace_id
                                 && (e.source_node_id == *node_id || e.target_node_id == *node_id)
@@ -516,7 +516,7 @@ pub fn hybrid_search(
                 let mut memories: Vec<_> = ctx
                     .db
                     .memory()
-                    .iter()
+                    .iter().take(crate::MAX_RESULTS)
                     .filter(|m| m.workspace_id == workspace_id)
                     .take(crate::MAX_RESULTS)
                     .filter(|m| {
@@ -596,7 +596,7 @@ pub fn hybrid_search(
         let all_rows: Vec<_> = ctx
             .db
             .hybrid_result()
-            .iter()
+            .iter().take(crate::MAX_RESULTS)
             .take(MAX_RESULTS)
             .filter(|r| r.query_hash == qhash && r.workspace_id == workspace_id)
             .collect();
@@ -606,7 +606,7 @@ pub fn hybrid_search(
 
             // Build embedding lookup: entity_id → Vec<f64>
             let mut emb_cache: HashMap<String, Vec<f64>> = HashMap::new();
-            for si in ctx.db.search_index().iter()
+            for si in ctx.db.search_index().iter().take(crate::MAX_RESULTS)
                 .filter(|si| si.workspace_id == workspace_id)
                 .take(MAX_RESULTS)
             {
@@ -780,7 +780,7 @@ pub fn compute_god_nodes(
     let old: Vec<_> = ctx
         .db
         .god_node()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|g| g.workspace_id == workspace_id)
         .collect();
     for g in old {

@@ -301,7 +301,7 @@ pub fn list_facts(
     let facts: Vec<Fact> = ctx
         .db
         .fact()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|f| {
             if f.workspace_id != workspace_id {
                 return false;
@@ -354,7 +354,7 @@ pub fn search_facts(
     let facts: Vec<Fact> = ctx
         .db
         .fact()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|f| {
             if f.workspace_id != workspace_id {
                 return false;

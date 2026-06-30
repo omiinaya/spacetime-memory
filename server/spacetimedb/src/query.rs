@@ -217,7 +217,7 @@ fn query_memory(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for m in ctx.db.memory().iter().filter(|m: &crate::memory::Memory| {
+    for m in ctx.db.memory().iter().take(crate::MAX_RESULTS).filter(|m: &crate::memory::Memory| {
         (workspace_id.is_empty() || m.workspace_id == workspace_id) && m.is_active
     }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
@@ -241,7 +241,7 @@ fn query_kg_node(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for n in ctx.db.kg_node().iter().filter(|n: &crate::knowledge_graph::KgNode| {
+    for n in ctx.db.kg_node().iter().take(crate::MAX_RESULTS).filter(|n: &crate::knowledge_graph::KgNode| {
         workspace_id.is_empty() || n.workspace_id == workspace_id
     }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
@@ -263,7 +263,7 @@ fn query_kg_edge(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for e in ctx.db.kg_edge().iter().filter(|e: &crate::knowledge_graph::KgEdge| {
+    for e in ctx.db.kg_edge().iter().take(crate::MAX_RESULTS).filter(|e: &crate::knowledge_graph::KgEdge| {
         workspace_id.is_empty() || e.workspace_id == workspace_id
     }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
@@ -304,7 +304,7 @@ fn query_session(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for s in ctx.db.session().iter().filter(|s: &crate::session::Session| {
+    for s in ctx.db.session().iter().take(crate::MAX_RESULTS).filter(|s: &crate::session::Session| {
         s.workspace_id == workspace_id
     }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
@@ -341,7 +341,7 @@ fn query_note(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for n in ctx.db.note().iter().filter(|n: &crate::note::Note| {
+    for n in ctx.db.note().iter().take(crate::MAX_RESULTS).filter(|n: &crate::note::Note| {
         let ws_ok = workspace_id.is_empty() || n.workspace_id == workspace_id;
         ws_ok && n.is_active
     }).take(crate::MAX_RESULTS) {
@@ -416,7 +416,7 @@ fn query_peer(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for p in ctx.db.peer().iter().filter(|p: &crate::peer::Peer| {
+    for p in ctx.db.peer().iter().take(crate::MAX_RESULTS).filter(|p: &crate::peer::Peer| {
         workspace_id.is_empty() || p.workspace_id == workspace_id
     }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({
@@ -471,7 +471,7 @@ fn query_context_pack(
     ctx: &ReducerContext, query_id: String, workspace_id: String,
     filter: &serde_json::Map<String, serde_json::Value>, columns: &[String], now: i64,
 ) -> Result<(), String> {
-    for cp in ctx.db.context_pack().iter().filter(|cp: &crate::context_compression::ContextPack| {
+    for cp in ctx.db.context_pack().iter().take(crate::MAX_RESULTS).filter(|cp: &crate::context_compression::ContextPack| {
         cp.workspace_id == workspace_id
     }).take(crate::MAX_RESULTS) {
         let row = serde_json::json!({

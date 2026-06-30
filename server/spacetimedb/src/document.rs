@@ -215,7 +215,7 @@ pub fn delete_document(ctx: &ReducerContext, id: String) -> Result<(), String> {
     let chunks: Vec<_> = ctx
         .db
         .doc_chunk()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|c| c.document_id == id)
         .collect();
     for c in chunks {

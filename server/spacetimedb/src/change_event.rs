@@ -125,7 +125,7 @@ pub fn get_changes_since(
     let mut events: Vec<ChangeEvent> = ctx
         .db
         .change_event()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|e| e.created_at > since_cursor)
         .take(crate::MAX_RESULTS)
         .collect();
@@ -153,7 +153,7 @@ pub fn get_changes_since(
     let stale: Vec<_> = ctx
         .db
         .change_event_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|r| r.since_cursor == since_cursor && r.id != result_id)
         .collect();
     for r in stale {
@@ -173,7 +173,7 @@ pub fn get_latest_change_cursor(ctx: &ReducerContext) -> Result<(), String> {
     let cursor = ctx
         .db
         .change_event()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .map(|e| e.created_at)
         .max()
         .unwrap_or(0);
@@ -206,7 +206,7 @@ pub fn cleanup_change_events(
     let expired: Vec<_> = ctx
         .db
         .change_event()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|e| e.created_at < cutoff)
         .collect();
 
