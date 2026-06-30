@@ -8,20 +8,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P0: Rust — Finish `.take(MAX_RESULTS)` on remaining unbounded `.iter()` calls — ✅ DONE
-7 more unbounded STDB table `.iter()` calls remain in consolidation.rs (lines 198, 204, 220, 488, 494, 590, 605, 813). The last commit only addressed the easy cases.
-Files: server/spacetimedb/src/consolidation.rs
-Difficulty: Easy
-Est: 20min
-
-### P0: Rust — Add `.take(MAX_RESULTS)` to all unbounded `.iter()` calls
-Critical for production safety. Every unbounded iter risks reducer timeout/OOM on large tables.
-All remaining STDB-table `.iter()` calls now bounded with `.take(crate::MAX_RESULTS)`.
-Still safe after audit: Vec/HashMap local iters in knowledge_graph.rs, graph_traversal.rs.
-Files: server/spacetimedb/src/consolidation.rs
-Difficulty: Medium
-Est: 1-2h
-
 ### P1: TypeScript — Fix SQL injection vulnerability
 All SQL queries use raw string interpolation with single-char `esc()` function.
 Doesn't handle backslash escapes, Unicode attacks, or other injection vectors.
@@ -136,9 +122,11 @@ Difficulty: Medium
 Est: 30min
 
 ### P0: Rust — Add `.take(MAX_RESULTS)` to 8+ unbounded `.iter()` calls
-Fixed all remaining unbounded STDB table `.iter()` calls in consolidation.rs (7 calls).
-Previously only consolidation.rs:119 and context_directory.rs had been addressed.
-Files: server/spacetimedb/src/consolidation.rs
+Fixed all remaining unbounded STDB table `.iter()` calls across the entire server module.
+7 calls in consolidation.rs + 1 in entity_linking.rs + 1 in memory.rs + 6 in replication.rs
++ 1 in user.rs + 4 in workspace.rs = 20 total bounded calls in this pass.
+All STDB `.iter()` calls now have `.take(crate::MAX_RESULTS)`.
+Files: server/spacetimedb/src/*.rs
 Difficulty: Medium
 Est: 1h
 
