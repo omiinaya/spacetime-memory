@@ -25,6 +25,13 @@ import re
 logger = logging.getLogger(__name__)
 
 from .query_expansion import expand_query  # noqa: E402 — intentional late import
+from ._protocols import (
+    EventBusProtocol,
+    LocalLLMProtocol,
+    MetricsCollectorProtocol,
+    PluginManagerProtocol,
+    QueryCacheProtocol,
+)
 
 # ---------------------------------------------------------------------------
 # OpenTelemetry tracer — optional, degrades gracefully
@@ -190,10 +197,10 @@ class Client:
         timeout: float = 30.0,
         verbose: bool = False,
         token: str | None = None,
-        plugin_manager: Any | None = None,
-        event_bus: Any | None = None,
-        query_cache: Any | None = None,
-        local_llm: Any | None = None,
+        plugin_manager: PluginManagerProtocol | None = None,
+        event_bus: EventBusProtocol | None = None,
+        query_cache: QueryCacheProtocol | None = None,
+        local_llm: LocalLLMProtocol | None = None,
     ):
         """Initialise a SpacetimeDB client connection.
 
@@ -205,10 +212,11 @@ class Client:
             timeout: HTTP request timeout in seconds.
             verbose: Enable verbose logging.
             token: Auth token (default: env ``SPACETIMEDB_TOKEN``).
-            plugin_manager: Optional plugin manager instance.
-            event_bus: Optional event bus instance.
-            query_cache: Optional query cache instance.
-            local_llm: Optional local LLM instance.
+            plugin_manager: Optional plugin manager instance (duck-typed, accepts
+                any object that satisfies ``PluginManagerProtocol``).
+            event_bus: Optional event bus instance (``EventBusProtocol``).
+            query_cache: Optional query cache instance (``QueryCacheProtocol``).
+            local_llm: Optional local LLM instance (``LocalLLMProtocol``).
         """
         self.host = host or os.environ.get("SPACETIMEDB_HOST", "127.0.0.1")
         self.port = str(port or os.environ.get("SPACETIMEDB_PORT", "3001"))
@@ -229,7 +237,7 @@ class Client:
         # MIB binary vector cache — entity_id → packed bytes
         self._binary_cache: dict[str, bytes] = {}
         self._circuit_open_until: float = 0.0
-        self._metrics: Any = None  # Set via set_metrics_collector()
+        self._metrics: MetricsCollectorProtocol | None = None  # Set via set_metrics_collector()
         self._delta_sync: Any = None  # Lazy DeltaSync instance
         self._compounder: Any = None  # Lazy Compounder instance
         self.request_id: str = os.urandom(4).hex()  # Unique per-client instance
