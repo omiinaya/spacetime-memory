@@ -70,7 +70,13 @@ pub fn add_profile_fact(ctx: &ReducerContext, peer_id: String, fact: String) -> 
 
     if let Some(mut p) = existing {
         // Append fact to static_facts_json array — use serde_json for safety
-        let mut facts: Vec<String> = serde_json::from_str(&p.static_facts_json).unwrap_or_default();
+        let mut facts: Vec<String> = match serde_json::from_str(&p.static_facts_json) {
+            Ok(v) => v,
+            Err(e) => {
+                log::info!("Failed to parse static_facts_json: {}", e);
+                Vec::new()
+            }
+        };
         facts.push(fact);
         p.static_facts_json = serde_json::to_string(&facts).unwrap_or_else(|_| "[]".to_string());
         p.updated_at = now;
@@ -107,7 +113,13 @@ pub fn add_dynamic_context(
 
     if let Some(mut p) = existing {
         // Append context entry to dynamic_context_json — use serde_json for safety
-        let mut entries: Vec<String> = serde_json::from_str(&p.dynamic_context_json).unwrap_or_default();
+        let mut entries: Vec<String> = match serde_json::from_str(&p.dynamic_context_json) {
+            Ok(v) => v,
+            Err(e) => {
+                log::info!("Failed to parse dynamic_context_json: {}", e);
+                Vec::new()
+            }
+        };
         entries.push(context);
         p.dynamic_context_json = serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string());
         p.updated_at = now;

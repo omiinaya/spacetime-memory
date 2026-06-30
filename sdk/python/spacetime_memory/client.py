@@ -1036,7 +1036,7 @@ class Client:
                 tier_enum = VeracityTier(veracity_tier)
                 confidence = compound(tier=tier_enum, sources=max(1, veracity_sources))
             except ValueError:
-                pass  # Unknown tier string, keep default confidence
+                logger.warning("Unknown VeracityTier string '%s', keeping default confidence", veracity_tier)
 
         # ── Plugin dispatch: on_store ──
         metadata: dict[str, Any] = {
@@ -1101,7 +1101,7 @@ class Client:
                 try:
                     self._binary_cache[memory_id] = binarize(emb)
                 except (ValueError, Exception):
-                    pass  # Binary compression best-effort, non-critical
+                    logger.warning("store_batch: binary compression failed for memory %s, skipping", memory_id)
                 self._call(
                     "index_entity",
                     [
@@ -1178,7 +1178,7 @@ class Client:
                         ],
                     )
                 except RuntimeError:
-                    pass
+                    logger.warning("store(): LLM entity extraction call failed for memory %s", memory_id)
 
                 # Link entity to the source memory
                 try:
@@ -1191,13 +1191,13 @@ class Client:
                         ],
                     )
                 except RuntimeError:
-                    pass
+                    logger.warning("store(): link_entity_to_memory failed for entity '%s', memory %s", name, memory_id)
         else:
             # Fall back to regex-based extraction (no LLM key or LLM failed)
             try:
                 self._call("extract_entities", [workspace_id, content])
             except RuntimeError:
-                pass
+                logger.warning("store(): regex entity extraction failed for memory %s", memory_id)
 
     def store_batch(
         self,
@@ -1270,6 +1270,7 @@ class Client:
             else:
                 emb_list = []
         except RuntimeError:
+            logger.warning("store_batch: get_embeddings_batch failed, returning empty embeddings")
             emb_list = []
 
         # Call batch reducer — pass items as JSON string
@@ -1646,6 +1647,7 @@ class Client:
                 columns=["id", "label", "summary", "node_type"],
             )
         except RuntimeError:
+            logger.warning("get_graph_context: query kg_node failed, returning partial results")
             return rows  # Graceful degradation
 
         # Fetch entity_link records for alias matching
@@ -1656,6 +1658,7 @@ class Client:
                 columns=["id", "entity_name", "aliases_json", "entity_type"],
             )
         except RuntimeError:
+            logger.debug("get_graph_context: entity_link table may not exist, skipping alias matching")
             links = []  # entity_link table may not exist — graceful degradation
 
         if not nodes and not links:
@@ -1705,6 +1708,7 @@ class Client:
             try:
                 alias_list: list[str] = _json.loads(raw_aliases)
             except (ValueError, TypeError):
+                logger.debug("get_graph_context: failed to parse aliases_json, treating as empty")
                 alias_list = []
 
             # Build the set of names to check against the query:
@@ -1984,7 +1988,7 @@ class Client:
                     binary_rows.sort(key=lambda r: r["score"], reverse=True)
                     per_strat["binary"] = binary_rows[:fusion_limit]
                 except (ValueError, Exception):
-                    pass  # Binary scoring is best-effort
+                    logger.warning("search: binary scoring failed, skipping binary results")
 
             # Add STDB rows for semantic, graph, temporal (plus legacy keyword
             # as fallback — any row not in Tantivy still participates)
@@ -2160,7 +2164,7 @@ class Client:
             try:
                 self._call("reinforce_memory", [memory_id])
             except RuntimeError:
-                pass
+                logger.warning("reinforce_memory: _call failed for memory %s", memory_id)
         return results
 
     def fuzzy_get(
@@ -2903,6 +2907,7 @@ class Client:
                 try:
                     meta = json.loads(meta_str) if isinstance(meta_str, str) else meta_str
                 except Exception:
+                    logger.debug("filter: failed to parse metadata_json, treating as empty")
                     meta = {}
                 matches = all(meta.get(k) == v for k, v in mf.items())
                 if matches:
@@ -3595,7 +3600,7 @@ class Client:
             try:
                 return json.loads(rows[0].get("json_data", "[]"))
             except (json.JSONDecodeError, IndexError):
-                pass
+                logger.warning("get_cached_fact_result: failed to parse cached JSON data")
         return []
 
     def delete_fact(self, fact_id: str) -> dict[str, Any]:
@@ -3671,7 +3676,7 @@ class Client:
             try:
                 return json.loads(rows[0].get("json_data", "[]"))
             except (json.JSONDecodeError, IndexError):
-                pass
+                logger.warning("get_fact_cache: failed to parse cached JSON data")
         return []
 
     # -----------------------------------------------------------------------
@@ -3902,7 +3907,7 @@ class Client:
                     # Index into Tantivy BM25 sidecar
                     self._tantivy_index(workspace_id, note_id, content, "note")
             except RuntimeError:
-                pass  # Best-effort indexing
+                logger.warning("add_note: Tantivy indexing failed for note %s, skipping", note_id)
         return result
 
     def update_note(
@@ -3938,7 +3943,7 @@ class Client:
                 self._call("index_terms", [wid, "note", note_id, content])
                 self._tantivy_index(wid, note_id, content, "note")
             except RuntimeError:
-                pass  # Best-effort re-indexing
+                logger.warning("update_note: Tantivy re-indexing failed for note %s, skipping", note_id)
         return result
 
     def delete_note(self, note_id: str) -> dict[str, Any]:
@@ -3949,7 +3954,7 @@ class Client:
             try:
                 self._call("remove_from_index", ["note", note_id])
             except RuntimeError:
-                pass  # Best-effort cleanup
+                logger.warning("delete_note: remove_from_index failed for note %s, skipping", note_id)
         return result
 
     def list_notes(
@@ -4236,6 +4241,7 @@ class Client:
             try:
                 rows = self._query(table)
             except RuntimeError:
+                logger.debug("backup: table '%s' does not exist or is not queryable, skipping", table)
                 continue  # table doesn't exist or isn't queryable
             if rows:
                 manifest[table] = rows
@@ -4323,10 +4329,11 @@ class Client:
                     try:
                         self._sql(sql)
                     except RuntimeError:
-                        pass  # may be a duplicate or schema mismatch
+                        logger.warning("restore: INSERT failed for table '%s' row, may be duplicate or schema mismatch", table)
                 restored.append(table)
                 total_restored += len(rows)
             except Exception:
+                logger.error("restore: failed to restore table '%s', skipping", table)
                 continue
 
         return {
@@ -4511,8 +4518,8 @@ def _parse_rerank_json(content: str) -> list[dict]:
                     if isinstance(obj, dict):
                         scores = [obj]
                         parse_ok = True
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as e:
+                    logger.debug("_parse_rerank_json: strategy 4 object salvage failed: %s", e)
 
     # Strategy 5: Dict wrapper — LLM returned {"scores": [...]} or similar
     if not parse_ok:
@@ -4542,7 +4549,8 @@ def _parse_rerank_json(content: str) -> list[dict]:
                     obj = json.loads(line.rstrip(","))
                     if isinstance(obj, dict) and "index" in obj:
                         extracted.append(obj)
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    logger.debug("_parse_rerank_json: strategy 6 line-by-line parse failed: %s", e)
                     continue
             if extracted:
                 scores = extracted

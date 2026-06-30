@@ -70,7 +70,6 @@ pub fn create_directory(
     description: String,
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
-    let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v7(ctx);
 
@@ -92,7 +91,6 @@ pub fn create_directory(
 #[reducer]
 pub fn delete_directory(ctx: &ReducerContext, id: String) -> Result<(), String> {
     let _account = require_auth(ctx)?;
-    let _account = require_auth(ctx)?;
     // Check it exists
     let _dir = ctx
         .db
@@ -113,7 +111,6 @@ pub fn get_children(
     directory_id: String,
     include_memories: bool,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
     let _account = require_auth(ctx)?;
     // Verify directory exists
     let dir = ctx
@@ -186,7 +183,6 @@ pub fn traverse_recursive(
     root_directory_id: String,
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
-    let _account = require_auth(ctx)?;
     // Verify root directory exists
     let _root = ctx
         .db
@@ -247,7 +243,6 @@ pub fn get_directory(
     path_or_id: String,
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
-    let _account = require_auth(ctx)?;
     // Try lookup by id first
     if let Some(dir) = ctx.db.context_directory().id().find(&path_or_id) {
         let id = uuid_v7(ctx);
@@ -304,7 +299,6 @@ pub fn link_memory_to_directory(
     workspace_id: String,
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
-    let _account = require_auth(ctx)?;
     // Verify directory exists
     ctx.db
         .context_directory()
@@ -350,7 +344,6 @@ pub fn unlink_memory_from_directory(
     directory_id: String,
     memory_id: String,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
     let _account = require_auth(ctx)?;
     // Find the link row
     let link = ctx

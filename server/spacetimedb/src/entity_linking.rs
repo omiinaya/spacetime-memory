@@ -59,7 +59,13 @@ pub fn add_alias(ctx: &ReducerContext, id: String, alias: String) -> Result<(), 
         .ok_or_else(|| format!("EntityLink '{}' not found", id))?;
 
     // Append alias to aliases_json array — use serde_json for safety
-    let mut aliases: Vec<String> = serde_json::from_str(&el.aliases_json).unwrap_or_default();
+    let mut aliases: Vec<String> = match serde_json::from_str(&el.aliases_json) {
+        Ok(v) => v,
+        Err(e) => {
+            log::info!("Failed to parse aliases_json: {}", e);
+            Vec::new()
+        }
+    };
     aliases.push(alias);
     el.aliases_json = serde_json::to_string(&aliases).unwrap_or_else(|_| "[]".to_string());
 
