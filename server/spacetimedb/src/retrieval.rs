@@ -88,7 +88,7 @@ pub fn remove_from_index(
     let matched = ctx
         .db
         .search_index()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|si| si.entity_type == entity_type && si.entity_id == entity_id)
         .collect::<Vec<_>>();
 
@@ -100,7 +100,7 @@ pub fn remove_from_index(
     let terms_to_delete: Vec<String> = ctx
         .db
         .term_index()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|ti| ti.entity_type == entity_type && ti.entity_id == entity_id)
         .map(|ti| ti.id.clone())
         .collect();
@@ -213,7 +213,7 @@ pub fn index_terms(
     let old: Vec<String> = ctx
         .db
         .term_index()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|ti| ti.entity_type == entity_type && ti.entity_id == entity_id)
         .map(|ti| ti.id.clone())
         .collect();

@@ -107,7 +107,7 @@ pub fn join_session(
     let already = ctx
         .db
         .session_participant()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .find(|sp| sp.session_id == session_id && sp.peer_id == peer_id);
 
     if already.is_some() {
@@ -141,7 +141,7 @@ pub fn leave_session(
     let exists = ctx
         .db
         .session_participant()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .any(|sp| sp.session_id == session_id && sp.peer_id == peer_id);
 
     if !exists {
@@ -153,7 +153,7 @@ pub fn leave_session(
 
     // Delete matching rows (table has no PK, so iterate and delete each row)
     let to_delete: Vec<_> = ctx.db.session_participant()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|sp| sp.session_id == session_id && sp.peer_id == peer_id)
         .collect();
     for sp in to_delete {

@@ -429,6 +429,7 @@ pub fn list_space_members(ctx: &ReducerContext, workspace_id: String) -> Result<
         .db
         .space_permission()
         .iter()
+        .take(crate::MAX_RESULTS)
         .filter(|sp: &SpacePermission| sp.workspace_id == workspace_id)
         .collect();
 

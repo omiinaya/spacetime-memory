@@ -135,7 +135,7 @@ pub fn clear_harmonic_beliefs(
     let to_delete: Vec<_> = ctx
         .db
         .harmonic_belief()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|b| b.workspace_id == workspace_id && b.confidence < min_confidence)
         .collect();
 

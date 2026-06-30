@@ -40,7 +40,7 @@ pub fn store_context_pack(
     let existing: Vec<_> = ctx
         .db
         .context_pack()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|p| p.workspace_id == workspace_id && p.query_hash == query_hash)
         .collect();
     for pack in existing {
@@ -140,7 +140,7 @@ pub fn escalate_memories(
     let to_update: Vec<_> = ctx
         .db
         .memory()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|m| {
             m.workspace_id == workspace_id
                 && m.is_active
