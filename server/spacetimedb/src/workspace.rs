@@ -177,7 +177,7 @@ pub fn delete_workspace(ctx: &ReducerContext, id: String) -> Result<(), String> 
     let permissions: Vec<SpacePermission> = ctx
         .db
         .space_permission()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|sp: &SpacePermission| sp.workspace_id == id)
         .collect();
     for perm in permissions {
@@ -323,7 +323,7 @@ pub fn grant_space_access(
     let existing = ctx
         .db
         .space_permission()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .find(|sp: &SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == peer_id);
 
     if let Some(existing) = existing {
@@ -371,7 +371,7 @@ pub fn revoke_space_access(
 
     // Only an existing owner or admin can revoke access
     let is_admin_or_owner = auth::is_admin(&caller, ctx)
-        || ctx.db.space_permission().iter().any(|sp: SpacePermission| {
+        || ctx.db.space_permission().iter().take(crate::MAX_RESULTS).any(|sp: SpacePermission| {
             sp.workspace_id == workspace_id && sp.peer_id == caller && sp.permission == "owner"
         });
 
@@ -414,7 +414,7 @@ pub fn list_space_members(ctx: &ReducerContext, workspace_id: String) -> Result<
     let has_access = ctx
         .db
         .space_permission()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .any(|sp: SpacePermission| sp.workspace_id == workspace_id && sp.peer_id == caller);
 
     if !has_access {

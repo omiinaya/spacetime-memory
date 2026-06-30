@@ -164,7 +164,7 @@ pub fn get_user_sessions(ctx: &ReducerContext, user_id: String) -> Result<(), St
     let old: Vec<_> = ctx
         .db
         .user_session_result()
-        .iter()
+        .iter().take(crate::MAX_RESULTS)
         .filter(|r| r.query_id == query_id)
         .collect();
     for r in old {

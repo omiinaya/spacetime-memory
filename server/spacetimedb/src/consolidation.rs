@@ -196,12 +196,14 @@ pub fn suggest_merges(
         .db
         .memory()
         .iter()
+        .take(crate::MAX_RESULTS)
         .filter(|m| m.workspace_id == workspace_id && m.is_active)
         .map(|m| {
             let emb = ctx
                 .db
                 .search_index()
                 .iter()
+                .take(crate::MAX_RESULTS)
                 .find(|si| si.entity_type == "memory" && si.entity_id == m.id)
                 .map(|si| parse_embedding_json(&si.embedding_json))
                 .unwrap_or_default();
@@ -218,6 +220,7 @@ pub fn suggest_merges(
         .db
         .merge_suggestion()
         .iter()
+        .take(crate::MAX_RESULTS)
         .filter(|s| s.workspace_id == workspace_id && s.status == "pending")
         .map(|s| s.id.clone())
         .collect();
@@ -486,12 +489,14 @@ pub fn dedup_memories(ctx: &ReducerContext, workspace_id: String) -> Result<(), 
         .db
         .memory()
         .iter()
+        .take(crate::MAX_RESULTS)
         .filter(|m| m.workspace_id == workspace_id && m.is_active)
         .map(|m| {
             let emb = ctx
                 .db
                 .search_index()
                 .iter()
+                .take(crate::MAX_RESULTS)
                 .find(|si| si.entity_type == "memory" && si.entity_id == m.id)
                 .map(|si| parse_embedding_json(&si.embedding_json))
                 .unwrap_or_default();
@@ -588,6 +593,7 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
         .db
         .memory()
         .iter()
+        .take(crate::MAX_RESULTS)
         .filter(|m| m.expires_at > 0 && m.expires_at < now)
         .collect();
     for mut mem in expired {
@@ -603,6 +609,7 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
             .db
             .memory()
             .iter()
+            .take(crate::MAX_RESULTS)
             .filter(|m| {
                 m.workspace_id == ws.id
                     && m.is_active
@@ -811,6 +818,7 @@ pub fn restore_backup(ctx: &ReducerContext, workspace_id: String) -> Result<(), 
         .db
         .backup_entry()
         .iter()
+        .take(crate::MAX_RESULTS)
         .filter(|e| e.workspace_id == workspace_id)
         .collect();
 
