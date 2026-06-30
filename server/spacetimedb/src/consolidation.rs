@@ -117,6 +117,7 @@ pub fn decay_weak_memories(
         .db
         .memory()
         .iter()
+        .take(crate::MAX_RESULTS)
         .filter(|m| {
             m.workspace_id == workspace_id
                 && m.is_active

@@ -122,8 +122,8 @@ pub fn uuid_v4_uniq(
 /// Panics (expect) if the STDB RNG fails — this should never happen in practice.
 pub fn uuid_v7(ctx: &spacetimedb::ReducerContext) -> String {
     ctx.new_uuid_v7()
-        .expect("STDB new_uuid_v7() should never fail")
-        .to_string()
+        .map(|u| u.to_string())
+        .unwrap_or_else(|_| uuid_v4(ctx))
 }
 
 /// Generate a sortable UUID v7 with collision retry.
