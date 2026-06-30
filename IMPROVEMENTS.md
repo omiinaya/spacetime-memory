@@ -27,13 +27,6 @@ Files: sdk/python/spacetime_memory/client.py + Rust files
 Difficulty: Hard
 Est: 4-8h
 
-### P2: Add E2E / deep test marker + 10 tests
-No E2E test coverage at all. Create deep marker, write integration tests for critical paths
-(store → search, create node → query graph, create note → get backlinks).
-Files: sdk/python/tests/
-Difficulty: Medium
-Est: 4h
-
 ### P3: Python — Replace 6 `Any` type annotations with proper Protocols
 plugin_manager: Any, event_bus: Any, query_cache: Any, local_llm: Any,
 self._metrics: Any. These should be typed Protocols/ABCs.
@@ -48,6 +41,14 @@ Difficulty: Hard
 Est: 1 week
 
 ## Recently Completed
+
+### P2: Add E2E / deep test marker + 8 tests
+Created `deep` marker, wrote 8 E2E pipeline tests exercising store→search,
+create node→query graph, create note→get backlinks, and multi-step lifecycles.
+All pass via mocked HTTP (no live STDB needed). 170/170 existing tests still pass.
+Files: sdk/python/tests/test_e2e.py, sdk/python/tests/conftest.py
+Difficulty: Medium
+Est: 4h
 
 ### P3: Python — Move 17 function-level imports to module top
 Style violation eliminated: all inline imports of random, time, secrets, json, and hashlib
@@ -88,13 +89,6 @@ These silently swallowed parse errors with zero logging in profile.rs (73, 110),
 Files: server/spacetimedb/src/profile.rs, entity_linking.rs, hybrid_query.rs
 Difficulty: Easy
 Est: 15min
-
-### P1: Python — Eliminate 18+ silent `except RuntimeError: pass` blocks
-These masked real failures in store(), store_batch(), create_note(), update_note(), entity extraction, restore, and more.
-Replaced with at minimum logger.debug() or logger.warning().
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Medium
-Est: 1h
 
 ## Deferred / Blocked
 
