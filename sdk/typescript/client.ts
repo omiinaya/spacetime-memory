@@ -261,9 +261,39 @@ export interface ClientOptions {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Escape a string for safe SQL usage (single-quote doubling for SQLite). */
+/** Escape a string for safe SQL equality context. Doubles single quotes, escapes backslashes. */
 function esc(val: string): string {
-  return val.replace(/'/g, "''");
+  return val.replace(/\\/g, '\\\\').replace(/'/g, "''");
+}
+
+/**
+ * Escape a string for safe SQL LIKE context.
+ * Escapes single quotes, backslashes, and LIKE wildcards (% and _).
+ * Always use with ESCAPE '\\' in the SQL clause.
+ */
+function escLike(val: string): string {
+  return esc(val).replace(/%/g, '\%').replace(/_/g, '\_');
+}
+
+/**
+ * Ensure an identifier (table name, column name) contains only safe characters.
+ * Throws if the identifier contains SQL-metacharacters that could facilitate injection.
+ */
+function safeIdent(name: string): string {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+    throw new Error(`Invalid SQL identifier — contains unsafe characters: "${name}"`);
+  }
+  return name;
+}
+
+/**
+ * Numeric placeholder helper for _sqlExec. Returns the raw number as a SQL-safe literal,
+ * or 0 if undefined/null.
+ */
+function safeNum(n: number | undefined | null): string {
+  if (n == null) return "0";
+  const clamped = isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  return String(clamped);
 }
 
 function queryHash(query: string): string {
@@ -352,6 +382,50 @@ export class Client {
   }
 
   /**
+   * SAFE parameterized SQL execution.
+   *
+   * Builds a query by replacing `:param` placeholders with properly escaped
+   * string values. Use this instead of raw string interpolation with `_sql()`.
+   *
+   * For LIKE clauses, set `opts.like = true` to escape `%` and `_` wildcards
+   * via `escLike()`.  The caller MUST also add `ESCAPE '\'` to the SQL clause
+   * when doing LIKE matching.
+   *
+   * For numeric parameters, pass the value through the `:param` placeholder
+   * as a string representation — the method coerces via the `safeNum()` helper.
+   *
+   * Example:
+   * ```
+   * this._sqlExec(
+   *   "SELECT * FROM memory WHERE workspace_id = :ws AND id = :id",
+   *   { ws: workspaceId, id: memoryId },
+   * );
+   * ```
+   *
+   * @param template - SQL query with `:name` placeholders (NOT `$1` style)
+   * @param params - Map of placeholder name (without colon) → value
+   * @param opts - `{ like: true }` to use LIKE-safe escaping
+   */
+  private async _sqlExec(
+    template: string,
+    params: Record<string, string>,
+    opts?: { like?: boolean },
+  ): Promise<any[]> {
+    let query = template;
+    for (const [key, val] of Object.entries(params)) {
+      const escaped = opts?.like
+        ? `'${escLike(val)}'`
+        : `'${esc(val)}'`;
+      // Replace all occurrences of `:key` with the escaped value
+      query = query.replace(
+        new RegExp(`:${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
+        escaped,
+      );
+    }
+    return this._sql(query);
+  }
+
+  /**
    * Call a named reducer (stored procedure) with positional arguments.
    * Reducers are the safe way to mutate data in SpacetimeDB.
    */
@@ -414,8 +488,9 @@ export class Client {
       filterJson,
       "[]",
     ]);
-    const rows = await this._sql(
-      `SELECT table_name, row_json FROM query_result WHERE query_id = '${esc(queryId)}'`
+    const rows = await this._sqlExec(
+      `SELECT table_name, row_json FROM query_result WHERE query_id = :qid`,
+      { qid: queryId },
     );
     const results: Record<string, unknown>[] = [];
     for (const r of rows) {
@@ -494,8 +569,9 @@ export class Client {
    */
   async getWorkspaceContext(workspaceId: string): Promise<Record<string, unknown> | null> {
     await this._call("get_workspace_context", [workspaceId]);
-    const rows = await this._sql(
-      `SELECT * FROM workspace_context_result WHERE workspace_id = '${esc(workspaceId)}'`
+    const rows = await this._sqlExec(
+      `SELECT * FROM workspace_context_result WHERE workspace_id = :wsid`,
+      { wsid: workspaceId },
     );
     return rows.length > 0 ? rows[0] : null;
   }
@@ -506,8 +582,9 @@ export class Client {
    * @returns Array of space member records
    */
   async listSpaceMembers(workspaceId: string): Promise<SpaceMemberRecord[]> {
-    return (await this._sql(
-      `SELECT * FROM space_member WHERE workspace_id = '${esc(workspaceId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM space_member WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     )) as SpaceMemberRecord[];
   }
 
@@ -556,8 +633,9 @@ export class Client {
       workspaceId,
       JSON.stringify(memoryIds),
     ]);
-    return (await this._sql(
-      `SELECT * FROM mental_model_result WHERE workspace_id = '${esc(workspaceId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM mental_model_result WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     )) as MentalModelRecord[];
   }
 
@@ -567,8 +645,9 @@ export class Client {
    * @returns Array containing the mental model record (or empty)
    */
   async getMentalModel(modelId: string): Promise<MentalModelRecord[]> {
-    return (await this._sql(
-      `SELECT * FROM mental_model WHERE id = '${esc(modelId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM mental_model WHERE id = :mid`,
+      { mid: modelId },
     )) as MentalModelRecord[];
   }
 
@@ -583,12 +662,15 @@ export class Client {
     workspaceId: string,
     status?: string
   ): Promise<MentalModelRecord[]> {
-    let where = `workspace_id = '${esc(workspaceId)}'`;
+    let q = `SELECT * FROM mental_model WHERE workspace_id = :ws`;
+    const params: Record<string, string> = { ws: workspaceId };
     if (status) {
-      where += ` AND status = '${esc(status)}'`;
+      q += ` AND status = :st`;
+      params.st = status;
     }
-    return (await this._sql(
-      `SELECT * FROM mental_model WHERE ${where} ORDER BY created_at DESC`
+    return (await this._sqlExec(
+      q + ` ORDER BY created_at DESC`,
+      params,
     )) as MentalModelRecord[];
   }
 
@@ -653,8 +735,9 @@ export class Client {
 
     const emb = await this._embed(content);
     if (emb.length > 0) {
-      const mems = await this._sql(
-        `SELECT id FROM memory WHERE workspace_id = '${esc(workspaceId)}'`
+      const mems = await this._sqlExec(
+        `SELECT id FROM memory WHERE workspace_id = :ws`,
+        { ws: workspaceId },
       );
       if (mems.length > 0) {
         await this._call("index_entity", [
@@ -668,8 +751,9 @@ export class Client {
     }
 
     if (opts?.tier && ["L0", "L1", "L2"].includes(opts.tier)) {
-      const mems = await this._sql(
-        `SELECT id FROM memory WHERE workspace_id = '${esc(workspaceId)}'`
+      const mems = await this._sqlExec(
+        `SELECT id FROM memory WHERE workspace_id = :ws`,
+        { ws: workspaceId },
       );
       if (mems.length > 0) {
         await this._call("update_memory_tier", [(mems[mems.length - 1].id as string), opts.tier]);
@@ -717,8 +801,9 @@ export class Client {
         strategies,
       ]);
       const qhash = queryHash(query);
-      let rows = await this._sql(
-        `SELECT * FROM hybrid_result WHERE workspace_id = '${esc(workspaceId)}' AND query_hash = '${esc(qhash)}'`
+      let rows = await this._sqlExec(
+        `SELECT * FROM hybrid_result WHERE workspace_id = :ws AND query_hash = :qh`,
+        { ws: workspaceId, qh: qhash },
       );
       rows.sort((a, b) => ((b.score ?? 0) as number) - ((a.score ?? 0) as number));
 
@@ -728,11 +813,17 @@ export class Client {
       const memMap: Record<string, string> = {};
       const nodeMap: Record<string, string> = {};
       for (const mid of memIds) {
-        const mems = await this._sql(`SELECT id, content FROM memory WHERE id = '${esc(mid)}'`);
+        const mems = await this._sqlExec(
+          `SELECT id, content FROM memory WHERE id = :mid`,
+          { mid },
+        );
         if (mems.length > 0) memMap[mid] = (mems[0].content ?? "") as string;
       }
       for (const nid of nodeIds) {
-        const nodes = await this._sql(`SELECT id, label FROM kg_node WHERE id = '${esc(nid)}'`);
+        const nodes = await this._sqlExec(
+          `SELECT id, label FROM kg_node WHERE id = :nid`,
+          { nid },
+        );
         if (nodes.length > 0) nodeMap[nid] = (nodes[0].label ?? "") as string;
       }
       for (const r of rows) {
@@ -744,22 +835,21 @@ export class Client {
       return rows.slice(0, limit) as SearchResult[];
     }
 
-    let clauses = [`workspace_id = '${esc(workspaceId)}'`];
+    let qBase = `SELECT * FROM memory WHERE workspace_id = :ws`;
+    const params: Record<string, string> = { ws: workspaceId };
     if (query) {
-      clauses.push(
-        `(content LIKE '%${esc(query)}%' OR summary LIKE '%${esc(query)}%')`
-      );
+      qBase += ` AND (content LIKE '%' || :q || '%' ESCAPE '\\' OR summary LIKE '%' || :q || '%' ESCAPE '\\')`;
+      params.q = query;
     }
     if (opts?.memoryType) {
-      clauses.push(`memory_type = '${esc(opts.memoryType)}'`);
+      qBase += ` AND memory_type = :mt`;
+      params.mt = opts.memoryType;
     }
     if (opts?.tier) {
-      clauses.push(`tier = '${esc(opts.tier)}'`);
+      qBase += ` AND tier = :t`;
+      params.t = opts.tier;
     }
-    const where = clauses.join(" AND ");
-    let rows = await this._sql(
-      `SELECT * FROM memory WHERE ${where}`
-    );
+    let rows = await this._sqlExec(qBase, params, query ? { like: true } : undefined);
     rows.sort((a, b) => ((b.created_at ?? 0) as number) - ((a.created_at ?? 0) as number));
     return rows.slice(0, limit) as unknown as SearchResult[];
   }
@@ -770,8 +860,9 @@ export class Client {
    * @returns Array containing the memory record (or empty)
    */
   async getMemory(memoryId: string): Promise<MemoryRecord[]> {
-    const results = (await this._sql(
-      `SELECT * FROM memory WHERE id = '${esc(memoryId)}'`
+    const results = (await this._sqlExec(
+      `SELECT * FROM memory WHERE id = :mid`,
+      { mid: memoryId },
     )) as unknown as MemoryRecord[];
     if (results.length > 0) {
       try {
@@ -868,8 +959,9 @@ export class Client {
    * @returns Array of memory revision records, ordered by version
    */
   async getMemoryHistory(memoryId: string): Promise<MemoryRevisionRecord[]> {
-    return (await this._sql(
-      `SELECT * FROM memory_revision WHERE memory_id = '${esc(memoryId)}' ORDER BY version ASC`
+    return (await this._sqlExec(
+      `SELECT * FROM memory_revision WHERE memory_id = :mid ORDER BY version ASC`,
+      { mid: memoryId },
     )) as MemoryRevisionRecord[];
   }
 
@@ -884,8 +976,9 @@ export class Client {
     directoryPath: string
   ): Promise<Record<string, unknown>[]> {
     await this._call("search_directory_contents", [workspaceId, directoryPath]);
-    return await this._sql(
-      `SELECT * FROM directory_content_result WHERE workspace_id = '${esc(workspaceId)}' AND directory_path = '${esc(directoryPath)}' ORDER BY created_at DESC LIMIT 1`
+    return await this._sqlExec(
+      `SELECT * FROM directory_content_result WHERE workspace_id = :ws AND directory_path = :dp ORDER BY created_at DESC LIMIT 1`,
+      { ws: workspaceId, dp: directoryPath },
     );
   }
 
@@ -901,17 +994,13 @@ export class Client {
     opts?: ListMemoriesOptions
   ): Promise<MemoryRecord[]> {
     const limit = opts?.limit ?? 50;
-    let clauses = [
-      `workspace_id = '${esc(workspaceId)}'`,
-      "is_active = true",
-    ];
+    let q = `SELECT * FROM memory WHERE workspace_id = :ws AND is_active = true`;
+    const params: Record<string, string> = { ws: workspaceId };
     if (opts?.memoryType) {
-      clauses.push(`memory_type = '${esc(opts.memoryType)}'`);
+      q += ` AND memory_type = :mt`;
+      params.mt = opts.memoryType;
     }
-    const where = clauses.join(" AND ");
-    let rows = await this._sql(
-      `SELECT * FROM memory WHERE ${where}`
-    );
+    let rows = await this._sqlExec(q, params);
     rows.sort((a: any, b: any) => (b.created_at ?? 0) - (a.created_at ?? 0));
     return rows.slice(0, limit) as MemoryRecord[];
   }
@@ -945,8 +1034,9 @@ export class Client {
     const content = summary ? `${label}: ${summary}` : label;
     const emb = await this._embed(content);
     if (emb.length > 0) {
-      const nodes = await this._sql(
-        `SELECT id FROM kg_node WHERE workspace_id = '${esc(workspaceId)}' AND label = '${esc(label)}'`
+      const nodes = await this._sqlExec(
+        `SELECT id FROM kg_node WHERE workspace_id = :ws AND label = :label`,
+        { ws: workspaceId, label },
       );
       if (nodes.length > 0) {
         await this._call("index_entity", [
@@ -998,12 +1088,15 @@ export class Client {
     query?: string
   ): Promise<KGNodeRecord[]> {
     if (query) {
-      return (await this._sql(
-        `SELECT * FROM kg_node WHERE workspace_id = '${esc(workspaceId)}' AND label LIKE '%${esc(query)}%'`
+      return (await this._sqlExec(
+        `SELECT * FROM kg_node WHERE workspace_id = :ws AND label LIKE '%' || :q || '%' ESCAPE '\\'`,
+        { ws: workspaceId, q: query },
+        { like: true },
       )) as KGNodeRecord[];
     }
-    return (await this._sql(
-      `SELECT * FROM kg_node WHERE workspace_id = '${esc(workspaceId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM kg_node WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     )) as KGNodeRecord[];
   }
 
@@ -1013,10 +1106,11 @@ export class Client {
    * @returns Array of edge records involving this node
    */
   async getNeighbors(nodeId: string): Promise<KGEdgeRecord[]> {
-    return (await this._sql(
+    return (await this._sqlExec(
       `SELECT source_node_id, target_node_id, relation, weight FROM kg_edge ` +
-        `WHERE source_node_id = '${esc(nodeId)}' ` +
-        `   OR target_node_id = '${esc(nodeId)}'`
+        `WHERE source_node_id = :nid ` +
+        `   OR target_node_id = :nid`,
+      { nid: nodeId },
     )) as KGEdgeRecord[];
   }
 
@@ -1071,8 +1165,9 @@ export class Client {
    * @returns Array of note records
    */
   async listNotes(workspaceId: string): Promise<NoteRecord[]> {
-    return (await this._sql(
-      `SELECT * FROM note WHERE workspace_id = '${esc(workspaceId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM note WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     )) as NoteRecord[];
   }
 
@@ -1082,8 +1177,9 @@ export class Client {
    * @returns Array containing the note record (or empty)
    */
   async getNote(noteId: string): Promise<NoteRecord[]> {
-    return (await this._sql(
-      `SELECT * FROM note WHERE id = '${esc(noteId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM note WHERE id = :nid`,
+      { nid: noteId },
     )) as NoteRecord[];
   }
 
@@ -1149,8 +1245,9 @@ export class Client {
    * @returns Array of fact records
    */
   async listFacts(workspaceId: string, peerId: string): Promise<FactRecord[]> {
-    return (await this._sql(
-      `SELECT * FROM fact_result WHERE workspace_id = '${esc(workspaceId)}' AND peer_id = '${esc(peerId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM fact_result WHERE workspace_id = :ws AND peer_id = :pid`,
+      { ws: workspaceId, pid: peerId },
     )) as FactRecord[];
   }
 
@@ -1186,8 +1283,10 @@ export class Client {
     workspaceId: string,
     query: string
   ): Promise<FactRecord[]> {
-    return (await this._sql(
-      `SELECT * FROM fact WHERE workspace_id = '${esc(workspaceId)}' AND content LIKE '%${esc(query)}%'`
+    return (await this._sqlExec(
+      `SELECT * FROM fact WHERE workspace_id = :ws AND content LIKE '%' || :q || '%' ESCAPE '\\'`,
+      { ws: workspaceId, q: query },
+      { like: true },
     )) as FactRecord[];
   }
 
@@ -1307,8 +1406,9 @@ export class Client {
       startNodeId,
       maxDepth ?? 5,
     ]);
-    return await this._sql(
-      `SELECT * FROM bfs_result WHERE workspace_id = '${esc(workspaceId)}'`
+    return await this._sqlExec(
+      `SELECT * FROM bfs_result WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     );
   }
 
@@ -1330,8 +1430,9 @@ export class Client {
       sourceId,
       targetId,
     ]);
-    return await this._sql(
-      `SELECT * FROM bfs_result WHERE workspace_id = '${esc(workspaceId)}'`
+    return await this._sqlExec(
+      `SELECT * FROM bfs_result WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     );
   }
 
@@ -1341,8 +1442,9 @@ export class Client {
    * @returns Array of edge history result records
    */
   async getEdgeHistory(edgeGroupId: string): Promise<Record<string, unknown>[]> {
-    return await this._sql(
-      `SELECT * FROM edge_history_result WHERE edge_group_id = '${esc(edgeGroupId)}'`
+    return await this._sqlExec(
+      `SELECT * FROM edge_history_result WHERE edge_group_id = :egid`,
+      { egid: edgeGroupId },
     );
   }
 
@@ -1402,8 +1504,9 @@ export class Client {
    * @returns Array of session step records
    */
   async getSessionSteps(sessionId: string): Promise<SessionStepRecord[]> {
-    return (await this._sql(
-      `SELECT * FROM session_step WHERE session_id = '${esc(sessionId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM session_step WHERE session_id = :sid`,
+      { sid: sessionId },
     )) as SessionStepRecord[];
   }
 
@@ -1495,8 +1598,9 @@ export class Client {
     workspaceId: string,
     limit?: number
   ): Promise<CrossLinkResult> {
-    const memories = await this._sql(
-      `SELECT id, content FROM memory WHERE workspace_id = '${esc(workspaceId)}' AND is_active = true ORDER BY created_at DESC LIMIT ${limit ?? 50}`
+    const memories = await this._sqlExec(
+      `SELECT id, content FROM memory WHERE workspace_id = :ws AND is_active = true ORDER BY created_at DESC LIMIT ${limit ?? 50}`,
+      { ws: workspaceId },
     );
 
     let linksCreated = 0;
@@ -1509,15 +1613,18 @@ export class Client {
 
       // Look for existing edges from this memory to others
       // by searching for semantically similar content via keyword
-      const similar = await this._sql(
-        `SELECT id, content FROM memory WHERE workspace_id = '${esc(workspaceId)}' AND id != '${esc(mid)}' AND content LIKE '%${esc(content.slice(0, 30))}%' LIMIT 5`
+      const similar = await this._sqlExec(
+        `SELECT id, content FROM memory WHERE workspace_id = :ws AND id != :mid AND content LIKE '%' || :q || '%' ESCAPE '\\' LIMIT 5`,
+        { ws: workspaceId, mid, q: content.slice(0, 30) },
+        { like: true },
       );
 
       for (const sim of similar) {
         pairsChecked++;
         // Check if edge already exists
-        const existing = await this._sql(
-          `SELECT id FROM kg_edge WHERE source_node_id = '${esc(mid)}' AND target_node_id = '${esc(sim.id as string)}'`
+        const existing = await this._sqlExec(
+          `SELECT id FROM kg_edge WHERE source_node_id = :mid AND target_node_id = :sid`,
+          { mid, sid: sim.id as string },
         );
         if (existing.length === 0) {
           try {
@@ -1550,8 +1657,9 @@ export class Client {
   ): Promise<KGNodeRecord[]> {
     // Find node pairs that share neighbors but aren't directly connected
     await this._call("compute_community_hierarchy", [workspaceId]);
-    return (await this._sql(
-      `SELECT * FROM kg_node WHERE workspace_id = '${esc(workspaceId)}'`
+    return (await this._sqlExec(
+      `SELECT * FROM kg_node WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     )) as KGNodeRecord[];
   }
 
@@ -1564,13 +1672,15 @@ export class Client {
     workspaceId: string
   ): Promise<LintResult> {
     // Find KG nodes with no edges
-    const allNodes = await this._sql(
-      `SELECT id FROM kg_node WHERE workspace_id = '${esc(workspaceId)}'`
+    const allNodes = await this._sqlExec(
+      `SELECT id FROM kg_node WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     );
     let orphans = 0;
     for (const node of allNodes) {
-      const edges = await this._sql(
-        `SELECT id FROM kg_edge WHERE source_node_id = '${esc(node.id as string)}' OR target_node_id = '${esc(node.id as string)}' LIMIT 1`
+      const edges = await this._sqlExec(
+        `SELECT id FROM kg_edge WHERE source_node_id = :nid OR target_node_id = :nid LIMIT 1`,
+        { nid: node.id as string },
       );
       if (edges.length === 0) orphans++;
     }
@@ -1584,11 +1694,12 @@ export class Client {
    */
   async generateOverview(workspaceId: string): Promise<OverviewResult> {
     // Gather workspace stats
+    const params = { ws: workspaceId };
     const [memories, kgNodes, kgEdges, notes] = await Promise.all([
-      this._sql(`SELECT COUNT(*) as c FROM memory WHERE workspace_id = '${esc(workspaceId)}'`),
-      this._sql(`SELECT COUNT(*) as c FROM kg_node WHERE workspace_id = '${esc(workspaceId)}'`),
-      this._sql(`SELECT COUNT(*) as c FROM kg_edge WHERE workspace_id = '${esc(workspaceId)}'`),
-      this._sql(`SELECT COUNT(*) as c FROM note WHERE workspace_id = '${esc(workspaceId)}'`),
+      this._sqlExec(`SELECT COUNT(*) as c FROM memory WHERE workspace_id = :ws`, params),
+      this._sqlExec(`SELECT COUNT(*) as c FROM kg_node WHERE workspace_id = :ws`, params),
+      this._sqlExec(`SELECT COUNT(*) as c FROM kg_edge WHERE workspace_id = :ws`, params),
+      this._sqlExec(`SELECT COUNT(*) as c FROM note WHERE workspace_id = :ws`, params),
     ]);
 
     return {
@@ -1607,8 +1718,9 @@ export class Client {
    * @returns Concatenated markdown string
    */
   async exportWorkspace(workspaceId: string): Promise<string> {
-    const notes = await this._sql(
-      `SELECT title, content FROM note WHERE workspace_id = '${esc(workspaceId)}'`
+    const notes = await this._sqlExec(
+      `SELECT title, content FROM note WHERE workspace_id = :ws`,
+      { ws: workspaceId },
     );
     return notes
       .map((n) => `# ${n.title}\n\n${n.content ?? ""}` as string)
@@ -1643,8 +1755,9 @@ export class Client {
     await this._call("create_note", [wsId, title, answer, opts?.embed ?? true]);
 
     // Get the note we just created
-    const notes = await this._sql(
-      `SELECT id FROM note WHERE workspace_id = '${esc(wsId)}' AND title = '${esc(title)}' ORDER BY created_at DESC LIMIT 1`
+    const notes = await this._sqlExec(
+      `SELECT id FROM note WHERE workspace_id = :ws AND title = :title ORDER BY created_at DESC LIMIT 1`,
+      { ws: wsId, title },
     );
     if (notes.length === 0) return { note: { id: '', title: '' }, entities: [], links: 0 };
     const noteId = notes[0].id;
@@ -1667,8 +1780,9 @@ export class Client {
     for (const entity of entities.slice(0, 10)) {
       try {
         await this._call("create_node", [wsId, entity, "concept", "", "{}"]);
-        const nodes = await this._sql(
-          `SELECT id FROM kg_node WHERE workspace_id = '${esc(wsId)}' AND label = '${esc(entity)}'`
+        const nodes = await this._sqlExec(
+          `SELECT id FROM kg_node WHERE workspace_id = :ws AND label = :label`,
+          { ws: wsId, label: entity },
         );
         if (nodes.length > 0) {
           await this._call("create_edge", [
@@ -1784,8 +1898,9 @@ export class Client {
       const emb = embeddings[i];
       if (emb && emb.length > 0) {
         // Find the newly created memory by content prefix
-        const mems = await this._sql(
-          `SELECT id FROM memory WHERE workspace_id = '${esc(workspaceId)}'`
+        const mems = await this._sqlExec(
+          `SELECT id FROM memory WHERE workspace_id = :ws`,
+          { ws: workspaceId },
         );
         if (mems.length > 0) {
           // Take the last match (most recently inserted)
