@@ -34,13 +34,6 @@ Files: sdk/python/tests/
 Difficulty: Medium
 Est: 4h
 
-### P3: Python — Move 15+ function-level imports to module top
-Style violation: import random, import time, import json, import secrets, etc.
-inside function bodies across client.py.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 30min
-
 ### P3: Python — Replace 6 `Any` type annotations with proper Protocols
 plugin_manager: Any, event_bus: Any, query_cache: Any, local_llm: Any,
 self._metrics: Any. These should be typed Protocols/ABCs.
@@ -56,6 +49,13 @@ Est: 1 week
 
 ## Recently Completed
 
+### P3: Python — Move 17 function-level imports to module top
+Style violation eliminated: all inline imports of random, time, secrets, json, and hashlib
+moved to top-level section. Removed 17 inline imports across 10 functions. 170/170 tests pass.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 30min
+
 ### P2: Remove 168MB stale `.upstream-venv`
 Cleaned up 168MB of stale virtualenv. Already in .gitignore, no git changes needed.
 Files: .upstream-venv/ (removed)
@@ -63,9 +63,9 @@ Difficulty: Easy
 Est: 10min
 
 ### P2: Python — Route 5 direct-HTTP methods through retry circuit
-All 5 methods (ping, check\_embedder\_health, \_tantivy\_index, \_tantivy\_search, \_embed\_openai)
-plus \_embed\_batch\_openai now use retry wrappers. Internal sidecar calls use \_request\_with\_retry()
-(STDB circuit breaker); external OpenAI calls use new \_request\_with\_retry\_simple() that retries
+All 5 methods (ping, check_embedder_health, _tantivy_index, _tantivy_search, _embed_openai)
+plus _embed_batch_openai now use retry wrappers. Internal sidecar calls use _request_with_retry()
+(STDB circuit breaker); external OpenAI calls use new _request_with_retry_simple() that retries
 without touching the circuit breaker. 170/170 client tests pass.
 Files: sdk/python/spacetime_memory/client.py
 Difficulty: Medium
