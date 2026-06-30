@@ -46,6 +46,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "embedder: tests that also need the proxy embedder (set OPENAI_API_KEY)"
     )
+    config.addinivalue_line(
+        "markers", "deep: pipeline/E2E tests that exercise multiple components end-to-end via mocked HTTP"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
