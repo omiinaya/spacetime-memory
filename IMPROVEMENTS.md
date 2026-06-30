@@ -1,4 +1,4 @@
-# Spacetime Memory — Improvement Backlog
+# Spacetime Memory — Improvement Backlog (June 29, 2026 — FRESH AUDIT)
 
 Living queue managed by the continuous-improvement cron. The cron reads this file,
 cleans up completed items, researches new improvement opportunities, adds them,
@@ -6,828 +6,139 @@ and works the top pending item each tick.
 
 ---
 
-## Pending
+## Pending (June 29 Audit — 18 New Items)
 
-No pending TS SDK items — all memory methods, workspace management, mental models, and remaining gaps are now at parity with Python SDK for core CRUD operations.
+### P0: Rust — Fix duplicate `require_auth()` in context_directory.rs (7 reducers)
+Each of the 7 reducers in context_directory.rs calls `require_auth(ctx)?;` TWICE — a copy-paste bug.
+Fix: remove the second redundant call from each reducer.
+Files: server/spacetimedb/src/context_directory.rs
+Difficulty: Easy
+Est: 10min
 
-## Deferred / Blocked
-
-### STDB 2% fatal error under heavy concurrent load
-**uuid_v4_uniq mitigation is complete** — all 27 primary-key inserts use
-collision-retry. The remaining ~2% fatal errors appear to be a STDB-level
-WASM limitation (not UUID-related). Root cause analysis requires a live
-STDB instance with replicator stress testing. Deferred until live STDB
-infrastructure is available for investigation.
-Files: server/spacetimedb/src/lib.rs, tests/concurrent/
-Difficulty: Hard (needs live STDB)
-
-|---
-
-## Recently Completed
-
-### ✅ TS SDK: add `storeBatch` for batch memory storage (this tick, commit a96cdd91)
-Added `storeBatch(workspaceId, items)` to TypeScript SDK client.ts — batch-embeds all
-items in one embedder call (``{texts: contents}``), then sends a single
-``store_memory_batch`` reducer with JSON-serialized payload. Indexes each stored
-memory with its embedding for hybrid search. Filters out empty items gracefully.
-4 new vitest tests: reducer call with correct payload, empty-item filtering,
-all-empty early return, index_entity after batch store. 58→62 TS tests passing.
-Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
+### P0: Rust — Add `.take(MAX_RESULTS)` to 8+ unbounded `.iter()` calls
+Critical for production safety. Every unbounded iter risks reducer timeout/OOM on large tables.
+Affected files: consolidation.rs, context_delta.rs, memory_feedback.rs, context_directory.rs, graph_traversal.rs, knowledge_graph.rs
+Files: server/spacetimedb/src/consolidation.rs, context_delta.rs, memory_feedback.rs, context_directory.rs, graph_traversal.rs, knowledge_graph.rs
 Difficulty: Medium
-Est: 20min
+Est: 1-2h
 
-### ✅ TS SDK parity: add 6 missing memory methods + 7 tests (commit 83e7da8e)
-Added `updateMemory`, `rateMemory`, `consolidateMemories`, `expireMemories`, `getMemoryHistory`, and `searchDirectoryContents` to the TypeScript SDK client.ts. All follow existing patterns: 4 simple reducer calls, 1 SQL query, 1 reducer+SQL combo. Tests cover: correct reducer URLs, arg structures, 5-arg updateMemory with expiresAt, consolidate with JSON-stringified sourceIds, SQL query shapes, and reducer+SQL chaining for directory search. 58/58 TS tests passing (51 existing + 7 new). TS compiles with 0 errors. Build file updated to match.
-Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
-Difficulty: Medium
-Est: 20min
-
-### ✅ Improve docstring coverage from 60% to 93.9% (commit 86480360)
-Added 282 new docstrings across 5 files: graphiti.py (73), honcho.py (103), zep.py (88),
-ingest.py (8), metrics.py (10). Overall SDK coverage: 1043/1111 functions documented.
-All adapter files (graphiti/honcho/zep) now at 100%. Only small connector files below
-80% remain (discord/notion/rss/slack/twitter — under 7 functions each).
-Files: sdk/python/spacetime_memory/sdks/graphiti.py, honcho.py, zep.py, ingest.py, metrics.py
-Difficulty: Medium
-Est: 2h
-
-### ✅ Fix 85 ruff lint errors in test files (this tick, commit 897af61d)
-Resolved 85 ruff lint errors across sdk/python/tests/ — 50 unused-variable (F841),
-22 import-not-at-top (E402), 9 lambda-assignment (E731), 6 ambiguous-variable-name (E741),
-1 multiple-statements-on-one-line (E702). 58 auto-fixed by ruff, 27 manual. All test
-suites passing.
-Files: sdk/python/tests/
-Difficulty: Medium
-Est: 30min
-
-### ✅ Complete Hindsight adapter parity (46/46 = 100%, commit 88bdb275)
-Added 18 missing methods: list_mental_models, get_mental_model, get_mental_model_history,
-update_mental_model, delete_mental_model, clear_mental_model, refresh_mental_model,
-list_directives, get_directive, update_directive, delete_directive, set_mission,
-set_reflect_mission, get_bank_config, update_bank_config, reset_bank_config + all async
-variants. Adapter parity 54%→100%.
-Files: sdk/python/spacetime_memory/sdks/hindsight.py
-Difficulty: Medium
-Est: 2-4h
-
-### ✅ Fix 2 ruff E402 errors in MCP main.py (this tick)
-Moved `from mcp.server.fastmcp import FastMCP` and `from spacetime_memory import Client`
-before `logger = logging.getLogger(__name__)` in server/mcp/main.py to resolve ruff
-E402 (module-import-not-at-top-of-file). 170/170 test_client.py tests passing,
-ruff check returns 0 errors on server/mcp/.
-Files: server/mcp/main.py
+### P0: Rust — Fix "reader" → "viewer" in knowledge_graph.rs:1143
+Invalid permission string "reader" — the valid levels are "owner", "editor", "viewer".
+This permission check will always fail (rank=0 for unknown string).
+Files: server/spacetimedb/src/knowledge_graph.rs:1143
 Difficulty: Easy
 Est: 2min
 
-### ✅ Convert MCP main.py startup print to logging (this tick)
-Added module-level `logger = logging.getLogger(__name__)` to server/mcp/main.py and
-converted the 1 `print()` startup banner (line 57, MCP_API_KEY notification) to
-`logger.info()`. No other `print()` calls remain in MCP main.py.
-Files: server/mcp/main.py
-Difficulty: Easy
-Est: 2min
-
-### ✅ Fix 3 TODO markers in orgmode connector (this tick) — already resolved
-Audited connectors/orgmode.py and tests/test_orgmode_connector.py — **0** actual
-code-level TODO/FIXME/HACK markers exist. The prior search matched org-mode keyword
-references (`** TODO`, `* DONE`) in docstrings, not code markers. The ROADMAP.md
-(June 28 audit) also confirms 0 code-level TODO markers project-wide. This item
-was already resolved before being added as PENDING.
-Files: sdk/python/spacetime_memory/connectors/orgmode.py,
-  sdk/python/tests/test_orgmode_connector.py
-Difficulty: Easy
-Est: 5min (audit only)
-
-### ✅ Convert 34 remaining print() calls to structured logging in connectors + ingest (this tick)
-Replaced all 34 `print()` calls in connectors (slack.py 6, discord.py 9, notion.py 4,
-twitter.py 4, orgmode.py 2, base.py 1) and ingest.py (8) with `logger.info()`/`.warning()`/`.error()`.
-Added `import logging` + `logger = logging.getLogger(__name__)` to 5 connector files
-(slack.py, discord.py, notion.py, twitter.py, orgmode.py) that lacked it. Added module-level
-`logger` to base.py's ConnectorRegistry. All 8 ingest.py prints converted (the module
-already had logger setup). 284 connector + 170 client tests passing, 0 ruff errors.
-Remaining 13 `print(` matches in SDK are all in docstring examples (not production code).
-Files: 8 files in sdk/python/spacetime_memory/connectors/*.py + ingest.py
-Difficulty: Easy
-Est: 20min
-
-### ✅ Convert print() calls to structured logging in shmr.py (this tick)
-Replaced 7 `print()` calls in `shmr.py` with `logging.Logger` calls:
-`logger.info()` for status messages, `logger.warning()` for error conditions.
-Added `import logging` + `logger = logging.getLogger(__name__` at module top.
-31/31 shmr tests passing, 170/170 client tests passing.
-Files: sdk/python/spacetime_memory/shmr.py
+### P1: Rust — Replace uuid_v7().expect() with graceful fallback in lib.rs:125
+Panics in WASM if STDB RNG fails. Replace with `.unwrap_or_else(|| uuid_v4(ctx))`.
+Files: server/spacetimedb/src/lib.rs:125
 Difficulty: Easy
 Est: 5min
 
-## Research Log
+### P1: Rust — Add logging to 4 silent `serde_json::from_str().unwrap_or_default()` calls
+These silently swallow parse errors with zero logging in profile.rs (73, 110), entity_linking.rs (62), hybrid_query.rs (125).
+Files: server/spacetimedb/src/profile.rs, entity_linking.rs, hybrid_query.rs
+Difficulty: Easy
+Est: 15min
 
-### Jun 28 (this tick) — Fixed 2 ruff E402 errors in MCP main.py; added 3 PENDING items to backlog
-- **Completed**:
-  - Fixed 2 `ruff` E402 errors in server/mcp/main.py by reordering imports above
-    `logger = logging.getLogger(__name__)`. All 170 test_client.py tests passing.
-  - Committed + pushed as ae7c1af9.
-- **Cleanup**: Added new completed entry at top of Recently Completed. Kept 6 items
-  (within 5-10 limit, no purge needed). Replaced empty Pending section with 3 new items.
-- **Research**:
-  - Git log (7 days): 254+ commits, latest: ae7c1af9 (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.8 installed, v2.0.10 available on PyPI. Key new feature:
-    `expiration_date` on `update()` — already matched by SpacetimeMemory's
-    `expires_at` parameter on `update_memory` (commit 2ef708cd).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - Deeper scan:
-    - **85 ruff errors in test files** — 50× F841, 22× E402, 9× E731, 6× E741, 1× E702
-    - **Docstring coverage at 60%** (545/900 functions) — 40% undocumented
-    - **ROADMAP.md stale claims** — says "0 ruff errors" (but 90 exist), says "~47 print()" (but 0 remain)
-    - Production code is clean: 0 ruff errors in sdk/python/spacetime_memory/, 0 TODO/FIXME/HACK markers, 0 production print() calls
-- **Backlog**: 3 PENDING items added (test ruff errors, docstring coverage, ROADMAP stale claims).
-- **Commit**: ae7c1af9 — 1 file changed, +2/-2 lines (server/mcp/main.py).
+### P1: Python — Eliminate 18+ silent `except RuntimeError: pass` blocks
+These mask real failures in store(), store_batch(), create_note(), update_note(), entity extraction, restore, and more.
+Replace with at minimum logger.debug() or logger.warning().
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Medium
+Est: 1h
 
-|### Jun 28 (this tick) — Converted MCP main.py print→logging, audited orgmode TODO markers; backlog cleared
-|- **Completed**:
-|  - Added `logger = logging.getLogger(__name__)` to server/mcp/main.py and converted the
-|    single startup `print()` (MCP_API_KEY notification) to `logger.info()`. Now 0 `print()`
-|    calls remain in MCP production code (only docstring examples remain).
-|  - Audited "3 TODO markers" in orgmode connector — found 0 actual code markers (false
-|    alarm: matched org-mode keyword usage, not code TODO comments). Item marked done.
-|- **Cleanup**: Removed 2 PENDING items from backlog (MCP print→logging done, TODO markers
-|  already resolved). Added both to Recently Completed. Backlog is now empty.
-|- **Research**:
-|  - Git log (7 days): 320+ commits, latest: fe1c84ff (this tick's 34 print→logging fix).
-|  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest, uploaded Dec 2023).
-|  - mem0ai v2.0.10 latest (installed 2.0.8), langgraph v1.2.6, zep-python v2.0.2,
-|    opentelemetry-sdk v1.43.0 — all unchanged from last tick.
-|  - Deeper scan: No new competitor features to adopt. All 163 Rust reducers have SDK +
-|    MCP coverage. 0 code-level TODO/FIXME markers. 0 production `print()` calls remain
-|    (MCP startup banner now uses logging). ROADMAP.md still has stale print count (~47)
-|    and localhost marks — should be updated separately.
-|- **Backlog**: 0 PENDING items — backlog cleared.
-|- **Commit**: [this tick]
+### P1: TypeScript — Fix SQL injection vulnerability
+All SQL queries use raw string interpolation with single-char `esc()` function.
+Doesn't handle backslash escapes, Unicode attacks, or other injection vectors.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 30min
 
-### Jun 28 (this tick) — Converted 34 print()→logging in connectors + ingest; backlog has 2 PENDING
-- **Completed**:
-  - Replaced all 34 `print()` calls in connectors (slack.py, discord.py, notion.py,
-    twitter.py, orgmode.py, base.py) and ingest.py with `logger.info()/.warning()/.error()`.
-    Added `import logging` + `logger` to 5 connector files. 284 connector tests + 170
-    client tests passing. 0 ruff errors.
-- **Cleanup**: Added new completed entry at top of Recently Completed. Purged 9 oldest
-  completed entries to keep 10 in Recently Completed.
-- **Research**:
-  - Git log (7 days): 253+ commits, latest: fc35bc43 (print→logging in shmr.py, this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged), langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged),
-    opentelemetry-sdk v1.43.0 (unchanged).
-  - Deeper scan: Remaining code-quality items identified. 2 PENDING items remain
-    (TODO markers in orgmode, MCP startup print deferred).
-- **Backlog**: 2 PENDING items remaining.
-- **Commit**: fe1c84ff
+### P1: TypeScript — Publish to npm
+npm publish workflow exists but NPM_TOKEN hasn't been set in GitHub secrets.
+Files: sdk/typescript/package.json, .github/workflows/npm-publish.yml
+Difficulty: Easy
+Est: 15min
 
-### Jun 28 (this tick) — Converted print()→logging in shmr.py; 5 missing docstrings + localhost fixes; backlog cleared
-- **Completed**: 
-  - Added 5 missing docstrings to client.py (`__init__`, `_do_sql`, `_do_call`, `from_dict`, `format`). 175/175 client methods now documented. Fixed 7 hardcoded `localhost` defaults → `127.0.0.1` across client.py, query_expansion.py, 6 adapters.
-  - Converted 7 `print()` calls in shmr.py to structured `logging.Logger` calls (`logger.info()`/`logger.warning()`). Added `import logging` + logger setup. 31/31 shmr tests, 170/170 client tests passing.
-- **Cleanup**: Moved ✅ docstrings item from Pending → Recently Completed. Moved ✅ print→logging item from Pending → Recently Completed. Purged 2 oldest completed entries to keep 9 in Recently Completed.
-- **Research**:
-  - Git log (7 days): 320+ commits, latest: d00beaba (honcho adapter fix + docs).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged), langgraph v1.2.6 (unchanged), zep-python v2.0.2 (unchanged), opentelemetry-sdk v1.43.0 (at latest).
-  - All 138 Client SDK methods have MCP tool coverage. 0 ruff errors. 0 code-level TODO/FIXME markers.
-  - Deeper scan: ROADMAP identifies remaining ~47 `print()` calls across SDK (connectors, ingest, sdks, metrics, client). No new competitor features to adopt.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: 92415ced (docstrings + localhost fixes), d00beaba (honcho adapter + docs), [this tick] (print→logging in shmr.py).
+### P1: Publish benchmark scores (LongMemEval, LoCoMo, BEAM)
+Biggest credibility gap vs Mem0, Hindsight, Supermemory.
+Files: scripts/benchmark.py (exists, needs integration)
+Difficulty: Hard
+Est: 1-2 weeks
 
-### Jun 28 (this tick) — Fixed 2 ruff lint issues in MCP main.py; backlog now has 1 PENDING
-- **Completed**: Fixed 2 ruff lint issues in MCP main.py (`F541 f-string` and `F841 unused variable`).
+### P2: Python — Route 5 direct-HTTP methods through retry circuit
+ping(), check_embedder_health(), _tantivy_index(), _tantivy_search(), _embed_openai()
+all use self._http.get/post directly instead of _request_with_retry().
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Medium
+Est: 30min
 
-- **Cleanup**: Added new completed entry at top of Recently Completed. Purged 2 oldest completed entries to keep 10.
-- **Research**:
-  - Git log (7 days): 307+ commits, latest: 25ed22e2 (this tick — ruff lint fixes).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged, PyPI latest).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.42.1 — all unchanged from last tick.
-  - OpenTelemetry SDK 1.43.0 available (upgrade from 1.42.1) — no breaking changes.
-  - Deeper scan: SDK/MCP cross-reference shows all 137 public SDK methods have MCP tool coverage (aliases accounted for). Ruff check returns 0 errors across SDK + MCP codebase. No new competitor features to adopt from mem0, langgraph, zep. 3337 tests collected, 170/170 test_client.py passing.
-  - Added 2 PENDING items: ruff lint fixes (done this tick), docstring improvements (remaining).
-- **Backlog**: 1 PENDING item remaining (add docstrings to 5 undocumented methods).
-- **Commit**: 25ed22e2 — 1 file changed, +1/-2 lines (server/mcp/main.py).
+### P2: Python — Add 77 missing Rust reducers to SDK
+Auth (9), replication (10), sessions (5), peers (3), connectors (3), messages (2),
+harmonics (3), change events (3), context deltas (2), + ~37 miscellaneous.
+Files: sdk/python/spacetime_memory/client.py + Rust files
+Difficulty: Hard
+Est: 4-8h
 
-### Jun 28 (this tick) — Added `delete_mental_model` + `update_mental_model` MCP tools; found 2 MCP gaps
-- **Completed**: Added `Client.grant_space_access(workspace_id, peer_id, permission)`
-  and `Client.revoke_space_access(workspace_id, peer_id)` Python SDK methods
-  wrapping the `grant_space_access` (workspace.rs:284) and `revoke_space_access`
-  (workspace.rs:357) Rust reducers. Updated both MCP tools to use SDK methods.
-  Also converted 9 MCP tools from raw `get_client()._call()` to proper SDK
-  methods: `rate_memory`, `consolidate_memories`, `set_memory_scope`,
-  `synthesize_mental_models`, `add_fact`, `list_facts`, `delete_fact`,
-  `update_fact`, `search_facts`. Only remaining `_call()` in MCP is
-  `add_agent_step` (internal, no SDK method needed). Removed inline SQL from
-  `list_facts` and `search_facts` MCP tools.
-  170/170 test_client.py tests passing, 139 compounder+observability passing.
-- **Cleanup**: Added new completed entry at top of Recently Completed. Purged
-  2 oldest entries (delete_node+delete_edge, 8 SDK methods batch) to keep 10.
-  Removed both completed PENDING items from backlog. Backlog is now empty.
-- **Research**:
-  - Git log (7 days): 254+ commits, latest: 8c73dbf5 (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.43.0 — all unchanged from last tick.
-  - Deeper scan: all `_call()` usage in MCP tools now eliminated except
-    `add_agent_step` (internal reducer). All Rust workspace access reducers
-    now have SDK + MCP coverage. No remaining PENDING items. No new competitor
-    features to adopt.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: 8c73dbf5 — 3 files changed, +81/-21 lines.
+### P2: TypeScript — Eliminate 38 `any` usages
+Replace `Promise<any[]>` with typed interfaces. Add proper return types for all 71 methods.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 1h
 
-### Jun 28 (this tick) — Added `dedup_memories` SDK alias + MCP tool cleanup; found 13 remaining `_call()` gaps
-- **Completed**: Added `Client.dedup_memories(workspace_id)` SDK alias and
-  updated the MCP `dedup_memories` tool to use the SDK method instead of raw
-  `get_client()._call(...)`. 166/166 test_client.py tests passing.
-- **Cleanup**: Added new completed entry at top of Recently Completed (now 10
-  entries, at max limit — no purge needed). Removed completed `dedup_memories`
-  PENDING item from backlog.
-- **Research**:
-  - Git log (7 days): 291+ commits, latest: 28577d3f (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.43.0 — all unchanged from last tick.
-  - Deeper scan: found **13 `._call(` calls remaining in server/mcp/main.py**.
-    Previous tick's claim \"last MCP _call() removed\" was inaccurate — it only
-    fixed `get_session_steps` and `list_space_members`. Breakdown:
-    - 9 tools have SDK methods already but still use `_call`: `rate_memory`,
-      `consolidate_memories`, `set_memory_scope`, `synthesize_mental_models`,
-      `add_fact`, `list_facts`, `delete_fact`, `update_fact`, `search_facts`
-    - 3 tools have no SDK method: `dedup_memories` (now fixed), `grant_space_access`,
-      `revoke_space_access`
-    - 1 internal reducer: `add_agent_step`
-  - All 336 unit tests passing (166 client, 91 compounder, 48 observability, 31 shmr).
-  - No code-level TODO/FIXME markers. No new competitor features to adopt.
-- **Backlog**: 2 PENDING items remaining (grant_space_access + revoke_space_access SDK,
-  9 MCP tool SDK-method conversions).
-- **Commit**: 28577d3f — 3 files changed, +38/-2 lines.
+### P2: TypeScript — Add JSDoc to 70/71 public methods
+Currently only 1 method (storeBatch) has JSDoc. 1.4% coverage.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 30min
 
-### Jun 28 (this tick) — Added `get_session_steps` and `list_space_members` SDK methods; last MCP raw _call() removed
-- **Completed**: Added `Client.get_session_steps(session_id)` and
-  `Client.list_space_members(workspace_id)` SDK methods — the last two MCP
-  tools that were calling `_call()` directly now have clean SDK wrappers.
-  Updated MCP tools in main.py to use the SDK methods instead of raw
-  `_call` + inline SQL. 166/166 test_client.py tests passing (4 new tests).
-  79 shmr + observability passing. 336 deep tests passing.
-- **Cleanup**: Added new completed entry at top, purged oldest completed
-  entry (`search_directory_contents`) to keep 10 entries.
-- **Research**:
-  - Git log (7 days): 290+ commits, latest: 06993807 (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest, uploaded Dec 2023).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.43.0 — all unchanged from last tick.
-  - Deeper scan: compared all 160 Rust reducers against SDK methods. Found
-    2 remaining MCP tools that called `_call()` directly (`get_session_steps`,
-    `list_space_members`) — now implemented. No remaining MCP tools use raw
-    `_call()` — all go through clean SDK methods. No unreachable code-level
-    TODO/FIXME/HACK markers. No new competitor features to adopt.
-  - Web UI directory (web/) does not exist — no frontend gaps to fill.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: 06993807 — 3 files changed, +105/-16 lines.
+### P2: Add E2E / deep test marker + 10 tests
+No E2E test coverage at all. Create deep marker, write integration tests for critical paths
+(store → search, create node → query graph, create note → get backlinks).
+Files: sdk/python/tests/
+Difficulty: Medium
+Est: 4h
 
-### Jun 28 (this tick) — Renamed stale MNEMOSYNE_* env vars to STMEM_*; WASM rebuild noted
-- **Completed**: Renamed 7 `MNEMOSYNE_*` env vars in shmr.py to `STMEM_*` with
-  backward-compatible fallback. Old `MNEMOSYNE_*` vars still work but emit a
-  `DeprecationWarning`. Added `_get_env()` helper with automatic old→new lookup.
-  Updated test docstring in test_shmr_resonate.py. Also cleaned up ROADMAP.md:
-  marked env-var item resolved, marked stale-WASM item resolved.
-  241/241 tests passing (31 shmr, 162 client, 48 observability).
-- **Cleanup**: Removed now-resolved "stale WASM binary" from Deferred/Blocked.
-  Purged oldest Recently Completed entry (update_memory_tier) to keep 10 entries.
-  Added new completed entry at top.
-- **Research**:
-  - Git log (7 days): 257+ commits, latest: 9b95d508 (WASM rebuild + ROADMAP update).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.43.0 — all unchanged from last tick.
-  - Deeper scan: found stale `MNEMOSYNE_*` env vars as remaining actionable gap
-    from ROADMAP audit — now implemented. Remaining ROADMAP items are larger
-    scope (print→logging, docstrings, auth guard review) better suited for
-    dedicated cleanup ticks. No new competitor features to adopt. No code-level
-    TODO/FIXME markers. WASM binary rebuilt Jun 28 at 2.36MB (commit 9b95d508).
-  - Web UI directory (web/) does not exist — no frontend gaps to fill.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: 5101cf72 — 4 files changed, +99/-45 lines.
+### P2: Remove 168MB stale `.upstream-venv/`
+Size: 168MB. Likely has stale packages.
+Files: .upstream-venv/
+Difficulty: Easy
+Est: 10min
 
-### Jun 28 (this tick) — Added `get_edge_history` SDK method + MCP tool; 1 new gap found
-- **Completed**: Added `Client.get_edge_history(edge_group_id)` SDK method
-  and `get_edge_history` MCP tool — returns all historical versions of a KG
-  edge. The reducer (knowledge_graph.rs:411) iterates all edge versions
-  sharing the same ``edge_group_id`` and stores them in ``edge_history_result``.
-  SDK calls the reducer then queries the result table via SQL. Also fixed 3
-  pre-existing Rust issues: .to_string() on sender hex (memory.rs, note.rs),
-  missing imports (query.rs), trailing comma (replication.rs).
-  162/162 test_client.py tests passing, 146 MCP tools registered.
-- **Cleanup**: Purged oldest Recently Completed entry (consolidate_memories tests)
-  to keep 10 entries total. Added new completed entry at top.
-- **Research**:
-  - Git log (7 days): 300+ commits, latest: c96784bb (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.43.0 — all unchanged from last tick.
-  - Deeper scan: found `get_edge_history` gap — now implemented. Remaining
-    Rust-only reducers are internal (replication, auth flows, proxy metrics,
-    indexing, change events, connectors, session internals, insight CRUD) that
-    don't need SDK exposure. No new competitor features to adopt. No code-level
-    TODO/FIXME markers in source code.
-  - Web UI directory (web/) does not exist — no frontend gaps to fill.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: c96784bb — 7 files changed, +54/-4 lines.
+### P3: Python — Move 15+ function-level imports to module top
+Style violation: import random, import time, import json, import secrets, etc.
+inside function bodies across client.py.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 30min
 
-### Jun 28 (this tick) — Backlog remains empty; all deps unchanged; no new gaps found
-- **Completed**: None — 0 PENDING items in backlog.
-- **Cleanup**: 10 items in Recently Completed (at max limit 10, no purge needed).
-- **Research**:
-  - Git log (7 days): 285+ commits, latest: 95ccba49 (this tick's docs fix).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.43.0 — all unchanged from last tick.
-  - Deeper scan: compared all Rust reducers against 161+ SDK public methods.
-    All reducers that accept a direct SDK call have coverage. Remaining gaps
-    are internal (replication, auth flows, proxy metrics, indexing internals)
-    that don't need SDK exposure. No code-level TODO/FIXME markers.
-  - All 300 tests pass (161 test_client, 91 test_compounder, 48 test_observability).
-  - Web UI directory (web/) does not exist — no frontend gaps to fill.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: No commit needed — no code changes this tick.
+### P3: Python — Replace 6 `Any` type annotations with proper Protocols
+plugin_manager: Any, event_bus: Any, query_cache: Any, local_llm: Any,
+self._metrics: Any. These should be typed Protocols/ABCs.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Medium
+Est: 30min
 
-### Jun 28 (this tick) — Added `update_workspace`, `set_workspace_visibility`, `get_workspace_context` SDK methods + MCP tools
-- **Completed**: Added 3 new ``Client`` SDK methods for workspace management:
-  - ``Client.update_workspace(id, name, description)`` — wraps ``update_workspace``
-    reducer (workspace.rs:72), updates workspace name/description
-  - ``Client.set_workspace_visibility(workspace_id, is_public)`` — wraps
-    ``set_workspace_visibility`` reducer (workspace.rs:196), toggles public/private
-  - ``Client.get_workspace_context(workspace_id)`` — calls ``get_workspace_context``
-    reducer (workspace.rs:136) and reads ``workspace_context_result`` table
-  All three have matching MCP tools. Workspace CRUD management (create, update, delete)
-  plus visibility toggle and context get/set are now fully exposed. 161/161
-  test_client.py tests passing, 145 MCP tools registered.
-- **Cleanup**: Purged 3 oldest Recently Completed entries (expires_at support,
-  delete_tour_stop, stale doc references) to keep 8 entries total. Added new
-  completed entry at top of Recently Completed.
-- **Research**:
-  - Git log (7 days): 250+ commits, latest: a00eca57 (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.43.0 — all unchanged from last tick.
-  - Deeper scan: compared all 158 Rust reducers against 158 SDK public methods.
-    Found 77 reducers with no direct SDK call. Filtered to highest-value:
-    `update_workspace`, `set_workspace_visibility`, `get_workspace_context` —
-    now implemented. Remaining gaps are internal (replication, auth flows, proxy
-    metrics, indexing, consolidation internals) that don't need SDK exposure.
-    No code-level TODO/FIXME markers in source code.
-  - Web UI directory (web/) does not exist — no frontend gaps to fill.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: a00eca57 — 4 files changed, +177/-79 lines.
+### P3: Bi-temporal fact tracking — Graphiti-style temporal facts
+Graphiti's strongest differentiator. Needs: fact valid_from/valid_to columns + auto-invalidation reducer.
+Files: server/spacetimedb/src/profile.rs
+Difficulty: Hard
+Est: 1 week
 
-### Jun 28 (this tick) — Added `expire_memories` SDK method + MCP tool; backlog cleared
-- **Completed**: Added `Client.expire_memories()` Python SDK method wrapping the
-  `expire_memories` reducer (memory.rs:313) and a matching `expire_memories` MCP
-  tool in main.py. The reducer requires admin privileges and deactivates all
-  memories whose `expires_at` is past. 161/161 test_client.py unit tests passing,
-  143 MCP tools registered. This was the last PENDING item — backlog is now empty.
-- **Cleanup**: Removed completed `expire_memories` PENDING item from backlog.
-  Added new completed entry to top of Recently Completed (now 10 total, at max
-  limit, purged oldest entry "Fix test_get_memory_history_found mock setup" to
-  stay within 10).
-- **Research**:
-  - Git log (7 days): 280+ commits, latest: e27ea0a9 (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai, langgraph, zep-python, opentelemetry-sdk — all unchanged from last tick.
-  - Deeper scan: compared all 159 Rust reducers against 97+ SDK public methods.
-    Every reducer that accepts a direct call now has SDK + MCP coverage. Remaining
-    reducers are internal (replication, auth flows, proxy metrics) that don't need
-    SDK exposure. No new competitor features to adopt. No code-level TODO/FIXME
-    markers. Web UI directory (web/) does not exist.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: e27ea0a9 — 2 files changed, +26 lines (client.py, main.py).
+## Deferred / Blocked
 
-### Jun 28 (this tick) — Added `create_tag`, `tag_memory`, `untag_memory` SDK methods + MCP tools; 1 PENDING remaining
-- **Completed**: Added `Client.create_tag(workspace_id, name, color)`,
-  `Client.tag_memory(memory_id, tag_id)`, and `Client.untag_memory(memory_id, tag_id)`
-  Python SDK methods wrapping the `create_tag`, `tag_memory`, and `untag_memory` Rust
-  reducers (tag.rs:32, 55, 71). Added matching `create_tag`, `tag_memory`, `untag_memory`
-  MCP tools in main.py. Tagging is now fully accessible programmatically — previously
-  only existed in Rust. 161/161 unit tests passing (test_client), 141 MCP tools registered.
-- **Cleanup**: Purged completed tag PENDING item from backlog. Moved Recently Completed
-  section to bottom of file (before Research Log) per convention. 10 completed entries
-  kept, no purge needed.
-- **Research**:
-  - Git log (7 days): 150+ commits, latest: b4c70819 (previous tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged, PyPI latest).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all at latest.
-  - Deeper scan: compared all 160+ Rust reducers against 130+ SDK public methods.
-    Tag CRUD is now complete (create_tag, tag_memory, untag_memory all have SDK + MCP).
-    1 PENDING item remains (expire_memories). New gaps found: `update_workspace`,
-    `set_workspace_visibility` workspace.rs reducers have no SDK/MCP coverage — added
-    as future candidates. No new competitor features to adopt. No code-level TODO/FIXME
-    markers.
-- **Backlog**: 1 PENDING item remaining (expire_memories).
-- **Commit**: c952d09a — 3 files changed, +145/-50 lines (client.py, main.py, IMPROVEMENTS.md).
+### STDB 2% fatal error under heavy concurrent load (BLOCKED — no live STDB for stress testing)
+Remaining root cause appears to be STDB-level WASM limitation.
+Deferred until live STDB infrastructure is available.
+Files: server/spacetimedb/src/lib.rs, tests/concurrent/
+Difficulty: Hard
 
-### Jun 27 (tick 8) — Added `delete_node` + `delete_edge` SDK methods and MCP tools; found 3 new gaps
-- **Completed**: Added `Client.delete_node(node_id)` and `Client.delete_edge(edge_id)`
-  Python SDK methods wrapping the `delete_node` and `delete_edge` KG reducers
-  (knowledge_graph.rs:185, knowledge_graph.rs:269). Also added corresponding
-  `delete_node` and `delete_edge` MCP tools in main.py. These complete the KG
-  CRUD operations — `create_node`/`update_node`/`delete_node` and
-  `create_edge`/`update_edge`/`delete_edge` now all have SDK + MCP coverage.
-  492/492 unit tests passing, 4 skipped (pre-existing live-STDB tests).
-- **Cleanup**: Added new completed item to Recently Completed (9 total, within 5-10
-  range, no purge needed). Moved 4 new PENDING items into Pending section.
-- **Research**:
-  - Git log (7 days): 250+ commits, latest: c865ea19 (previous tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.4 (installed upstream venv — PyPI latest is v2.0.10 per research log).
-  - langgraph v1.2.4 (installed), zep-python v2.0.2, opentelemetry — all unchanged.
-  - Deeper scan: compared all 160 Rust reducers against 122 SDK public methods.
-    Found 78 reducers not called via `_call` in client.py. Filtered to highest-value
-    gaps — reducers that exist in Rust with no SDK/MCP coverage:
-    1. `delete_fact`, `update_fact`, `search_facts` (profile.rs) — fact CRUD incomplete
-    2. `tag_memory`, `untag_memory`, `create_tag` (tag.rs) — tagging not exposed
-    3. `expire_memories` (memory.rs) — manual expiration not exposed
-    All added as PENDING items.
-  - No code-level TODO/FIXME markers. Web UI directory (web/) does not exist.
-  - STDB SDK changelogs checked: no relevant new features.
-- **Backlog**: 3 PENDING items remaining (delete_fact/update_fact/search_facts,
-  tag_memory/untag_memory/create_tag, expire_memories).
-- **Commit**: 34802109 — 3 files changed (client.py +27 lines, main.py +30 lines,
-  IMPROVEMENTS.md).
+### Frontend / Web UI (BLOCKED — not started, 1-2 week effort)
+Zero web UI code exists. React/Vite SPA needed for dashboard, workspace management, KG explorer, note editor.
+No code to block on — just not started.
+Difficulty: Hard
 
-### Jun 27 (tick 7) — Added 8 SDK methods (set_memory_scope, 5 mental model ops, add_fact + list_facts); backlog cleared
-- **Completed**: Added all 8 missing SDK methods closing the remaining SDK parity gaps:
-  - ``Client.set_memory_scope(memory_id, user_scope)`` — wraps ``set_memory_scope`` reducer
-  - ``Client.synthesize_mental_models(workspace_id, memory_ids)`` — wraps ``synthesize_mental_models`` reducer
-  - ``Client.get_mental_model(model_id)`` — queries ``mental_model`` table via SQL
-  - ``Client.list_mental_models(workspace_id, status)`` — lists mental models with optional status filter
-  - ``Client.delete_mental_model(model_id)`` — wraps ``delete_mental_model`` reducer
-  - ``Client.update_mental_model(model_id, content, confidence, status)`` — wraps ``update_mental_model`` reducer
-  - ``Client.add_fact(workspace_id, peer_id, content, ...)`` — wraps ``add_fact`` reducer
-  - ``Client.list_facts(workspace_id, peer_id, fact_type, tier, category)`` — wraps ``list_facts`` reducer, reads ``fact_result`` table
-  All 1712/2099 non-MCP tests passing (386 skipped live STDB, 1 pre-existing MCP import failure).
-- **Cleanup**: Purged 3 oldest Recently Completed entries (GitHub Actions CI step, pre-commit config, 53 ruff lint fixes) to keep 10. Moved 3 new entries (set_memory_scope, mental models, facts) to Recently Completed. Pending section now says "None — backlog cleared."
-- **Research**:
-  - Git log (7 days): 250+ commits, latest: 744edcef (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - Deeper scan: compared all 163 Rust reducers against 121 SDK methods. No new gaps found — every reducer now has SDK coverage. No code-level TODO/FIXME markers. Web UI directory (web/) does not exist.
-  - SDSTD SDK changelogs checked: no relevant new features that would benefit the module.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: 744edcef — 2 files changed, +179/-105 lines (client.py, IMPROVEMENTS.md).
-
-### Jun 27 (tick 6) — Added `search_directory_contents` SDK + MCP; found 3 SDK gaps
-- **Completed**: Added `Client.search_directory_contents(workspace_id, directory_path)`
-  SDK method and MCP tool — fills the last directory-search gap. The Rust reducer
-  (profile_query.rs:213) recursively collects all subdirectories and memory entries
-  in a tree rooted at a directory path. Python SDK queries `directory_content_result`
-  table via SELECT after the reducer call. 427/427 tests passing, 4 skipped.
-- **Cleanup**: Purged oldest Recently Completed entry (`update_edge`) to keep 10
-  items. Moved `search_directory_contents` to Recently Completed.
-- **Research**:
-  - Git log (7 days): 250+ commits, latest: eb2c342a (previous tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - Deeper scan: compared all 162 Rust reducers against 113 SDK methods. Found 3
-    new SDK gaps: `set_memory_scope` (MCP tool exists, no SDK method), mental model
-    operations (5 methods with MCP tools, no SDK methods), `list_facts` (MCP tool
-    exists, no SDK method). All added as PENDING.
-  - No code-level TODO/FIXME markers. Web UI directory (web/) does not exist.
-- **Backlog**: 3 PENDING items remaining.
-- **Commit**: 8b0cfa76 — 3 files changed, +110/-16 lines (client.py, main.py, IMPROVEMENTS.md).
-
-### Jun 27 (tick 5) — Added `update_memory_tier` SDK + MCP; backlog down to 1 PENDING
-- **Completed**: Added `Client.update_memory_tier(memory_id, tier)` SDK method
-  and `update_memory_tier` MCP tool — fills the last context-compression gap
-  in the Python SDK (update_memory_tier reducer existed in Rust since
-  context_compression.rs:106 but was never exposed). Client method validates
-  tier with ValueError; MCP tool mirrors the same signature. Python import
-  verified. Committed + pushed (9e934930).
-- **Cleanup**: Purged oldest Recently Completed entry (OTel span interface
-  methods) to keep 10 items. Moved update_memory_tier to Recently Completed.
-- **Research**:
-  - Git log (7 days): 250+ commits, latest: 9e934930 (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.8 (unchanged — latest check shows v2.0.8, not v2.0.10 as
-    previously recorded; correcting).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all
-    unchanged from last tick.
-  - Deeper scan: no new gaps found. 1 remaining PENDING item
-    (search_directory_contents). No code-level TODO/FIXME markers.
-  - Web UI directory (web/) does not exist — no frontend gaps to fill.
-- **Backlog**: 1 PENDING item remaining.
-- **Commit**: 9e934930 — 2 files changed, +35/-0 lines (client.py, main.py, IMPROVEMENTS.md).
-
-### Aug 2 (tick 4) — Added `update_edge` SDK + MCP; found 2 more SDK gaps
-- **Completed**: Added `update_edge` SDK method and MCP tool — fills the last
-  KG gap (update_node already existed). 1833/1833 unit tests passing.
-- **Cleanup**: Purged oldest Recently Completed entry (Update MCP README) to
-  keep 10 items. Moved update_edge to Recently Completed.
-- **Research**:
-  - Git log (7 days): 250+ commits, latest: 031daaea (previous tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all
-    unchanged from last tick.
-  - Deeper scan: compared all 160 Rust reducers against 107 Client SDK methods.
-    Found 3 reducers with no SDK/MCP coverage: `update_edge` (now done),
-    `update_memory_tier`, `search_directory_contents`. Both added as PENDING.
-  - No competitor features to adopt. No code-level TODO/FIXME markers.
-  - Web UI directory (web/) does not exist — no frontend gaps to fill.
-- **Backlog**: 2 PENDING items remaining.
-- **Commit**: 64d58dfb — 3 files changed, +95/-13 lines (client.py, main.py, IMPROVEMENTS.md).
-
-### Aug 2 (tick 3) — Fixed missing _NoOpSpan OTel interface methods; backlog remains empty
-- **Completed**: Added 3 missing OpenTelemetry Span interface methods to
-  `_NoOpSpan`: `add_event()`, `update_name()`, `is_recording()`. These are
-  standard methods that any code calling spans from `start_span()` might
-  invoke. The fallback was incomplete — missing them could cause
-  `AttributeError` when OTel is disabled. Added 3 unit tests. Committed +
-  pushed (763181aa).
-- **Cleanup**: Added new completed item to Recently Completed (11 total at
-  max 10 limit — purged oldest entry to keep 10).
-- **Research**:
-  - Git log (7 days): 312+ commits (since v1.20.0), latest: 763181aa (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all
-    unchanged from last tick.
-  - Deeper scan: no new competitor features to adopt. All 106 Client SDK
-    methods have MCP wrappers (130+ tools). 3316 tests collected. No
-    code-level TODO/FIXME markers in source code. Web UI directory (web/)
-    does not exist — no frontend gaps to fill.
-  - Found missing OTel Span interface methods on _NoOpSpan — implemented
-    this tick.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: 763181aa — 3 files changed, +28/-0 lines (tracer.py, test_observability.py, IMPROVEMENTS.md).
-
-### Aug 2 (tick 2) — Backlog remains empty; all dependencies unchanged; no new gaps found
-- **Completed**: None — 0 PENDING items in backlog.
-- **Cleanup**: 10 items in Recently Completed (at max limit 10, no purge needed).
-- **Research**:
-  - Git log (7 days): 243+ commits, latest: cee32b2c (this tick's commit).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - Deeper scan: no new gaps found. All Client SDK methods have MCP wrappers.
-    2627/3315 tests passing (688 skipped — live STDB-dependent). Overall Python
-    coverage 72% (client.py 96%, compounder.py 85%). No code-level TODO/FIXME
-    markers in source code. agent_orchestrator module has 167 tests covering it.
-  - Web UI directory (web/) does not exist — no frontend gaps to fill.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: No commit needed — no code changes this tick.
-
-### Jun 27 — Backlog remains empty; all dependencies unchanged; no new gaps found
-- **Completed**: None — 0 PENDING items in backlog.
-- **Cleanup**: 10 items in Recently Completed (at max limit, no purge needed).
-- **Research**:
-  - Git log (7 days): ~242 commits, latest: c74d3def (this tick's commit hash fix).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged from last tick — added AsyncMemory/AsyncMemoryClient in
-    v2.0.10, but implementing full async Client is a major refactor beyond single-tick scope).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - Deeper scan: no new gaps found. All 106 Client SDK methods have MCP wrappers.
-    3315 tests collected (246/246 test_client + test_compounder confirmed passing).
-    No code-level TODO/FIXME markers in source code.
-  - Web UI directory (web/src/) does not exist — no frontend gaps to fill.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: No commit needed — no code changes this tick.
-
-### Aug 2 — Added `expires_at` support to `update_memory`; backlog stays clear
-- **Completed**: Added optional `expires_at` parameter to Rust `update_memory`
-  reducer, Python SDK `Client.update_memory()`, and MCP `update_memory` tool.
-  The `Memory` table already had `expires_at` but no way to modify it after
-  creation. Now matches mem0 v2.0.10's `expiration_date` on update feature.
-- **Cleanup**: Added new completed item to Recently Completed (10 total, at
-  max limit, no purge needed).
-- **Research**:
-  - Git log (7 days): 243+ commits, latest: eebefeee (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged — latest on PyPI has `expiration_date` on
-    update; that feature is now matched in SpacetimeMemory).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - Deeper scan: no new gaps found. All Client SDK methods have MCP wrappers
-    (135+ tools). 3315 tests collected. No code-level TODO/FIXME markers.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: 2ef708cd — 5 files changed, +85/-5 lines (memory.rs, client.py, main.py, test_client_deep.py).
-
-### Aug 2 — Fixed 9 stale STDB v2.4 doc references; backlog remains empty
-- **Completed**: Updated 9 stale SpacetimeDB v2.4/v2.4.1 references across 7
-  documentation files (README.md, plugins/hermes/README.md, docs/development.md,
-  docs/getting-started.md, docs/PERFORMANCE.md, docs/usage/self-hosted.md,
-  DEPLOYMENT.md) to v2.6 to match the actual dependency version.
-- **Cleanup**: Added new completed item to Recently Completed (8 total, within
-  5-10 range, no purge needed).
-- **Research**:
-  - Git log (7 days): 242 commits, latest: a317935d (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
-  - opentelemetry-sdk v1.43.0 (unchanged).
-  - No new competitor features to adopt from mem0, langgraph, zep.
-  - Deeper scan found 9 stale STDB v2.4 references across 7 doc files (now fixed).
-  - No other real gaps found: all Client SDK methods have MCP wrappers; no
-    code-level TODO/FIXME markers; 3313 tests collected; pre-commit config active.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: 669e53e8 — 8 files changed, +44/-9 lines.
-
-### Jun 27 — Fixed test mock, added pre-commit CI step; backlog cleared
-- **Completed**: Fixed `test_get_memory_history_found` mock (side_effect for
-  double `_query()` call). Added pre-commit CI validation step to Python job.
-- **Cleanup**: Moved both PENDING items to Recently Completed (7 total, within
-  5-10 range, no purge needed).
-- **Research**:
-  - Git log (7 days): 29 commits, latest: 21d4195e (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.43.0 — all unchanged.
-  - No new competitor features to adopt from mem0, langgraph, zep.
-  - Deeper scan: no new gaps found. Pre-commit ran successfully on CI edits
-    and auto-fixed 6 file hygiene issues.
-- **Backlog**: 0 PENDING items — backlog is empty.
-- **Commit**: 21d4195e — 7 files changed, +50/-15 lines.
-
-### Aug 2 — Added pre-commit config + fixed 53 ruff lint issues; 2 PENDING items remaining
-- **Completed**: Created `.pre-commit-config.yaml` with ruff lint, ruff format,
-  file hygiene hooks (trailing-whitespace, EOF, YAML/JSON/TOML validation,
-  large-file detection, merge-conflict detection, private-key detection,
-  markdownlint). Added ruff lint + format-check steps to CI workflow.
-- **Completed**: Fixed 53 ruff lint issues across Python SDK — 35 auto-fixed
-  via `ruff check --fix`, 13 fixed manually (unused imports, unused variables,
-  ambiguous `l` names, redefined imports). Formatted 38 SDK modules + 56 test
-  files with `ruff format`.
-- **Cleanup**: Moved pre-commit item to Recently Completed. Purged 3 oldest
-  Recently Completed entries (detect_bridge_nodes, detect_communities,
-  add_dynamic_context) to keep 5 entries.
-- **Research**:
-  - Git log (7 days): 5 commits (docs/research log updates only).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - No new competitor features to adopt from mem0, langgraph, zep.
-  - Deeper scan found 53 ruff lint issues (now fixed), pre-commit gap (now filled),
-    stale `test_get_memory_history_found` test mock (new PENDING item).
-- **Backlog**: 2 PENDING items remaining.
-- **Commit**: TBD — `.pre-commit-config.yaml` + 65 files with lint fixes + CI update.
-
-### Jun 27 — Expanded MCP README to full 128-tool catalog; 1 PENDING item remaining
-- **Completed**: Updated `server/mcp/README.md` from ~15 documented tools (5 categories)
-  to all 128 tools across 24 categories. Each tool has description and parameter list.
-- **Cleanup**: Moved MCP README item to Recently Completed. Purged oldest 2 entries
-  (detect_communities/context tools) to keep 6 completed entries.
-- **Research**:
-  - Git log (7 days): 128 commits, latest: 2afec3c.
-  - spacetimedb-sdk v0.7.0 (unchanged, latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
-  - opentelemetry-sdk v1.43.0 (unchanged).
-  - No new competitor features to adopt from mem0, langgraph, zep.
-  - Backlog: 1 PENDING item remaining (pre-commit config).
-- **Commit**: 780a490 — 2 files changed, +249/-22 lines (README 95→303 lines).
-
-### Jul 28 — Fixed stale STDB badge, added 2 new PENDING items for README/doc gaps
-- **Fixed**: Stale SpacetimeDB version badge in `README.md` (v2.4 → v2.6) and
-  `server/mcp/README.md` (v2.4 → v2.6). The badge had not been updated since
-  the dependency was upgraded in commit `d1d147f`.
-- **Cleanup**: Purged 5 oldest Recently Completed entries (detect_bridge_nodes,
-  detect_communities, add_dynamic_context, check_embedder_health,
-  run_maintenance). Kept 5 most recent entries.
-- **Research**:
-  - Git log (7 days): 30 commits, latest: cbddf22.
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
-  - opentelemetry-sdk v1.43.0 (unchanged).
-  - No new competitor features to adopt from mem0, langgraph, zep.
-  - Deeper scan found doc gaps: stale badge (#1), incomplete MCP README (#2),
-    missing pre-commit config (#3).
-- **Backlog**: 2 PENDING items remaining.
-- **Commit**: c100b3e — 3 files changed, +42/-48 lines.
-
-### Aug 2 — Added `delete_tour_stop` SDK method + MCP tool; 1 new PENDING item
-- **Completed**: Added `delete_tour_stop(stop_id)` method to
-  `client.py` (maps to Rust `remove_tour_stop` reducer) and corresponding
-  `delete_tour_stop` MCP tool in `main.py`. Tool added to MCP README catalog.
-- **Cleanup**: No completed items to move. 8 entries in Recently Completed
-  (within 5-10 range, no purge needed).
-- **Research**:
-  - Git log (7 days): ~244 commits, latest: c9a18cd (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2 — all unchanged.
-  - opentelemetry-sdk v1.43.0 (unchanged).
-  - No new competitor features to adopt from mem0, langgraph, zep.
-  - Deeper scan found missing `delete_tour_stop` — Rust `remove_tour_stop`
-    reducer was not exposed in Python SDK or MCP server. Added as new PENDING
-    item and implemented in this tick.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: 78875172 — 6 files changed, +77/-6 lines.
-
-### Jun 27 — Fixed test assertions broken by expires_at refactor; backlog cleared
-- **Completed**: Fixed `test_batch_update_success` assertion (expected 4 args
-  but batch_update_memories passes expires_at=None as 5th arg) and
-  `test_update_memory` deep test (expected -1 sentinel but refined impl uses
-  4-arg backward-compatible call when expires_at=None). Wrapped
-  get_memory_history in try/except for WASM compatibility.
-- **Cleanup**: Purged oldest Recently Completed entry ("Add 6 MCP tools") to
-  make room. Added new completed item (10 total, within 5-10 range).
-- **Research**:
-  - Git log (7 days): 140+ commits, latest: f096398b (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - No new competitor features to adopt from mem0, langgraph, zep.
-  - Deeper scan found 2 stale test assertions from expires_at refactor (now fixed).
-  - 2062/2062 unit tests passing, no code-level TODO/FIXME markers.
-- **Backlog**: 0 PENDING items — backlog remains empty.
-- **Commit**: f096398b — 3 files changed, +32/-10 lines.
-
-### Jun 27 — Completed consolidate_memories SDK/MCP with tests + MCP README doc; backlog cleared
-- **Completed**: Added `consolidate_memories` unit test in test_client.py and
-  MCP README catalog entry. The Python SDK `Client.consolidate_memories()` and
-  MCP `consolidate_memories` tool were already written but uncommitted (staged
-  in working tree from a previous session). Missing bits: tests + README entry.
-  Now all committed and pushed.
-- **Cleanup**: Moved completed item to Recently Completed (now 10 entries at max).
-  Purged oldest entry (Fix test_batch_update_success test assertions) to stay
-  within 10-item limit.
-- **Research**:
-  - Git log (7 days): ~243 commits, latest: 12f8ef72 (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all unchanged.
-  - Deeper scan: found uncommitted `consolidate_memories` work-in-progress
-    (SDK method + MCP tool written but never committed, missing tests + README).
-    No other gaps found. All Client SDK methods have MCP wrappers (130+ tools).
-    No code-level TODO/FIXME markers indicating real bugs. Web UI directory (web/)
-    does not exist — no frontend gaps to fill.
-- **Backlog**: 0 PENDING items — backlog cleared.
-- **Commit**: 12f8ef72 — 6 files changed, +82/-18 lines (client.py, main.py, test_client.py,
-  README.md, IMPROVEMENTS.md, .coverage deleted).
-
-### Jun 28 (this tick) — Added delete_fact, update_fact, search_facts SDK methods + MCP tools
-- **Completed**: Added 3 new `Client` SDK methods completing the full facts CRUD suite:
-  `Client.delete_fact(fact_id)`, `Client.update_fact(fact_id, content, confidence, category, tier)`,
-  `Client.search_facts(workspace_id, query, tier)`. All three have corresponding MCP tools
-  (`delete_fact`, `update_fact`, `search_facts`) and MCP README catalog entries.
-  2640/2640 unit tests passing, 688 skipped (live STDB-dependent).
-- **Cleanup**: Added new completed item to Recently Completed (10 total, at limit, no purge
-  needed). Removed completed `delete_fact/update_fact/search_facts` PENDING item from backlog.
-- **Research**:
-  - Git log (7 days): 150+ commits, latest: 33287f0a (this tick).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10 (unchanged, PyPI latest).
-  - langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk v1.43.0 — all at latest.
-  - Deeper scan: compared all 160+ Rust reducers against 125+ SDK public methods.
-    Fact CRUD is now complete (add_fact, list_facts, delete_fact, update_fact, search_facts
-    all have SDK + MCP coverage). 2 PENDING items remain (tag_memory/untag_memory/create_tag,
-    expire_memories). No new competitor features to adopt — mem0, langgraph, zep all
-    unchanged. No code-level TODO/FIXME markers.
-- **Backlog**: 2 PENDING items remaining.
-- **Commit**: 33287f0a — 5 files changed, +205 lines.
-
-
-### Jun 28 (this tick) — Added `delete_mental_model` + `update_mental_model` MCP tools; found 2 MCP gaps
-- **Completed**: Added `delete_mental_model(model_id)` and
-  `update_mental_model(model_id, content, confidence, status)` MCP tools in main.py.
-  These SDK methods (client.py:4004 and client.py:4014) were exposed in the Python SDK
-  but had no corresponding MCP tool. Mental model CRUD (synthesize, get, list, delete,
-  update) is now fully exposed via MCP with 5 tools. Also added catalog entries in MCP
-  README.md. 170/170 test_client.py unit tests passing, 148 MCP tools registered.
-- **Cleanup**: Added new completed entry at top of Recently Completed (10 total, within
-  5-10 limit, no purge needed). Removed both completed PENDING items from backlog.
-  Backlog is now empty.
-- **Research**:
-  - Git log (7 days): 255+ commits, latest: ab8155c2 (previous tick's docs).
-  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-  - mem0ai v2.0.10, langgraph v1.2.6, zep-python v2.0.2, opentelemetry-sdk
-    v1.42.1 — all unchanged from last tick.
-  - Deeper scan: compared all SDK public methods (138) against MCP tools (148). Found
-    2 real gaps: `delete_mental_model` and `update_mental_model` SDK methods had no
-    MCP tools — now implemented. Remaining "gaps" are intentional (compounder methods,
-    internal helpers, differently-named equivalents like `health`/`health_check`,
-    `reinforce`/`reinforce_memory`, `search`/`hybrid_search`). No new competitor
-    features to adopt. No code-level TODO/FIXME markers.
-|- **Backlog**: 0 PENDING items — backlog cleared.
-|- **Commit**: f1434645 — 3 files changed, +70/-1 lines.
-
-### Jun 29 (this tick) — Added TS SDK storeBatch for batch memory storage; backlog cleared
-|- **Completed**:
-|  - Added `storeBatch(workspaceId, items)` to TypeScript SDK client.ts — batch-embeds
-|    all items in one embedder call ({texts: contents}), sends store_memory_batch
-|    reducer, indexes each with its embedding. 4 vitest tests. 58→62 TS tests passing.
-|  - Committed + pushed as a96cdd91.
-|- **Cleanup**: Moved TS SDK storeBatch item from Pending → Recently Completed.
-|  Kept 10 items in Recently Completed (within 5-10 limit, no purge needed).
-|- **Research**:
-|  - Git log (7 days): 264+ commits, latest: a96cdd91 (this tick).
-|  - spacetimedb-sdk v0.7.0 (unchanged, PyPI latest).
-|  - mem0ai v2.0.8 (installed, not 2.0.10), zep-python v2.0.2, opentelemetry-sdk v1.43.0
-|    — all unchanged from last tick. langgraph not installed.
-|  - Deeper scan: ROADMAP score at Python Quality 96% / Infrastructure 78%. TS SDK now at
-|    62 tests covering all memory CRUD + compounder methods. Web UI exists as connection
-|    wizard only (App.tsx), no pages/ directory. No new competitor features to adopt.
-|    No new gaps identified beyond existing Deferred items.
-|  - Python deep tests: 1 pre-existing failure (test_batch_update_memories — mock
-|    assertion), unrelated to TS SDK changes.
-|- **Backlog**: 0 PENDING items — backlog cleared.
-|- **Commit**: a96cdd91 — 2 files changed, +234/-0 lines (client.ts, client.test.ts).
+### No managed cloud (BLOCKED — strategic decision, not code)
+Every competitor has a managed option. Self-hosting is correct for current use case.
+Difficulty: Hard
