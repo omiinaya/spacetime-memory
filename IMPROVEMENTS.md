@@ -34,12 +34,6 @@ Files: sdk/python/tests/
 Difficulty: Medium
 Est: 4h
 
-### P2: Remove 168MB stale `.upstream-venv/`
-Size: 168MB. Likely has stale packages.
-Files: .upstream-venv/
-Difficulty: Easy
-Est: 10min
-
 ### P3: Python — Move 15+ function-level imports to module top
 Style violation: import random, import time, import json, import secrets, etc.
 inside function bodies across client.py.
@@ -62,6 +56,12 @@ Est: 1 week
 
 ## Recently Completed
 
+### P2: Remove 168MB stale `.upstream-venv`
+Cleaned up 168MB of stale virtualenv. Already in .gitignore, no git changes needed.
+Files: .upstream-venv/ (removed)
+Difficulty: Easy
+Est: 10min
+
 ### P2: Python — Route 5 direct-HTTP methods through retry circuit
 All 5 methods (ping, check\_embedder\_health, \_tantivy\_index, \_tantivy\_search, \_embed\_openai)
 plus \_embed\_batch\_openai now use retry wrappers. Internal sidecar calls use \_request\_with\_retry()
@@ -76,20 +76,6 @@ All SQL queries migrated from raw string interpolation (`${esc()}`) to parameter
 Files: sdk/typescript/client.ts
 Difficulty: Medium
 Est: 30min
-
-### P0: Rust — Fix duplicate `require_auth()` in context_directory.rs (7 reducers)
-Each of the 7 reducers in context_directory.rs called `require_auth(ctx)?;` TWICE — a copy-paste bug.
-Fix: removed the second redundant call from each reducer.
-Files: server/spacetimedb/src/context_directory.rs
-Difficulty: Easy
-Est: 10min
-
-### P0: Rust — Fix "reader" → "viewer" in knowledge_graph.rs:1143
-Invalid permission string "reader" — the valid levels are "owner", "editor", "viewer".
-This permission check always failed (rank=0 for unknown string).
-Files: server/spacetimedb/src/knowledge_graph.rs:1143
-Difficulty: Easy
-Est: 2min
 
 ### P1: Rust — Replace uuid_v7().expect() with graceful fallback in lib.rs:125
 Panics in WASM if STDB RNG fails. Replaced with `.unwrap_or_else(|| uuid_v4(ctx))`.
