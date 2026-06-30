@@ -16,7 +16,7 @@ Est: 15min
 
 ### P1: Publish benchmark scores (LongMemEval, LoCoMo, BEAM)
 Biggest credibility gap vs Mem0, Hindsight, Supermemory.
-Files: scripts/benchmark.py (exists, needs integration)
+Files: scripts/benchmark.py (exists, needs integration) — NOTE: file doesn't actually exist yet
 Difficulty: Hard
 Est: 1-2 weeks
 
@@ -27,13 +27,6 @@ Files: sdk/python/spacetime_memory/client.py + Rust files
 Difficulty: Hard
 Est: 4-8h
 
-### P3: Python — Replace 6 `Any` type annotations with proper Protocols
-plugin_manager: Any, event_bus: Any, query_cache: Any, local_llm: Any,
-self._metrics: Any. These should be typed Protocols/ABCs.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Medium
-Est: 30min
-
 ### P3: Bi-temporal fact tracking — Graphiti-style temporal facts
 Graphiti's strongest differentiator. Needs: fact valid_from/valid_to columns + auto-invalidation reducer.
 Files: server/spacetimedb/src/profile.rs
@@ -41,6 +34,15 @@ Difficulty: Hard
 Est: 1 week
 
 ## Recently Completed
+
+### P3: Python — Replace 6 `Any` type annotations with proper Protocols
+plugin_manager: Any, event_bus: Any, query_cache: Any, local_llm: Any,
+self._metrics: Any. These should be typed Protocols/ABCs.
+Created sdk/python/spacetime_memory/_protocols.py with 5 runtime-checkable Protocols.
+All 304 existing tests pass. Concrete classes verified via isinstance().
+Files: sdk/python/spacetime_memory/_protocols.py, sdk/python/spacetime_memory/client.py
+Difficulty: Medium
+Est: 30min
 
 ### P2: Add E2E / deep test marker + 8 tests
 Created `deep` marker, wrote 8 E2E pipeline tests exercising store→search,
@@ -73,7 +75,7 @@ Difficulty: Medium
 Est: 30min
 
 ### P1: TypeScript — Fix SQL injection vulnerability
-All SQL queries migrated from raw string interpolation (`${esc()}`) to parameterized `_sqlExec(':param')`. Fixed critical `esc()` backslash regex bug (`/\\\\/g` → `/\\/g`) that missed single backslashes. 46 queries converted, 44 `_sqlExec()` calls now serve all public methods.
+All SQL queries migrated from raw string interpolation (`${esc()}`) to parameterized `_sqlExec(':param')`. Fixed critical `esc()` backslash regex bug (`/\\\\\\\\/g` → `/\\\\/g`) that missed single backslashes. 46 queries converted, 44 `_sqlExec()` calls now serve all public methods.
 Files: sdk/typescript/client.ts
 Difficulty: Medium
 Est: 30min
