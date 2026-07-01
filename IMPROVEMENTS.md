@@ -29,6 +29,10 @@ Est: 1 week
 
 ## Recently Completed
 
+### P2: Add 3 more TS methods — recommendMemories, searchSessionsSemantic, searchWithFilters
+Added recommendMemories(), searchSessionsSemantic(), searchWithFilters().
+71/71 TS tests pass, clean tsc. Total TS: 143 methods (was 85).
+
 ### P2: Add 8 more TS methods — health, profiles, context, merge suggestions
 Added health(), checkEmbedderHealth(), upsertProfile(), suggestMerges(),
 searchProfiles(), getProfileContext(), getUserMemories(), getOutgoingLinks().
