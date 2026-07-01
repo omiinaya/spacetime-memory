@@ -8,18 +8,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P2: Optimize semantic strategy in hybrid_search reducer — 5s → sub-second
-The `semantic` strategy in the WASM reducer iterates `search_index` table and computes
-cosine similarity for every row individually (60 memories × ~85ms each = 5s).
-Each row parses full 1024-dim embedding JSON, computes cosine similarity, then does
-a memory lookup for trust_score and context. Fix options:
-(a) Client-side cosine similarity: fetch search_index, compute in Python, skip reducer
-(b) Batch embedding comparison in WASM: process all memories in one loop
-(c) Limit to fewer candidates before vector comparison
-Files: server/spacetimedb/src/hybrid_query.rs (lines 229-286)
-Difficulty: Medium
-Est: 2-3h for option (a)
-
 ### P3: `search_by_tags` — tag-filtered semantic search
 Combine tag filtering with vector search in a single reducer: specify tag IDs
 and only return memories that have *all* matching tags.
@@ -30,6 +18,17 @@ Est: 1h
 ---
 
 ## Recently Completed
+
+### P2: Optimize semantic strategy in hybrid_search reducer — 5s → sub-second (July 1, 2026)
+Moved cosine similarity computation from WASM reducer to Python client-side.
+The reducer semantic strategy (iterating search_index, parsing 1024-dim embeddings,
+individual memory lookups) was ~85ms/row in STDB. Python client-side: fetch
+search_index via SQL, compute cosine similarity in pure Python, inject into
+per_strat['semantic'] for fusion. Reducer fallback kept if embedder is down.
+Commit: 5ea553c7
+Files: sdk/python/spacetime_memory/client.py, server/spacetimedb/src/hybrid_query.rs
+Difficulty: Medium
+Est: 2-3h
 
 ### P3: Add `batch_tag_memories` + `batch_untag_memories` reducers + SDK methods (July 1, 2026)
 Eliminates O(n) network round-trips for bulk tagging/untagging operations.
