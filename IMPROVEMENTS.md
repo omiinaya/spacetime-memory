@@ -27,9 +27,25 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
-### P3: Add list_peers / peer discovery Python SDK method
-Rust `list_peers` reducer exists, Python SDK only has raw _call() access.
-Files: sdk/python/spacetime_memory/client.py, server/spacetimedb/src/peer.rs
+### P2: TypeScript SDK — Auth method wrappers (register, login, logout, etc.)
+Python SDK has 9 public auth method wrappers. TypeScript SDK has zero.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 20min
+
+### P2: TypeScript SDK — Context pack list queries (listContextPacks, listContextEntries, listContextDeltas)
+Python SDK has these as public methods, TypeScript SDK only has storeContextPack.
+Files: sdk/typescript/client.ts
+Difficulty: Easy
+Est: 10min
+
+## Recently Completed
+
+### P3: Add listPeers to TypeScript SDK
+Added `PeerRecord` interface and `listPeers(workspaceId?)` method to TypeScript
+SDK. Lists the `peer` table with optional workspace filter. 71/71 TS tests pass.
+Detection: Python SDK already had this method; TypeScript was missing parity.
+Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
 Difficulty: Easy
 Est: 10min
 
@@ -41,14 +57,6 @@ output, JSON/CSV format support, and confirmation prompt for deletion.
 Files: cli/stmem.py
 Difficulty: Easy
 Est: 15min
-
-### P3: Add listTags/deleteTag tests to TypeScript SDK test suite
-Added vitest tests verifying `listTags` calls `list_tags` reducer and
-`deleteTag` calls `delete_tag` reducer with correct arguments.
-68/69 tests pass (1 pre-existing ESM import failure unrelated).
-Files: sdk/typescript/tests/client.test.ts
-Difficulty: Easy
-Est: 10min
 
 ### P3: Add list_tags + delete_tag reducers with full SDK + MCP support
 Added Rust reducers (list_tags, delete_tag), Python SDK methods (list_tags, delete_tag),
@@ -77,23 +85,6 @@ miscellaneous all covered.
 Files: sdk/python/spacetime_memory/client.py
 Difficulty: Hard
 Est: 4-8h
-
-### P3: Python — Replace 6 `Any` type annotations with proper Protocols
-plugin_manager: Any, event_bus: Any, query_cache: Any, local_llm: Any,
-self._metrics: Any. These should be typed Protocols/ABCs.
-Created sdk/python/spacetime_memory/_protocols.py with 5 runtime-checkable Protocols.
-All 304 existing tests pass. Concrete classes verified via isinstance().
-Files: sdk/python/spacetime_memory/_protocols.py, sdk/python/spacetime_memory/client.py
-Difficulty: Medium
-Est: 30min
-
-### P2: Add E2E / deep test marker + 8 tests
-Created `deep` marker, wrote 8 E2E pipeline tests exercising store→search,
-create node→query graph, create note→get backlinks, and multi-step lifecycles.
-All pass via mocked HTTP (no live STDB needed). 170/170 existing tests still pass.
-Files: sdk/python/tests/test_e2e.py, sdk/python/tests/conftest.py
-Difficulty: Medium
-Est: 4h
 
 ## Deferred / Blocked
 
