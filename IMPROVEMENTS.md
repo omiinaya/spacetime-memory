@@ -8,26 +8,19 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P3: Bi-temporal fact tracking — Graphiti-style temporal facts
-Graphiti's strongest differentiator. Needs: fact valid_from/valid_to columns + auto-invalidation reducer.
-Files: server/spacetimedb/src/profile.rs
-Difficulty: Hard
-Est: 1 week
+### P2: Optimize semantic strategy in hybrid_search reducer — 5s → sub-second
+The `semantic` strategy in the WASM reducer iterates `search_index` table and computes
+cosine similarity for every row individually (60 memories × ~85ms each = 5s).
+Each row parses full 1024-dim embedding JSON, computes cosine similarity, then does
+a memory lookup for trust_score and context. Fix options:
+(a) Client-side cosine similarity: fetch search_index, compute in Python, skip reducer
+(b) Batch embedding comparison in WASM: process all memories in one loop
+(c) Limit to fewer candidates before vector comparison
+Files: server/spacetimedb/src/hybrid_query.rs (lines 229-286)
+Difficulty: Medium
+Est: 2-3h for option (a)
 
-### P3: Add `listTagsByMemory` / `getMemoryTags` — efficient reverse tag lookup
-No way to efficiently get all tags for a given memory. Currently requires iterating
-all MemoryTag rows. Add a reducer + SDK method that does this in one call.
-Files: server/spacetimedb/src/tag.rs, sdk/python/..., sdk/typescript/...
-Difficulty: Easy
-Est: 15min
-
-### P3: Tag rename/color update reducer
-Tags cannot be renamed or re-colored after creation (no `update_tag` reducer).
-Files: server/spacetimedb/src/tag.rs
-Difficulty: Easy
-Est: 10min
-
-### P3: Add `search_by_tags` — tag-filtered semantic search
+### P3: `search_by_tags` — tag-filtered semantic search
 Combine tag filtering with vector search in a single reducer: specify tag IDs
 and only return memories that have *all* matching tags.
 Files: server/spacetimedb/src/hybrid_query.rs, tag.rs

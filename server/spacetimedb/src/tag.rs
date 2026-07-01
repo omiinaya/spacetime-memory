@@ -165,6 +165,90 @@ pub fn batch_untag_memories(ctx: &ReducerContext, tag_id: String, memory_ids_jso
     Ok(())
 }
 
+// ── Result table for list_tags_by_memory ────────────────────────────────────
+
+/// Stores tags for a specific memory query.
+#[table(accessor = memory_tag_result, public)]
+#[derive(Debug, Clone)]
+pub struct MemoryTagResult {
+    #[primary_key]
+    pub id: String,
+    pub memory_id: String,
+    pub tag_id: String,
+    pub tag_name: String,
+    pub tag_color: String,
+}
+
+/// List all tags attached to a specific memory.
+/// Writes results to ``memory_tag_result`` table, keyed by memory_id.
+#[reducer]
+pub fn list_tags_by_memory(
+    ctx: &ReducerContext,
+    memory_id: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+
+    // Clear previous results for this memory
+    let old: Vec<_> = ctx
+        .db
+        .memory_tag_result()
+        .iter()
+        .take(crate::MAX_RESULTS)
+        .filter(|r| r.memory_id == memory_id)
+        .collect();
+    for r in old {
+        ctx.db.memory_tag_result().id().delete(r.id);
+    }
+
+    // Find all MemoryTag rows for this memory
+    let tag_ids: Vec<String> = ctx
+        .db
+        .memory_tag()
+        .iter()
+        .take(crate::MAX_RESULTS)
+        .filter(|mt: &MemoryTag| mt.memory_id == memory_id)
+        .map(|mt| mt.tag_id.clone())
+        .collect();
+
+    // Resolve tag details and insert results
+    for tid in &tag_ids {
+        if let Some(tag) = ctx.db.tag().id().find(tid) {
+            ctx.db.memory_tag_result().insert(MemoryTagResult {
+                id: crate::uuid_v7(ctx),
+                memory_id: memory_id.clone(),
+                tag_id: tid.clone(),
+                tag_name: tag.name,
+                tag_color: tag.color,
+            });
+        }
+    }
+
+    Ok(())
+}
+
+// ── Update tag ──────────────────────────────────────────────────────────────
+
+/// Update a tag's name and/or color.
+#[reducer]
+pub fn update_tag(
+    ctx: &ReducerContext,
+    tag_id: String,
+    name: String,
+    color: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let tag = ctx.db.tag().id().find(&tag_id)
+        .ok_or_else(|| format!("Tag not found: {}", tag_id))?;
+
+    let updated = Tag {
+        name: if name.is_empty() { tag.name } else { name },
+        color,
+        ..tag
+    };
+    ctx.db.tag().id().update(updated);
+    Ok(())
+}
+
 #[reducer]
 pub fn delete_tag(
     ctx: &ReducerContext,
