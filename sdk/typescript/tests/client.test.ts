@@ -572,6 +572,38 @@ describe("Client", () => {
       expect(url).toContain("call/delete_tag");
       expect(JSON.parse(req.body)).toEqual(["tag-1"]);
     });
+
+    it("batchTagMemories calls batch_tag_memories reducer", async () => {
+      mockReducerOk();
+      await client.batchTagMemories("tag-1", ["mem-1", "mem-2", "mem-3"]);
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/batch_tag_memories");
+      expect(JSON.parse(req.body)).toEqual(["tag-1", '["mem-1","mem-2","mem-3"]']);
+    });
+
+    it("batchTagMemories skips call for empty array", async () => {
+      mockReducerOk();
+      const fetchSpy = jest.spyOn(globalThis, "fetch");
+      await client.batchTagMemories("tag-1", []);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    it("batchUntagMemories calls batch_untag_memories reducer", async () => {
+      mockReducerOk();
+      await client.batchUntagMemories("tag-1", ["mem-1", "mem-2"]);
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/batch_untag_memories");
+      expect(JSON.parse(req.body)).toEqual(["tag-1", '["mem-1","mem-2"]']);
+    });
+
+    it("batchUntagMemories skips call for empty array", async () => {
+      mockReducerOk();
+      const fetchSpy = jest.spyOn(globalThis, "fetch");
+      await client.batchUntagMemories("tag-1", []);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
   });
 
   describe("error handling", () => {

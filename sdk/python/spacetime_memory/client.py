@@ -4451,6 +4451,42 @@ class Client:
         """
         self._call("untag_memory", [memory_id, tag_id])
 
+    def batch_tag_memories(self, tag_id: str, memory_ids: list[str]) -> dict[str, Any]:
+        """Batch-attach a tag to multiple memories in a single reducer call.
+
+        Eliminates O(n) network round-trips for bulk tagging by sending all
+        memory IDs in one call to the ``batch_tag_memories`` reducer.
+
+        Args:
+            tag_id: The tag to attach.
+            memory_ids: List of memory ID strings to tag. Already-tagged
+                memories are silently skipped (idempotent).
+
+        Returns:
+            Dict with ``status``: ``"ok"`` on success.
+        """
+        if not memory_ids:
+            return {"status": "ok", "note": "no memory IDs provided"}
+        return self._call("batch_tag_memories", [tag_id, json.dumps(memory_ids)])
+
+    def batch_untag_memories(self, tag_id: str, memory_ids: list[str]) -> dict[str, Any]:
+        """Batch-remove a tag from multiple memories in a single reducer call.
+
+        Eliminates O(n) network round-trips for bulk untagging by sending all
+        memory IDs in one call to the ``batch_untag_memories`` reducer.
+
+        Args:
+            tag_id: The tag to detach.
+            memory_ids: List of memory ID strings to untag. Missing
+                associations are silently skipped (idempotent).
+
+        Returns:
+            Dict with ``status``: ``"ok"`` on success.
+        """
+        if not memory_ids:
+            return {"status": "ok", "note": "no memory IDs provided"}
+        return self._call("batch_untag_memories", [tag_id, json.dumps(memory_ids)])
+
     def list_tags(self, workspace_id: str) -> list[dict[str, Any]]:
         """List all tags in a workspace.
 
