@@ -29,6 +29,17 @@ Est: 1 week
 
 ## Recently Completed
 
+### P2: Batch-add 20 TS SDK methods — docs, directories, API keys, KG communities
+Added 20 public methods to the TypeScript SDK matching Python SDK:
+getBacklinks, createDocument, getDocument, listDocuments, getDocumentChunks,
+deleteDocument, listDirectory, traverseDirectory, getDirectory, createDirectory,
+linkMemoryToDirectory, unlinkMemoryFromDirectory, createApiKey (crypto.subtle
+SHA-256), deactivateApiKey, listApiKeys, seedCommunities, getCommunity.
+71/71 TS tests pass, clean tsc.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 30min
+
 ### P2: TypeScript SDK — Context pack list queries (listContextPacks, listContextEntries, listContextDeltas)
 Added 3 context pack query methods to the TypeScript SDK matching the Python SDK:
 listContextPacks(), listContextEntries(), listContextDeltas() — each queries the
