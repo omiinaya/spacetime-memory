@@ -3831,7 +3831,7 @@ class TestClientUnitCoverage:
         with patch.object(client, "_call", return_value={"status": "ok"}) as mock_call:
             result = client.update_memory("m1", "new content", summary="sum", confidence=0.9)
             mock_call.assert_called_once_with(
-                "update_memory", ["m1", "new content", "sum", 0.9]
+                "update_memory", ["m1", "new content", "sum", 0.9, 0]
             )
             assert result == {"status": "ok"}
 
@@ -4226,8 +4226,10 @@ class TestClientUnitCoverage:
         mock_http.get.return_value = mock_resp
         client._http = mock_http
         result = client.check_embedder_health()
+        # _request_with_retry retries 503s, then raises RuntimeError,
+        # which is caught in check_embedder_health as unreachable
         assert result["status"] == "error"
-        assert result["code"] == 503
+        assert result.get("reachable") is False
 
     # ── search with MMR rerank (line 1385-1386) ──
 
