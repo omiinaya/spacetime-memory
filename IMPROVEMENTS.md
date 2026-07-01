@@ -14,15 +14,6 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
-### P2: Time-weighted memory retrieval scoring (mem0 v3 temporal parity)
-mem0 v3 adds temporal reasoning — time-aware retrieval scoring that ranks memories
-based on recency relevance to the query. Add `recency_weight` param to hybrid search
-that boosts newer memories exponentially, and a `time_context` filter for queries
-about "recent" / "last week" / "current state".
-Files: server/spacetimedb/src/hybrid_query.rs, sdk/python/spacetime_memory/query_expansion.py
-Difficulty: Medium
-Est: 1-2h
-
 ### P3: Add `merge_duplicate_memories` consolidation step
 Consolidation cron lacks memory deduplication. Add a reducer + SDK method
 that finds near-duplicate memories (by content hash or cosine similarity > 0.95),
@@ -30,6 +21,20 @@ merges metadata (tags, edge references), and deactivates the duplicate.
 Files: server/spacetimedb/src/consolidation.rs
 Difficulty: Medium
 Est: 30min
+
+---
+
+## Recently Completed
+
+### P2: Time-weighted memory retrieval — `temporal_search_with_weight` (July 1, 2026)
+Added new `temporal_search_with_weight` reducer in hybrid_query.rs that provides
+exponential recency boosting (controlled by `recency_weight` 0.0–1.0) and
+`time_context` filters ("recent", "last_week", "last_month").
+Python SDK: `client.temporal_search_with_weight()`.
+Commit: fa97ee0d
+Files: server/spacetimedb/src/hybrid_query.rs, sdk/python/spacetime_memory/client.py
+Difficulty: Medium
+Est: 1-2h
 
 ---
 
