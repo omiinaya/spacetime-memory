@@ -582,6 +582,35 @@ def untag_memory(memory_id: str, tag_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 @require_api_key
+def list_tags(workspace_id: str) -> list[dict[str, Any]]:
+    """List all tags in a workspace.
+
+    Args:
+        workspace_id: Target workspace.
+
+    Returns:
+        List of tag dicts with id, workspace_id, name, color, created_at.
+    """
+    return get_client().list_tags(workspace_id)
+
+
+@mcp.tool()
+@require_api_key
+def delete_tag(tag_id: str) -> dict[str, Any]:
+    """Delete a tag and all its memory associations.
+
+    Args:
+        tag_id: The tag ID to delete.
+
+    Returns:
+        Confirmation dict.
+    """
+    get_client().delete_tag(tag_id)
+    return {"status": "ok", "deleted_tag_id": tag_id}
+
+
+@mcp.tool()
+@require_api_key
 def store_batch(
     items_json: str,
     workspace_id: str = "default",

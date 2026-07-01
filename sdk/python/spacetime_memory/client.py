@@ -4319,6 +4319,28 @@ class Client:
         """
         self._call("untag_memory", [memory_id, tag_id])
 
+    def list_tags(self, workspace_id: str) -> list[dict[str, Any]]:
+        """List all tags in a workspace.
+
+        Args:
+            workspace_id: Target workspace.
+
+        Returns:
+            List of tag dicts with id, workspace_id, name, color, created_at.
+        """
+        result = self._call("list_tags", [workspace_id])
+        if isinstance(result, str):
+            return json.loads(result)
+        return result or []
+
+    def delete_tag(self, tag_id: str) -> None:
+        """Delete a tag and all its memory associations.
+
+        Args:
+            tag_id: The tag ID to delete.
+        """
+        self._call("delete_tag", [tag_id])
+
     # -------------------------------------------------------------------
     # Entity Linking
     # -------------------------------------------------------------------
