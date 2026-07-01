@@ -266,6 +266,16 @@ export interface ClientOptions {
   port?: number | string;
   database?: string;
   embedderUrl?: string;
+  /** MCP server URL for cross-encoder reranking and other LLM tools (default: http://127.0.0.1:8099). */
+  mcpUrl?: string;
+}
+
+/** Options for crossEncoderRerank(). */
+export interface CrossEncoderRerankOptions {
+  /** Which field in each candidate contains the text to score (default: "memory_content"). */
+  contentKey?: string;
+  /** Max number of top-scoring candidates to return (default: 20). */
+  topK?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -369,6 +379,7 @@ export class Client {
   private readonly port: string;
   private readonly database: string;
   private readonly embedderUrl: string;
+  private readonly mcpUrl: string;
   private readonly baseUrl: string;
 
   constructor(opts: ClientOptions = {}) {
@@ -380,6 +391,8 @@ export class Client {
       "spacetime-memory";
     this.embedderUrl =
       opts.embedderUrl ?? process.env.EMBEDDER_URL ?? "http://127.0.0.1:4000";
+    this.mcpUrl =
+      opts.mcpUrl ?? process.env.MCP_URL ?? "http://127.0.0.1:8099";
     this.baseUrl = `http://${this.host}:${this.port}`;
   }
 
@@ -3782,5 +3795,76 @@ export class Client {
       return { status: "partial", updated, errors };
     }
     return { status: "ok", updated };
+  }
+
+  /**
+   * Cross-encoder re-rank candidates using the MCP server.
+   *
+   * Calls the MCP server's cross-encoder reranker for more accurate relevance
+   * scoring than cosine-similarity-based semantic search alone. The MCP server
+   * must be running with the `--transport streamable-http` or `--transport sse`
+   * flag.
+   *
+   * This is the recommended approach for TypeScript clients — the actual
+   * ONNX cross-encoder model runs server-side via the Python SDK.
+   *
+   * @example
+   * ```typescript
+   * const results = await client.search("ws-id", "machine learning", { semantic: true, limit: 50 });
+   * const reranked = await client.crossEncoderRerank("machine learning", results, { topK: 10 });
+   * ```
+   *
+   * @param query - The query string to evaluate relevance against.
+   * @param candidates - Array of candidate objects to re-rank. Each should have a text field.
+   * @param opts - {@link CrossEncoderRerankOptions}.
+   * @returns Re-ranked candidates sorted by cross-encoder score (descending), each with a `crossEncoderScore` field.
+   */
+  async crossEncoderRerank(
+    query: string,
+    candidates: Record<string, unknown>[],
+    opts: CrossEncoderRerankOptions = {},
+  ): Promise<Record<string, unknown>[]> {
+    const contentKey = opts.contentKey ?? "memory_content";
+    const topK = opts.topK ?? 20;
+
+    try {
+      const resp = await fetch(`${this.mcpUrl}/tools/call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "cross_encoder_rerank",
+          arguments: {
+            query,
+            candidates_json: JSON.stringify(candidates),
+            content_key: contentKey,
+            top_k: topK,
+          },
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`MCP tool call failed (${resp.status}): ${text}`);
+      }
+      const data = (await resp.json()) as Record<string, unknown>;
+      // Parse the result — MCP returns a JSON string in the result field
+      const resultField = data?.result;
+      if (typeof resultField === "string" && resultField.startsWith("[")) {
+        return JSON.parse(resultField) as Record<string, unknown>[];
+      }
+      // If the MCP server wraps it differently, try content array
+      if (Array.isArray(data?.content)) {
+        const contentArr = data.content as Array<{ text?: string }>;
+        for (const item of contentArr) {
+          if (typeof item.text === "string" && item.text.startsWith("[")) {
+            return JSON.parse(item.text) as Record<string, unknown>[];
+          }
+        }
+      }
+      throw new Error(`Unexpected MCP response format`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`crossEncoderRerank failed: ${msg}`);
+    }
   }
 }
