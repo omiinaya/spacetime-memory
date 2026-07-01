@@ -5,7 +5,7 @@ use crate::{now_micros, uuid_v7};
 
 /// A tag that can be attached to memories and other entities.
 #[table(accessor = tag)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Tag {
     #[primary_key]
     pub id: String,
@@ -97,16 +97,14 @@ pub fn untag_memory(
 #[reducer]
 pub fn list_tags(
     ctx: &ReducerContext,
-    workspace_id: String,
-) -> Result<String, String> {
+    _workspace_id: String,
+) -> Result<(), String> {
     let _account = require_auth(ctx)?;
-    let tags: Vec<_> = ctx
-        .db
-        .tag()
-        .iter().take(crate::MAX_RESULTS)
-        .filter(|t| t.workspace_id == workspace_id)
-        .collect();
-    serde_json::to_string(&tags).map_err(|e| format!("Failed to serialize tags: {}", e))
+    // Note: list_tags was previously a value-returning reducer. STDB v2.6
+    // doesn't support reducer return values. The SDK now queries the `tag`
+    // table directly via `_query("tag", workspace_id=ws, columns=[...])`.
+    // This reducer still exists for auth-gated identity verification.
+    Ok(())
 }
 
 #[reducer]

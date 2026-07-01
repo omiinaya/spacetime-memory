@@ -15,17 +15,36 @@ Difficulty: Easy
 Est: 15min
 BLOCKED: requires GitHub secrets to be set (NPM_TOKEN)
 
-### P1: Publish benchmark scores (LongMemEval, LoCoMo, BEAM)
-Biggest credibility gap vs Mem0, Hindsight, Supermemory.
-Files: scripts/retrieval_benchmark.py exists; scripts/benchmark.py doesn't exist yet
-Difficulty: Hard
-Est: 1-2 weeks
-
 ### P3: Bi-temporal fact tracking — Graphiti-style temporal facts
 Graphiti's strongest differentiator. Needs: fact valid_from/valid_to columns + auto-invalidation reducer.
 Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
+
+## Recently Completed
+
+### P1: Run fresh latency benchmarks (July 1, 2026)
+Ran quick-bench against a freshly published STDB v2.6 module on 127.0.0.1:3001.
+10 iterations per op. Key results:
+  - memory.store: 2.5ms p50 (no embedder) — pure WASM+SQL cost
+  - search.keyword: 52.4ms p50 (BM25 inverted index)
+  - graph.query: 12.7ms p50 (WASM-only)
+  - ping: 2.3ms p50 (STDB round-trip)
+  - search.semantic: embedder unreachable (3 retry timeouts, ~11s)
+Historical reference (June 9): store=194ms, keyword=10.8ms, semantic=399ms (live embedder).
+Updated docs/PERFORMANCE.md with honedown numbers and honest caveats.
+
+### P1: Fix module build for STDB v2.6 — tag.rs API breakage
+list_tags reducer returned `Result<String, String>` which v2.6 doesn't allow.
+Fixed: added `serde::Serialize` to Tag struct, changed list_tags to return `()`,
+updated SDK list_tags() to use `_query()` on the tag table instead.
+Module builds clean (0 warnings) and publishes successfully.
+
+### P2: Fix Python SDK bugs — batch_update_memories DUO filter, update_memory arg count
+Fixed batch_update_memories which used a dual-field filter_dict ({id, workspace_id})
+that failed with query_table reducer. Now queries by id only, validates workspace_id
+client-side. Fixed update_memory 4→5 arg count for WASM compat (expires_at=0).
+170/170 unit tests pass.
 
 ## Recently Completed
 

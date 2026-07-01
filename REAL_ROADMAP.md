@@ -32,6 +32,21 @@
 
 Dataset: 25 memories, 18 labeled queries. GBrain reference: P@5=49.1%, R@5=97.9% (146K pages).
 
+## Performance benchmarks (July 1, 2026)
+
+| # | Operation | p50 (ms) | p90 (ms) | Notes |
+|---|-----------|---------:|---------:|-------|
+| 1 | memory.store (single) | 2.5 | 2.8 | No embedder; ~194ms with live ONNX |
+| 2 | search.keyword | 52.4 | 74.5 | BM25 inverted index |
+| 3 | search.semantic | ~11,000† | ~13,000† | Embedder unreachable — 3 retries |
+| 4 | graph.query | 12.7 | 26.0 | Pure WASM |
+| 5 | ping | 2.3 | 3.8 | STDB round-trip |
+
+† Semantic times include 3 exponential-backoff retries against missing embedder. Historical live embedder: ~400ms.
+
+**System:** 127.0.0.1:3001, STDB v2.6, fresh module publish, 10 iterations/op.
+**Full data:** see docs/PERFORMANCE.md
+
 ## Honest caveats
 
 ### 1. Multi-user performance is unproven
