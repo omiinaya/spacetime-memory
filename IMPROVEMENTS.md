@@ -27,7 +27,29 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
+### P3: TypeScript SDK — Add chat/completion workspace methods
+Several workspace-level chat and completion reducers exist in Rust but may not
+have TypeScript wrappers: send_message, get_session_messages, get_peer_sessions,
+add_agent_step, delete_session_steps. Audit and fill gaps.
+Difficulty: Medium
+Est: 30min
+
+### P3: TypeScript SDK — Document chunk + document CRUD methods
+TypeScript missing addChunk, createDocument, getDocument, listDocuments,
+deleteDocument, getDocumentChunks. Python has all of these.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 20min
+
 ## Recently Completed
+
+### P3: TypeScript SDK — Add citation methods (addNodeCitation, addEdgeCitation, getCitations) + fix getEdgeHistory
+Added 3 citation methods matching Python SDK parity. Also fixed getEdgeHistory
+which was missing the reducer call (known reducer pattern: call reducer to
+populate result table, then SELECT from it). All 71 TS tests pass, clean tsc.
+Files: sdk/typescript/client.ts
+Difficulty: Easy
+Est: 10min
 
 ### P2: Batch-add 33 TS SDK methods — profiles, context, KG, utilities
 Added 33+ methods to complete feature parity: addProfileFact,
@@ -69,51 +91,6 @@ calling _call() expecting a return value (was void). 71/71 TS tests pass.
 Files: sdk/typescript/client.ts
 Difficulty: Medium
 Est: 20min
-
-### P3: Add listPeers to TypeScript SDK
-Added `PeerRecord` interface and `listPeers(workspaceId?)` method to TypeScript
-SDK. Lists the `peer` table with optional workspace filter. 71/71 TS tests pass.
-Detection: Python SDK already had this method; TypeScript was missing parity.
-Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
-Difficulty: Easy
-Est: 10min
-
-## Recently Completed
-
-### P3: Add CLI commands for tag management (list, delete)
-Added `stmem tag list` and `stmem tag delete` CLI commands with rich table
-output, JSON/CSV format support, and confirmation prompt for deletion.
-Files: cli/stmem.py
-Difficulty: Easy
-Est: 15min
-
-### P3: Add list_tags + delete_tag reducers with full SDK + MCP support
-Added Rust reducers (list_tags, delete_tag), Python SDK methods (list_tags, delete_tag),
-TypeScript SDK methods (listTags, deleteTag), and MCP tools (list_tags, delete_tag).
-All 170 existing Python tests pass.
-Files: server/spacetimedb/src/tag.rs, sdk/python/spacetime_memory/client.py,
-       sdk/typescript/client.ts, server/mcp/main.py
-Difficulty: Easy
-Est: 30min
-
-### P3: Python SDK — Add public auth method wrappers
-Added register(), login(), logout(), update_account(), deactivate_account(),
-promote_admin(), demote_admin(), list_admins() public methods with proper
-docstrings and type hints. These auth reducers were only accessible via
-raw _call(). 861 tests pass (2 pre-existing failures unrelated).
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 20min
-
-### P2: Python — Add 77 missing Rust reducers to SDK
-All 162 Rust reducers now have corresponding Python _call() wrappers or
-high-level public methods. Auth (9), replication (10), sessions (5),
-peers (3), connectors (3), messages (2), harmonics (3), change events (3),
-context deltas (2), consolidation (9), knowledge graph (12), and ~37
-miscellaneous all covered.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Hard
-Est: 4-8h
 
 ## Deferred / Blocked
 
