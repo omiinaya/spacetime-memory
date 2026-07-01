@@ -1231,6 +1231,173 @@ export class Client {
   }
 
   /**
+   * Collect per-workspace memory metrics from the server.
+   *
+   * Stats returned:
+   * - total_memories — count of all memories
+   * - active_memories — count of active memories
+   * - by_tier — JSON map of tier → count (L0, L1, L2)
+   * - by_type — JSON map of memory_type → count
+   * - avg_confidence — average confidence score
+   * - avg_age_seconds — average age in seconds
+   * - total_revisions — number of memory revisions
+   * - top_tags — JSON array of top-10 used tags
+   * - total_users — count of distinct user_scope values
+   *
+   * @param workspaceId - Workspace ID
+   * @returns Record of stat_key → stat_value, or null if not computed yet
+   */
+  async getMemoryStats(workspaceId: string): Promise<Record<string, string> | null> {
+    await this._call("get_memory_stats", [workspaceId]);
+    const rows = await this._sqlExec(
+      `SELECT * FROM workspace_memory_stats_result WHERE workspace_id = :ws`,
+      { ws: workspaceId },
+    );
+    if (rows && rows.length > 0) {
+      const result: Record<string, string> = {};
+      for (const row of rows) {
+        result[row.stat_key] = row.stat_value;
+      }
+      return result;
+    }
+    return null;
+  }
+
+  // Tables included in backup / restore
+  private static readonly BACKUP_TABLES = [
+    "workspace",
+    "space_permission",
+    "memory",
+    "memory_version",
+    "kg_node",
+    "kg_edge",
+    "kg_community",
+    "session",
+    "session_participant",
+    "message",
+    "profile",
+    "note",
+    "fact",
+    "peer",
+    "context_pack",
+    "context_entry",
+    "directory",
+    "directory_link",
+    "backlink",
+    "merge_suggestion",
+    "connector_config",
+  ] as const;
+
+  /**
+   * Export all user data tables to a JSON file (client-side).
+   * The backup is returned as a JSON string — the caller is responsible
+   * for writing it to disk or sending it wherever needed.
+   *
+   * @param outputPath - Optional output filename (if provided, triggers download in browser / writes to fs in Node)
+   * @returns Backup metadata: tables backed up, row counts
+   */
+  async backup(outputPath?: string): Promise<Record<string, unknown>> {
+    const manifest: Record<string, unknown[]> = {};
+    const backedUp: string[] = [];
+    let totalRows = 0;
+
+    for (const table of Client.BACKUP_TABLES) {
+      try {
+        const rows = await this._query(table);
+        manifest[table] = rows as unknown[];
+        totalRows += (rows as unknown[]).length;
+        backedUp.push(table);
+      } catch {
+        // table doesn't exist or isn't queryable — skip silently
+        manifest[table] = [];
+      }
+    }
+
+    // Fallback filename for Node.js
+    const date = new Date().toISOString().slice(0, 10);
+    const finalPath = outputPath ?? `spacetime-memory-backup-${date}.json`;
+
+    const payload = {
+      version: "0.3.0",
+      created_at: new Date().toISOString(),
+      tables: manifest,
+      stats: {
+        table_count: backedUp.length,
+        total_rows: totalRows,
+      },
+    };
+
+    // In Node.js, write to file; in browser, trigger download
+    const json = JSON.stringify(payload, null, 2);
+    if (typeof process !== "undefined" && typeof process.version === "string") {
+      // Node.js environment
+      const fs = await import("fs");
+      fs.writeFileSync(finalPath, json, "utf-8");
+    }
+
+    return {
+      status: "ok",
+      path: finalPath,
+      tables: backedUp,
+      total_rows: totalRows,
+    };
+  }
+
+  /**
+   * Import a backup JSON payload into the current database.
+   * The backup payload should have the structure produced by `backup()`.
+   *
+   * @param inputJson - JSON string or already-parsed object matching backup format
+   * @returns Restore metadata: tables restored, row counts
+   */
+  async restore(inputJson: string | Record<string, unknown>): Promise<Record<string, unknown>> {
+    const payload: Record<string, unknown> =
+      typeof inputJson === "string" ? JSON.parse(inputJson) : inputJson;
+    const manifest = (payload.tables ?? {}) as Record<string, unknown[]>;
+    const restored: string[] = [];
+    let totalRestored = 0;
+
+    for (const [table, rows] of Object.entries(manifest)) {
+      if (!rows || rows.length === 0) continue;
+      const firstRow = rows[0] as Record<string, unknown> | undefined;
+      if (!firstRow || Object.keys(firstRow).length === 0) continue;
+
+      try {
+        const colNames = Object.keys(firstRow);
+        for (const row of rows) {
+          const rawRow = row as Record<string, unknown>;
+          const values = colNames.map((col) => {
+            const val = rawRow[col];
+            if (val === null || val === undefined) return "NULL";
+            if (typeof val === "boolean") return val ? "true" : "false";
+            if (typeof val === "number") return String(val);
+            // string — escape single quotes
+            return `'${String(val).replace(/'/g, "''")}'`;
+          });
+          const cols = colNames.join(", ");
+          const vals = values.join(", ");
+          const sql = `INSERT INTO ${table} (${cols}) VALUES (${vals})`;
+          try {
+            await this._sql(sql);
+          } catch {
+            // row may be duplicate or schema mismatch — skip
+          }
+        }
+        restored.push(table);
+        totalRestored += rows.length;
+      } catch {
+        // table restoration failed — skip
+      }
+    }
+
+    return {
+      status: "ok",
+      tables: restored,
+      total_rows: totalRestored,
+    };
+  }
+
+  /**
    * Get the revision history of a memory.
    * @param memoryId - The memory ID
    * @returns Array of memory revision records, ordered by version
