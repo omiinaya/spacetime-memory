@@ -535,6 +535,22 @@ describe("Client", () => {
       await client.untagMemory("tag-1", "mem-1");
       expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/untag_memory");
     });
+
+    it("listTags calls list_tags reducer", async () => {
+      mockReducerOk();
+      await client.listTags("ws-1");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/list_tags");
+      expect(JSON.parse(req.body)).toEqual(["ws-1"]);
+    });
+
+    it("deleteTag calls delete_tag reducer", async () => {
+      mockReducerOk();
+      await client.deleteTag("tag-1");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/delete_tag");
+      expect(JSON.parse(req.body)).toEqual(["tag-1"]);
+    });
   });
 
   describe("error handling", () => {
