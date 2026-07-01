@@ -27,13 +27,15 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
+## Recently Completed
+
 ### P2: TypeScript SDK — Context pack list queries (listContextPacks, listContextEntries, listContextDeltas)
-Python SDK has these as public methods, TypeScript SDK only has storeContextPack.
+Added 3 context pack query methods to the TypeScript SDK matching the Python SDK:
+listContextPacks(), listContextEntries(), listContextDeltas() — each queries the
+corresponding STDB table via _sql(). 71/71 TS tests pass.
 Files: sdk/typescript/client.ts
 Difficulty: Easy
 Est: 10min
-
-## Recently Completed
 
 ### P2: TypeScript SDK — Auth method wrappers (register, login, logout, etc.)
 Added 9 public auth method wrappers to the TypeScript SDK matching the Python SDK:
