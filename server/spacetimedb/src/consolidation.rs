@@ -478,6 +478,9 @@ mod tests {
 ///
 /// When a pair matches, the older memory is kept and reinforced; the
 /// newer one is marked inactive and consolidated_to the older one.
+/// All MemoryTag associations and KG edges referencing the duplicate are
+/// migrated to the survivor, and the duplicate's entities_json is merged
+/// into the survivor's.
 #[reducer]
 pub fn dedup_memories(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
     let _admin = crate::auth::require_admin(ctx)?;
@@ -540,15 +543,84 @@ pub fn dedup_memories(ctx: &ReducerContext, workspace_id: String) -> Result<(), 
                 (id_b.clone(), id_a.clone())
             };
 
+            // ── Migrate MemoryTag associations from duplicate → survivor ──
+            let tags_to_migrate: Vec<crate::tag::MemoryTag> = ctx
+                .db
+                .memory_tag()
+                .iter()
+                .filter(|mt| mt.memory_id == remove_id)
+                .collect();
+            for mt in &tags_to_migrate {
+                // Only add if survivor doesn't already have this tag
+                let already = ctx
+                    .db
+                    .memory_tag()
+                    .iter()
+                    .any(|existing| existing.memory_id == keep_id && existing.tag_id == mt.tag_id);
+                if !already {
+                    ctx.db.memory_tag().insert(crate::tag::MemoryTag {
+                        memory_id: keep_id.clone(),
+                        tag_id: mt.tag_id.clone(),
+                    });
+                }
+                // Remove the old association
+                ctx.db.memory_tag().delete(mt.clone());
+            }
+
+            // ── Migrate KG edges whose source_memory_id points to duplicate ──
+            let edges_to_migrate: Vec<crate::knowledge_graph::KgEdge> = ctx
+                .db
+                .kg_edge()
+                .iter()
+                .filter(|e| e.source_memory_id == remove_id)
+                .collect();
+            for mut edge in edges_to_migrate {
+                edge.source_memory_id = keep_id.clone();
+                edge.metadata_json = edge
+                    .metadata_json
+                    .trim_end_matches('}')
+                    .to_string()
+                    + &format!(",\"merged_from\":\"{}\"", remove_id)
+                    + "}";
+                ctx.db.kg_edge().id().update(edge);
+            }
+
+            // ── Merge entities_json from duplicate into survivor ──
+            if let Some(mut survivor) = ctx.db.memory().id().find(&keep_id) {
+                // Parse entities from both, deduplicate by name, merge arrays
+                let existing_entities: Vec<serde_json::Value> =
+                    serde_json::from_str(&survivor.entities_json)
+                        .unwrap_or_default();
+                let mut dedup_map: std::collections::HashMap<String, serde_json::Value> =
+                    std::collections::HashMap::new();
+                for ent in existing_entities {
+                    if let Some(name) = ent.get("name").and_then(|v| v.as_str()) {
+                        dedup_map.insert(name.to_string(), ent);
+                    }
+                }
+                // Add duplicate's entities
+                if let Some(dup) = ctx.db.memory().id().find(&remove_id) {
+                    let dup_entities: Vec<serde_json::Value> =
+                        serde_json::from_str(&dup.entities_json).unwrap_or_default();
+                    for ent in dup_entities {
+                        if let Some(name) = ent.get("name").and_then(|v| v.as_str()) {
+                            dedup_map.entry(name.to_string()).or_insert(ent);
+                        }
+                    }
+                }
+                let merged_entities: Vec<serde_json::Value> =
+                    dedup_map.into_values().collect();
+                survivor.entities_json =
+                    serde_json::to_string(&merged_entities).unwrap_or_else(|_| "[]".to_string());
+                survivor.access_count = survivor.access_count.saturating_add(1);
+                survivor.updated_at = now;
+                ctx.db.memory().id().update(survivor);
+            }
+
+            // Deactivate the duplicate
             if let Some(mut mem) = ctx.db.memory().id().find(&remove_id) {
                 mem.is_active = false;
                 mem.consolidated_to = keep_id.clone();
-                mem.updated_at = now;
-                ctx.db.memory().id().update(mem);
-            }
-
-            if let Some(mut mem) = ctx.db.memory().id().find(&keep_id) {
-                mem.access_count = mem.access_count.saturating_add(1);
                 mem.updated_at = now;
                 ctx.db.memory().id().update(mem);
             }
