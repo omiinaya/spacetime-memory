@@ -14,17 +14,18 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
-### P3: Add `merge_duplicate_memories` consolidation step
-Consolidation cron lacks memory deduplication. Add a reducer + SDK method
-that finds near-duplicate memories (by content hash or cosine similarity > 0.95),
-merges metadata (tags, edge references), and deactivates the duplicate.
-Files: server/spacetimedb/src/consolidation.rs
-Difficulty: Medium
-Est: 30min
-
 ---
 
 ## Recently Completed
+
+### P3: Enhanced `dedup_memories` — merge tags, KG edges, entities (July 1, 2026)
+Enhanced the `dedup_memories` reducer to fully migrate MemoryTag associations,
+KG edges (source_memory_id redirect with 'merged_from' annotation), and
+entities_json arrays from the duplicate to the survivor, not just deactivate.
+Commit: 82c30702
+Files: server/spacetimedb/src/consolidation.rs
+Difficulty: Medium
+Est: 30min
 
 ### P2: Time-weighted memory retrieval — `temporal_search_with_weight` (July 1, 2026)
 Added new `temporal_search_with_weight` reducer in hybrid_query.rs that provides
@@ -35,10 +36,6 @@ Commit: fa97ee0d
 Files: server/spacetimedb/src/hybrid_query.rs, sdk/python/spacetime_memory/client.py
 Difficulty: Medium
 Est: 1-2h
-
----
-
-## Recently Completed
 
 ### P3: Add `batch_delete_memories` reducer + SDK methods (July 1, 2026)
 Added a new `batch_delete_memories(ids_json: String)` reducer in
@@ -72,26 +69,7 @@ Est: 20min
 ### P3: Cross-encoder rerank unit tests (July 1, 2026)
 15 tests already existed and pass covering CrossEncoderReranker init,
 rerank scoring, fallback behavior, singleton lifecycle, and custom content keys.
-Verified: `python3 -m pytest tests/test_cross_encoder.py -v` — 15/15 pass.
 Files: sdk/python/tests/test_cross_encoder.py (verified existing)
-Difficulty: Easy
-Est: 5min
-
-### P2: Add `exportWorkspaceJson` with full JSON format to TypeScript SDK (July 1, 2026)
-Added `exportWorkspaceJson(workspaceId, opts?)` method that exports all workspace-scoped
-data (notes, KG nodes/edges, memories, profiles, facts, sessions, tours, directories,
-25+ tables) as structured JSON matching the backup format (v0.3.0). Includes
-optional system-note filtering, file writing for Node.js. 2 unit tests.
-Commit: 21faab53
-Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
-Difficulty: Easy
-Est: 5min
-
-### P2: Add getMemoryStats, backup, restore to TypeScript SDK (July 1, 2026)
-Added `getMemoryStats()` calling the get_memory_stats reducer + reading the result
-table, plus `backup()` and `restore()` matching Python SDK's backup format.
-Commit: 36d1cae6
-Files: sdk/typescript/client.ts
 Difficulty: Easy
 Est: 5min
 
