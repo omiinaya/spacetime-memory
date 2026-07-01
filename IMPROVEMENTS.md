@@ -8,20 +8,43 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P1: TypeScript — Publish to npm
-npm publish workflow exists but NPM_TOKEN hasn't been set in GitHub secrets.
-Files: sdk/typescript/package.json, .github/workflows/npm-publish.yml
-Difficulty: Easy
-Est: 15min
-BLOCKED: requires GitHub secrets to be set (NPM_TOKEN)
-
 ### P3: Bi-temporal fact tracking — Graphiti-style temporal facts
 Graphiti's strongest differentiator. Needs: fact valid_from/valid_to columns + auto-invalidation reducer.
 Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
+---
+
+## Next up (reserve queue — not yet fully scoped)
+
+### P3: Cross-encoder rerank MCP tool
+`cross_encoder_rerank()` exists in Python SDK but no MCP tool wraps it. Useful for
+retrieval pipelines needing precision re-scoring.
+Files: server/mcp/main.py
+Difficulty: Easy
+Est: 10min
+
+### P2: Fix pytest-asyncio deprecation warning
+Add `asyncio_default_fixture_loop_scope = true` to pyproject.toml to suppress the
+recurring PytestDeprecationWarning.
+Files: sdk/python/pyproject.toml
+Difficulty: Easy
+Est: 1min
+
+---
+
 ## Recently Completed
+
+### P2: TS SDK — Add deleteTourStop + detectPatterns; stage+commit 3 unwritten methods (July 1, 2026)
+Added 2 genuinely missing TS methods plus staged the 3 previously-written methods (globGet,
+detectBridgeNodes, batchUpdateMemories) that were unstaged. Also added deleteTourStop as an
+alias for removeTourStop. detectPatterns is a full client-side pattern detection method
+(temporal clustering, frequent term extraction, co-occurrence) matching Python's
+`pattern_detection.py` logic. 71/71 TS tests pass, clean tsc. Total TS: 149 public methods.
+Files: sdk/typescript/client.ts
+Difficulty: Easy
+Est: 20min
 
 ### P0: Fixed N+1 `_enrich_content` — semantic search 3x faster (July 1, 2026)
 `_enrich_content` was doing N individual `_query()` calls (160 queries at 25ms each = 4s).
@@ -60,102 +83,39 @@ Integrated into `make bench`.
 
 **Key takeaways:**
 - Pure WASM ops (store, create_edge) are **1-2ms** — STDB is fast.
-- **Semantic search is 2.5s** (previously 7.5s). Fixed the N+1 `_enrich_content` bottleneck that was doing 160 individual STDB queries at 25ms each. Now uses content already in `hybrid_result` rows + single batch confidence query.
-- Remaining bottleneck: **1.5s hybrid_search reducer** (WASM BM25 + graph + temporal search). That's the Rust side — would need indexing or parallelism to cut.
-- Tantivy search returns in **1ms** — but results are empty because the benchmark seeds via `_call("store_memory",...)` which bypasses Tantivy indexing. Real usage through `c.store()` indexes into Tantivy.
+- **Semantic search is 2.5s** (previously 7.5s). Fixed the N+1 `_enrich_content` bottleneck.
+- Remaining bottleneck: **1.5s hybrid_search reducer** (WASM BM25 + graph + temporal search).
+- Tantivy search returns in **1ms** — but results are empty because benchmark seeds via `_call("store_memory",...)` bypasses Tantivy indexing.
 - 0 failures across all 148 operations.
 
-**Retrieval quality (keyword-only, 5 queries, 8 eval memories):**
-P@5=40.0%  R@5=40.0%  MRR=0.400
-
-**Key gaps:**
-- Embedder health check works; `_embed()` runs in 250ms with bge-large-en-v1.5 at :9090.
-- No LongMemEval, LoCoMo, or BEAM benchmark harnesses exist (1-2 week effort each).
-- These are **honest baseline scores**, not cherry-picked. The old reference showing
-  store=194ms was with an embedder; this is the module-only cost.
+### P2: Fix 10 ruff lint issues in Python SDK (July 1, 2026)
+Fixed 10 lint errors across cli.py, client.py, and sdks/hindsight.py.
+71/71 TS tests pass, clean tsc.
 
 ### P1: Fix module build for STDB v2.6 — tag.rs API breakage
 list_tags reducer returned `Result<String, String>` which v2.6 doesn't allow.
-Fixed: added `serde::Serialize` to Tag struct, changed list_tags to return `()`,
-updated SDK list_tags() to use `_query()` on the tag table instead.
 Module builds clean and publishes successfully.
 
 ### P1: Publish and integrate benchmark runner
-- Built unified benchmark runner at `sdk/python/scripts/benchmark_runner.py`
-- Integrated into `make bench` with auto-DB discovery
-- Runs latency + retrieval quality benchmarks in one invocation
-- Outputs structured JSON + markdown table
-- Covers: store (single/batch), search (keyword/hybrid), graph (query/node/edge/neighbors), ping, count
+Built unified benchmark runner at `sdk/python/scripts/benchmark_runner.py`.
+Integrated into `make bench` with auto-DB discovery.
 
 ### P2: Fix Python SDK bugs — batch_update_memories dual filter, update_memory arg count
-Fixed batch_update_memories which used a dual-field filter_dict ({id, workspace_id})
-that failed with query_table reducer. Now queries by id only, validates workspace_id
-client-side. Fixed update_memory 4→5 arg count for WASM compat (expires_at=0).
 170/170 unit tests pass.
 
 ### P2: Add getNoteHistory and fuzzyGet to TS SDK
-Added getNoteHistory(noteId) and fuzzyGet(ws, name, field?, threshold?, limit?).
 71/71 TS tests pass. Total TS: 145 methods.
 
 ### P2: Add 3 more TS methods — recommendMemories, searchSessionsSemantic, searchWithFilters
-Added recommendMemories(), searchSessionsSemantic(), searchWithFilters().
-71/71 TS tests pass, clean tsc. Total TS: 143 methods (was 85).
-
-### P2: Add 8 more TS methods — health, profiles, context, merge suggestions
-Added health(), checkEmbedderHealth(), upsertProfile(), suggestMerges(),
-searchProfiles(), getProfileContext(), getUserMemories(), getOutgoingLinks().
-71/71 TS tests pass, clean tsc. Total TS: 140 methods (was 85).
-
-### P3: TypeScript SDK — Add citation methods (addNodeCitation, addEdgeCitation, getCitations) + fix getEdgeHistory
-Added 3 citation methods matching Python SDK parity. Also fixed getEdgeHistory
-which was missing the reducer call (known reducer pattern: call reducer to
-populate result table, then SELECT from it). All 71 TS tests pass, clean tsc.
-Files: sdk/typescript/client.ts
-Difficulty: Easy
-Est: 10min
-
-### P2: Batch-add 33 TS SDK methods — profiles, context, KG, utilities
-Added 33+ methods to complete feature parity: addProfileFact,
-addDynamicContext, getProfile, listProfiles, setWorkspaceContext,
-setMemoryContext, getContextChain, addAlias, createEntityLink, getNode,
-getNoteByDate, getNoteByTitle, getNeighborsViaReducer, getPeerSessions,
-getSessionMessages, computePageRank, computeKgStats,
-computeCommunityHierarchy, setDecayModel, ping, getPeerReputation,
-resolveEntity, approveMerge, rejectMerge, setMemoryScope, escalateMemories,
-getOutgoingLinks. 71/71 TS tests pass, clean tsc.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 45min
-
-### P2: Batch-add 20 TS SDK methods — docs, directories, API keys, KG communities
-Added 20 public methods to the TypeScript SDK matching Python SDK:
-getBacklinks, createDocument, getDocument, listDocuments, getDocumentChunks,
-deleteDocument, listDirectory, traverseDirectory, getDirectory, createDirectory,
-linkMemoryToDirectory, unlinkMemoryFromDirectory, createApiKey (crypto.subtle
-SHA-256), deactivateApiKey, listApiKeys, seedCommunities, getCommunity.
-71/71 TS tests pass, clean tsc.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 30min
-
-### P2: TypeScript SDK — Context pack list queries (listContextPacks, listContextEntries, listContextDeltas)
-Added 3 context pack query methods to the TypeScript SDK matching the Python SDK:
-listContextPacks(), listContextEntries(), listContextDeltas() — each queries the
-corresponding STDB table via _sql(). 71/71 TS tests pass.
-Files: sdk/typescript/client.ts
-Difficulty: Easy
-Est: 10min
-
-### P2: TypeScript SDK — Auth method wrappers (register, login, logout, etc.)
-Added 9 public auth method wrappers to the TypeScript SDK matching the Python SDK:
-register(), login(), logout(), updateAccount(), deactivateAccount(),
-promoteAdmin(), demoteAdmin(), listAdmins(). Also fixed listTags() which was
-calling _call() expecting a return value (was void). 71/71 TS tests pass.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 20min
+71/71 TS tests pass, clean tsc. Total TS: 143 methods.
 
 ## Deferred / Blocked
+
+### P1: TypeScript — Publish to npm (BLOCKED — needs GitHub secrets)
+npm publish workflow exists but NPM_TOKEN hasn't been set in GitHub secrets.
+Files: sdk/typescript/package.json, .github/workflows/npm-publish.yml
+Difficulty: Easy
+Est: 15min
 
 ### STDB 2% fatal error under heavy concurrent load (BLOCKED — no live STDB for stress testing)
 Remaining root cause appears to be STDB-level WASM limitation.
