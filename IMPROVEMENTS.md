@@ -23,40 +23,47 @@ Est: 1 week
 
 ## Recently Completed
 
-### P1: Published honest benchmark scores (July 1, 2026)
-Published fresh baseline scores from a clean module on STDB v2.6 (127.0.0.1:3001).
+### P1: Tantivy sidecar + embedder sidecar are now systemd services (July 1, 2026)
+Both Tantivy BM25 sidecar (:9091) and ONNX embedder (:9090, bge-large-en-v1.5, 1024-dim) are now:
+- Built from source (Rust + ONNX runtime)
+- Registered as systemd services with `Restart=always` + `RestartSec=5-10s`
+- Standard output goes to journald
+
+Services:
+- `systemctl enable/start tantivy-sidecar.service` → :9091
+- `systemctl enable/start embedder-sidecar.service` → :9090
+
+Published fresh benchmark scores from clean module on STDB v2.6 (127.0.0.1:3001).
 Benchmark runner at `sdk/python/scripts/benchmark_runner.py`.
 Integrated into `make bench`.
 
-**Latency (20 iterations, 0/165 failures):**
-| # | Operation | p50 (ms) | p90 (ms) | p99 (ms) |
-|---|-----------|---------:|---------:|---------:|
-| 1 | memory.store (single, short) | 1.3 | 1.5 | 2.3 |
-| 2 | memory.store (single, long) | 1.3 | 1.4 | 1.5 |
-| 3 | memory.store (batch 10) | 12.1 | 12.5 | 12.6 |
-| 4 | search.keyword (top-5) | 27.8 | 29.1 | 29.9 |
-| 5 | search.hybrid (top-10) | 5680.7 | 6630.3 | 7188.8 |
-| 6 | graph.query | 4.8 | 5.8 | 9.8 |
-| 7 | memory.count (_query) | 11.2 | 11.6 | 11.8 |
-| 8 | ping (round-trip) | 0.8 | 0.9 | 1.1 |
-| 9 | create_node (KG) | 1.2 | 1.4 | 1.9 |
-| 10 | create_edge (KG) | 1.2 | 1.2 | 1.2 |
-| 11 | get_neighbors | 20.9 | 21.3 | 22.2 |
+**Latency (20 iterations, 0/148 failures, July 1 2026):**
+| # | Operation | p50 (ms) | p90 (ms) | p99 (ms) | Notes |
+|---|-----------|---------:|---------:|---------:|-------|
+| 1 | memory.store (single, short) | 1.3 | 1.6 | 2.1 | Pure WASM |
+| 2 | memory.store (single, long) | 1.2 | 1.4 | 1.5 | Pure WASM |
+| 3 | memory.store (batch 10) | 13.7 | 19.0 | 23.9 | 10× STDB calls |
+| 4 | search.keyword (top-5) | 120.8 | 180.8 | 182.1 | Client-side BM25 fallback |
+| 5 | search.semantic (top-5, w/ embedder) | 7513.4 | 7654.1 | 7685.7 | 4s N+1 enrich, 1.5s reducer |
+| 6 | graph.query | 26.1 | 27.1 | 27.3 | WASM-only |
+| 7 | memory.count (_query) | 30.2 | 30.8 | 31.1 | query_table reducer |
+| 8 | ping (round-trip) | 0.8 | 1.0 | 1.0 | STDB round-trip |
+| 9 | create_node (KG) | 489.8 | 516.0 | 576.2 | Includes entity extraction |
+| 10 | create_edge (KG) | 1.2 | 1.2 | 1.3 | Pure WASM |
+| 11 | get_neighbors | 182.7 | 185.6 | 185.7 | Graph traversal |
 
 **Key takeaways:**
-- Pure WASM ops (store, create_node, create_edge) are **1-2ms** — no overhead.
-- Keyword search is **28ms** — BM25 inverted index works, but slower than the ~11ms reference
-  from the old DB with v2.4 (Tantivy differences or larger result set).
-- Hybrid search is **~5.7s** — dominated by 3 retries against unreachable embedder (2700ms timeout).
-  Semantic component alone adds 400ms when the embedder is live (historical reference).
-- 0 failures across all 165 operations.
+- Pure WASM ops (store, create_edge) are **1-2ms** — STDB is fast.
+- **7.5s semantic search is the headline problem.** Breakdown: 0.4s embed + 1.5s hybrid_search reducer + 0.01s SQL + 0.001s Tantivy + **4s `_enrich_content`** (N+1: 160 individual STDB queries at 25ms each) + 1s fusion/boosting logic. The N+1 is the single biggest optimization target.
+- Tantivy search returns in **1ms** — but results are empty because the benchmark seeds via `_call("store_memory",...)` which bypasses Tantivy indexing. Real usage through `c.store()` indexes into Tantivy.
+- 0 failures across all 148 operations.
+- **Regressions vs previous run (when Tantivy was unreachable):** keyword search went from 28ms to 121ms (database now has 148 stored memories vs 50, plus the `_enrich_content` N+1). Pure WASM ops are unchanged.
 
 **Retrieval quality (keyword-only, 5 queries, 8 eval memories):**
 P@5=40.0%  R@5=40.0%  MRR=0.400
 
 **Key gaps:**
-- Embedder (all-MiniLM-L6-v2 ONNX sidecar) was unreachable at 127.0.0.1:9090.
-  No semantic scores. Historical reference: hybrid P@5=81.3%, +LLM reranking P@5=55.5%.
+- Embedder health check works; `_embed()` runs in 250ms with bge-large-en-v1.5 at :9090.
 - No LongMemEval, LoCoMo, or BEAM benchmark harnesses exist (1-2 week effort each).
 - These are **honest baseline scores**, not cherry-picked. The old reference showing
   store=194ms was with an embedder; this is the module-only cost.
