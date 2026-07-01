@@ -2457,10 +2457,11 @@ class Client:
         The 5-arg form requires the ``expires_at`` reducer (rebuilt WASM).
         """  # noqa: E501
         if expires_at is None:
-            # Backward-compatible 4-arg call (works with old WASM)
+            # Backward-compatible: 4-arg call may fail on newer WASM that expects 5.
+            # Try 5-arg with 0 (no expiration change = preserve current).
             return self._call(
                 "update_memory",
-                [memory_id, content, summary, confidence],
+                [memory_id, content, summary, confidence, 0],
             )
         # Forward-looking 5-arg call (requires rebuilt WASM with expires_at support)
         return self._call(
@@ -2702,16 +2703,20 @@ class Client:
                 # Fetch current memory to preserve unchanged fields
                 current_rows = self._query(
                     "memory",
-                    filter_dict={"id": mem_id, "workspace_id": workspace_id},
+                    filter_dict={"id": mem_id},
                 )
                 if not current_rows:
                     errors.append(f"Memory '{mem_id}' not found")
                     continue
                 current = current_rows[0]
+                mem_ws = current.get("workspace_id", "")
+                if workspace_id and mem_ws and mem_ws != workspace_id:
+                    errors.append(f"Memory '{mem_id}' not in workspace '{workspace_id}'")
+                    continue
                 content = updates.get("content", current.get("content", ""))
                 summary = updates.get("summary", current.get("summary", ""))
                 confidence = updates.get("confidence", current.get("confidence", 0.8))
-                expires_at = updates.get("expires_at", None)
+                expires_at = updates.get("expires_at", 0)
                 self.update_memory(mem_id, content, summary, confidence, expires_at)
                 updated += 1
             except Exception as e:
