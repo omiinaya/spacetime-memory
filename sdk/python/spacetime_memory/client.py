@@ -3060,6 +3060,32 @@ class Client:
             return rows[0]
         return None
 
+    def get_memory_stats(self, workspace_id: str) -> dict[str, Any] | None:
+        """Collect per-workspace memory metrics.
+
+        Stats returned:
+        - ``total_memories`` — count of all memories
+        - ``active_memories`` — count of active memories
+        - ``by_tier`` — JSON map of tier → count (L0, L1, L2)
+        - ``by_type`` — JSON map of memory_type → count
+        - ``avg_confidence`` — average confidence score
+        - ``avg_age_seconds`` — average age in seconds
+        - ``total_revisions`` — number of memory revisions
+        - ``top_tags`` — JSON array of top-10 used tags
+        - ``total_users`` — count of distinct user_scope values
+
+        Returns a dict of stat_key → stat_value, or ``None`` if no stats
+        were computed.
+        """
+        self._call("get_memory_stats", [workspace_id])
+        # Public result table — queryable via SQL directly
+        rows = self._sql(
+            f"SELECT * FROM workspace_memory_stats_result WHERE workspace_id = '{_esc(workspace_id)}'"
+        )
+        if rows:
+            return {r["stat_key"]: r["stat_value"] for r in rows}
+        return None
+
     # -----------------------------------------------------------------------
     # Search with metadata/location filters (Honcho parity)
     # -----------------------------------------------------------------------

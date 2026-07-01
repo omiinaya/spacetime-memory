@@ -1775,6 +1775,27 @@ def compute_kg_stats(workspace_id: str) -> str:
 
 @mcp.tool()
 @require_api_key
+def get_memory_stats(workspace_id: str) -> str:
+    """Collect per-workspace memory metrics.
+
+    Returns total_memories, active_memories, by_tier, by_type,
+    avg_confidence, avg_age_seconds, total_revisions, top_tags,
+    and total_users as a JSON dict.
+
+    Args:
+        workspace_id: The workspace to compute memory stats for.
+
+    Returns:
+        JSON string with memory statistics.
+    """
+    result = get_client().get_memory_stats(workspace_id)
+    if result is None:
+        return json.dumps({"workspace_id": workspace_id, "error": "No stats found"})
+    return json.dumps(result, default=str)
+
+
+@mcp.tool()
+@require_api_key
 def detect_communities(workspace_id: str) -> dict[str, Any]:
     """Run label-propagation community detection on the knowledge graph.
 
