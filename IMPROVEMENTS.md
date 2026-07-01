@@ -29,6 +29,10 @@ Est: 1 week
 
 ## Recently Completed
 
+### P2: Add getNoteHistory and fuzzyGet to TS SDK
+Added getNoteHistory(noteId) and fuzzyGet(ws, name, field?, threshold?, limit?).
+71/71 TS tests pass. Total TS: 145 methods.
+
 ### P2: Add 3 more TS methods — recommendMemories, searchSessionsSemantic, searchWithFilters
 Added recommendMemories(), searchSessionsSemantic(), searchWithFilters().
 71/71 TS tests pass, clean tsc. Total TS: 143 methods (was 85).
