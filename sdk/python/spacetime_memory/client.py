@@ -3556,6 +3556,66 @@ class Client:
             [workspace_id, json.dumps(source_ids), target_content, target_summary],
         )
 
+    def temporal_search_with_weight(
+        self,
+        workspace_id: str,
+        query: str = "",
+        memory_type: str = "",
+        tier: str = "",
+        limit: int = 20,
+        recency_weight: float = 0.7,
+        time_context: str = "",
+    ) -> list[dict[str, Any]]:
+        """Time-weighted memory retrieval with configurable recency decay.
+
+        Like the ``temporal`` strategy in :meth:`search`, but with:
+        - Exponential recency boost controlled by ``recency_weight`` (0.0–1.0).
+          Higher values penalize older memories more strongly.
+          Default 0.7 provides a good balance (roughly corresponding to a
+          7-day half-life with 70% recency influence).
+        - ``time_context`` filters memories by age: "recent" (24h),
+          "last_week", "last_month", "last_3_months", "last_year", or
+          "" (no filter).
+
+        Results are written to the ``HybridResult`` table with strategy
+        ``temporal_weighted_<weight_int>``, keyed by a unique query hash
+        that includes the recency_weight. Read back via SQL on
+        ``hybrid_result`` filtered by workspace_id and query_hash.
+
+        Args:
+            workspace_id: The workspace to search.
+            query: The search query (for query hash and optional semantic boosting).
+            memory_type: Optional ``memory_type`` filter (e.g., "world_fact").
+            tier: Optional tier filter ("L0", "L1", "L2").
+            limit: Max results to return (default 20).
+            recency_weight: How much to penalise old memories (0.0–1.0).
+                0.0 = no recency bias, 1.0 = strong exponential decay.
+            time_context: Temporal filter keyword as described above.
+
+        Returns:
+            List of hybrid_result rows matching the search.
+        """
+        emb_json = "[]"
+        self._call(
+            "temporal_search_with_weight",
+            [
+                workspace_id,
+                query,
+                emb_json,
+                memory_type,
+                tier,
+                limit,
+                recency_weight,
+                time_context,
+            ],
+        )
+        qhash = _query_hash(f"tw:{query}:{int(recency_weight * 100)}")
+        return self._sql(
+            "SELECT * FROM hybrid_result "
+            f"WHERE workspace_id = '{_esc(workspace_id)}' "
+            f"  AND query_hash = '{_esc(qhash)}' "
+        )
+
     # -----------------------------------------------------------------------
     # Merge suggestions
     # -----------------------------------------------------------------------
@@ -4103,12 +4163,15 @@ class Client:
                     filter_dict={},
                     columns=["id", "content", "title"],
                 )
-                note_id = ""
                 for n in reversed(notes):
                     if n.get("content", "") == content:
                         note_id = n["id"]
                         break
-                if note_id:
+            except RuntimeError:
+                logger.warning("add_note: note ID resolution failed, skipping Tantivy/BM25 indexing")
+                return result
+            if note_id:
+                try:
                     index_emb = embedding_json if embedding_json != "[]" else "[]"
                     self._call(
                         "index_entity",
@@ -4132,8 +4195,8 @@ class Client:
                     )
                     # Index into Tantivy BM25 sidecar
                     self._tantivy_index(workspace_id, note_id, content, "note")
-            except RuntimeError:
-                logger.warning("add_note: Tantivy indexing failed for note %s, skipping", note_id)
+                except RuntimeError:
+                    logger.warning("add_note: Tantivy/BM25 indexing failed for note %s, skipping", note_id)
         return result
 
     def update_note(
