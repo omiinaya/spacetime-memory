@@ -8,16 +8,50 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P3: `search_by_tags` — tag-filtered semantic search
-Combine tag filtering with vector search in a single reducer: specify tag IDs
-and only return memories that have *all* matching tags.
-Files: server/spacetimedb/src/hybrid_query.rs, tag.rs
-Difficulty: Medium
-Est: 1h
+### P3: Add connector reducer wrappers to Python + TypeScript SDKs
+Three reducers exist in `connector.rs` (`register_connector`, `update_connector`,
+`delete_connector`) but have no Python SDK or TypeScript SDK method wrappers.
+CLI has a `register_connector` call via `_call` but no typed method.
+Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+Difficulty: Easy
+Est: 15min
+
+### P3: Add extract_entities SDK methods
+`extract_entities` reducer in `entity_extraction.rs` has no Python SDK or
+TypeScript SDK method wrapper.
+Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+Difficulty: Easy
+Est: 10min
+
+### P3: `harmonic_belief` reducers — SDK method coverage
+`store_harmonic_beliefs`, `clear_harmonic_beliefs`, `log_resonance_session`
+reducers in `harmonic_belief.rs` lack Python SDK and TypeScript SDK wrappers.
+Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+Difficulty: Easy
+Est: 15min
+
+### P3: `entity_linking` reducers — SDK method coverage
+`create_entity_link`, `add_alias`, `resolve_entity` reducers in
+`entity_linking.rs` need Python and TypeScript SDK wrappers.
+Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+Difficulty: Easy
+Est: 10min
 
 ---
 
 ## Recently Completed
+
+### P3: `search_by_tags` — tag-filtered search (July 1, 2026)
+Added `search_by_tags` reducer in hybrid_query.rs that finds memories with
+ALL specified tags (AND intersection), optionally ranks by cosine similarity
+when a query embedding is provided, and writes results to `hybrid_result`
+with strategy "tagged". Python SDK `search_by_tags()` and TypeScript SDK
+`searchByTags()` methods included.
+Commit: c05054be
+Files: server/spacetimedb/src/hybrid_query.rs, sdk/python/spacetime_memory/client.py,
+  sdk/typescript/client.ts
+Difficulty: Medium
+Est: 1h
 
 ### P2: Optimize semantic strategy in hybrid_search reducer — 5s → sub-second (July 1, 2026)
 Moved cosine similarity computation from WASM reducer to Python client-side.
@@ -32,54 +66,29 @@ Est: 2-3h
 
 ### P3: Add `batch_tag_memories` + `batch_untag_memories` reducers + SDK methods (July 1, 2026)
 Eliminates O(n) network round-trips for bulk tagging/untagging operations.
-- Rust: batch_tag_memories (idempotent — skips already-tagged) and
-  batch_untag_memories (idempotent — skips missing associations) reducers
-- Python SDK: batch_tag_memories() + batch_untag_memories()
-- TypeScript SDK: batchTagMemories() + batchUntagMemories()
-- 10 Python unit tests + 4 TypeScript unit tests
 Commit: 4a1b3bd3
-Files: server/spacetimedb/src/tag.rs, sdk/python/spacetime_memory/client.py,
-  sdk/python/tests/test_tags.py, sdk/typescript/client.ts,
-  sdk/typescript/tests/client.test.ts
 Difficulty: Medium
 Est: 20min
 
 ### P3: Enhanced `dedup_memories` — merge tags, KG edges, entities (July 1, 2026)
 Enhanced the `dedup_memories` reducer to fully migrate MemoryTag associations,
-KG edges (source_memory_id redirect with 'merged_from' annotation), and
-entities_json arrays from the duplicate to the survivor, not just deactivate.
+KG edges and entities_json arrays from the duplicate to the survivor.
 Commit: 82c30702
-Files: server/spacetimedb/src/consolidation.rs
 Difficulty: Medium
 Est: 30min
 
 ### P2: Time-weighted memory retrieval — `temporal_search_with_weight` (July 1, 2026)
-Added new `temporal_search_with_weight` reducer in hybrid_query.rs that provides
-exponential recency boosting (controlled by `recency_weight` 0.0–1.0) and
-`time_context` filters ("recent", "last_week", "last_month").
-Python SDK: `client.temporal_search_with_weight()`.
-Commit: fa97ee0d
-Files: server/spacetimedb/src/hybrid_query.rs, sdk/python/spacetime_memory/client.py
+Added new `temporal_search_with_weight` reducer. Commit: fa97ee0d
 Difficulty: Medium
 Est: 1-2h
 
 ### P3: Add `batch_delete_memories` reducer + SDK methods (July 1, 2026)
-Added a new `batch_delete_memories(ids_json: String)` reducer in
-server/spacetimedb/src/memory.rs that accepts a JSON array of memory IDs and
-deactivates them in a single call — eliminating O(n) network round-trips for
-bulk deletion. Idempotent per-memory (skips missing IDs).
-Added `batch_delete_memories(memory_ids)` to Python SDK and
-`batchDeleteMemories(memoryIds)` to TypeScript SDK.
-Commit: 09da711a
-Files: server/spacetimedb/src/memory.rs, sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+Bulk deletion reducer + Python + TS SDK wrappers. Commit: 09da711a
 Difficulty: Medium
 Est: 15min
 
 ### P2: Python `batch_update_memories` SDK method (July 1, 2026)
-Python SDK already had `batch_update_memories(memory_ids, updates)` — confirmed
-existing at line 2705 of client.py. Item was stale; verified code exists and works.
-Files: sdk/python/spacetime_memory/client.py (verified existing, line 2705)
-Difficulty: Easy
+Verified exists at line 2705. Item was stale. Difficulty: Easy
 Est: 5min
 
 ---
