@@ -33,19 +33,22 @@ Files: sdk/python/spacetime_memory/client.py, server/spacetimedb/src/peer.rs
 Difficulty: Easy
 Est: 10min
 
+## Recently Completed
+
 ### P3: Add CLI commands for tag management (list, delete)
-CLI has no `stmem tag list` or `stmem tag delete` — only SDK/MCP methods exist now.
+Added `stmem tag list` and `stmem tag delete` CLI commands with rich table
+output, JSON/CSV format support, and confirmation prompt for deletion.
 Files: cli/stmem.py
 Difficulty: Easy
 Est: 15min
 
 ### P3: Add listTags/deleteTag tests to TypeScript SDK test suite
-New methods need vitest reducer-call tests following existing patterns.
+Added vitest tests verifying `listTags` calls `list_tags` reducer and
+`deleteTag` calls `delete_tag` reducer with correct arguments.
+68/69 tests pass (1 pre-existing ESM import failure unrelated).
 Files: sdk/typescript/tests/client.test.ts
 Difficulty: Easy
 Est: 10min
-
-## Recently Completed
 
 ### P3: Add list_tags + delete_tag reducers with full SDK + MCP support
 Added Rust reducers (list_tags, delete_tag), Python SDK methods (list_tags, delete_tag),
