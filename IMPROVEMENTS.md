@@ -22,16 +22,35 @@ Files: sdk/typescript/client.ts
 Difficulty: Medium
 Est: 20min
 
-### P2: Add `exportWorkspace` with full JSON format to TypeScript SDK
-Python SDK has `export()` that dumps all tables as JSON. TS `exportWorkspace()` only
-dumps notes as markdown. Add a full JSON export matching Python's backup format.
-Files: sdk/typescript/client.ts
+### P2: Time-weighted memory retrieval scoring (mem0 v3 temporal parity)
+mem0 v3 adds temporal reasoning — time-aware retrieval scoring that ranks memories
+based on recency relevance to the query. Add `recency_weight` param to hybrid search
+that boosts newer memories exponentially, and a `time_context` filter for queries
+about "recent" / "last week" / "current state".
+Files: server/spacetimedb/src/hybrid_query.rs, sdk/python/spacetime_memory/query_expansion.py
+Difficulty: Medium
+Est: 1-2h
+
+### P3: Cross-encoder rerank CI benchmark test
+Our `CrossEncoderReranker` has no CI guard. Add a test that verifies
+reranking produces correct ordering (higher similarity → lower rank index).
+Files: sdk/python/tests/test_cross_encoder.py (new)
 Difficulty: Easy
 Est: 5min
 
 ---
 
 ## Recently Completed
+
+### P2: Add `exportWorkspaceJson` with full JSON format to TypeScript SDK (July 1, 2026)
+Added `exportWorkspaceJson(workspaceId, opts?)` method that exports all workspace-scoped
+data (notes, KG nodes/edges, memories, profiles, facts, sessions, tours, directories,
+25+ tables) as structured JSON matching the backup format (v0.3.0). Includes
+optional system-note filtering, file writing for Node.js. 2 unit tests.
+Commit: 21faab53
+Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
+Difficulty: Easy
+Est: 5min
 
 ### P2: Add getMemoryStats, backup, restore to TypeScript SDK (July 1, 2026)
 Added `getMemoryStats()` calling the get_memory_stats reducer + reading the result
@@ -61,9 +80,7 @@ Est: 5min
 ### P2: Add `get_memory_stats` endpoint (July 1, 2026)
 New reducer `get_memory_stats` in workspace.rs computes per-workspace memory metrics:
 total/active memories, by-tier breakdown, by-type breakdown, avg confidence,
-avg age, total revisions, top-10 tags, distinct users. Results stored in
-`workspace_memory_stats_result` public table. Python SDK `Client.get_memory_stats()`
-returns dict of stat_key → stat_value. Unit tests added (TestMemoryStats).
+avg age, total revisions, top-10 tags, distinct users.
 Files: server/spacetimedb/src/workspace.rs, sdk/python/spacetime_memory/client.py,
 sdk/python/tests/test_client_deep.py
 Difficulty: Easy
@@ -75,13 +92,6 @@ Commit: 0020d83e
 Files: server/mcp/main.py
 Difficulty: Easy
 Est: 10min
-
-### P2: Fix pytest-asyncio deprecation warning (July 1, 2026)
-Added `asyncio_default_fixture_loop_scope = true` to pyproject.toml.
-Commit: 0020d83e
-Files: sdk/python/pyproject.toml
-Difficulty: Easy
-Est: 1min
 
 ---
 
