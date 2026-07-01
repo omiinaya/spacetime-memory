@@ -1723,6 +1723,45 @@ export class Client {
   // -----------------------------------------------------------------------
 
   /**
+   * List context packs for a workspace.
+   * @param workspaceId - Workspace ID
+   * @returns Array of context pack records
+   */
+  async listContextPacks(
+    workspaceId: string
+  ): Promise<Record<string, unknown>[]> {
+    return this._sql(
+      `SELECT * FROM context_pack WHERE workspace_id = '${workspaceId}'`
+    );
+  }
+
+  /**
+   * List entries in a context pack.
+   * @param packId - Context pack ID
+   * @returns Array of context entry records
+   */
+  async listContextEntries(
+    packId: string
+  ): Promise<Record<string, unknown>[]> {
+    return this._sql(
+      `SELECT * FROM context_entry WHERE pack_id = '${packId}'`
+    );
+  }
+
+  /**
+   * List delta entries for a pack.
+   * @param previousPackId - Previous pack ID
+   * @returns Array of context delta records
+   */
+  async listContextDeltas(
+    previousPackId: string
+  ): Promise<Record<string, unknown>[]> {
+    return this._sql(
+      `SELECT * FROM context_delta WHERE previous_pack_id = '${previousPackId}'`
+    );
+  }
+
+  /**
    * Store a context pack (named collection of memories).
    * @param workspaceId - Workspace ID
    * @param name - Context pack name
