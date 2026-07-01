@@ -1140,6 +1140,17 @@ export class Client {
   }
 
   /**
+   * Batch-deactivate multiple memories in a single reducer call.
+   * Much faster than N sequential ``deleteMemory()`` calls.
+   * Missing IDs are silently skipped (idempotent).
+   * @param memoryIds - Array of memory IDs to deactivate
+   */
+  async batchDeleteMemories(memoryIds: string[]): Promise<void> {
+    if (memoryIds.length === 0) return;
+    return this._call("batch_delete_memories", [JSON.stringify(memoryIds)]);
+  }
+
+  /**
    * Reinforce a memory (increment access count / strengthen recall).
    * @param memoryId - The memory ID to reinforce
    */
