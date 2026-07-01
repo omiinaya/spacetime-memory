@@ -699,6 +699,174 @@ pub fn hybrid_search(
     }
 
         Ok(())
+
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Reducer: temporal_search_with_weight
+// ---------------------------------------------------------------------------
+
+/// Time-weighted memory retrieval with configurable recency weight.
+///
+/// Like the ``"temporal"`` strategy inside `hybrid_search`, but with:
+/// - Exponential recency boost controlled by `recency_weight` (0.0-1.0)
+/// - Optional `time_context`: "recent", "last_week", "last_month", or "" (no filter)
+/// - Produces rows in the `HybridResult` table, keyed by an ad-hoc query_hash
+///   that includes the recency_weight value (so different weights produce
+///   separate result sets).
+///
+/// Results are sorted by recency-weighted score descending.
+#[reducer]
+pub fn temporal_search_with_weight(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    query: String,
+    query_embedding_json: String,
+    memory_type: String,
+    tier: String,
+    limit: u32,
+    recency_weight: f64,
+    time_context: String,
+) -> Result<(), String> {
+    trace_span!(ctx, "temporal_search_with_weight", TracingSpanKind::Read, &workspace_id, {
+        let _account = require_auth(ctx)?;
+        let now = now_micros(ctx);
+        let limit = if limit == 0 { 10 } else { limit };
+        let recency_weight = recency_weight.clamp(0.0, 1.0);
+
+        // Build a unique query hash that includes recency_weight
+        let qhash = format!(
+            "tw:{}:{}",
+            crate::hybrid_query::query_hash(&query),
+            (recency_weight * 100.0) as u32
+        );
+
+        // Parse time_context into a temporal filter (in micros since epoch)
+        let min_created_at: i64 = match time_context.as_str() {
+            "recent" => now - 86_400_000_000,          // last 24 hours
+            "last_week" => now - 7 * 86_400_000_000,   // last 7 days
+            "last_month" => now - 30 * 86_400_000_000,  // last 30 days
+            "last_3_months" => now - 90 * 86_400_000_000,
+            "last_year" => now - 365 * 86_400_000_000,
+            _ => 0, // no filter
+        };
+
+        // Clear previous results for this (workspace, query_hash)
+        let old: Vec<_> = ctx
+            .db
+            .hybrid_result()
+            .iter()
+            .take(crate::MAX_RESULTS)
+            .filter(|r| r.workspace_id == workspace_id && r.query_hash == qhash)
+            .collect();
+        for r in old {
+            ctx.db.hybrid_result().id().delete(r.id);
+        }
+
+        let workspace_context = ctx
+            .db
+            .workspace()
+            .id()
+            .find(&workspace_id)
+            .map(|ws| ws.context)
+            .unwrap_or_default();
+
+        // Collect memories matching filters
+        let query_emb = crate::hybrid_query::parse_embedding_json(&query_embedding_json);
+
+        let mut scored: Vec<(f64, String, String, String)> = Vec::new();
+
+        for m in ctx.db.memory().iter().take(crate::MAX_RESULTS) {
+            if m.workspace_id != workspace_id || !m.is_active {
+                continue;
+            }
+            if !memory_type.is_empty() && m.memory_type != memory_type {
+                continue;
+            }
+            if !tier.is_empty() && m.tier != tier {
+                continue;
+            }
+            if min_created_at > 0 && m.created_at < min_created_at {
+                continue;
+            }
+
+            // Compute age in micros (1 day = 86_400_000_000 micros)
+            let age = if now > m.created_at {
+                (now - m.created_at) as f64
+            } else {
+                0.0
+            };
+
+            // Base recency: exponential decay controlled by recency_weight.
+            // recency_weight=0.0 -> all memories score ~1.0 (no recency bias)
+            // recency_weight=1.0 -> strong exponential decay over time
+            // Half-life: 7 days in micros
+            let half_life: f64 = 7.0 * 86_400_000_000.0;
+            let recency_score = if recency_weight > 0.0 {
+                (-age / half_life).exp()
+            } else {
+                1.0
+            };
+            // Blend: weight=0.0 -> always 1.0; weight=1.0 -> full exponential
+            let blended_recency = 1.0 - recency_weight + recency_weight * recency_score;
+
+            // Semantic boost if query embedding is available
+            let semantic_boost = if !query_emb.is_empty() {
+                if let Some(si) = ctx
+                    .db
+                    .search_index()
+                    .iter()
+                    .take(crate::MAX_RESULTS)
+                    .find(|si| si.entity_type == "memory" && si.entity_id == m.id)
+                {
+                    let stored_emb = crate::hybrid_query::parse_embedding_json(&si.embedding_json);
+                    if stored_emb.len() == query_emb.len() {
+                        crate::hybrid_query::cosine_similarity(&query_emb, &stored_emb)
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+
+            // Final score: blend recency (70%) with semantic relevance (30%)
+            let score = 0.7 * blended_recency + 0.3 * semantic_boost;
+
+            scored.push((score, m.id.clone(), m.content.clone(), m.context.clone()));
+        }
+
+        // Sort by score descending, take top limit
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(limit as usize);
+
+        for (score, entity_id, content, context) in &scored {
+            let context_json = format!(
+                "{{\"workspace_context\":{},\"memory_context\":{}}}",
+                serde_json::to_string(&workspace_context)
+                    .unwrap_or_else(|_| "\"\"".to_string()),
+                serde_json::to_string(context)
+                    .unwrap_or_else(|_| "\"\"".to_string()),
+            );
+
+            ctx.db.hybrid_result().insert(HybridResult {
+                id: uuid_v7(ctx),
+                workspace_id: workspace_id.clone(),
+                query_hash: qhash.clone(),
+                entity_type: "memory".to_string(),
+                entity_id: entity_id.clone(),
+                content: content.clone(),
+                score: *score,
+                strategy: format!("temporal_weighted_{}", (recency_weight * 100.0) as u32),
+                context_json,
+                created_at: now,
+            });
+        }
+
+        Ok(())
     })
 }
 
