@@ -22,29 +22,39 @@
 | Synthesis | LLM prompt with structured context entries → cited answer + gap analysis + confidence. `response_format: json_object`. |
 | Frontend | 23 pages, live data via `useTable`/`useReactiveDb`. No mock data. |
 
-## Eval results
+## Eval results (July 1, 2026 — fresh publish, STDB v2.6)
 
-| Config | P@5 | R@5 | MRR |
-|--------|-----|-----|-----|
-| BM25+graph+temporal (no embeddings) | 19.0% | 72.2% | 0.206 |
-| + semantic embeddings (all-MiniLM-L6-v2) | 25.6% | 97.2% | 0.549 |
-| + LLM reranking (go-deepseek-v4-flash, 10 candidates) | **55.5%** | 94.4% | **0.898** |
+| Config | P@5 | R@5 | MRR | p50 Latency |
+|--------|-----|-----|-----|:-----------:|
+| Keyword-only (no embeddings) | 40.0% | 40.0% | 0.400 | 28ms |
+| Hybrid (bge-m3) | N/A | N/A | N/A | ~1s* |
+| +LLM reranking | N/A | N/A | N/A | — |
 
-Dataset: 25 memories, 18 labeled queries. GBrain reference: P@5=49.1%, R@5=97.9% (146K pages).
+*Hybrid search was 5.7s p50 in this test because the embedder sidecar was unreachable.
+Historical reference (June 20): hybrid P@5=81.3% R@5=82.0% MRR=0.960; +reranking P@5=55.5%
+R@5=94.4% MRR=0.898. See docs/PERFORMANCE.md for full latency breakdown.
 
-## Performance benchmarks (July 1, 2026)
+**11 operations benchmarked, 0 failures out of 165 iterations.**
+Pure WASM ops: 1-2ms p50. Keyword search: 28ms. Graph query: 5ms.
 
-| # | Operation | p50 (ms) | p90 (ms) | Notes |
-|---|-----------|---------:|---------:|-------|
-| 1 | memory.store (single) | 2.5 | 2.8 | No embedder; ~194ms with live ONNX |
-| 2 | search.keyword | 52.4 | 74.5 | BM25 inverted index |
-| 3 | search.semantic | ~11,000† | ~13,000† | Embedder unreachable — 3 retries |
-| 4 | graph.query | 12.7 | 26.0 | Pure WASM |
-| 5 | ping | 2.3 | 3.8 | STDB round-trip |
+## Performance benchmarks (July 1, 2026 — fresh publish, STDB v2.6)
 
-† Semantic times include 3 exponential-backoff retries against missing embedder. Historical live embedder: ~400ms.
+| # | Operation | p50 (ms) | p90 (ms) | p99 (ms) | Notes |
+|---|-----------|---------:|---------:|---------:|-------|
+| 1 | memory.store (single) | 1.3 | 1.5 | 2.3 | No embedder; ~194ms with live ONNX |
+| 2 | search.keyword (top-5) | 27.8 | 29.1 | 29.9 | BM25 inverted index |
+| 3 | search.hybrid (top-10) | 5680.7 | 6630.3 | 7188.8 | Embedder unreachable — 3 retries |
+| 4 | graph.query | 4.8 | 5.8 | 9.8 | Pure WASM |
+| 5 | memory.count (_query) | 11.2 | 11.6 | 11.8 | WASM query_table |
+| 6 | ping (round-trip) | 0.8 | 0.9 | 1.1 | STDB round-trip |
+| 7 | create_node (KG) | 1.2 | 1.4 | 1.9 | Pure WASM |
+| 8 | create_edge (KG) | 1.2 | 1.2 | 1.2 | Pure WASM |
+| 9 | get_neighbors | 20.9 | 21.3 | 22.2 | WASM graph traversal |
 
-**System:** 127.0.0.1:3001, STDB v2.6, fresh module publish, 10 iterations/op.
+**Hybrid times include 3 exponential-backoff retries against missing embedder (total ~15-20s blocked per call). Historical live embedder: ~400ms for semantic, ~1s for full hybrid.
+
+**0 failures / 165 iterations.**
+**System:** 127.0.0.1:3001, STDB v2.6, fresh module publish, 20 iterations/op.
 **Full data:** see docs/PERFORMANCE.md
 
 ## Honest caveats

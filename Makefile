@@ -76,7 +76,7 @@ bench:  ## Run performance benchmark (needs live STDB on :3001)
 		echo "spacetime-memory not published. Run: cd server/spacetimedb && spacetime publish spacetime-memory --yes -p . --delete-data=never"; \
 		exit 1; \
 	fi; \
-	PYTHONPATH=sdk/python SPACETIMEDB_DB=$$DB python3 scripts/benchmark.py
+	PYTHONPATH=sdk/python DB_ID=$$DB HOST=localhost PORT=3001 ITERATIONS=20 python3 sdk/python/scripts/benchmark_runner.py
 
 smoke:  ## Run end-to-end smoke test (needs live STDB on :3001)
 	@PYTHONPATH=$(CURDIR)/sdk/python python3 $(CURDIR)/sdk/python/tests/smoke_test.py
