@@ -1019,6 +1019,120 @@ class Client:
         return self._call("revoke_space_access", [workspace_id, peer_id])
 
     # -----------------------------------------------------------------------
+    # Auth / Account
+    # -----------------------------------------------------------------------
+
+    def register(
+        self, username: str, display_name: str = "", password: str = ""
+    ) -> dict[str, Any]:
+        """Register a new account. First user becomes admin.
+
+        Args:
+            username: Unique username for the account.
+            display_name: Optional display name (defaults to username).
+            password: Password (minimum 6 characters). If empty, generates
+                a warning — the Rust reducer enforces >=6 chars.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("register", [username, display_name, password])
+
+    def login(self, username: str, password: str) -> dict[str, Any]:
+        """Login with username + password. Links this identity to the account.
+
+        After a successful login, the caller's identity is associated with
+        this account. A new identity token is captured from the response
+        headers automatically by :meth:`_call`.
+
+        Args:
+            username: Account username.
+            password: Account password.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("login", [username, password])
+
+    def logout(self) -> dict[str, Any]:
+        """Logout — detach the current identity from its account.
+
+        After logout, the caller must re-login to access gated features.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("logout", [])
+
+    def update_account(
+        self,
+        display_name: str = "",
+        current_password: str = "",
+        new_password: str = "",
+    ) -> dict[str, Any]:
+        """Update account display name and/or password.
+
+        Args:
+            display_name: New display name (empty = no change).
+            current_password: Current password (required for verification).
+            new_password: New password (empty = no change, min 6 chars).
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("update_account", [display_name, current_password, new_password])
+
+    def deactivate_account(self, password: str) -> dict[str, Any]:
+        """Deactivate (soft-delete) this account.
+
+        The account remains in the database with ``is_active = false``,
+        preventing future logins. Cannot be reversed through the API.
+
+        Args:
+            password: Account password (required for verification).
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("deactivate_account", [password])
+
+    def promote_admin(self, target_identity: str) -> dict[str, Any]:
+        """Promote a user to admin. Caller must be an existing admin.
+
+        Args:
+            target_identity: The identity hex string of the user to promote.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("promote_admin", [target_identity])
+
+    def demote_admin(self, target_identity: str) -> dict[str, Any]:
+        """Demote an admin to regular user. Caller must be an existing admin.
+
+        Cannot demote yourself. At least one admin must always remain.
+
+        Args:
+            target_identity: The identity hex string of the admin to demote.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("demote_admin", [target_identity])
+
+    def list_admins(self) -> list[dict[str, Any]]:
+        """List all admin accounts.
+
+        Results are read from the admin_result public table after calling
+        the reducer.
+
+        Returns:
+            List of admin account records.
+        """
+        self._call("list_admins", [])
+        return self._query("admin_result")
+
+    # -----------------------------------------------------------------------
     # Memory
     # -----------------------------------------------------------------------
 

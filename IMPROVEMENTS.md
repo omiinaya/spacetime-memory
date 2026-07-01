@@ -13,19 +13,13 @@ npm publish workflow exists but NPM_TOKEN hasn't been set in GitHub secrets.
 Files: sdk/typescript/package.json, .github/workflows/npm-publish.yml
 Difficulty: Easy
 Est: 15min
+BLOCKED: requires GitHub secrets to be set (NPM_TOKEN)
 
 ### P1: Publish benchmark scores (LongMemEval, LoCoMo, BEAM)
 Biggest credibility gap vs Mem0, Hindsight, Supermemory.
-Files: scripts/benchmark.py (exists, needs integration) — NOTE: file doesn't actually exist yet
+Files: scripts/retrieval_benchmark.py exists; scripts/benchmark.py doesn't exist yet
 Difficulty: Hard
 Est: 1-2 weeks
-
-### P2: Python — Add 77 missing Rust reducers to SDK
-Auth (9), replication (10), sessions (5), peers (3), connectors (3), messages (2),
-harmonics (3), change events (3), context deltas (2), + ~37 miscellaneous.
-Files: sdk/python/spacetime_memory/client.py + Rust files
-Difficulty: Hard
-Est: 4-8h
 
 ### P3: Bi-temporal fact tracking — Graphiti-style temporal facts
 Graphiti's strongest differentiator. Needs: fact valid_from/valid_to columns + auto-invalidation reducer.
@@ -33,7 +27,26 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
+### P3: Python SDK — Add public auth method wrappers
+register(), login(), logout(), deactivate_account(), update_account(),
+promote_admin(), demote_admin(), list_admins(), create_api_key(),
+deactivate_api_key(), list_api_keys() only accessible via raw _call.
+Add typed public methods with docstrings.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 20min
+
 ## Recently Completed
+
+### P2: Python — Add 77 missing Rust reducers to SDK
+All 162 Rust reducers now have corresponding Python _call() wrappers or
+high-level public methods. Auth (9), replication (10), sessions (5),
+peers (3), connectors (3), messages (2), harmonics (3), change events (3),
+context deltas (2), consolidation (9), knowledge graph (12), and ~37
+miscellaneous all covered.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Hard
+Est: 4-8h
 
 ### P3: Python — Replace 6 `Any` type annotations with proper Protocols
 plugin_manager: Any, event_bus: Any, query_cache: Any, local_llm: Any,
@@ -75,7 +88,7 @@ Difficulty: Medium
 Est: 30min
 
 ### P1: TypeScript — Fix SQL injection vulnerability
-All SQL queries migrated from raw string interpolation (`${esc()}`) to parameterized `_sqlExec(':param')`. Fixed critical `esc()` backslash regex bug (`/\\\\\\\\/g` → `/\\\\/g`) that missed single backslashes. 46 queries converted, 44 `_sqlExec()` calls now serve all public methods.
+All SQL queries migrated from raw string interpolation (`${esc()}`) to parameterized `_sqlExec(':param')`. Fixed critical `esc()` backslash regex bug (`/\\\\\\\\\\\\\\\\/g` → `/\\\\\\\\/g`) that missed single backslashes. 46 queries converted, 44 `_sqlExec()` calls now serve all public methods.
 Files: sdk/typescript/client.ts
 Difficulty: Medium
 Est: 30min
