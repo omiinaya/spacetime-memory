@@ -3458,6 +3458,64 @@ def get_decay_config(workspace_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Retrieval enhancement tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def cross_encoder_rerank(
+    query: str,
+    candidates_json: str,
+    content_key: str = "memory_content",
+    top_k: int = 20,
+) -> str:
+    """Re-rank candidate memories using a cross-encoder for precision.
+
+    Uses a local cross-encoder model (``CrossEncoderReranker`` singleton)
+    to score each candidate's relevance to the query, producing a more
+    accurate ranking than cosine-similarity-based semantic search alone.
+
+    Args:
+        query: The query string to evaluate relevance against.
+        candidates_json: JSON array of candidate dicts to re-rank.
+            Each candidate should contain the field specified by
+            *content_key* (default: ``memory_content``).
+            Example: ``'[{"memory_content": "...", "id": "..."}]'``
+        content_key: Which field in each candidate contains the text
+            to score (default: ``memory_content``).
+        top_k: Max number of top-scoring candidates to return
+            (default: 20).
+
+    Returns:
+        JSON string with re-ranked candidates sorted by cross-encoder
+        score (descending), each with a ``cross_encoder_score`` field.
+    """
+    import json as _json
+
+    try:
+        candidates = _json.loads(candidates_json)
+    except (json.JSONDecodeError, TypeError):
+        return (
+            "Error: candidates_json must be a valid JSON array, "
+            "e.g. '[{\"memory_content\": \"...\", \"id\": \"...\"}]'"
+        )
+    if not isinstance(candidates, list):
+        return "Error: candidates_json must be a JSON array."
+
+    # Lazy import to avoid hard dependency on torch/transformers
+    from spacetime_memory.cross_encoder import cross_encoder_rerank as _rerank
+
+    result = _rerank(
+        query=query,
+        candidates=candidates,
+        content_key=content_key,
+        top_k=top_k,
+    )
+    return _json.dumps(result, default=str)
+
+
+# ---------------------------------------------------------------------------
 # Diagnostic tools
 # ---------------------------------------------------------------------------
 
