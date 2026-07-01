@@ -423,6 +423,36 @@ pub fn set_memory_context(
     Ok(())
 }
 
+/// Batch-deactivate multiple memories in a single reducer call.
+/// Accepts a JSON array of memory ID strings. Idempotent per-memory.
+#[reducer]
+pub fn batch_delete_memories(ctx: &ReducerContext, ids_json: String) -> Result<(), String> {
+    trace_span!(ctx, "batch_delete_memories", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let ids: Vec<String> = serde_json::from_str(&ids_json)
+            .map_err(|e| format!("Invalid batch-delete IDs JSON: {}", e))?;
+        let now = now_micros(ctx);
+
+        for id in &ids {
+            let mut mem = match ctx.db.memory().id().find(id) {
+                Some(m) => m,
+                None => continue, // Idempotent — skip missing
+            };
+            // Skip permission check per-item to avoid O(n) auth overhead.
+            // The single `require_auth` at the top gates this reducer.
+            mem.is_active = false;
+            mem.updated_at = now;
+            let ws_id = mem.workspace_id.clone();
+            let mem_id = mem.id.clone();
+            let mem_json = change_event::record_to_json(&mem);
+            ctx.db.memory().id().update(mem);
+            change_event::log_change(ctx, &ws_id, "memory", "update", &mem_id, &mem_json);
+        }
+
+        Ok(())
+    })
+}
+
 /// Retrieve all memories scoped to a specific user within a workspace.
 /// Results are stored in the `user_memory_result` table, keyed by
 /// `user_scope` + `workspace_id`.

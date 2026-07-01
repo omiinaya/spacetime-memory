@@ -2513,6 +2513,27 @@ class Client:
                 return {"status": "ok", "note": "already deleted"}
             raise
 
+    def batch_delete_memories(self, memory_ids: list[str]) -> dict[str, Any]:
+        """Batch-deactivate multiple memories in a single reducer call.
+
+        Much faster than N sequential ``delete_memory()`` calls because it
+        sends all IDs in one network round-trip to the
+        ``batch_delete_memories`` reducer.
+
+        Parameters
+        ----------
+        memory_ids:
+            List of memory ID strings to deactivate. Missing IDs are
+            silently skipped (idempotent).
+
+        Returns
+        -------
+        Dict with ``status``: ``"ok"`` on success.
+        """
+        if not memory_ids:
+            return {"status": "ok", "note": "no IDs provided"}
+        return self._call("batch_delete_memories", [json.dumps(memory_ids)])
+
     def update_memory_tier(self, memory_id: str, tier: str) -> dict[str, Any]:
         """Change a memory's compression tier.
 

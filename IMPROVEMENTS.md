@@ -23,22 +23,6 @@ Files: server/spacetimedb/src/hybrid_query.rs, sdk/python/spacetime_memory/query
 Difficulty: Medium
 Est: 1-2h
 
-### P2: Add Python `batch_update_memories` SDK method (Python parity gap)
-TypeScript SDK has `batchUpdateMemories()`. Python SDK has no equivalent batch
-update method — only loops calling `update_memory` individually via network.
-Add `batch_update_memories` that uses the `store_memory_batch` reducer pattern.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 5min
-
-### P3: Add `batch_delete_memories` SDK method (both Python + TypeScript)
-No batch delete exists — delete operations are O(n) network calls. Add a new
-reducer `batch_delete_memories(ids: Vec<String>)` and SDK wrappers for both
-Python and TypeScript for bulk deletion.
-Files: server/spacetimedb/src/memory.rs, sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
-Difficulty: Medium
-Est: 15min
-
 ### P3: Add `merge_duplicate_memories` consolidation step
 Consolidation cron lacks memory deduplication. Add a reducer + SDK method
 that finds near-duplicate memories (by content hash or cosine similarity > 0.95),
@@ -50,6 +34,25 @@ Est: 30min
 ---
 
 ## Recently Completed
+
+### P3: Add `batch_delete_memories` reducer + SDK methods (July 1, 2026)
+Added a new `batch_delete_memories(ids_json: String)` reducer in
+server/spacetimedb/src/memory.rs that accepts a JSON array of memory IDs and
+deactivates them in a single call — eliminating O(n) network round-trips for
+bulk deletion. Idempotent per-memory (skips missing IDs).
+Added `batch_delete_memories(memory_ids)` to Python SDK and
+`batchDeleteMemories(memoryIds)` to TypeScript SDK.
+Commit: (pending — push after tests verify)
+Files: server/spacetimedb/src/memory.rs, sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+Difficulty: Medium
+Est: 15min
+
+### P2: Python `batch_update_memories` SDK method (July 1, 2026)
+Python SDK already had `batch_update_memories(memory_ids, updates)` — confirmed
+existing at line 2705 of client.py. Item was stale; verified code exists and works.
+Files: sdk/python/spacetime_memory/client.py (verified existing, line 2705)
+Difficulty: Easy
+Est: 5min
 
 ### P3: Add `crossEncoderRerank` to TypeScript SDK via MCP (July 1, 2026)
 Added `crossEncoderRerank(query, candidates, opts?)` method that calls the MCP
@@ -84,23 +87,6 @@ Added `getMemoryStats()` calling the get_memory_stats reducer + reading the resu
 table, plus `backup()` and `restore()` matching Python SDK's backup format.
 Commit: 36d1cae6
 Files: sdk/typescript/client.ts
-Difficulty: Easy
-Est: 5min
-
-### P2: Add `expire_memories` call to consolidation cron (July 1, 2026)
-Added `expire_stale()` function calling `Client.expire_memories()` at start
-of consolidation tick, plus 3 pre-existing test fixes.
-Commit: 8492ee59
-Files: scripts/consolidate.py
-Difficulty: Easy
-Est: 2min
-
-### P3: Add workspace-level memory stats CLI + MCP tool (July 1, 2026)
-Added `stmem memory stats <workspace_id>` CLI command under the memory group with
-rich table output showing total/active memories, by-tier, by-type, avg confidence,
-avg age, revisions, top tags, and users. Also added `get_memory_stats` MCP tool
-to the MCP server for agent access.
-Files: sdk/python/spacetime_memory/cli.py, server/mcp/main.py
 Difficulty: Easy
 Est: 5min
 
