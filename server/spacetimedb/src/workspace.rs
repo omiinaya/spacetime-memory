@@ -3,6 +3,8 @@ use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4_uniq};
 use crate::auth;
+use crate::memory::memory;
+use crate::tag::{tag, memory_tag};
 
 /// A workspace representing a project, agent-world, or sandbox.
 #[table(accessor = workspace)]

@@ -3155,6 +3155,29 @@ export class Client {
     return this._call("delete_tag", [tagId]);
   }
 
+  /**
+   * List all tags attached to a specific memory.
+   * @param memoryId - Memory ID to look up
+   * @returns Array of tag records with tag_id, tag_name, tag_color
+   */
+  async listTagsByMemory(memoryId: string): Promise<Record<string, unknown>[]> {
+    await this._call("list_tags_by_memory", [memoryId]);
+    return this._sqlExec(
+      `SELECT id, memory_id, tag_id, tag_name, tag_color FROM memory_tag_result WHERE memory_id = :mid`,
+      { mid: memoryId },
+    );
+  }
+
+  /**
+   * Update a tag's name and/or color.
+   * @param tagId - Tag ID to update
+   * @param name - New display name (empty string leaves unchanged)
+   * @param color - New hex color string (default: "#808080")
+   */
+  async updateTag(tagId: string, name: string = "", color: string = "#808080"): Promise<void> {
+    return this._call("update_tag", [tagId, name, color]);
+  }
+
   // -----------------------------------------------------------------------
   // Directories
   // -----------------------------------------------------------------------
