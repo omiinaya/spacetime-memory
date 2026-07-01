@@ -186,6 +186,15 @@ def detect_communities(workspace_id: str) -> bool:
         return False
 
 
+def expire_stale() -> bool:
+    """Expire all memories past their expires_at timestamp."""
+    try:
+        result = _c().expire_memories()
+        return bool(result.get("ok", result.get("deactivated", 0) > 0))
+    except RuntimeError:
+        return False
+
+
 def run_all(workspace_id: str | None = None) -> dict[str, Any]:
     if workspace_id:
         ws_list = [{"id": workspace_id}]
@@ -197,7 +206,12 @@ def run_all(workspace_id: str | None = None) -> dict[str, Any]:
         "decayed": 0, "reinforced": 0,
         "consolidated": 0, "god_nodes": 0, "communities": 0,
         "replication_cleaned": 0, "embeddings_backfilled": 0,
+        "expired": 0,
     }
+
+    # Expire stale memories globally before per-workspace operations
+    if expire_stale():
+        results["expired"] = 1
 
     for ws in ws_list:
         wid = ws["id"]
@@ -241,4 +255,5 @@ if __name__ == "__main__":
           f"{results['god_nodes']} god-node updates, "
           f"{results['communities']} community detections, "
           f"{results['replication_cleaned']} replication log cleanups, "
-          f"{results['embeddings_backfilled']} embeddings backfilled")
+          f"{results['embeddings_backfilled']} embeddings backfilled, "
+          f"{'expired' if results['expired'] else 'no expired'} memories")

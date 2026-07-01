@@ -4073,6 +4073,7 @@ class Client:
 
         # Index the note into search_index so hybrid search finds it
         if result.get("status") == "ok" and content.strip():
+            note_id = ""
             try:
                 # Resolve the note ID by content match (same pattern as store_memory)
                 notes = self._query(
