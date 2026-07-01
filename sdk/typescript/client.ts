@@ -1506,6 +1506,327 @@ export class Client {
   }
 
   // -----------------------------------------------------------------------
+  // Profiles & Facts
+  // -----------------------------------------------------------------------
+
+  /**
+   * Add a fact to a peer's profile (appended to static_facts_json array).
+   * @param peerId - Peer identity
+   * @param fact - Fact text to add
+   */
+  async addProfileFact(peerId: string, fact: string): Promise<void> {
+    return this._call("add_profile_fact", [peerId, fact]);
+  }
+
+  /**
+   * Add dynamic context to a peer's profile.
+   * @param peerId - Peer identity
+   * @param context - Context text to add
+   */
+  async addDynamicContext(peerId: string, context: string): Promise<void> {
+    return this._call("add_dynamic_context", [peerId, context]);
+  }
+
+  /**
+   * Get a peer's profile by peer_id.
+   * @param peerId - Peer identity
+   * @returns Profile record or null
+   */
+  async getProfile(peerId: string): Promise<Record<string, unknown> | null> {
+    const rows = await this._sqlExec(
+      `SELECT * FROM profile WHERE id = :pid`,
+      { pid: peerId },
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * List all profiles in a workspace.
+   * @param workspaceId - Workspace ID
+   * @returns Array of profile records
+   */
+  async listProfiles(workspaceId: string): Promise<Record<string, unknown>[]> {
+    return this._sqlExec(
+      `SELECT p.* FROM profile p INNER JOIN peer pr ON p.id = pr.id WHERE pr.workspace_id = :ws`,
+      { ws: workspaceId },
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Context & Utilities
+  // -----------------------------------------------------------------------
+
+  /**
+   * Attach a context string to a workspace.
+   * @param workspaceId - Workspace ID
+   * @param context - Context text
+   */
+  async setWorkspaceContext(
+    workspaceId: string,
+    context: string
+  ): Promise<void> {
+    return this._call("set_workspace_context", [workspaceId, context]);
+  }
+
+  /**
+   * Attach a context string to a memory.
+   * @param memoryId - Memory ID
+   * @param context - Context text
+   */
+  async setMemoryContext(
+    memoryId: string,
+    context: string
+  ): Promise<void> {
+    return this._call("set_memory_context", [memoryId, context]);
+  }
+
+  /**
+   * Get the context chain for a memory (parents, ancestors).
+   * @param memoryId - Memory ID
+   * @returns Context chain record or empty
+   */
+  async getContextChain(memoryId: string): Promise<Record<string, unknown>[]> {
+    await this._call("get_context_chain", [memoryId]);
+    return this._sqlExec(
+      `SELECT * FROM context_chain_result WHERE memory_id = :mid`,
+      { mid: memoryId },
+    );
+  }
+
+  /**
+   * Add an alias to an existing entity link.
+   * @param entityLinkId - Entity link ID
+   * @param alias - Alias text to add
+   */
+  async addAlias(entityLinkId: string, alias: string): Promise<void> {
+    return this._call("add_alias", [entityLinkId, alias]);
+  }
+
+  /**
+   * Create an entity link that maps an alias to an identity.
+   * @param workspaceId - Workspace ID
+   * @param name - Entity name
+   * @param identity - Identity to link to
+   */
+  async createEntityLink(
+    workspaceId: string,
+    name: string,
+    identity: string
+  ): Promise<void> {
+    return this._call("create_entity_link", [workspaceId, name, identity]);
+  }
+
+  /**
+   * Get a KG node by ID.
+   * @param nodeId - Node ID
+   * @returns Array containing the node record (or empty)
+   */
+  async getNode(nodeId: string): Promise<Record<string, unknown>[]> {
+    return this._sqlExec(
+      `SELECT * FROM kg_node WHERE id = :nid`,
+      { nid: nodeId },
+    );
+  }
+
+  /**
+   * Get a note by its date string (YYYY-MM-DD).
+   * @param noteDate - Date string in YYYY-MM-DD format
+   * @returns Array of matching note records
+   */
+  async getNoteByDate(noteDate: string): Promise<NoteRecord[]> {
+    return (await this._sqlExec(
+      `SELECT * FROM note WHERE note_date = :nd AND is_active = true`,
+      { nd: noteDate },
+    )) as NoteRecord[];
+  }
+
+  /**
+   * Find a note by exact title.
+   * @param title - Exact note title
+   * @returns Array of matching note records
+   */
+  async getNoteByTitle(title: string): Promise<NoteRecord[]> {
+    return (await this._sqlExec(
+      `SELECT * FROM note WHERE title = :t AND is_active = true`,
+      { t: title },
+    )) as NoteRecord[];
+  }
+
+  /**
+   * Get neighbouring nodes of a node via reducer (results in graph_traversal_result).
+   * @param workspaceId - Workspace ID
+   * @param nodeId - Node ID
+   */
+  async getNeighborsViaReducer(
+    workspaceId: string,
+    nodeId: string
+  ): Promise<void> {
+    return this._call("get_neighbors", [workspaceId, nodeId]);
+  }
+
+  /**
+   * List sessions a peer has participated in.
+   * @param peerId - Peer identity
+   * @returns Array of session records with role and joined_at
+   */
+  async getPeerSessions(peerId: string): Promise<Record<string, unknown>[]> {
+    const parts = await this._sqlExec(
+      `SELECT session_id, role, joined_at FROM session_participant WHERE peer_id = :pid`,
+      { pid: peerId },
+    );
+    const results: Record<string, unknown>[] = [];
+    for (const sp of parts) {
+      const sessions = await this._sqlExec(
+        `SELECT * FROM session WHERE id = :sid`,
+        { sid: sp.session_id as string },
+      );
+      for (const s of sessions) {
+        s.role = sp.role ?? "";
+        s.joined_at = sp.joined_at ?? 0;
+        results.push(s);
+      }
+    }
+    results.sort((a, b) => ((b.joined_at ?? 0) as number) - ((a.joined_at ?? 0) as number));
+    return results;
+  }
+
+  /**
+   * Retrieve messages for a session.
+   * @param sessionId - Session ID
+   * @returns Array of message records sorted by created_at
+   */
+  async getSessionMessages(sessionId: string): Promise<Record<string, unknown>[]> {
+    const rows = await this._sqlExec(
+      `SELECT * FROM message WHERE session_id = :sid ORDER BY created_at ASC`,
+      { sid: sessionId },
+    );
+    return rows;
+  }
+
+  /**
+   * Compute PageRank centrality for all nodes in a workspace.
+   * @param workspaceId - Workspace ID
+   * @param damping - PageRank damping factor (default: 0.85)
+   * @param maxIterations - Maximum iterations (default: 100)
+   */
+  async computePageRank(
+    workspaceId: string,
+    damping?: number,
+    maxIterations?: number
+  ): Promise<void> {
+    return this._call("compute_pagerank", [
+      workspaceId,
+      damping ?? 0.85,
+      maxIterations ?? 100,
+    ]);
+  }
+
+  /**
+   * Compute knowledge graph statistics for a workspace.
+   * @param workspaceId - Workspace ID
+   * @returns Stats record or null
+   */
+  async computeKgStats(workspaceId: string): Promise<Record<string, unknown> | null> {
+    await this._call("compute_kg_stats", [workspaceId]);
+    const rows = await this._sqlExec(
+      `SELECT * FROM kg_stats_result WHERE workspace_id = :ws`,
+      { ws: workspaceId },
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * Compute community hierarchy for a workspace.
+   * @param workspaceId - Workspace ID
+   */
+  async computeCommunityHierarchy(workspaceId: string): Promise<void> {
+    return this._call("compute_community_hierarchy", [workspaceId]);
+  }
+
+  /**
+   * Approve a merge suggestion.
+   * @param suggestionId - Suggestion ID to approve
+   */
+  async approveMerge(suggestionId: string): Promise<void> {
+    return this._call("approve_merge", [suggestionId]);
+  }
+
+  /**
+   * Reject a merge suggestion.
+   * @param suggestionId - Suggestion ID to reject
+   */
+  async rejectMerge(suggestionId: string): Promise<void> {
+    return this._call("reject_merge", [suggestionId]);
+  }
+
+  /**
+   * Resolve an entity name to its identity via alias resolution.
+   * @param workspaceId - Workspace ID
+   * @param name - Entity name to resolve
+   */
+  async resolveEntity(workspaceId: string, name: string): Promise<void> {
+    return this._call("resolve_entity", [workspaceId, name]);
+  }
+
+  /**
+   * Get decay configuration for a workspace.
+   * @param workspaceId - Workspace ID
+   * @returns Decay config record or null
+   */
+  async getDecayConfig(workspaceId: string): Promise<Record<string, unknown> | null> {
+    const rows = await this._sqlExec(
+      `SELECT * FROM workspace_config WHERE id = :wsid`,
+      { wsid: workspaceId },
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * Get reputation stats for a peer.
+   * @param peerId - Peer identity
+   * @returns Reputation record or null
+   */
+  async getPeerReputation(peerId: string): Promise<Record<string, unknown> | null> {
+    const rows = await this._sqlExec(
+      `SELECT * FROM peer_reputation WHERE id = :pid`,
+      { pid: peerId },
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * Quick connectivity check against SpacetimeDB.
+   * @returns Status record
+   */
+  async ping(): Promise<Record<string, unknown>> {
+    return this._callWithResult("ping", []).then(
+      () => ({ status: "ok" }),
+      () => ({ status: "error" }),
+    );
+  }
+
+  /**
+   * Set the decay model configuration for a workspace.
+   * @param workspaceId - Workspace ID
+   * @param modelType - Decay model type (e.g. "exponential", "linear")
+   * @param halfLife - Half-life in seconds
+   * @param maxStrength - Maximum strength value
+   */
+  async setDecayModel(
+    workspaceId: string,
+    modelType: string,
+    halfLife: number,
+    maxStrength: number
+  ): Promise<void> {
+    return this._call("set_decay_model", [
+      workspaceId,
+      modelType,
+      halfLife,
+      maxStrength,
+    ]);
+  }
+
+  // -----------------------------------------------------------------------
   // Maintenance
   // -----------------------------------------------------------------------
 
