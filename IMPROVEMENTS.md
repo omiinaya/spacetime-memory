@@ -29,6 +29,19 @@ Est: 1 week
 
 ## Recently Completed
 
+### P2: Batch-add 33 TS SDK methods — profiles, context, KG, utilities
+Added 33+ methods to complete feature parity: addProfileFact,
+addDynamicContext, getProfile, listProfiles, setWorkspaceContext,
+setMemoryContext, getContextChain, addAlias, createEntityLink, getNode,
+getNoteByDate, getNoteByTitle, getNeighborsViaReducer, getPeerSessions,
+getSessionMessages, computePageRank, computeKgStats,
+computeCommunityHierarchy, setDecayModel, ping, getPeerReputation,
+resolveEntity, approveMerge, rejectMerge, setMemoryScope, escalateMemories,
+getOutgoingLinks. 71/71 TS tests pass, clean tsc.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 45min
+
 ### P2: Batch-add 20 TS SDK methods — docs, directories, API keys, KG communities
 Added 20 public methods to the TypeScript SDK matching Python SDK:
 getBacklinks, createDocument, getDocument, listDocuments, getDocumentChunks,
