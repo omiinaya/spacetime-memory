@@ -3921,6 +3921,68 @@ def veracity_list_cmd() -> None:
     console.print("\\n[dim]Formula: confidence = 1 - (1 - base)^sources[/dim]")
 
 
+# ===================================================================
+# tag — tag management
+# ===================================================================
+
+
+@cli.group()
+def tag() -> None:
+    """Manage tags for organizing memories."""
+
+
+@tag.command(name="list")
+@click.argument("workspace_id", required=False, default="default")
+@click.option("--json", "_json", is_flag=True, help="Output raw JSON")
+def tag_list_cmd(workspace_id: str, _json: bool) -> None:
+    """List all tags in a workspace."""
+    with console.status(f"Listing tags in workspace '{workspace_id}'..."):
+        tags = _sdk_client().list_tags(workspace_id)
+
+    if not tags:
+        _quiet_print("[yellow]No tags found in this workspace.[/yellow]")
+        return
+
+    if _json or _current_output_format == "json":
+        print_json(json.dumps(tags))
+    elif _current_output_format == "csv":
+        _print_csv(tags)
+    else:
+        table = Table(title=f"Tags in '{workspace_id}'", box=box.ROUNDED)
+        table.add_column("ID", style="dim")
+        table.add_column("Name", style="cyan")
+        table.add_column("Color")
+        table.add_column("Created", style="dim")
+        for t in tags:
+            table.add_row(
+                t.get("id", ""),
+                t.get("name", ""),
+                t.get("color", "#808080"),
+                str(t.get("created_at", "")),
+            )
+        console.print(table)
+
+
+@tag.command(name="delete")
+@click.argument("tag_id")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
+def tag_delete_cmd(tag_id: str, yes: bool) -> None:
+    """Delete a tag and all its memory associations."""
+    if not yes:
+        confirmed = click.confirm(
+            f"Delete tag '{tag_id}'? This will remove all memory associations.",
+            default=False,
+        )
+        if not confirmed:
+            _quiet_print("[yellow]Cancelled.[/yellow]")
+            return
+
+    with console.status(f"Deleting tag '{tag_id}'..."):
+        _sdk_client().delete_tag(tag_id)
+
+    _quiet_print(f"[green]Tag '{tag_id}' deleted.[/green]")
+
+
 @cli.group()
 def aaak() -> None:
     """AAAK compression — lossless LLM context shorthand.
