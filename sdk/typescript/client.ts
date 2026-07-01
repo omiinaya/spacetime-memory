@@ -1437,6 +1437,116 @@ export class Client {
     )) as NoteRecord[];
   }
 
+  /**
+   * Get version history for a note.
+   * Returns revision history from the note_revision table,
+   * ordered by version ascending, with the current state appended.
+   * @param noteId - Note ID
+   * @returns Array of revision records with previous/new title, content, timestamps
+   */
+  async getNoteHistory(noteId: string): Promise<Record<string, unknown>[]> {
+    // Fetch revision history
+    const revisions = await this._sqlExec(
+      `SELECT version, previous_title, previous_content, new_title AS title, new_content AS content, changed_at, changed_by FROM note_revision WHERE note_id = :nid ORDER BY version ASC`,
+      { nid: noteId },
+    );
+    const result: Record<string, unknown>[] = [];
+    for (const rev of revisions) {
+      result.push({
+        version: rev.version ?? 0,
+        previous_title: rev.previous_title ?? "",
+        previous_content: rev.previous_content ?? "",
+        title: rev.title ?? "",
+        content: rev.content ?? "",
+        changed_at: rev.changed_at ?? 0,
+        changed_by: rev.changed_by ?? "",
+      });
+    }
+    // Append the current state as the latest version
+    const current = await this._sqlExec(
+      `SELECT title, content, version, updated_at FROM note WHERE id = :nid`,
+      { nid: noteId },
+    );
+    if (current.length > 0) {
+      const r = current[0];
+      const currentVersion = (r.version as number) ?? 1;
+      if (result.length === 0 || (result[result.length - 1].version as number) !== currentVersion) {
+        result.push({
+          version: currentVersion,
+          previous_title: "",
+          previous_content: "",
+          title: r.title ?? "",
+          content: r.content ?? "",
+          changed_at: r.updated_at ?? 0,
+          changed_by: "",
+        });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Find the closest-matching memory by string similarity.
+   * Fetches up to *limit* memories and uses Levenshtein-like comparison
+   * to find the one with the highest similarity ratio.
+   * @param workspaceId - The workspace to search
+   * @param name - The target name to fuzzy-match against
+   * @param field - Which memory field to compare (default: "content")
+   * @param threshold - Minimum similarity ratio 0.0–1.0 (default: 0.5)
+   * @param limit - Max memories to scan (default: 50)
+   * @returns Best-matching memory record, or null if below threshold
+   */
+  async fuzzyGet(
+    workspaceId: string,
+    name: string,
+    field?: string,
+    threshold?: number,
+    limit?: number
+  ): Promise<Record<string, unknown> | null> {
+    const rows = await this._sqlExec(
+      `SELECT * FROM memory WHERE workspace_id = :ws AND is_active = true LIMIT ${limit ?? 50}`,
+      { ws: workspaceId },
+    );
+
+    if (rows.length === 0) return null;
+
+    const t = threshold ?? 0.5;
+    const f = field ?? "content";
+
+    let best: Record<string, unknown> | null = null;
+    let bestRatio = 0;
+
+    for (const r of rows) {
+      const text = ((r[f] as string) ?? "").toLowerCase();
+      const target = name.toLowerCase();
+      if (!text) continue;
+
+      // Simple dice coefficient / bigram similarity
+      const bigrams = new Map<string, number>();
+      for (let i = 0; i < text.length - 1; i++) {
+        const bg = text.substring(i, i + 2);
+        bigrams.set(bg, (bigrams.get(bg) ?? 0) + 1);
+      }
+      let intersect = 0;
+      for (let i = 0; i < target.length - 1; i++) {
+        const bg = target.substring(i, i + 2);
+        if ((bigrams.get(bg) ?? 0) > 0) {
+          intersect++;
+          bigrams.set(bg, (bigrams.get(bg) ?? 0) - 1);
+        }
+      }
+      const ratio = (2 * intersect) / (Math.max(text.length - 1, 1) + Math.max(target.length - 1, 1));
+
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        best = r as Record<string, unknown>;
+      }
+    }
+
+    if (best && bestRatio >= t) return best;
+    return null;
+  }
+
   // -----------------------------------------------------------------------
   // Backlinks & Document References
   // -----------------------------------------------------------------------
