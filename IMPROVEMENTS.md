@@ -22,17 +22,32 @@ Files: sdk/typescript/client.ts
 Difficulty: Medium
 Est: 20min
 
-### P2: Add `expire_memories` call to consolidation cron
-The `expires_at` column, `expire_memories` reducer, Python SDK param, and MCP tool all exist.
-Missing: the consolidation cron (`scripts/consolidate.py`) doesn't call `expire_memories()`
-periodically. Add a call to auto-cleanup expired memories.
-Files: scripts/consolidate.py
+### P2: Add `exportWorkspace` with full JSON format to TypeScript SDK
+Python SDK has `export()` that dumps all tables as JSON. TS `exportWorkspace()` only
+dumps notes as markdown. Add a full JSON export matching Python's backup format.
+Files: sdk/typescript/client.ts
 Difficulty: Easy
-Est: 2min
+Est: 5min
 
 ---
 
 ## Recently Completed
+
+### P2: Add getMemoryStats, backup, restore to TypeScript SDK (July 1, 2026)
+Added `getMemoryStats()` calling the get_memory_stats reducer + reading the result
+table, plus `backup()` and `restore()` matching Python SDK's backup format.
+Commit: 36d1cae6
+Files: sdk/typescript/client.ts
+Difficulty: Easy
+Est: 5min
+
+### P2: Add `expire_memories` call to consolidation cron (July 1, 2026)
+Added `expire_stale()` function calling `Client.expire_memories()` at start
+of consolidation tick, plus 3 pre-existing test fixes.
+Commit: 8492ee59
+Files: scripts/consolidate.py
+Difficulty: Easy
+Est: 2min
 
 ### P3: Add workspace-level memory stats CLI + MCP tool (July 1, 2026)
 Added `stmem memory stats <workspace_id>` CLI command under the memory group with
@@ -67,16 +82,6 @@ Commit: 0020d83e
 Files: sdk/python/pyproject.toml
 Difficulty: Easy
 Est: 1min
-
-### P2: TS SDK — Add deleteTourStop + detectPatterns; stage+commit 3 unwritten methods (July 1, 2026)
-Added 2 genuinely missing TS methods plus staged 3 previously-written methods.
-71/71 TS tests pass, clean tsc. Total TS: 149 public methods.
-Files: sdk/typescript/client.ts
-Difficulty: Easy
-Est: 20min
-
-### P0: Fixed N+1 `_enrich_content` — semantic search 3x faster (July 1, 2026)
-**Result: semantic search 7.5s → 2.5s p50 (3x speedup).**
 
 ---
 
