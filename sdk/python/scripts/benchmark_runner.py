@@ -86,9 +86,16 @@ def run(label, fn, n=N):
 
 # Seed some memories for search benchmarks
 print("Seeding test memories...")
+# Use _call directly to bypass Tantivy indexing (not running on this test setup)
 for i in range(50):
-    c.store(WORKSPACE_ID, f"Benchmark test memory number {i} for keyword and semantic searches. This is a test payload.", "experience")
+    c._call("store_memory", [WORKSPACE_ID, "", "", "experience", 
+                            f"Benchmark test memory number {i} for keyword and semantic searches. This is a test payload.",
+                            "", "[]", 0.8, "", ""])
 print(f"  Seeded 50 memories.")
+# Also index terms for BM25 keyword search
+for mem in c._query("memory", workspace_id=WORKSPACE_ID, columns=["id", "content"]):
+    c._call("index_terms", [WORKSPACE_ID, "memory", mem["id"], mem["content"]])
+print(f"  Indexed BM25 terms for {len([m for m in c._query('memory', workspace_id=WORKSPACE_ID, columns=['id'])]) if False else 'all'} memories")
 # Also create some graph nodes
 for i in range(10):
     try:
@@ -112,15 +119,16 @@ print("LATENCY BENCHMARKS")
 print("─" * 60)
 
 # 1
-run("memory.store (single, short)", lambda: c.store(WORKSPACE_ID, "Short test memory", "experience"))
+run("memory.store (single, short) [no embed]", lambda: c._call("store_memory", [WORKSPACE_ID, "", "", "experience", "Short test memory", "", "[]", 0.8, "", ""]))
 # 2
-run("memory.store (single, long)", lambda: c.store(WORKSPACE_ID, "Long " * 200 + "test memory", "experience"))
+run("memory.store (single, long) [no embed]", lambda: c._call("store_memory", [WORKSPACE_ID, "", "", "experience", "Long " * 200 + "test memory", "", "[]", 0.8, "", ""]))
 # 3
-run("memory.store (batch 10)", lambda: [c.store(WORKSPACE_ID, f"Batch item {i}", "experience") for i in range(10)], n=min(N, 10))
+run("memory.store (batch 10) [no embed]", lambda: [c._call("store_memory", [WORKSPACE_ID, "", "", "experience", f"Batch item {i}", "", "[]", 0.8, "", ""]) for i in range(10)], n=min(N, 10))
 # 4
 run("search.keyword (top-5)", lambda: c.search(WORKSPACE_ID, "test", limit=5, semantic=False))
 # 5
-run("search.hybrid (top-10)", lambda: c.search(WORKSPACE_ID, "test", limit=10, semantic=True))
+# 5
+run("search.semantic (top-5, w/ embedder)", lambda: c.search(WORKSPACE_ID, "test", limit=5, semantic=True), n=min(N, 3))
 # 6
 run("graph.query", lambda: c.query_graph(WORKSPACE_ID, "BenchNode"))
 # 7
@@ -174,9 +182,14 @@ eval_queries = [
     {"query": "Space technology", "relevant_contents": ["SpaceX successfully launched another Falcon 9 rocket carrying Starlink satellites into orbit."]},
 ]
 
-# Store eval memories
+# Store eval memories (bypassing Tantivy for speed — no Tantivy server running)
 for m in eval_memories:
-    c.store(WORKSPACE_ID, m["content"], m["type"])
+    c._call("store_memory", [WORKSPACE_ID, "", "", m["type"], m["content"], "", "[]", 0.8, "", ""])
+    # Also index terms for BM25
+    for mem in c._query("memory", workspace_id=WORKSPACE_ID, columns=["id", "content"]):
+        if mem["content"] == m["content"]:
+            c._call("index_terms", [WORKSPACE_ID, "memory", mem["id"], mem["content"]])
+            break
 
 # Wait for indexing
 time.sleep(3)
