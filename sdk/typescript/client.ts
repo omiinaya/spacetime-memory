@@ -1148,6 +1148,37 @@ export class Client {
   }
 
   /**
+   * Get profile context result for a peer (calls get_profile_context reducer).
+   * @param peerId - Peer identity
+   * @returns Profile context record or null
+   */
+  async getProfileContext(peerId: string): Promise<Record<string, unknown> | null> {
+    await this._call("get_profile_context", [peerId]);
+    const rows = await this._sqlExec(
+      `SELECT * FROM profile_context_result WHERE peer_id = :pid`,
+      { pid: peerId },
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * Get all memories scoped to a specific user within a workspace.
+   * @param userScope - User identity hash
+   * @param workspaceId - Workspace ID
+   * @returns Array of user-scoped memory records
+   */
+  async getUserMemories(
+    userScope: string,
+    workspaceId: string
+  ): Promise<Record<string, unknown>[]> {
+    await this._call("get_user_memories", [userScope, workspaceId]);
+    return this._sqlExec(
+      `SELECT * FROM user_memory_result WHERE user_scope = :us AND workspace_id = :ws`,
+      { us: userScope, ws: workspaceId },
+    );
+  }
+
+  /**
    * Consolidate multiple memories into a single memory with merged content.
    * @param workspaceId - Workspace ID
    * @param sourceIds - Array of source memory IDs to consolidate
@@ -1552,6 +1583,68 @@ export class Client {
     );
   }
 
+  /**
+   * Search profiles by static_facts or dynamic_context (client-side filter).
+   * @param workspaceId - Workspace ID
+   * @param query - Search text
+   * @param limit - Max results (default: 20)
+   * @returns Filtered array of profile records
+   */
+  async searchProfiles(
+    workspaceId: string,
+    query: string,
+    limit?: number
+  ): Promise<Record<string, unknown>[]> {
+    const profiles = await this.listProfiles(workspaceId);
+    if (query) {
+      const q = query.toLowerCase();
+      return profiles
+        .filter(
+          (r) =>
+            ((r.static_facts_json as string) ?? "").toLowerCase().includes(q) ||
+            ((r.dynamic_context_json as string) ?? "").toLowerCase().includes(q)
+        )
+        .slice(0, limit ?? 20);
+    }
+    return profiles.slice(0, limit ?? 20);
+  }
+
+  /**
+   * Create or update a peer profile.
+   * @param peerId - Peer ID
+   * @param staticFacts - JSON-encoded list of fact strings
+   * @param dynamicContext - JSON-encoded list of context strings
+   * @param preferences - JSON-encoded object of key-value preferences
+   * @param tags - JSON-encoded list of tag strings
+   */
+  async upsertProfile(
+    peerId: string,
+    staticFacts?: string,
+    dynamicContext?: string,
+    preferences?: string,
+    tags?: string
+  ): Promise<void> {
+    return this._call("upsert_profile", [
+      peerId,
+      staticFacts ?? "",
+      dynamicContext ?? "",
+      preferences ?? "",
+      tags ?? "",
+    ]);
+  }
+
+  /**
+   * Scan active memories and record merge suggestions.
+   * @param workspaceId - Workspace ID
+   * @param threshold - Minimum cosine similarity threshold (default: 0.8)
+   */
+  async suggestMerges(
+    workspaceId: string,
+    threshold?: number
+  ): Promise<void> {
+    return this._call("suggest_merges", [workspaceId, threshold ?? 0.8]);
+  }
+
   // -----------------------------------------------------------------------
   // Context & Utilities
   // -----------------------------------------------------------------------
@@ -1803,6 +1896,42 @@ export class Client {
       () => ({ status: "ok" }),
       () => ({ status: "error" }),
     );
+  }
+
+  /**
+   * Check if the embedder sidecar is running.
+   * @returns Status info with reachable flag
+   */
+  async checkEmbedderHealth(): Promise<Record<string, unknown>> {
+    try {
+      const resp = await fetch(`${this.embedderUrl}/health`, {
+        method: "GET",
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as Record<string, unknown>;
+        data.reachable = true;
+        return data;
+      }
+      return { status: "error", code: resp.status, reachable: true };
+    } catch (e) {
+      return { status: "error", message: String(e), reachable: false };
+    }
+  }
+
+  /**
+   * Comprehensive health check: SpacetimeDB + embedder.
+   * @returns Health status with per-component breakdown
+   */
+  async health(): Promise<Record<string, unknown>> {
+    const dbCheck = await this.ping();
+    const embCheck = await this.checkEmbedderHealth();
+    const allOk = dbCheck.status === "ok" && embCheck.reachable === true;
+    return {
+      status: allOk ? "ok" : "degraded",
+      database: dbCheck,
+      embedder: embCheck,
+    };
   }
 
   /**
