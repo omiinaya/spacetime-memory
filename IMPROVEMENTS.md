@@ -27,21 +27,12 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
-### P3: TypeScript SDK — Add chat/completion workspace methods
-Several workspace-level chat and completion reducers exist in Rust but may not
-have TypeScript wrappers: send_message, get_session_messages, get_peer_sessions,
-add_agent_step, delete_session_steps. Audit and fill gaps.
-Difficulty: Medium
-Est: 30min
-
-### P3: TypeScript SDK — Document chunk + document CRUD methods
-TypeScript missing addChunk, createDocument, getDocument, listDocuments,
-deleteDocument, getDocumentChunks. Python has all of these.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 20min
-
 ## Recently Completed
+
+### P2: Add 8 more TS methods — health, profiles, context, merge suggestions
+Added health(), checkEmbedderHealth(), upsertProfile(), suggestMerges(),
+searchProfiles(), getProfileContext(), getUserMemories(), getOutgoingLinks().
+71/71 TS tests pass, clean tsc. Total TS: 140 methods (was 85).
 
 ### P3: TypeScript SDK — Add citation methods (addNodeCitation, addEdgeCitation, getCitations) + fix getEdgeHistory
 Added 3 citation methods matching Python SDK parity. Also fixed getEdgeHistory
