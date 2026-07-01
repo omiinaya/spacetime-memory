@@ -3111,6 +3111,28 @@ export class Client {
   }
 
   /**
+   * Batch-attach a tag to multiple memories in a single reducer call.
+   * Eliminates O(n) network round-trips for bulk tagging.
+   * @param tagId - Tag ID
+   * @param memoryIds - Array of memory ID strings to tag (already-tagged are skipped, idempotent)
+   */
+  async batchTagMemories(tagId: string, memoryIds: string[]): Promise<void> {
+    if (memoryIds.length === 0) return;
+    return this._call("batch_tag_memories", [tagId, JSON.stringify(memoryIds)]);
+  }
+
+  /**
+   * Batch-remove a tag from multiple memories in a single reducer call.
+   * Eliminates O(n) network round-trips for bulk untagging.
+   * @param tagId - Tag ID
+   * @param memoryIds - Array of memory ID strings to untag (missing associations are skipped, idempotent)
+   */
+  async batchUntagMemories(tagId: string, memoryIds: string[]): Promise<void> {
+    if (memoryIds.length === 0) return;
+    return this._call("batch_untag_memories", [tagId, JSON.stringify(memoryIds)]);
+  }
+
+  /**
    * List all tags in a workspace.
    * @param workspaceId - Workspace ID
    * @returns Array of tag records
