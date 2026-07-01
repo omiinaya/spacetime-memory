@@ -970,4 +970,108 @@ describe("Client", () => {
       expect(results).toHaveLength(1);
     });
   });
+
+  describe("crossEncoderRerank", () => {
+    it("calls MCP tool with correct payload", async () => {
+      let callUrl = "";
+      let callBody = "";
+      globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts: RequestInit) => {
+        callUrl = url;
+        callBody = opts.body as string;
+        return {
+          ok: true,
+          json: vi.fn().mockResolvedValue({
+            result: JSON.stringify([
+              { id: "a", score: 0.9, memory_content: "first" },
+              { id: "b", score: 0.7, memory_content: "second" },
+            ]),
+          }),
+        };
+      });
+
+      const candidates = [
+        { id: "a", memory_content: "first" },
+        { id: "b", memory_content: "second" },
+      ];
+      const results = await client.crossEncoderRerank("test query", candidates, { topK: 5 });
+
+      expect(callUrl).toContain("/tools/call");
+      const parsed = JSON.parse(callBody);
+      expect(parsed.name).toBe("cross_encoder_rerank");
+      expect(parsed.arguments.query).toBe("test query");
+      expect(parsed.arguments.top_k).toBe(5);
+      expect(results).toHaveLength(2);
+      expect(results[0]).toHaveProperty("score", 0.9);
+    });
+
+    it("throws on non-ok response", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: vi.fn().mockResolvedValue("Internal Server Error"),
+      });
+
+      await expect(
+        client.crossEncoderRerank("q", [{ memory_content: "x" }]),
+      ).rejects.toThrow("MCP tool call failed (500)");
+    });
+
+    it("uses custom contentKey option", async () => {
+      let callBody = "";
+      globalThis.fetch = vi.fn().mockImplementation(async (_url: string, opts: RequestInit) => {
+        callBody = opts.body as string;
+        return {
+          ok: true,
+          json: vi.fn().mockResolvedValue({
+            result: JSON.stringify([{ id: "a", body: "custom", score: 0.8 }]),
+          }),
+        };
+      });
+
+      const candidates = [{ id: "a", body: "custom" }];
+      await client.crossEncoderRerank("q", candidates, { contentKey: "body" });
+
+      const parsed = JSON.parse(callBody);
+      expect(parsed.arguments.content_key).toBe("body");
+    });
+
+    it("defaults topK to 20", async () => {
+      let callBody = "";
+      globalThis.fetch = vi.fn().mockImplementation(async (_url: string, opts: RequestInit) => {
+        callBody = opts.body as string;
+        return {
+          ok: true,
+          json: vi.fn().mockResolvedValue({ result: "[]" }),
+        };
+      });
+
+      await client.crossEncoderRerank("q", [{ memory_content: "x" }]);
+      const parsed = JSON.parse(callBody);
+      expect(parsed.arguments.top_k).toBe(20);
+    });
+
+    it("handles MCP content array response format", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          content: [{ text: JSON.stringify([{ id: "a", score: 0.95 }]) }],
+        }),
+      });
+
+      const results = await client.crossEncoderRerank("q", [{ memory_content: "x" }]);
+      expect(results).toHaveLength(1);
+      expect(results[0]).toHaveProperty("score", 0.95);
+    });
+
+    it("rejects invalid MCP response gracefully", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ result: "not JSON array", content: [] }),
+      });
+
+      await expect(
+        client.crossEncoderRerank("q", [{ memory_content: "x" }]),
+      ).rejects.toThrow("Unexpected MCP response format");
+    });
+  });
 });
