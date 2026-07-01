@@ -823,6 +823,31 @@ def memory_history(memory_id: str) -> None:
     print_table(rows, title=f"Memory History ({memory_id[:16]}...)")
 
 
+@memory.command(name="stats")
+@click.argument("workspace_id")
+def memory_stats(workspace_id: str) -> None:
+    """Show per-workspace memory statistics."""
+    with console.status(f"Computing memory stats for workspace '{workspace_id[:12]}...'..."):
+        stats = _sdk_client().get_memory_stats(workspace_id)
+    if stats:
+        from rich.table import Table
+
+        table = Table(title=f"Memory Stats ({workspace_id[:12]}...)", box=box.ROUNDED)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value")
+        for key in ["total_memories", "active_memories", "avg_confidence",
+                     "avg_age_seconds", "total_revisions", "total_users"]:
+            table.add_row(key.replace("_", " ").title(), str(stats.get(key, "")))
+        from rich.json import JSON
+        for key in ["by_tier", "by_type", "top_tags"]:
+            raw = stats.get(key)
+            if raw:
+                table.add_row(key.replace("_", " ").title(), JSON(raw))
+        console.print(table)
+    else:
+        console.print("[yellow]No memory stats — add some memories first.[/yellow]")
+
+
 
 # ===================================================================
 # decay commands

@@ -5278,6 +5278,36 @@ class TestKgStats:
         assert result is None
 
 
+@pytest.mark.unit
+class TestMemoryStats:
+    """Cover get_memory_stats."""
+
+    def test_get_memory_stats_found(self):
+        from unittest.mock import Mock
+
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[
+            {"stat_key": "total_memories", "stat_value": "42"},
+            {"stat_key": "active_memories", "stat_value": "38"},
+            {"stat_key": "by_tier", "stat_value": '{"L0":5,"L1":30,"L2":7}'},
+        ])
+        result = c.get_memory_stats("ws")
+        c._call.assert_called_with("get_memory_stats", ["ws"])
+        assert result is not None
+        assert result["total_memories"] == "42"
+        assert result["active_memories"] == "38"
+
+    def test_get_memory_stats_not_found(self):
+        from unittest.mock import Mock
+
+        c = Client(host="localhost", port=3001)
+        c._call = Mock(return_value={"status": "ok"})
+        c._sql = Mock(return_value=[])
+        result = c.get_memory_stats("ws")
+        assert result is None
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Directory operations (lines 1699-1734)
 # ═══════════════════════════════════════════════════════════════════════

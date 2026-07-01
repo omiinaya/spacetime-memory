@@ -463,3 +463,137 @@ pub struct SpaceMemberResult {
     pub created_at: i64,
     pub queried_at: i64,
 }
+
+/// Result table for `get_memory_stats`. Each row is one stat key-value pair
+/// for the queried workspace.
+#[table(accessor = workspace_memory_stats_result, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WorkspaceMemoryStatsResult {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub stat_key: String,
+    pub stat_value: String,
+    pub queried_at: i64,
+}
+
+/// Collect per-workspace memory metrics and write them into
+/// `workspace_memory_stats_result` for SQL querying.
+///
+/// Stats computed:
+/// - `total_memories` — count of all memories
+/// - `active_memories` — count of active (is_active=true) memories
+/// - `by_tier` — JSON map of tier → count (L0, L1, L2)
+/// - `by_type` — JSON map of memory_type → count
+/// - `avg_confidence` — average confidence across active memories
+/// - `avg_age_seconds` — average age in seconds (from created_at)
+/// - `total_revisions` — count of memory revisions
+/// - `top_tags` — JSON array of top-10 most-used tags
+/// - `total_users` — count of distinct user_scope values
+#[reducer]
+pub fn get_memory_stats(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex().to_string();
+    check_space_access(ctx, &workspace_id, &caller, "viewer")?;
+
+    let now = now_micros(ctx);
+    let mut total_memories: u64 = 0;
+    let mut active_memories: u64 = 0;
+    let mut by_tier: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut by_type: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut total_confidence: f64 = 0.0;
+    let mut total_age_micros: i64 = 0;
+    let mut user_scopes: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for mem in ctx.db.memory().iter().take(crate::MAX_RESULTS) {
+        if mem.workspace_id != workspace_id {
+            continue;
+        }
+        total_memories += 1;
+        if mem.is_active {
+            active_memories += 1;
+            total_confidence += mem.confidence;
+            total_age_micros += now.saturating_sub(mem.created_at);
+        }
+        *by_tier.entry(mem.tier.clone()).or_insert(0) += 1;
+        *by_type.entry(mem.memory_type.clone()).or_insert(0) += 1;
+        if !mem.user_scope.is_empty() {
+            user_scopes.insert(mem.user_scope.clone());
+        }
+    }
+
+    // Tag stats: count how many times each tag name is used across memory_tags
+    let mut tag_counts: Vec<(String, u64)> = Vec::new();
+    {
+        // Build a tag_id → tag_name map from the tag table
+        let mut name_by_id: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        for t in ctx.db.tag().iter().take(crate::MAX_RESULTS) {
+            if t.workspace_id == workspace_id {
+                name_by_id.insert(t.id.clone(), t.name.clone());
+            }
+        }
+        // Count memory_tag entries per tag_id
+        let mut count_by_id: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+        for mt in ctx.db.memory_tag().iter().take(crate::MAX_RESULTS) {
+            *count_by_id.entry(mt.tag_id.clone()).or_insert(0) += 1;
+        }
+        // Resolve to names
+        let mut tag_map: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+        for (tag_id, count) in count_by_id {
+            if let Some(name) = name_by_id.get(&tag_id) {
+                *tag_map.entry(name.clone()).or_insert(0) += count;
+            }
+        }
+        let mut vec: Vec<(String, u64)> = tag_map.into_iter().collect();
+        vec.sort_by(|a, b| b.1.cmp(&a.1));
+        tag_counts = vec.into_iter().take(10).collect();
+    }
+
+    let total_revisions: u64 = ctx
+        .db
+        .memory_revision()
+        .iter()
+        .take(crate::MAX_RESULTS)
+        .filter(|r| r.workspace_id == workspace_id)
+        .count() as u64;
+
+    let avg_confidence = if active_memories > 0 {
+        total_confidence / active_memories as f64
+    } else {
+        0.0
+    };
+
+    let avg_age_seconds = if active_memories > 0 {
+        (total_age_micros / active_memories as i64) / 1_000_000
+    } else {
+        0
+    };
+
+    let top_tags_json = serde_json::to_string(
+        &tag_counts.into_iter().map(|(t, c)| serde_json::json!({"tag": t, "count": c})).collect::<Vec<_>>()
+    ).unwrap_or_default();
+
+    // Helper to insert a stat row
+    let insert_stat = |ctx: &ReducerContext, key: &str, value: String| {
+        let id = uuid_v4_uniq(ctx, |id| ctx.db.workspace_memory_stats_result().id().find(id).is_none(), 3);
+        ctx.db.workspace_memory_stats_result().insert(WorkspaceMemoryStatsResult {
+            id,
+            workspace_id: workspace_id.clone(),
+            stat_key: key.to_string(),
+            stat_value: value,
+            queried_at: now,
+        });
+    };
+
+    insert_stat(ctx, "total_memories", total_memories.to_string());
+    insert_stat(ctx, "active_memories", active_memories.to_string());
+    insert_stat(ctx, "by_tier", serde_json::to_string(&by_tier).unwrap_or_default());
+    insert_stat(ctx, "by_type", serde_json::to_string(&by_type).unwrap_or_default());
+    insert_stat(ctx, "avg_confidence", format!("{:.4}", avg_confidence));
+    insert_stat(ctx, "avg_age_seconds", avg_age_seconds.to_string());
+    insert_stat(ctx, "total_revisions", total_revisions.to_string());
+    insert_stat(ctx, "top_tags", top_tags_json);
+    insert_stat(ctx, "total_users", user_scopes.len().to_string());
+
+    Ok(())
+}
