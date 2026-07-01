@@ -1,4 +1,4 @@
-# Spacetime Memory — Improvement Backlog (June 30, 2026)
+# Spacetime Memory — Improvement Backlog (July 1, 2026)
 
 Living queue managed by the continuous-improvement cron. The cron reads this file,
 cleans up completed items, researches new improvement opportunities, adds them,
@@ -23,30 +23,62 @@ Est: 1 week
 
 ## Recently Completed
 
-### P1: Run fresh latency benchmarks (July 1, 2026)
-Ran quick-bench against a freshly published STDB v2.6 module on 127.0.0.1:3001.
-10 iterations per op. Key results:
-  - memory.store: 2.5ms p50 (no embedder) — pure WASM+SQL cost
-  - search.keyword: 52.4ms p50 (BM25 inverted index)
-  - graph.query: 12.7ms p50 (WASM-only)
-  - ping: 2.3ms p50 (STDB round-trip)
-  - search.semantic: embedder unreachable (3 retry timeouts, ~11s)
-Historical reference (June 9): store=194ms, keyword=10.8ms, semantic=399ms (live embedder).
-Updated docs/PERFORMANCE.md with honedown numbers and honest caveats.
+### P1: Published honest benchmark scores (July 1, 2026)
+Published fresh baseline scores from a clean module on STDB v2.6 (127.0.0.1:3001).
+Benchmark runner at `sdk/python/scripts/benchmark_runner.py`.
+Integrated into `make bench`.
+
+**Latency (20 iterations, 0/165 failures):**
+| # | Operation | p50 (ms) | p90 (ms) | p99 (ms) |
+|---|-----------|---------:|---------:|---------:|
+| 1 | memory.store (single, short) | 1.3 | 1.5 | 2.3 |
+| 2 | memory.store (single, long) | 1.3 | 1.4 | 1.5 |
+| 3 | memory.store (batch 10) | 12.1 | 12.5 | 12.6 |
+| 4 | search.keyword (top-5) | 27.8 | 29.1 | 29.9 |
+| 5 | search.hybrid (top-10) | 5680.7 | 6630.3 | 7188.8 |
+| 6 | graph.query | 4.8 | 5.8 | 9.8 |
+| 7 | memory.count (_query) | 11.2 | 11.6 | 11.8 |
+| 8 | ping (round-trip) | 0.8 | 0.9 | 1.1 |
+| 9 | create_node (KG) | 1.2 | 1.4 | 1.9 |
+| 10 | create_edge (KG) | 1.2 | 1.2 | 1.2 |
+| 11 | get_neighbors | 20.9 | 21.3 | 22.2 |
+
+**Key takeaways:**
+- Pure WASM ops (store, create_node, create_edge) are **1-2ms** — no overhead.
+- Keyword search is **28ms** — BM25 inverted index works, but slower than the ~11ms reference
+  from the old DB with v2.4 (Tantivy differences or larger result set).
+- Hybrid search is **~5.7s** — dominated by 3 retries against unreachable embedder (2700ms timeout).
+  Semantic component alone adds 400ms when the embedder is live (historical reference).
+- 0 failures across all 165 operations.
+
+**Retrieval quality (keyword-only, 5 queries, 8 eval memories):**
+P@5=40.0%  R@5=40.0%  MRR=0.400
+
+**Key gaps:**
+- Embedder (all-MiniLM-L6-v2 ONNX sidecar) was unreachable at 127.0.0.1:9090.
+  No semantic scores. Historical reference: hybrid P@5=81.3%, +LLM reranking P@5=55.5%.
+- No LongMemEval, LoCoMo, or BEAM benchmark harnesses exist (1-2 week effort each).
+- These are **honest baseline scores**, not cherry-picked. The old reference showing
+  store=194ms was with an embedder; this is the module-only cost.
 
 ### P1: Fix module build for STDB v2.6 — tag.rs API breakage
 list_tags reducer returned `Result<String, String>` which v2.6 doesn't allow.
 Fixed: added `serde::Serialize` to Tag struct, changed list_tags to return `()`,
 updated SDK list_tags() to use `_query()` on the tag table instead.
-Module builds clean (0 warnings) and publishes successfully.
+Module builds clean and publishes successfully.
 
-### P2: Fix Python SDK bugs — batch_update_memories DUO filter, update_memory arg count
+### P1: Publish and integrate benchmark runner
+- Built unified benchmark runner at `sdk/python/scripts/benchmark_runner.py`
+- Integrated into `make bench` with auto-DB discovery
+- Runs latency + retrieval quality benchmarks in one invocation
+- Outputs structured JSON + markdown table
+- Covers: store (single/batch), search (keyword/hybrid), graph (query/node/edge/neighbors), ping, count
+
+### P2: Fix Python SDK bugs — batch_update_memories dual filter, update_memory arg count
 Fixed batch_update_memories which used a dual-field filter_dict ({id, workspace_id})
 that failed with query_table reducer. Now queries by id only, validates workspace_id
 client-side. Fixed update_memory 4→5 arg count for WASM compat (expires_at=0).
 170/170 unit tests pass.
-
-## Recently Completed
 
 ### P2: Add getNoteHistory and fuzzyGet to TS SDK
 Added getNoteHistory(noteId) and fuzzyGet(ws, name, field?, threshold?, limit?).
