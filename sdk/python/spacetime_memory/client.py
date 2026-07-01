@@ -1551,37 +1551,53 @@ class Client:
         rows: list[dict[str, Any]],
         workspace_id: str,
     ) -> list[dict[str, Any]]:
-        """Look up memory/node/note content from STDB and apply veracity weighting."""
-        mem_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "memory"]
-        node_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "node"]
-        note_ids = [r.get("entity_id", "") for r in rows if r.get("entity_type") == "note"]
-        mem_map = {}
+        """Look up memory/node/note content from STDB and apply veracity weighting.
+
+        Uses the ``content`` field already present in hybrid_result rows.
+        Batches confidence lookups via a single ``_query()`` to avoid N+1.
+        """
+        mem_ids = list({r.get("entity_id", "") for r in rows if r.get("entity_type") == "memory"})
+        node_ids = list({r.get("entity_id", "") for r in rows if r.get("entity_type") == "node"})
+        note_ids = list({r.get("entity_id", "") for r in rows if r.get("entity_type") == "note"})
         mem_confidences: dict[str, float] = {}
-        node_map = {}
-        note_map = {}
-        for mid in mem_ids:
-            mems = self._query(
-                "memory",
-                filter_dict={"id": mid},
-                workspace_id=workspace_id,
-                columns=["id", "content", "confidence"],
-            )
-            if mems:
-                mem_map[mid] = mems[0].get("content", "")
-                mem_confidences[mid] = mems[0].get("confidence", 0.8)
-        for nid in node_ids:
-            nodes = self._query("kg_node", filter_dict={"id": nid}, columns=["id", "label"])
-            if nodes:
-                node_map[nid] = nodes[0].get("label", "")
-        for nid in note_ids:
-            notes = self._query("note", filter_dict={"id": nid}, columns=["id", "title", "content"])
-            if notes:
-                note = notes[0]
-                note_map[nid] = note.get("title", "") + "\n\n" + note.get("content", "")
+        node_map: dict[str, str] = {}
+        note_map: dict[str, str] = {}
+
+        # Batch fetch memory confidences — only for veracity weighting
+        if mem_ids:
+            try:
+                mems = self._query(
+                    "memory",
+                    workspace_id=workspace_id,
+                    columns=["id", "confidence"],
+                    filter_dict={},
+                )
+                # Build confidence map from ALL memories (filter dict doesn't support IN)
+                for m in mems:
+                    if m.get("id") in mem_ids:
+                        mem_confidences[m["id"]] = m.get("confidence", 0.8)
+            except RuntimeError:
+                logger.warning("_enrich_content: batch confidence lookup failed, skipping veracity")
+        if node_ids:
+            try:
+                nodes = self._query("kg_node", columns=["id", "label"])
+                for n in nodes:
+                    if n.get("id") in node_ids:
+                        node_map[n["id"]] = n.get("label", "")
+            except RuntimeError:
+                pass
+        if note_ids:
+            try:
+                notes = self._query("note", workspace_id=workspace_id, columns=["id", "title", "content"])
+                for n in notes:
+                    if n.get("id") in note_ids:
+                        note_map[n["id"]] = n.get("title", "") + "\n\n" + n.get("content", "")
+            except RuntimeError:
+                pass
         for r in rows:
             eid = r.get("entity_id", "")
             if r.get("entity_type") == "memory":
-                r["memory_content"] = mem_map.get(eid, "")
+                r["memory_content"] = r.get("content", "")
             elif r.get("entity_type") == "node":
                 r["memory_content"] = node_map.get(eid, "")
             elif r.get("entity_type") == "note":

@@ -1569,7 +1569,7 @@ class TestNoteSearchIndexing:
         assert result[0]["memory_content"] == "My Note\n\nHello world"
         c._query.assert_called_with(
             "note",
-            filter_dict={"id": "n1"},
+            workspace_id="ws-1",
             columns=["id", "title", "content"],
         )
 
