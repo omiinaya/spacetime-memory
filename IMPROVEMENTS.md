@@ -27,12 +27,6 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
-### P2: TypeScript SDK — Auth method wrappers (register, login, logout, etc.)
-Python SDK has 9 public auth method wrappers. TypeScript SDK has zero.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 20min
-
 ### P2: TypeScript SDK — Context pack list queries (listContextPacks, listContextEntries, listContextDeltas)
 Python SDK has these as public methods, TypeScript SDK only has storeContextPack.
 Files: sdk/typescript/client.ts
@@ -40,6 +34,15 @@ Difficulty: Easy
 Est: 10min
 
 ## Recently Completed
+
+### P2: TypeScript SDK — Auth method wrappers (register, login, logout, etc.)
+Added 9 public auth method wrappers to the TypeScript SDK matching the Python SDK:
+register(), login(), logout(), updateAccount(), deactivateAccount(),
+promoteAdmin(), demoteAdmin(), listAdmins(). Also fixed listTags() which was
+calling _call() expecting a return value (was void). 71/71 TS tests pass.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 20min
 
 ### P3: Add listPeers to TypeScript SDK
 Added `PeerRecord` interface and `listPeers(workspaceId?)` method to TypeScript
