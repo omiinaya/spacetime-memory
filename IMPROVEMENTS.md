@@ -27,16 +27,16 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
+## Recently Completed
+
 ### P3: Python SDK — Add public auth method wrappers
-register(), login(), logout(), deactivate_account(), update_account(),
-promote_admin(), demote_admin(), list_admins(), create_api_key(),
-deactivate_api_key(), list_api_keys() only accessible via raw _call.
-Add typed public methods with docstrings.
+Added register(), login(), logout(), update_account(), deactivate_account(),
+promote_admin(), demote_admin(), list_admins() public methods with proper
+docstrings and type hints. These auth reducers were only accessible via
+raw _call(). 861 tests pass (2 pre-existing failures unrelated).
 Files: sdk/python/spacetime_memory/client.py
 Difficulty: Easy
 Est: 20min
-
-## Recently Completed
 
 ### P2: Python — Add 77 missing Rust reducers to SDK
 All 162 Rust reducers now have corresponding Python _call() wrappers or
