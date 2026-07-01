@@ -2349,6 +2349,91 @@ export class Client {
     );
   }
 
+  /**
+   * Recommend memories that need attention (review, reinforce, discard).
+   * Returns memories sorted by urgency — low-trust, decaying, or consistently-poor memories.
+   * @param workspaceId - Target workspace
+   * @param limit - Max recommendations (default 20)
+   * @param minUrgency - Minimum urgency threshold 0.0–1.0 (default 0.3)
+   * @returns Array of memory recommendation records
+   */
+  async recommendMemories(
+    workspaceId: string,
+    limit?: number,
+    minUrgency?: number
+  ): Promise<Record<string, unknown>[]> {
+    await this._call("recommend_memories", [
+      workspaceId,
+      limit ?? 20,
+      minUrgency ?? 0.3,
+    ]);
+    return this._sqlExec(
+      `SELECT * FROM memory_recommendation WHERE workspace_id = :ws`,
+      { ws: workspaceId },
+    );
+  }
+
+  /**
+   * Semantically search across all sessions/workspaces.
+   * Embeds the query, calls the search_sessions_semantic reducer,
+   * and reads results from session_search_result table.
+   * @param query - Search query
+   * @param limit - Max results (default 10)
+   * @returns Array of session search results sorted by relevance
+   */
+  async searchSessionsSemantic(
+    query: string,
+    limit?: number
+  ): Promise<Record<string, unknown>[]> {
+    const emb = await this._embed(query);
+    if (emb.length === 0) return [];
+    const embJson = JSON.stringify(emb);
+    await this._call("search_sessions_semantic", [embJson, limit ?? 10]);
+    const qhash = `sessions:${limit ?? 10}`;
+    const rows = await this._sql(
+      `SELECT * FROM session_search_result WHERE query_hash = '${qhash}'`
+    );
+    rows.sort((a, b) => ((b.score ?? 0) as number) - ((a.score ?? 0) as number));
+    return rows.slice(0, limit ?? 10);
+  }
+
+  /**
+   * Search memories with advanced filters (memory type, tier, date range).
+   * Combines the search query with optional memory_type and tier filters.
+   * @param workspaceId - Workspace ID
+   * @param query - Search query text
+   * @param memoryType - Optional memory type filter
+   * @param tier - Optional tier filter ("L0", "L1", "L2")
+   * @param limit - Max results (default 20)
+   * @returns Array of matching memory records
+   */
+  async searchWithFilters(
+    workspaceId: string,
+    query: string,
+    memoryType?: string,
+    tier?: string,
+    limit?: number
+  ): Promise<Record<string, unknown>[]> {
+    let q = `SELECT * FROM memory WHERE workspace_id = :ws AND is_active = true`;
+    const params: Record<string, string> = { ws: workspaceId };
+    if (query) {
+      q += ` AND content LIKE '%' || :q || '%' ESCAPE '\\\\'`;
+      params.q = query;
+    }
+    if (memoryType) {
+      q += ` AND memory_type = :mt`;
+      params.mt = memoryType;
+    }
+    if (tier) {
+      q += ` AND tier = :t`;
+      params.t = tier;
+    }
+    q += ` ORDER BY created_at DESC`;
+    const ll = limit ?? 20;
+    let rows = await this._sqlExec(q, params, query ? { like: true } : undefined);
+    return rows.slice(0, ll);
+  }
+
   // -----------------------------------------------------------------------
   // Sessions
   // -----------------------------------------------------------------------
