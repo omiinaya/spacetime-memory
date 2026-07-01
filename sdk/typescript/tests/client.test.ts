@@ -720,6 +720,45 @@ describe("Client", () => {
       expect(md).toContain("Hello world");
     });
 
+    it("exportWorkspaceJson returns workspace-scoped JSON export", async () => {
+      let callCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
+        callCount++;
+        // First calls are reducer calls (query_table) — return ok
+        if (callCount <= 5) {
+          return { ok: true, text: vi.fn().mockResolvedValue("") };
+        }
+        // Subsequent calls are SQL reads — return rows from query_result or workspace
+        return {
+          ok: true,
+          text: vi.fn().mockResolvedValue(
+            JSON.stringify([
+              {
+                schema: {
+                  elements: [
+                    { name: { some: "table_name" } },
+                    { name: { some: "row_json" } },
+                  ],
+                },
+                rows: callCount % 2 === 0
+                  ? [["note", '{"id":"n1","title":"Test Note","content":"Hello"}']]
+                  : [],
+              },
+            ])
+          ),
+        };
+      });
+      const result = await client.exportWorkspaceJson("ws-1");
+      expect(result.status).toBe("ok");
+      expect(result.workspace_id).toBe("ws-1");
+      expect(typeof result.json).toBe("string");
+      const parsed = JSON.parse(result.json as string);
+      expect(parsed.version).toBe("0.3.0");
+      expect(parsed.workspace_id).toBe("ws-1");
+      expect(parsed.tables).toBeDefined();
+      expect(parsed.stats.table_count).toBeGreaterThan(0);
+    });
+
     it("storeAnswer creates note + extracts entities", async () => {
       let callCount = 0;
       globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {

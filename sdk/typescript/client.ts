@@ -3434,6 +3434,121 @@ export class Client {
       .join("\n\n---\n\n");
   }
 
+  /**
+   * Export all workspace data as structured JSON, matching the backup format
+   * but scoped to a single workspace. Includes notes, KG nodes/edges, memories,
+   * profiles, facts, sessions, tours, directories, and more.
+   *
+   * @param workspaceId - Workspace ID to export
+   * @param opts - Optional export settings
+   * @param opts.includeSystemNotes - Include _index / _log notes (default false)
+   * @param opts.outputPath - Optional file path to write JSON (Node.js only)
+   * @returns Export result with tables, row counts, and JSON string
+   */
+  async exportWorkspaceJson(
+    workspaceId: string,
+    opts?: {
+      includeSystemNotes?: boolean;
+      outputPath?: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    // Tables scoped by workspace_id — query through the query_table reducer
+    const wsScopedTables: string[] = [
+      "memory",
+      "memory_version",
+      "kg_node",
+      "kg_edge",
+      "kg_community",
+      "note",
+      "session",
+      "session_participant",
+      "message",
+      "profile",
+      "fact",
+      "tour",
+      "tour_stop",
+      "directory",
+      "directory_link",
+      "backlink",
+      "merge_suggestion",
+      "context_pack",
+      "context_entry",
+      "context_delta",
+      "document",
+      "document_chunk",
+      // content-type tables
+      "entity_extraction",
+      "entity_link",
+      "change_event",
+    ];
+
+    const manifest: Record<string, unknown[]> = {};
+    const backedUp: string[] = [];
+    let totalRows = 0;
+
+    for (const table of wsScopedTables) {
+      try {
+        let rows: Record<string, unknown>[];
+        if (table === "note" && !opts?.includeSystemNotes) {
+          // Fetch notes and filter out system notes client-side
+          const allRows = await this._query(table, workspaceId);
+          rows = allRows.filter((r) => !(r.title as string ?? "").startsWith("_"));
+        } else {
+          rows = await this._query(table, workspaceId);
+        }
+        manifest[table] = rows;
+        totalRows += rows.length;
+        backedUp.push(table);
+      } catch {
+        // table doesn't exist or isn't queryable — skip silently
+        manifest[table] = [];
+      }
+    }
+
+    // Include workspace metadata itself
+    try {
+      const ws = await this._sqlExec(
+        `SELECT * FROM workspace WHERE id = :ws LIMIT 1`,
+        { ws: workspaceId },
+      );
+      if (ws.length > 0) {
+        manifest["workspace"] = [ws[0] as Record<string, unknown>];
+        backedUp.push("workspace");
+        totalRows += 1;
+      }
+    } catch {
+      manifest["workspace"] = [];
+    }
+
+    const payload = {
+      version: "0.3.0",
+      exported_at: new Date().toISOString(),
+      workspace_id: workspaceId,
+      tables: manifest,
+      stats: {
+        table_count: backedUp.length,
+        total_rows: totalRows,
+      },
+    };
+
+    const json = JSON.stringify(payload, null, 2);
+
+    // Write to file if outputPath given (Node.js only)
+    const finalPath = opts?.outputPath;
+    if (finalPath && typeof process !== "undefined" && typeof process.version === "string") {
+      const fs = await import("fs");
+      fs.writeFileSync(finalPath, json, "utf-8");
+    }
+
+    return {
+      status: "ok",
+      workspace_id: workspaceId,
+      tables: backedUp,
+      total_rows: totalRows,
+      json,
+    };
+  }
+
   // -----------------------------------------------------------------------
   // Store Answer (simplified compounder — no LLM needed)
   // -----------------------------------------------------------------------
