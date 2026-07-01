@@ -1546,6 +1546,25 @@ export class Client {
     return this._call("untag_memory", [tagId, memoryId]);
   }
 
+  /**
+   * List all tags in a workspace.
+   * @param workspaceId - Workspace ID
+   * @returns Array of tag records
+   */
+  async listTags(workspaceId: string): Promise<TagRecord[]> {
+    const result = await this._call("list_tags", [workspaceId]);
+    if (typeof result === "string") return JSON.parse(result) as TagRecord[];
+    return (result ?? []) as TagRecord[];
+  }
+
+  /**
+   * Delete a tag and all its memory associations.
+   * @param tagId - Tag ID to delete
+   */
+  async deleteTag(tagId: string): Promise<void> {
+    return this._call("delete_tag", [tagId]);
+  }
+
   // -----------------------------------------------------------------------
   // Context Packs
   // -----------------------------------------------------------------------

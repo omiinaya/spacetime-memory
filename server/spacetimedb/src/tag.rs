@@ -93,3 +93,45 @@ pub fn untag_memory(
 
     Ok(())
 }
+
+#[reducer]
+pub fn list_tags(
+    ctx: &ReducerContext,
+    workspace_id: String,
+) -> Result<String, String> {
+    let _account = require_auth(ctx)?;
+    let tags: Vec<_> = ctx
+        .db
+        .tag()
+        .iter().take(crate::MAX_RESULTS)
+        .filter(|t| t.workspace_id == workspace_id)
+        .collect();
+    serde_json::to_string(&tags).map_err(|e| format!("Failed to serialize tags: {}", e))
+}
+
+#[reducer]
+pub fn delete_tag(
+    ctx: &ReducerContext,
+    tag_id: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    // Find the tag and delete it
+    let tag = ctx.db.tag().id().find(&tag_id);
+    match tag {
+        Some(t) => {
+            ctx.db.tag().delete(t);
+            // Also delete all associations
+            let to_delete: Vec<_> = ctx
+                .db
+                .memory_tag()
+                .iter().take(crate::MAX_RESULTS)
+                .filter(|mt| mt.tag_id == tag_id)
+                .collect();
+            for mt in to_delete {
+                ctx.db.memory_tag().delete(mt);
+            }
+            Ok(())
+        }
+        None => Err(format!("Tag not found: {}", tag_id)),
+    }
+}
