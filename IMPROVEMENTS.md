@@ -23,6 +23,12 @@ Est: 1 week
 
 ## Recently Completed
 
+### P0: Fixed N+1 `_enrich_content` — semantic search 3x faster (July 1, 2026)
+`_enrich_content` was doing N individual `_query()` calls (160 queries at 25ms each = 4s).
+The `HybridResult` table already stores `content` in each row — the re-fetch was redundant.
+Fix: use content from the row directly, batch confidence fetch in one `_query()` call.
+**Result: semantic search 7.5s → 2.5s p50 (3x speedup).**
+
 ### P1: Tantivy sidecar + embedder sidecar are now systemd services (July 1, 2026)
 Both Tantivy BM25 sidecar (:9091) and ONNX embedder (:9090, bge-large-en-v1.5, 1024-dim) are now:
 - Built from source (Rust + ONNX runtime)
@@ -37,27 +43,27 @@ Published fresh benchmark scores from clean module on STDB v2.6 (127.0.0.1:3001)
 Benchmark runner at `sdk/python/scripts/benchmark_runner.py`.
 Integrated into `make bench`.
 
-**Latency (20 iterations, 0/148 failures, July 1 2026):**
+**Latency (20 iterations, 0/148 failures, July 1 2026) — with N+1 fix:**
 | # | Operation | p50 (ms) | p90 (ms) | p99 (ms) | Notes |
 |---|-----------|---------:|---------:|---------:|-------|
-| 1 | memory.store (single, short) | 1.3 | 1.6 | 2.1 | Pure WASM |
-| 2 | memory.store (single, long) | 1.2 | 1.4 | 1.5 | Pure WASM |
-| 3 | memory.store (batch 10) | 13.7 | 19.0 | 23.9 | 10× STDB calls |
-| 4 | search.keyword (top-5) | 120.8 | 180.8 | 182.1 | Client-side BM25 fallback |
-| 5 | search.semantic (top-5, w/ embedder) | 7513.4 | 7654.1 | 7685.7 | 4s N+1 enrich, 1.5s reducer |
-| 6 | graph.query | 26.1 | 27.1 | 27.3 | WASM-only |
-| 7 | memory.count (_query) | 30.2 | 30.8 | 31.1 | query_table reducer |
-| 8 | ping (round-trip) | 0.8 | 1.0 | 1.0 | STDB round-trip |
-| 9 | create_node (KG) | 489.8 | 516.0 | 576.2 | Includes entity extraction |
-| 10 | create_edge (KG) | 1.2 | 1.2 | 1.3 | Pure WASM |
-| 11 | get_neighbors | 182.7 | 185.6 | 185.7 | Graph traversal |
+| 1 | memory.store (single, short) | 1.2 | 1.4 | 2.0 | Pure WASM |
+| 2 | memory.store (single, long) | 1.2 | 1.4 | 8.8 | Pure WASM |
+| 3 | memory.store (batch 10) | 11.8 | 13.1 | 14.9 | 10× STDB calls |
+| 4 | search.keyword (top-5) | 122.5 | 127.0 | 150.7 | Client-side BM25 fallback |
+| 5 | search.semantic (top-5, w/ embedder) | **2529.4** | 2530.1 | 2530.3 | Previously 7513ms — **3x faster** |
+| 6 | graph.query | 33.7 | 34.5 | 46.4 | WASM-only |
+| 7 | memory.count (_query) | 38.5 | 39.6 | 40.1 | query_table reducer |
+| 8 | ping (round-trip) | 1.2 | 1.3 | 1.3 | STDB round-trip |
+| 9 | create_node (KG) | 523.2 | 554.9 | 556.6 | Includes entity extraction |
+| 10 | create_edge (KG) | 1.2 | 1.4 | 1.5 | Pure WASM |
+| 11 | get_neighbors | 189.0 | 210.1 | 216.2 | Graph traversal |
 
 **Key takeaways:**
 - Pure WASM ops (store, create_edge) are **1-2ms** — STDB is fast.
-- **7.5s semantic search is the headline problem.** Breakdown: 0.4s embed + 1.5s hybrid_search reducer + 0.01s SQL + 0.001s Tantivy + **4s `_enrich_content`** (N+1: 160 individual STDB queries at 25ms each) + 1s fusion/boosting logic. The N+1 is the single biggest optimization target.
+- **Semantic search is 2.5s** (previously 7.5s). Fixed the N+1 `_enrich_content` bottleneck that was doing 160 individual STDB queries at 25ms each. Now uses content already in `hybrid_result` rows + single batch confidence query.
+- Remaining bottleneck: **1.5s hybrid_search reducer** (WASM BM25 + graph + temporal search). That's the Rust side — would need indexing or parallelism to cut.
 - Tantivy search returns in **1ms** — but results are empty because the benchmark seeds via `_call("store_memory",...)` which bypasses Tantivy indexing. Real usage through `c.store()` indexes into Tantivy.
 - 0 failures across all 148 operations.
-- **Regressions vs previous run (when Tantivy was unreachable):** keyword search went from 28ms to 121ms (database now has 148 stored memories vs 50, plus the `_enrich_content` N+1). Pure WASM ops are unchanged.
 
 **Retrieval quality (keyword-only, 5 queries, 8 eval memories):**
 P@5=40.0%  R@5=40.0%  MRR=0.400
