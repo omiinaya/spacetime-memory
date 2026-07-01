@@ -2148,9 +2148,75 @@ export class Client {
    * @returns Array of edge history result records
    */
   async getEdgeHistory(edgeGroupId: string): Promise<Record<string, unknown>[]> {
+    await this._call("get_edge_history", [edgeGroupId]);
     return await this._sqlExec(
       `SELECT * FROM edge_history_result WHERE edge_group_id = :egid`,
       { egid: edgeGroupId },
+    );
+  }
+
+  /**
+   * Add a citation linking a KG node to a source memory.
+   * @param workspaceId - Target workspace
+   * @param nodeId - The knowledge graph node ID
+   * @param memoryId - The memory record that supports this node
+   * @param description - Optional description of the citation relationship
+   */
+  async addNodeCitation(
+    workspaceId: string,
+    nodeId: string,
+    memoryId: string,
+    description?: string
+  ): Promise<void> {
+    return this._call("add_node_citation", [
+      workspaceId,
+      nodeId,
+      memoryId,
+      description ?? "",
+    ]);
+  }
+
+  /**
+   * Add a citation linking a KG edge to a source memory.
+   * @param workspaceId - Target workspace
+   * @param edgeId - The knowledge graph edge ID
+   * @param memoryId - The memory record that supports this edge
+   * @param description - Optional description of the citation relationship
+   */
+  async addEdgeCitation(
+    workspaceId: string,
+    edgeId: string,
+    memoryId: string,
+    description?: string
+  ): Promise<void> {
+    return this._call("add_edge_citation", [
+      workspaceId,
+      edgeId,
+      memoryId,
+      description ?? "",
+    ]);
+  }
+
+  /**
+   * Get all citations for a KG entity (node or edge).
+   * @param workspaceId - Target workspace
+   * @param entityId - The node or edge ID
+   * @param entityType - "node" (default) or "edge"
+   * @returns Array of citation records
+   */
+  async getCitations(
+    workspaceId: string,
+    entityId: string,
+    entityType?: string
+  ): Promise<Record<string, unknown>[]> {
+    await this._call("get_citations", [
+      workspaceId,
+      entityId,
+      entityType ?? "node",
+    ]);
+    return await this._sqlExec(
+      `SELECT * FROM citation_result WHERE entity_id = :eid AND entity_type = :etype`,
+      { eid: entityId, etype: entityType ?? "node" },
     );
   }
 
