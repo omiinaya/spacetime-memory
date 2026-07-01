@@ -307,6 +307,29 @@ function safeNum(n: number | undefined | null): string {
   return String(clamped);
 }
 
+/**
+ * Simple fnmatch-style glob matching (supports * and ? wildcards).
+ * Case-sensitive comparison — caller should lowercase both arguments.
+ */
+function _fnmatch(text: string, pattern: string): boolean {
+  // Convert glob pattern to regex
+  let regexStr = "^";
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "*") {
+      regexStr += ".*";
+    } else if (ch === "?") {
+      regexStr += ".";
+    } else if (ch === "." || ch === "+" || ch === "(" || ch === ")" || ch === "[" || ch === "]" || ch === "{" || ch === "}" || ch === "\\" || ch === "|" || ch === "^" || ch === "$") {
+      regexStr += "\\" + ch;
+    } else {
+      regexStr += ch;
+    }
+  }
+  regexStr += "$";
+  return new RegExp(regexStr).test(text);
+}
+
 function queryHash(query: string): string {
   let h = 0;
   for (let i = 0; i < query.length; i++) {
@@ -1547,6 +1570,44 @@ export class Client {
     return null;
   }
 
+  /**
+   * Return all memories matching a glob/fnmatch-style pattern.
+   *
+   * Uses wildcards (`*`, `?`) against the specified field on the client side.
+   * Example: `client.globGet("ws-1", "auth-*")` returns memories whose
+   * `id` field starts with "auth-".
+   *
+   * @param workspaceId - Workspace to search.
+   * @param pattern - Glob pattern (e.g. `"auth-*"`, `"journals/2025-05*"`).
+   * @param field - Which memory field to match (default: `"id"`).
+   * @param limit - Max memories to scan (default 200).
+   * @returns Array of matching memory records.
+   */
+  async globGet(
+    workspaceId: string,
+    pattern: string,
+    field?: string,
+    limit?: number
+  ): Promise<Record<string, unknown>[]> {
+    const rows = await this._sqlExec(
+      `SELECT * FROM memory WHERE workspace_id = :ws AND is_active = true LIMIT ${limit ?? 200}`,
+      { ws: workspaceId },
+    );
+    if (rows.length === 0) return [];
+
+    const f = field ?? "id";
+    const patLower = pattern.toLowerCase();
+    const matches: Record<string, unknown>[] = [];
+
+    for (const r of rows) {
+      const val = ((r[f] as string) ?? "").toLowerCase();
+      if (_fnmatch(val, patLower)) {
+        matches.push(r);
+      }
+    }
+    return matches;
+  }
+
   // -----------------------------------------------------------------------
   // Backlinks & Document References
   // -----------------------------------------------------------------------
@@ -2276,11 +2337,203 @@ export class Client {
   }
 
   /**
+   * Delete a tour stop (alias for removeTourStop).
+   * @param stopId - Tour stop ID to remove
+   */
+  async deleteTourStop(stopId: string): Promise<void> {
+    return this.removeTourStop(stopId);
+  }
+
+  /**
    * Delete a tour.
    * @param tourId - Tour ID to delete
    */
   async deleteTour(tourId: string): Promise<void> {
     return this._call("delete_tour", [tourId]);
+  }
+
+  // -----------------------------------------------------------------------
+  // Pattern Detection
+  // -----------------------------------------------------------------------
+
+  /**
+   * Run pattern detection on a workspace's memories.
+   *
+   * Performs client-side analysis: temporal clustering, frequent term
+   * extraction, and co-occurrence detection — no LLM needed.
+   *
+   * @param workspaceId - Workspace to analyze
+   * @param limit - Max memories to fetch (default 200)
+   * @param includeClusters - Run temporal clustering (default true)
+   * @param includeTerms - Run frequent term extraction (default true)
+   * @param includeCoOccur - Run co-occurrence detection (default true)
+   * @returns Detection results: temporal_clusters, frequent_terms, co_occurrences
+   */
+  async detectPatterns(
+    workspaceId: string,
+    opts?: {
+      limit?: number;
+      includeClusters?: boolean;
+      includeTerms?: boolean;
+      includeCoOccur?: boolean;
+    }
+  ): Promise<{
+    temporal_clusters: Array<{
+      start_time: number;
+      end_time: number;
+      count: number;
+      ids: string[];
+      summary_terms: string[];
+    }>;
+    frequent_terms: Array<{ term: string; frequency: number; doc_count: number }>;
+    co_occurrences: Array<{ term_a: string; term_b: string; count: number }>;
+    total_memories: number;
+    summary: string;
+  }> {
+    const lim = opts?.limit ?? 200;
+    const includeClusters = opts?.includeClusters ?? true;
+    const includeTerms = opts?.includeTerms ?? true;
+    const includeCoOccur = opts?.includeCoOccur ?? true;
+
+    // Fetch memories
+    const memories = await this._sqlExec(
+      `SELECT id, content, created_at FROM memory WHERE workspace_id = :ws AND is_active = true LIMIT ${lim}`,
+      { ws: workspaceId }
+    );
+
+    const total = memories.length;
+
+    // --- Tokenizer ---
+    function tokenize(text: string, minLen = 3): string[] {
+      const tokens = text.toLowerCase().match(/[a-zA-Z0-9_]+/g) ?? [];
+      return tokens.filter((t) => t.length >= minLen);
+    }
+
+    const result: {
+      temporal_clusters: any[];
+      frequent_terms: any[];
+      co_occurrences: any[];
+      total_memories: number;
+      summary: string;
+    } = {
+      temporal_clusters: [],
+      frequent_terms: [],
+      co_occurrences: [],
+      total_memories: total,
+      summary: "",
+    };
+
+    // --- Temporal Clusters ---
+    if (includeClusters && total > 0) {
+      const bucketSecs = 30 * 60; // 30 min buckets
+      const buckets = new Map<number, any[]>();
+      for (const m of memories) {
+        let ts = (m.created_at as number) ?? 0;
+        if (ts > 1_000_000_000_000) ts = Math.floor(ts / 1_000_000);
+        const key = Math.floor(ts / bucketSecs);
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key)!.push(m);
+      }
+
+      for (const [key, items] of buckets) {
+        if (items.length >= 2) {
+          // Extract common terms
+          const termCounts = new Map<string, number>();
+          for (const item of items) {
+            const terms = new Set(tokenize((item.content as string) ?? ""));
+            for (const t of terms) {
+              termCounts.set(t, (termCounts.get(t) ?? 0) + 1);
+            }
+          }
+          const sortedTerms = [...termCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([t]) => t);
+
+          result.temporal_clusters.push({
+            start_time: key * bucketSecs,
+            end_time: (key + 1) * bucketSecs,
+            count: items.length,
+            ids: items.map((m: any) => m.id as string),
+            summary_terms: sortedTerms,
+          });
+        }
+      }
+      result.temporal_clusters.sort((a, b) => b.start_time - a.start_time);
+    }
+
+    // --- Frequent Terms ---
+    if (includeTerms && total > 0) {
+      const docFreq = new Map<string, number>();
+      const termFreq = new Map<string, number>();
+      for (const m of memories) {
+        const terms = new Set(tokenize((m.content as string) ?? ""));
+        for (const t of terms) {
+          docFreq.set(t, (docFreq.get(t) ?? 0) + 1);
+          termFreq.set(t, (termFreq.get(t) ?? 0) + 1);
+        }
+      }
+
+      const minDf = 2;
+      for (const [term, df] of docFreq) {
+        if (df >= minDf) {
+          result.frequent_terms.push({
+            term,
+            frequency: termFreq.get(term) ?? 0,
+            doc_count: df,
+          });
+        }
+      }
+      result.frequent_terms.sort((a, b) => b.frequency - a.frequency);
+      result.frequent_terms = result.frequent_terms.slice(0, 20);
+    }
+
+    // --- Co-occurrence ---
+    if (includeCoOccur && total > 0) {
+      const coOccurMap = new Map<string, number>();
+      const memoryTerms: Set<string>[] = [];
+
+      for (const m of memories) {
+        const terms = new Set(tokenize((m.content as string) ?? ""));
+        memoryTerms.push(terms);
+      }
+
+      // Only look at top terms to keep it fast
+      const topTerms = new Set(result.frequent_terms.slice(0, 15).map((t) => t.term));
+      for (const terms of memoryTerms) {
+        const relevant = [...terms].filter((t) => topTerms.has(t));
+        for (let i = 0; i < relevant.length; i++) {
+          for (let j = i + 1; j < relevant.length; j++) {
+            const pair = [relevant[i], relevant[j]].sort().join("::");
+            coOccurMap.set(pair, (coOccurMap.get(pair) ?? 0) + 1);
+          }
+        }
+      }
+
+      for (const [pair, count] of coOccurMap) {
+        if (count >= 2) {
+          const [ta, tb] = pair.split("::");
+          result.co_occurrences.push({ term_a: ta, term_b: tb, count });
+        }
+      }
+      result.co_occurrences.sort((a, b) => b.count - a.count);
+      result.co_occurrences = result.co_occurrences.slice(0, 20);
+    }
+
+    // --- Summary ---
+    const parts: string[] = [];
+    if (result.temporal_clusters.length > 0) {
+      parts.push(`${result.temporal_clusters.length} temporal cluster(s)`);
+    }
+    if (result.frequent_terms.length > 0) {
+      parts.push(`${result.frequent_terms.length} frequent term(s)`);
+    }
+    if (result.co_occurrences.length > 0) {
+      parts.push(`${result.co_occurrences.length} co-occurrence pair(s)`);
+    }
+    result.summary = parts.length > 0 ? parts.join(", ") : "No patterns detected";
+
+    return result;
   }
 
   // -----------------------------------------------------------------------
@@ -2456,8 +2709,32 @@ export class Client {
     return await this._sqlExec(
       `SELECT * FROM citation_result WHERE entity_id = :eid AND entity_type = :etype`,
       { eid: entityId, etype: entityType ?? "node" },
-    );
-  }
+ );
+ }
+
+   /**
+    * Detect bridge nodes — KG nodes that connect multiple communities.
+    * Calls the `detect_bridge_nodes` reducer, then reads from the bridge_result table.
+    * @param workspaceId - Workspace ID
+    * @param limit - Max results (default 20)
+    * @param minCommunities - Minimum distinct communities to qualify (default 2)
+    * @returns Array of bridge node records sorted by bridge score
+    */
+   async detectBridgeNodes(
+     workspaceId: string,
+     limit?: number,
+     minCommunities?: number
+   ): Promise<Record<string, unknown>[]> {
+     await this._call("detect_bridge_nodes", [
+       workspaceId,
+       limit ?? 20,
+       minCommunities ?? 2,
+     ]);
+     return await this._sqlExec(
+       `SELECT * FROM bridge_result WHERE workspace_id = :ws ORDER BY bridge_score DESC`,
+       { ws: workspaceId },
+     );
+   }
 
   /**
    * Recommend memories that need attention (review, reinforce, discard).
@@ -3178,5 +3455,50 @@ export class Client {
         }
       }
     }
+  }
+
+  /**
+   * Batch-update multiple memories in a workspace.
+   *
+   * Loops over each memory ID and calls the `update_memory` reducer individually.
+   * Updates can include: content, summary, confidence.
+   *
+   * @param workspaceId - Workspace the memories belong to.
+   * @param memoryIds - Array of memory IDs to update.
+   * @param updates - Dict of fields to update (e.g. { content, summary, confidence }).
+   * @returns Status object with count of updated memories and any errors.
+   */
+  async batchUpdateMemories(
+    workspaceId: string,
+    memoryIds: string[],
+    updates: Record<string, unknown>
+  ): Promise<{ status: string; updated: number; errors?: string[] }> {
+    let updated = 0;
+    const errors: string[] = [];
+    for (const memId of memoryIds) {
+      try {
+        const rows = await this._sqlExec(
+          `SELECT * FROM memory WHERE id = :id AND workspace_id = :ws`,
+          { id: memId, ws: workspaceId },
+        );
+        if (rows.length === 0) {
+          errors.push(`Memory '${memId}' not found`);
+          continue;
+        }
+        const current = rows[0] as Record<string, unknown>;
+        const content = (updates.content as string) ?? (current.content as string) ?? "";
+        const summary = (updates.summary as string) ?? (current.summary as string) ?? "";
+        const confidence = (updates.confidence as number) ?? (current.confidence as number) ?? 0.8;
+        const expiresAt = (updates.expires_at as number) ?? 0;
+        await this.updateMemory(memId, content, summary, confidence, expiresAt);
+        updated++;
+      } catch (e: any) {
+        errors.push(`Memory '${memId}': ${e.message ?? e}`);
+      }
+    }
+    if (errors.length > 0) {
+      return { status: "partial", updated, errors };
+    }
+    return { status: "ok", updated };
   }
 }
