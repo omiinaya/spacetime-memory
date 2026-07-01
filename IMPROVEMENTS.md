@@ -14,9 +14,43 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
+### P3: Add `listTagsByMemory` / `getMemoryTags` — efficient reverse tag lookup
+No way to efficiently get all tags for a given memory. Currently requires iterating
+all MemoryTag rows. Add a reducer + SDK method that does this in one call.
+Files: server/spacetimedb/src/tag.rs, sdk/python/..., sdk/typescript/...
+Difficulty: Easy
+Est: 15min
+
+### P3: Tag rename/color update reducer
+Tags cannot be renamed or re-colored after creation (no `update_tag` reducer).
+Files: server/spacetimedb/src/tag.rs
+Difficulty: Easy
+Est: 10min
+
+### P3: Add `search_by_tags` — tag-filtered semantic search
+Combine tag filtering with vector search in a single reducer: specify tag IDs
+and only return memories that have *all* matching tags.
+Files: server/spacetimedb/src/hybrid_query.rs, tag.rs
+Difficulty: Medium
+Est: 1h
+
 ---
 
 ## Recently Completed
+
+### P3: Add `batch_tag_memories` + `batch_untag_memories` reducers + SDK methods (July 1, 2026)
+Eliminates O(n) network round-trips for bulk tagging/untagging operations.
+- Rust: batch_tag_memories (idempotent — skips already-tagged) and
+  batch_untag_memories (idempotent — skips missing associations) reducers
+- Python SDK: batch_tag_memories() + batch_untag_memories()
+- TypeScript SDK: batchTagMemories() + batchUntagMemories()
+- 10 Python unit tests + 4 TypeScript unit tests
+Commit: 4a1b3bd3
+Files: server/spacetimedb/src/tag.rs, sdk/python/spacetime_memory/client.py,
+  sdk/python/tests/test_tags.py, sdk/typescript/client.ts,
+  sdk/typescript/tests/client.test.ts
+Difficulty: Medium
+Est: 20min
 
 ### P3: Enhanced `dedup_memories` — merge tags, KG edges, entities (July 1, 2026)
 Enhanced the `dedup_memories` reducer to fully migrate MemoryTag associations,
@@ -53,23 +87,6 @@ Est: 15min
 Python SDK already had `batch_update_memories(memory_ids, updates)` — confirmed
 existing at line 2705 of client.py. Item was stale; verified code exists and works.
 Files: sdk/python/spacetime_memory/client.py (verified existing, line 2705)
-Difficulty: Easy
-Est: 5min
-
-### P3: Add `crossEncoderRerank` to TypeScript SDK via MCP (July 1, 2026)
-Added `crossEncoderRerank(query, candidates, opts?)` method that calls the MCP
-server's `cross_encoder_rerank` tool for server-side ONNX reranking. Includes
-`CrossEncoderRerankOptions` interface, `mcpUrl` config option (default port 8099),
-handles both 'result' and 'content' MCP response formats. 6 unit tests.
-Commit: 492b94c5
-Files: sdk/typescript/client.ts, sdk/typescript/tests/client.test.ts
-Difficulty: Medium
-Est: 20min
-
-### P3: Cross-encoder rerank unit tests (July 1, 2026)
-15 tests already existed and pass covering CrossEncoderReranker init,
-rerank scoring, fallback behavior, singleton lifecycle, and custom content keys.
-Files: sdk/python/tests/test_cross_encoder.py (verified existing)
 Difficulty: Easy
 Est: 5min
 
