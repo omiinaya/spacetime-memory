@@ -3178,6 +3178,38 @@ export class Client {
     return this._call("update_tag", [tagId, name, color]);
   }
 
+  /**
+   * Search memories by tag filter, optionally with semantic ranking.
+   * Only memories that have ALL specified tags are returned (intersection).
+   * @param workspaceId - Target workspace
+   * @param tagIds - Array of tag IDs to filter by (AND intersection)
+   * @param query - Optional query string for semantic ranking. Empty string
+   *   skips semantic similarity (results ordered by recency).
+   * @param limit - Maximum number of results (default 10)
+   * @returns Array of hybrid_result rows matching all tags
+   */
+  async searchByTags(
+    workspaceId: string,
+    tagIds: string[],
+    query: string = "",
+    limit: number = 10,
+  ): Promise<Record<string, unknown>[]> {
+    // Get embedding if query provided
+    let embJson = "[]";
+    if (query) {
+      const queryText = `Represent this sentence for searching relevant passages: ${query}`;
+      const emb = await this._embed(queryText);
+      embJson = emb ? JSON.stringify(emb) : "[]";
+    }
+    const tagIdsJson = JSON.stringify(tagIds);
+    await this._call("search_by_tags", [workspaceId, tagIdsJson, embJson, limit]);
+    const qhash = this._queryHash(`tagged:${tagIdsJson}`);
+    return this._sqlExec(
+      `SELECT * FROM hybrid_result WHERE workspace_id = :ws AND query_hash = :qh ORDER BY score DESC`,
+      { ws: workspaceId, qh: qhash },
+    );
+  }
+
   // -----------------------------------------------------------------------
   // Directories
   // -----------------------------------------------------------------------

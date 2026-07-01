@@ -1068,8 +1068,183 @@ pub fn search_sessions_semantic(
     Ok(())
 }
 
+// ── Search by tags ──────────────────────────────────────────────────────────────
+
+/// Search memories by tag filter, optionally with semantic ranking.
+///
+/// `tag_ids_json`: JSON array of tag ID strings. Only memories that have ALL
+///   specified tags are returned (intersection).
+/// `workspace_id`: Scope to a specific workspace.
+/// `query_embedding_json`: Optional JSON array of f64 embeddings. Pass "[]" to
+///   skip semantic ranking (results ordered by recency).
+/// `limit`: Maximum results to return (default 10).
+///
+/// Results are written to `hybrid_result` with strategy "tagged".
+#[reducer]
+pub fn search_by_tags(
+    ctx: &ReducerContext,
+    workspace_id: String,
+    tag_ids_json: String,
+    query_embedding_json: String,
+    limit: u32,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let now = now_micros(ctx);
+    let qhash = format!("tagged:{}", tag_ids_json); // deterministic query hash
+    let limit = if limit == 0 { 10 } else { limit };
+
+    // Parse tag IDs
+    let tag_ids: Vec<String> = serde_json::from_str(&tag_ids_json)
+        .map_err(|e| format!("Invalid tag_ids_json: {}", e))?;
+    if tag_ids.is_empty() {
+        return Err("search_by_tags: at least one tag_id required".to_string());
+    }
+
+    // ── Clear previous results for this query_hash ──
+    let old: Vec<_> = ctx
+        .db
+        .hybrid_result()
+        .iter().take(crate::MAX_RESULTS)
+        .filter(|r| r.workspace_id == workspace_id && r.query_hash == qhash)
+        .collect();
+    for r in old {
+        ctx.db.hybrid_result().id().delete(r.id);
+    }
+
+    // ── Find memories tagged with ALL specified tags (intersection) ──
+    // Collect all (memory_id, tag_id) pairs, then filter to memories that
+    // appear for every requested tag.
+    let mut mem_tags: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for mt in ctx.db.memory_tag().iter().take(crate::MAX_RESULTS) {
+        if tag_ids.contains(&mt.tag_id) {
+            mem_tags.entry(mt.memory_id.clone())
+                .or_insert_with(Vec::new)
+                .push(mt.tag_id.clone());
+        }
+    }
+    // Collect memory IDs that have ALL of the requested tags
+    let mut matched_memory_ids: Vec<String> = mem_tags
+        .into_iter()
+        .filter(|(_, tags)| {
+            tag_ids.iter().all(|tid| tags.contains(tid))
+        })
+        .map(|(mid, _)| mid)
+        .collect();
+
+    if matched_memory_ids.is_empty() {
+        return Ok(()); // No matches — nothing to write
+    }
+
+    // ── Parse query embedding ──
+    let query_emb = parse_embedding_json(&query_embedding_json);
+    let has_embedding = !query_emb.is_empty();
+    let qnorm = if has_embedding {
+        let s: f64 = query_emb.iter().map(|x| x * x).sum();
+        s.sqrt()
+    } else {
+        0.0
+    };
+
+    // ── Score and rank ──
+    struct Candidate {
+        entity_id: String,
+        entity_type: String,
+        content: String,
+        score: f64,
+    }
+
+    let mut candidates: Vec<Candidate> = Vec::new();
+
+    // Pre-fetch search_index for efficient lookup
+    let si_map: std::collections::HashMap<String, (String, String, String)> = ctx
+        .db
+        .search_index()
+        .iter()
+        .take(crate::MAX_RESULTS)
+        .filter(|si| si.workspace_id == workspace_id)
+        .filter(|si| matched_memory_ids.contains(&si.entity_id))
+        .map(|si| (si.entity_id.clone(), (si.embedding_json.clone(), si.content.clone(), si.entity_type.clone())))
+        .collect();
+
+    for mid in &matched_memory_ids {
+        let (emb_str, content, etype) = match si_map.get(mid) {
+            Some(v) => v.clone(),
+            None => continue,
+        };
+
+        let score = if has_embedding && !emb_str.is_empty() && emb_str != "[]" {
+            if let Ok(stored_emb) = serde_json::from_str::<Vec<f64>>(&emb_str) {
+                if stored_emb.len() == query_emb.len() && qnorm > 0.0 {
+                    let s_norm: f64 = stored_emb.iter().map(|x| x * x).sum::<f64>().sqrt();
+                    if s_norm > 0.0 {
+                        let dot: f64 = query_emb.iter().zip(stored_emb.iter()).map(|(a, b)| a * b).sum();
+                        (dot / (qnorm * s_norm)).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            }
+        } else {
+            // No embedding — score by recency (recent = higher)
+            0.5
+        };
+
+        if score >= 0.1 {
+            candidates.push(Candidate {
+                entity_id: mid.clone(),
+                entity_type: etype,
+                content,
+                score,
+            });
+        }
+    }
+
+    // Sort by score descending
+    candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Insert top results
+    let workspace_context = ctx
+        .db
+        .workspace()
+        .id()
+        .find(&workspace_id)
+        .map(|ws| ws.context)
+        .unwrap_or_default();
+
+    for c in candidates.into_iter().take(limit as usize) {
+        let memory_context = if c.entity_type == "memory" {
+            ctx.db.memory().id().find(&c.entity_id)
+                .map(|m| m.context)
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        let context_json = make_context_json(&workspace_context, &memory_context);
+
+        ctx.db.hybrid_result().insert(HybridResult {
+            id: uuid_v7(ctx),
+            workspace_id: workspace_id.clone(),
+            query_hash: qhash.clone(),
+            entity_type: c.entity_type,
+            entity_id: c.entity_id,
+            content: c.content,
+            score: c.score,
+            strategy: "tagged".to_string(),
+            context_json,
+            created_at: now,
+        });
+    }
+
+    Ok(())
+}
+
+// ─── Tests ──────────────────────────────────────────────────────────────────────
 #[cfg(test)]
-mod tests {
+mod tests {"
     use super::*;
 
     #[test]

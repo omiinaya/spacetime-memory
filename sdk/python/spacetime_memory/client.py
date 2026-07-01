@@ -4629,6 +4629,55 @@ class Client:
         """
         self._call("update_tag", [tag_id, name, color])
 
+    def search_by_tags(
+        self,
+        workspace_id: str,
+        tag_ids: list[str],
+        query: str = "",
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Search memories by tag filter, optionally with semantic ranking.
+
+        Only memories that have ALL specified tags are returned (intersection).
+
+        Args:
+            workspace_id: Target workspace.
+            tag_ids: List of tag IDs to filter by (AND intersection).
+            query: Optional query string for semantic ranking. Pass empty
+                string to skip semantic similarity (results ordered by recency).
+            limit: Maximum number of results.
+
+        Returns:
+            List of hybrid_result rows matching all tags, sorted by
+            relevance (if query provided) or recency.
+        """
+        # Get embedding if query provided
+        emb_json = "[]"
+        if query:
+            query_text = (
+                f"Represent this sentence for searching relevant passages: {query}"
+            )
+            emb = self._embed(query_text)
+            emb_json = json.dumps(emb) if emb else "[]"
+
+        tag_ids_json = json.dumps(tag_ids)
+        self._call(
+            "search_by_tags",
+            [
+                workspace_id,
+                tag_ids_json,
+                emb_json,
+                limit,
+            ],
+        )
+        qhash = _query_hash(f"tagged:{tag_ids_json}")
+        return self._sql(
+            "SELECT * FROM hybrid_result "
+            f"WHERE workspace_id = '{_esc(workspace_id)}' "
+            f"  AND query_hash = '{_esc(qhash)}' "
+            "ORDER BY score DESC"
+        )
+
     # -------------------------------------------------------------------
     # Entity Linking
     # -------------------------------------------------------------------
