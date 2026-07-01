@@ -339,11 +339,7 @@ function parseSqlResponse(raw: string): any[] {
     }
   }
   return results;
-}
-
-// ---------------------------------------------------------------------------
-// Client
-// ---------------------------------------------------------------------------
+  }
 
 export class Client {
   private readonly host: string;
@@ -454,6 +450,28 @@ export class Client {
   }
 
   /**
+   * Call a reducer and return the raw response body.
+   * Use when the reducer emits data via reducer_result (e.g. list_admins).
+   */
+  private async _callWithResult(reducer: string, args: unknown[]): Promise<string> {
+    const resp = await fetch(`${this.reducerUrl()}/${reducer}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+    });
+    if (!resp.ok) {
+      throw new Error(
+        `Reducer error (${resp.status}): ${await resp.text()}`
+      );
+    }
+    const text = await resp.text();
+    if (text.length === 0) {
+      throw new Error(`Reducer '${reducer}' returned empty response`);
+    }
+    return text;
+  }
+
+  /**
    * Get a text embedding vector from the embedder sidecar.
    * Returns an empty array if the embedder is unreachable or errors.
    */
@@ -512,6 +530,108 @@ export class Client {
       }
     }
     return results;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auth / Account
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Register a new account. First user becomes admin.
+   * @param username - Unique username for the account.
+   * @param displayName - Optional display name (defaults to username).
+   * @param password - Password (minimum 6 characters).
+   */
+  async register(
+    username: string,
+    displayName: string = "",
+    password: string = ""
+  ): Promise<void> {
+    return this._call("register", [username, displayName, password]);
+  }
+
+  /**
+   * Login with username + password. Links this identity to the account.
+   * @param username - Account username.
+   * @param password - Account password.
+   */
+  async login(username: string, password: string): Promise<void> {
+    return this._call("login", [username, password]);
+  }
+
+  /**
+   * Logout — detach the current identity from its account.
+   */
+  async logout(): Promise<void> {
+    return this._call("logout", []);
+  }
+
+  /**
+   * Update account display name and/or password.
+   * @param displayName - New display name (empty = no change).
+   * @param currentPassword - Current password (required for verification).
+   * @param newPassword - New password (empty = no change, min 6 chars).
+   */
+  async updateAccount(
+    displayName: string = "",
+    currentPassword: string = "",
+    newPassword: string = ""
+  ): Promise<void> {
+    return this._call("update_account", [
+      displayName,
+      currentPassword,
+      newPassword,
+    ]);
+  }
+
+  /**
+   * Deactivate (soft-delete) this account.
+   * The account remains in the database with is_active=false,
+   * preventing future logins.
+   * @param password - Account password (required for verification).
+   */
+  async deactivateAccount(password: string): Promise<void> {
+    return this._call("deactivate_account", [password]);
+  }
+
+  /**
+   * Promote a user to admin. Caller must be an existing admin.
+   * @param targetIdentity - The identity hex string of the user to promote.
+   */
+  async promoteAdmin(targetIdentity: string): Promise<void> {
+    return this._call("promote_admin", [targetIdentity]);
+  }
+
+  /**
+   * Demote an admin to regular user. Caller must be an existing admin.
+   * Cannot demote yourself. At least one admin must always remain.
+   * @param targetIdentity - The identity hex string of the admin to demote.
+   */
+  async demoteAdmin(targetIdentity: string): Promise<void> {
+    return this._call("demote_admin", [targetIdentity]);
+  }
+
+  /**
+   * List all admin accounts.
+   * @returns Array of admin account records.
+   */
+  async listAdmins(): Promise<Record<string, unknown>[]> {
+    await this._call("list_admins", []);
+    // list_admins emits results into the admin_result public table
+    const rows = await this._sqlExec(
+      `SELECT row_json FROM admin_result`,
+      {}
+    );
+    return rows.map((r: Record<string, unknown>) => {
+      if (r?.row_json) {
+        try {
+          return JSON.parse(r.row_json as string) as Record<string, unknown>;
+        } catch {
+          return r;
+        }
+      }
+      return r;
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -1581,9 +1701,13 @@ export class Client {
    * @returns Array of tag records
    */
   async listTags(workspaceId: string): Promise<TagRecord[]> {
-    const result = await this._call("list_tags", [workspaceId]);
-    if (typeof result === "string") return JSON.parse(result) as TagRecord[];
-    return (result ?? []) as TagRecord[];
+    await this._call("list_tags", [workspaceId]);
+    // list_tags emits results into the query_result table
+    const rows = await this._sqlExec(
+      `SELECT row_json FROM tag LIMIT 1000`,
+      {}
+    );
+    return rows as TagRecord[];
   }
 
   /**
