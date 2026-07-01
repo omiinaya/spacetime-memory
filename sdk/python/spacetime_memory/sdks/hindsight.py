@@ -1335,7 +1335,7 @@ class Hindsight:
         """Get a specific mental model by ID."""
         if self._closed:
             raise RuntimeError("Hindsight client is closed")
-        ws_id = self._ensure_bank(bank_id)
+        self._ensure_bank(bank_id)  # validate bank_id exists
         try:
             mems = self._client.get_memory(model_id)
             if isinstance(mems, list) and len(mems) > 0:
