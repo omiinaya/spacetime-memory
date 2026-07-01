@@ -42,7 +42,7 @@ deactivates them in a single call — eliminating O(n) network round-trips for
 bulk deletion. Idempotent per-memory (skips missing IDs).
 Added `batch_delete_memories(memory_ids)` to Python SDK and
 `batchDeleteMemories(memoryIds)` to TypeScript SDK.
-Commit: (pending — push after tests verify)
+Commit: 09da711a
 Files: server/spacetimedb/src/memory.rs, sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
 Difficulty: Medium
 Est: 15min
