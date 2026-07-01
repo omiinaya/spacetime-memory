@@ -27,7 +27,34 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
+### P3: Add list_peers / peer discovery Python SDK method
+Rust `list_peers` reducer exists, Python SDK only has raw _call() access.
+Files: sdk/python/spacetime_memory/client.py, server/spacetimedb/src/peer.rs
+Difficulty: Easy
+Est: 10min
+
+### P3: Add CLI commands for tag management (list, delete)
+CLI has no `stmem tag list` or `stmem tag delete` — only SDK/MCP methods exist now.
+Files: cli/stmem.py
+Difficulty: Easy
+Est: 15min
+
+### P3: Add listTags/deleteTag tests to TypeScript SDK test suite
+New methods need vitest reducer-call tests following existing patterns.
+Files: sdk/typescript/tests/client.test.ts
+Difficulty: Easy
+Est: 10min
+
 ## Recently Completed
+
+### P3: Add list_tags + delete_tag reducers with full SDK + MCP support
+Added Rust reducers (list_tags, delete_tag), Python SDK methods (list_tags, delete_tag),
+TypeScript SDK methods (listTags, deleteTag), and MCP tools (list_tags, delete_tag).
+All 170 existing Python tests pass.
+Files: server/spacetimedb/src/tag.rs, sdk/python/spacetime_memory/client.py,
+       sdk/typescript/client.ts, server/mcp/main.py
+Difficulty: Easy
+Est: 30min
 
 ### P3: Python SDK — Add public auth method wrappers
 Added register(), login(), logout(), update_account(), deactivate_account(),
@@ -64,46 +91,6 @@ All pass via mocked HTTP (no live STDB needed). 170/170 existing tests still pas
 Files: sdk/python/tests/test_e2e.py, sdk/python/tests/conftest.py
 Difficulty: Medium
 Est: 4h
-
-### P3: Python — Move 17 function-level imports to module top
-Style violation eliminated: all inline imports of random, time, secrets, json, and hashlib
-moved to top-level section. Removed 17 inline imports across 10 functions. 170/170 tests pass.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 30min
-
-### P2: Remove 168MB stale `.upstream-venv`
-Cleaned up 168MB of stale virtualenv. Already in .gitignore, no git changes needed.
-Files: .upstream-venv/ (removed)
-Difficulty: Easy
-Est: 10min
-
-### P2: Python — Route 5 direct-HTTP methods through retry circuit
-All 5 methods (ping, check_embedder_health, _tantivy_index, _tantivy_search, _embed_openai)
-plus _embed_batch_openai now use retry wrappers. Internal sidecar calls use _request_with_retry()
-(STDB circuit breaker); external OpenAI calls use new _request_with_retry_simple() that retries
-without touching the circuit breaker. 170/170 client tests pass.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Medium
-Est: 30min
-
-### P1: TypeScript — Fix SQL injection vulnerability
-All SQL queries migrated from raw string interpolation (`${esc()}`) to parameterized `_sqlExec(':param')`. Fixed critical `esc()` backslash regex bug (`/\\\\\\\\\\\\\\\\/g` → `/\\\\\\\\/g`) that missed single backslashes. 46 queries converted, 44 `_sqlExec()` calls now serve all public methods.
-Files: sdk/typescript/client.ts
-Difficulty: Medium
-Est: 30min
-
-### P1: Rust — Replace uuid_v7().expect() with graceful fallback in lib.rs:125
-Panics in WASM if STDB RNG fails. Replaced with `.unwrap_or_else(|| uuid_v4(ctx))`.
-Files: server/spacetimedb/src/lib.rs:125
-Difficulty: Easy
-Est: 5min
-
-### P1: Rust — Add logging to 4 silent `serde_json::from_str().unwrap_or_default()` calls
-These silently swallowed parse errors with zero logging in profile.rs (73, 110), entity_linking.rs (62), hybrid_query.rs (125).
-Files: server/spacetimedb/src/profile.rs, entity_linking.rs, hybrid_query.rs
-Difficulty: Easy
-Est: 15min
 
 ## Deferred / Blocked
 
