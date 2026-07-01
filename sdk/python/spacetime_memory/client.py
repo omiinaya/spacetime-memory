@@ -25,7 +25,7 @@ import re
 logger = logging.getLogger(__name__)
 
 from .query_expansion import expand_query  # noqa: E402 — intentional late import
-from ._protocols import (
+from ._protocols import (  # noqa: E402 — intentional late import
     EventBusProtocol,
     LocalLLMProtocol,
     MetricsCollectorProtocol,
