@@ -1806,6 +1806,48 @@ export class Client {
   }
 
   /**
+   * Set the memory scope for user isolation.
+   * @param memoryId - Memory ID
+   * @param userScope - User identity hash (empty = shared/unscoped)
+   */
+  async setMemoryScope(
+    memoryId: string,
+    userScope: string
+  ): Promise<void> {
+    return this._call("set_memory_scope", [memoryId, userScope]);
+  }
+
+  /**
+   * Batch-escalate memory tiers based on access_count thresholds.
+   * @param workspaceId - Workspace ID
+   * @param l2ToL1 - Access count threshold for L2→L1 (default: 5)
+   * @param l1ToL0 - Access count threshold for L1→L0 (default: 20)
+   */
+  async escalateMemories(
+    workspaceId: string,
+    l2ToL1?: number,
+    l1ToL0?: number
+  ): Promise<void> {
+    return this._call("escalate_memories", [
+      workspaceId,
+      l2ToL1 ?? 5,
+      l1ToL0 ?? 20,
+    ]);
+  }
+
+  /**
+   * Get all notes that the given note links to (outgoing wiki links).
+   * @param noteId - Note ID
+   * @returns Array of outgoing link records
+   */
+  async getOutgoingLinks(noteId: string): Promise<Record<string, unknown>[]> {
+    return this._sqlExec(
+      `SELECT target_note_id, relation FROM note_backlink WHERE source_note_id = :nid`,
+      { nid: noteId },
+    );
+  }
+
+  /**
    * Set the decay model configuration for a workspace.
    * @param workspaceId - Workspace ID
    * @param modelType - Decay model type (e.g. "exponential", "linear")
