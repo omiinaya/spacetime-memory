@@ -14,6 +14,30 @@ Files: server/spacetimedb/src/profile.rs
 Difficulty: Hard
 Est: 1 week
 
+### P3: Add `expires_at` support to memories (mem0 parity)
+mem0 v2.0.10 added `expiration_date` on memory update. We should add `expires_at` column
+to the memory store reducer + Python SDK client.update() parameter + auto-cleanup reducer
+that runs on a cron to delete/archive expired memories.
+Files: server/spacetimedb/src/lib.rs, sdk/python/spacetime_memory/client.py
+Difficulty: Medium
+Est: 30min
+
+### P2: Add `get_memory_stats` endpoint — workspace-level memory metrics
+Expose a reducer or Python SDK method returning per-workspace stats: total memories,
+by tier (L0/L1/L2), by type, avg confidence, avg age, top tags, etc. Useful for
+dashboards and agent introspection. Similar to mem0's user stats endpoint.
+Files: server/spacetimedb/src/lib.rs, sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 10min
+
+### P3: Add `cross_encoder_rerank` to TypeScript SDK (TS parity gap)
+Python SDK has `CrossEncoderReranker` + MCP tool. TypeScript SDK has no equivalent.
+Could be implemented client-side via ONNX runtime web or server-side via the MCP tool.
+For now, document the pattern: call MCP tool from TS.
+Files: sdk/typescript/client.ts
+Difficulty: Medium
+Est: 20min
+
 ---
 
 ## Recently Completed
