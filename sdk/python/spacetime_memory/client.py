@@ -4333,10 +4333,10 @@ class Client:
         Returns:
             List of tag dicts with id, workspace_id, name, color, created_at.
         """
-        result = self._call("list_tags", [workspace_id])
-        if isinstance(result, str):
-            return json.loads(result)
-        return result or []
+        # Note: the list_tags reducer was changed to return () for STDB v2.6 compat.
+        # We now query the tag table directly via _query.
+        self._call("list_tags", [workspace_id])  # auth gate
+        return self._query("tag", workspace_id=workspace_id, columns=["id", "workspace_id", "name", "color", "created_at"])
 
     def delete_tag(self, tag_id: str) -> None:
         """Delete a tag and all its memory associations.

@@ -70,12 +70,13 @@ test-frontend:  ## Run frontend vitest tests
 test-e2e:  ## Run Playwright E2E tests
 	cd client && npx playwright test
 
-bench:  ## Run performance benchmark (needs live STDB + embedder)
-	@if [ -z "$$SPACETIMEDB_DB" ]; then \
-		echo "Set SPACETIMEDB_DB=<identity> first"; \
+bench:  ## Run performance benchmark (needs live STDB on :3001)
+	@DB=$$(spacetime list 2>/dev/null | grep "spacetime-memory" | awk '{print $$NF}'); \
+	if [ -z "$$DB" ]; then \
+		echo "spacetime-memory not published. Run: cd server/spacetimedb && spacetime publish spacetime-memory --yes -p . --delete-data=never"; \
 		exit 1; \
-	fi
-	PYTHONPATH=sdk/python python3 sdk/python/scripts/quick-bench.py
+	fi; \
+	PYTHONPATH=sdk/python SPACETIMEDB_DB=$$DB python3 scripts/benchmark.py
 
 smoke:  ## Run end-to-end smoke test (needs live STDB on :3001)
 	@PYTHONPATH=$(CURDIR)/sdk/python python3 $(CURDIR)/sdk/python/tests/smoke_test.py
