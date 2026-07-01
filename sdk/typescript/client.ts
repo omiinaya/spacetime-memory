@@ -133,6 +133,17 @@ export interface SpaceMemberRecord {
   joined_at?: number;
 }
 
+/** A peer record. */
+export interface PeerRecord {
+  id: string;
+  workspace_id: string;
+  name: string;
+  peer_type: string;
+  metadata: string;
+  created_at: number;
+  updated_at: number;
+}
+
 /** A session step record. */
 export interface SessionStepRecord {
   id: string;
@@ -586,6 +597,24 @@ export class Client {
       `SELECT * FROM space_member WHERE workspace_id = :ws`,
       { ws: workspaceId },
     )) as SpaceMemberRecord[];
+  }
+
+  /**
+   * List peers, optionally filtered by workspace.
+   * @param workspaceId - Optional workspace ID to filter by
+   * @returns Array of peer records
+   */
+  async listPeers(workspaceId?: string): Promise<PeerRecord[]> {
+    if (workspaceId) {
+      return (await this._sqlExec(
+        `SELECT * FROM peer WHERE workspace_id = :ws`,
+        { ws: workspaceId },
+      )) as PeerRecord[];
+    }
+    return (await this._sqlExec(
+      `SELECT * FROM peer`,
+      {},
+    )) as PeerRecord[];
   }
 
   /**

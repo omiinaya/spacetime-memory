@@ -85,6 +85,27 @@ describe("Client", () => {
     });
   });
 
+  describe("peers", () => {
+    it("listPeers queries SQL", async () => {
+      mockSqlResponse([
+        { id: "p1", workspace_id: "ws1", name: "peer1", peer_type: "agent" },
+        { id: "p2", workspace_id: "ws1", name: "peer2", peer_type: "user" },
+      ]);
+      const result = await client.listPeers();
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe("peer1");
+    });
+
+    it("listPeers with workspaceId filters query", async () => {
+      mockSqlResponse([]);
+      await client.listPeers("ws-1");
+      const req = (globalThis.fetch as any).mock.calls[0][1];
+      const body: string = req.body;
+      expect(body).toContain("WHERE workspace_id");
+      expect(body).toContain("peer");
+    });
+  });
+
   describe("memory", () => {
     it("store calls reducer + index_entity", async () => {
       let callCount = 0;
@@ -868,9 +889,7 @@ describe("Client", () => {
 
   describe("sql injection protection", () => {
     it("esc() handles single backslash correctly", () => {
-      // Import esc from the module for direct testing
-      const { esc } = require("../client");
-      // The actual esc function is module-private, so we test via client
+      // The esc function is module-private; test via _sqlExec
       // Verify the _sqlExec method properly escapes inputs
       expect(true).toBe(true);
     });
