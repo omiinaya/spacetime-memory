@@ -764,6 +764,80 @@ export class Client {
   }
 
   // -----------------------------------------------------------------------
+  // API Keys
+  // -----------------------------------------------------------------------
+
+  /**
+   * Create a new API key with a specific permission set.
+   * Generates a secure random key secret (sk-...), hashes it, and stores
+   * the hash. The unhashed secret is returned only once.
+   * @param workspaceId - Workspace ID
+   * @param name - Human-readable label for the key
+   * @param permissions - Permission array as JSON string (default: '["read"]')
+   * @returns Object with status, apiKey (the secret), id (key DB ID), and warning
+   */
+  async createApiKey(
+    workspaceId: string,
+    name: string,
+    permissions?: string
+  ): Promise<Record<string, unknown>> {
+    // Generate a secure random key using crypto
+    const raw = new Uint8Array(32);
+    crypto.getRandomValues(raw);
+    const hex = Array.from(raw).map(b => b.toString(16).padStart(2, "0")).join("");
+    const apiKey = "sk-" + hex;
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(apiKey));
+    const keyHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+
+    const requestId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, "0")).join("");
+
+    const perms = permissions ?? '["read"]';
+
+    await this._call("create_api_key", [
+      workspaceId,
+      name,
+      perms,
+      keyHash,
+      requestId,
+    ]);
+
+    const rows = await this._sql(
+      `SELECT api_key_id, name, permissions FROM api_key_result WHERE request_id = '${requestId}' AND operation = 'create'`
+    );
+    const keyId = (rows[0]?.api_key_id as string) ?? "";
+
+    return {
+      status: "ok",
+      api_key: apiKey,
+      id: keyId,
+      note: "Save this key — it will not be shown again.",
+    };
+  }
+
+  /**
+   * Deactivate (revoke) an API key so it can no longer be used.
+   * @param keyId - The primary-key id of the API key row
+   */
+  async deactivateApiKey(keyId: string): Promise<void> {
+    return this._call("deactivate_api_key", [keyId]);
+  }
+
+  /**
+   * List all API keys for a workspace.
+   * Calls the list_api_keys reducer which populates the api_key_result table.
+   * @param workspaceId - Workspace ID
+   * @returns Array of API key metadata records
+   */
+  async listApiKeys(workspaceId: string): Promise<Record<string, unknown>[]> {
+    await this._call("list_api_keys", [workspaceId]);
+    return this._sql(
+      `SELECT * FROM api_key_result WHERE request_id = '${workspaceId}' ORDER BY created_at DESC`
+    );
+  }
+
+  // -----------------------------------------------------------------------
   // Mental Models
   // -----------------------------------------------------------------------
 
@@ -1333,6 +1407,105 @@ export class Client {
   }
 
   // -----------------------------------------------------------------------
+  // Backlinks & Document References
+  // -----------------------------------------------------------------------
+
+  /**
+   * Get all backlinks referencing a note (incoming wiki links).
+   * @param noteId - Note ID to find backlinks for
+   * @returns Array of backlink records
+   */
+  async getBacklinks(noteId: string): Promise<Record<string, unknown>[]> {
+    await this._call("get_backlinks", [noteId]);
+    return this._sqlExec(
+      `SELECT * FROM backlink_result WHERE target_note_id = :nid`,
+      { nid: noteId },
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // Documents
+  // -----------------------------------------------------------------------
+
+  /**
+   * Create a document with auto-chunking.
+   * Documents with content >= 100 chars are automatically split into
+   * overlapping ~500-char chunks (sentence-boundary-aware).
+   * @param workspaceId - Target workspace
+   * @param title - Document title
+   * @param content - Document body text (auto-chunked if >= 100 chars)
+   * @param contentType - Content type: "text", "pdf", "image", "video", "code", or "url"
+   * @param filePath - Optional file path
+   * @param sourceUrl - Optional source URL
+   * @param metadata - Optional metadata dict
+   */
+  async createDocument(
+    workspaceId: string,
+    title: string,
+    content?: string,
+    contentType?: string,
+    filePath?: string,
+    sourceUrl?: string,
+    metadata?: Record<string, unknown>
+  ): Promise<void> {
+    const metaJson = metadata ? JSON.stringify(metadata) : "{}";
+    return this._call("create_document", [
+      workspaceId,
+      title,
+      content ?? "",
+      contentType ?? "text",
+      filePath ?? "",
+      sourceUrl ?? "",
+      metaJson,
+    ]);
+  }
+
+  /**
+   * Get a document by ID.
+   * @param docId - Document ID
+   * @returns Document record or null
+   */
+  async getDocument(docId: string): Promise<Record<string, unknown> | null> {
+    const rows = await this._sqlExec(
+      `SELECT * FROM document WHERE id = :did`,
+      { did: docId },
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * List all documents in a workspace.
+   * @param workspaceId - Workspace ID
+   * @returns Array of document records
+   */
+  async listDocuments(workspaceId: string): Promise<Record<string, unknown>[]> {
+    return this._sqlExec(
+      `SELECT * FROM document WHERE workspace_id = :ws`,
+      { ws: workspaceId },
+    );
+  }
+
+  /**
+   * Get chunks for a document.
+   * @param docId - Document ID
+   * @returns Array of document chunk records
+   */
+  async getDocumentChunks(docId: string): Promise<Record<string, unknown>[]> {
+    return this._sqlExec(
+      `SELECT * FROM document_chunk WHERE document_id = :did ORDER BY chunk_index ASC`,
+      { did: docId },
+    );
+  }
+
+  /**
+   * Delete a document.
+   * @param docId - Document ID to delete
+   */
+  async deleteDocument(docId: string): Promise<void> {
+    return this._call("delete_document", [docId]);
+  }
+
+  // -----------------------------------------------------------------------
   // Maintenance
   // -----------------------------------------------------------------------
 
@@ -1343,6 +1516,27 @@ export class Client {
    */
   async detectCommunities(workspaceId: string): Promise<void> {
     return this._call("detect_communities", [workspaceId]);
+  }
+
+  /**
+   * Seed communities in the knowledge graph (initialise community structure).
+   * @param workspaceId - Workspace ID
+   */
+  async seedCommunities(workspaceId: string): Promise<void> {
+    return this._call("seed_communities", [workspaceId]);
+  }
+
+  /**
+   * Get community information by community ID.
+   * @param communityId - Community ID (integer)
+   * @returns Community record or empty
+   */
+  async getCommunity(communityId: number): Promise<Record<string, unknown>[]> {
+    await this._call("get_community", [communityId]);
+    return this._sqlExec(
+      `SELECT * FROM community_result WHERE community_id = :cid`,
+      { cid: String(communityId) },
+    );
   }
 
   /**
@@ -1716,6 +1910,111 @@ export class Client {
    */
   async deleteTag(tagId: string): Promise<void> {
     return this._call("delete_tag", [tagId]);
+  }
+
+  // -----------------------------------------------------------------------
+  // Directories
+  // -----------------------------------------------------------------------
+
+  /**
+   * List children of a directory.
+   * @param directoryId - Directory ID
+   * @returns Array of directory children records
+   */
+  async listDirectory(directoryId: string): Promise<Record<string, unknown>[]> {
+    await this._call("get_children", [directoryId, true]);
+    return this._sqlExec(
+      `SELECT * FROM directory_result WHERE query_hash = :qid`,
+      { qid: directoryId },
+    );
+  }
+
+  /**
+   * Recursive BFS traversal of a directory tree.
+   * @param workspaceId - Workspace ID
+   * @param rootDirectoryId - Root directory ID to start traversal from
+   * @returns Array of directory records
+   */
+  async traverseDirectory(
+    workspaceId: string,
+    rootDirectoryId: string
+  ): Promise<Record<string, unknown>[]> {
+    await this._call("traverse_recursive", [workspaceId, rootDirectoryId]);
+    return this._sqlExec(
+      `SELECT * FROM directory_result WHERE query_hash = :qid`,
+      { qid: rootDirectoryId },
+    );
+  }
+
+  /**
+   * Get a directory by ID or path.
+   * @param workspaceId - Workspace ID
+   * @param pathOrId - Directory ID or path string
+   * @returns Array of directory records
+   */
+  async getDirectory(
+    workspaceId: string,
+    pathOrId: string
+  ): Promise<Record<string, unknown>[]> {
+    await this._call("get_directory", [workspaceId, pathOrId]);
+    return this._sqlExec(
+      `SELECT * FROM directory_result WHERE workspace_id = :ws`,
+      { ws: workspaceId },
+    );
+  }
+
+  /**
+   * Create a directory in the context directory tree.
+   * @param workspaceId - Workspace ID
+   * @param name - Directory name
+   * @param path - Directory path
+   * @param parentId - Optional parent directory ID
+   * @param description - Optional description
+   */
+  async createDirectory(
+    workspaceId: string,
+    name: string,
+    path: string,
+    parentId?: string,
+    description?: string
+  ): Promise<void> {
+    return this._call("create_directory", [
+      workspaceId,
+      name,
+      path,
+      parentId ?? "",
+      description ?? "",
+    ]);
+  }
+
+  /**
+   * Link a memory to a directory.
+   * @param directoryId - Directory ID
+   * @param memoryId - Memory ID to link
+   * @param workspaceId - Workspace ID
+   */
+  async linkMemoryToDirectory(
+    directoryId: string,
+    memoryId: string,
+    workspaceId: string
+  ): Promise<void> {
+    return this._call("link_memory_to_directory", [
+      directoryId,
+      memoryId,
+      workspaceId,
+    ]);
+  }
+
+  /**
+   * Unlink a memory from a directory.
+   * @param directoryId - Directory ID
+   * @param memoryId - Memory ID to unlink
+   */
+  async unlinkMemoryFromDirectory(
+    directoryId: string,
+    memoryId: string
+  ): Promise<void> {
+    return this._call("unlink_memory_from_directory", [directoryId, memoryId]);
   }
 
   // -----------------------------------------------------------------------
