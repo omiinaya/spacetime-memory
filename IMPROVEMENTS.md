@@ -8,21 +8,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P3: Add connector reducer wrappers to Python + TypeScript SDKs
-Three reducers exist in `connector.rs` (`register_connector`, `update_connector`,
-`delete_connector`) but have no Python SDK or TypeScript SDK method wrappers.
-CLI has a `register_connector` call via `_call` but no typed method.
-Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
-Difficulty: Easy
-Est: 15min
-
-### P3: Add extract_entities SDK methods
-`extract_entities` reducer in `entity_extraction.rs` has no Python SDK or
-TypeScript SDK method wrapper.
-Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
-Difficulty: Easy
-Est: 10min
-
 ### P3: `harmonic_belief` reducers — SDK method coverage
 `store_harmonic_beliefs`, `clear_harmonic_beliefs`, `log_resonance_session`
 reducers in `harmonic_belief.rs` lack Python SDK and TypeScript SDK wrappers.
@@ -30,7 +15,7 @@ Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
 Difficulty: Easy
 Est: 15min
 
-### P3: `entity_linking` reducers — SDK method coverage
+### P3: `entity_linking` reducers — SDK method coverage (CHECK — may already have methods)
 `create_entity_link`, `add_alias`, `resolve_entity` reducers in
 `entity_linking.rs` need Python and TypeScript SDK wrappers.
 Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
@@ -40,6 +25,17 @@ Est: 10min
 ---
 
 ## Recently Completed
+
+### P3: Add connector, entity_extraction, harmonic_belief SDK wrappers + CLI commands (July 1, 2026)
+Added full SDK + CLI coverage for 7 reducers across three modules that were
+missing typed wrappers: connector (register/update/delete), entity extraction,
+and harmonic beliefs (store/clear/log). New CLI commands: `connector update`,
+`connector delete`, `entity extract`, `harmonic store`, `harmonic clear`,
+`harmonic log`. Updated `connector register` to use typed SDK methods.
+Commit: 98d04717
+Files: cli/stmem.py, sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+Difficulty: Easy
+Est: 15min
 
 ### P3: `search_by_tags` — tag-filtered search (July 1, 2026)
 Added `search_by_tags` reducer in hybrid_query.rs that finds memories with
