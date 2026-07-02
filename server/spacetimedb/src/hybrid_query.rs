@@ -4,6 +4,7 @@ use crate::auth::require_admin;
 
 use crate::knowledge_graph::{kg_edge, kg_node};
 use crate::memory::memory;
+use crate::tag::memory_tag;
 use crate::retrieval::{
     search_index, term_index, bm25_idf, bm25_score,
 };
@@ -1244,7 +1245,7 @@ pub fn search_by_tags(
 
 // ─── Tests ──────────────────────────────────────────────────────────────────────
 #[cfg(test)]
-mod tests {"
+mod tests {
     use super::*;
 
     #[test]

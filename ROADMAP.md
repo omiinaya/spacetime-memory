@@ -1,289 +1,330 @@
-# Spacetime Memory — Honest Assessment (June 29, 2026, v1.35.0+322 commits — FRESH AUDIT)
+# Spacetime Memory — Comprehensive Roadmap
 
-## Project Totals
-
-| Layer | LOC | Files | Key Count |
-|-------|-----|-------|-----------|
-| Rust module | 13,405 | 33 .rs | 81 tables, 160 reducers |
-| Python SDK | 16,431 | 25 .py | 139 public methods |
-| Python tests | ~47,000 | 57 | 3,337 test methods |
-| CLI | 3,509 | 1 stmem.py | 37 subcommands |
-| MCP server | 1,275 | 1 main.py | 133 tools |
-| TypeScript SDK | 1,156 | 1 client.ts | 71 methods |
-| Adapters | ~15,000 | 6 sdks/ | 6 drop-in competitors |
-| **Total** | **~98,000** | **~125** | **—** |
+**Generated:** 2026-07-02  
+**Codebase:** ~18K Rust, ~97K Python, ~913K TypeScript (source)  
+**Rust reducers:** 175+ across 36 source files  
+**Python SDK:** ~140 public methods, ~40 private  
+**TS SDK:** ~108 public async methods  
+**Compounder:** 15 high-level workflow methods  
+**Tests:** 60+ Python test files, 1 TS test file, 0 Rust unit tests  
+**Sidecars:** Embedder (:9090), Tantivy BM25 (:9091)  
 
 ---
 
-## FRESH AUDIT RESULTS (June 29, 2026)
+## ═══════════════════════════════════════════════
+## PHASE 0: WORKING (no work needed)
+## ═══════════════════════════════════════════════
 
-A comprehensive 4-subagent audit was conducted covering: Rust module, Python SDK, TypeScript SDK, and competitive feature parity. All scores are based on actual code inspection, not self-reported claims.
+### Core Rust WASM Module (`server/spacetimedb/`)
+- [x] 85 STDB tables (25 public, 60 private)
+- [x] Auth on every reducer (require_auth / require_admin)
+- [x] Private tables correctly gated
+- [x] BM25 inverted index with tokenization, stopwords, TF-IDF scoring
+- [x] 4-strategy fusion: semantic + keyword + graph + temporal
+- [x] Per-strategy min-max normalization in SDK
+- [x] MMR diversity reranking (mmr_lambda=0.7)
+- [x] Workspace pre-filters + MAX_RESULTS caps on all table scans
+- [x] trace_span telemetry on all major reducers
+- [x] User account system (register/login/logout/deactivate)
+- [x] API key auth (sk-...) with admin role
+- [x] Workspace permissions (owner/editor/viewer) via space_permission table
+- [x] Change event logging + queryable history
+- [x] Consolidation pipeline (dedup, rollup, decay, version merge)
+- [x] Knowledge graph (nodes, edges, communities, PageRank)
+- [x] Profile system with static facts + dynamic context
+- [x] Tag system (create, update, delete, list, tag/untag memories, search_by_tags)
+- [x] Note system (CRUD, revisions, backlinks, outgoing links)
+- [x] Document system (with chunks)
+- [x] Session tracking with messages
+- [x] Tour framework (guided memory walks)
+- [x] Mental model synthesis and retrieval
+- [x] Harmonic belief propagation
+- [x] Resonance logging
+- [x] Entity extraction and linking
+- [x] Insight generation
+- [x] Peer reputation tracking
+- [x] Context management (directory, delta, compression)
+- [x] Replication (peer-to-peer memory sync)
+- [x] Role-based access control (RBAC) with admin/owner/editor/viewer
+- [x] Backfill user profiles from workspace context
+- [x] Maintenance schedule (run_maintenance cron)
+- [x] Scheduled expiration of stale memories
 
----
+### Sidecars
+- [x] **Embedder** (:9090) — ONNX bge-large-en-v1.5, 1024-dim, systemd with Restart=always
+- [x] **Tantivy BM25** (:9091) — BM25 keyword search, systemd with Restart=always
+- [x] Health endpoints on both sidecars
+- [x] SDK gracefully degrades when embedder is unreachable
 
-### 1. Rust Module — Score: 58/100
-
-**What's Great:**
-- 81 tables, 160 reducers across 33 carefully-organized modules
-- Consistent WASM-safe patterns: no `SystemTime`, no `thread::sleep`, no `OsRng` in production
-- `ctx.timestamp` used everywhere for time
-- `trace_span!` instrumentation on every reducer
-- `MAX_RESULTS` constant defined (though not consistently used)
-- Table whitelist for query endpoint (security)
-- Auth guards: 158/160 reducers properly gated (only `init`, `register`, `login`, `logout` intentionally ungated)
-
-**🔴 CRITICAL ANTI-PATTERNS (8 deductions, -38 pts total):**
-
-| # | Issue | Severity | Location | Fix |
-|---|-------|----------|----------|-----|
-| A1 | **Duplicate `require_auth()` in every reducer** | 🚨 HIGH | `context_directory.rs` — 7 reducers, each calls `require_auth()` TWICE (copy-paste bug) | Remove duplicate line |
-| A2 | **Unbounded `.iter()` without `.take(MAX_RESULTS)`** | 🚨 HIGH | 8+ locations: `consolidation.rs:586/604`, `context_delta.rs:89/224`, `memory_feedback.rs:225`, `context_directory.rs` (multiple), `graph_traversal.rs`, `knowledge_graph.rs` (pagerank) | Add `.take(crate::MAX_RESULTS)` |
-| A3 | **Invalid permission string `"reader"`** | 🔴 HIGH | `knowledge_graph.rs:1143` — should be `"viewer"`, not `"reader"`. Will always fail auth checks. | Fix string |
-| A4 | **`uuid_v7().expect()` panic path** | 🔴 HIGH | `lib.rs:125` — panics in WASM if RNG fails | Replace with graceful fallback |
-| A5 | **Silent `serde_json::from_str().unwrap_or_default()`** | 🟡 MED | `profile.rs:73/110`, `entity_linking.rs:62`, `hybrid_query.rs:125` — swallows parse errors with zero logging | Add logging + fallback |
-
-**Verification:**
-
-| Check | Result |
-|-------|--------|
-| `SystemTime::now()` in production | ✅ **0** — all use `ctx.timestamp` |
-| `std::thread::sleep` | ✅ **0** |
-| Writes through reducers only | ✅ **100%** — no SQL DML |
-| Result-table pattern | ✅ **100%** — 28 result tables |
-| Public/private table discipline | ✅ **100%** |
-| All reducers `Result<(), String>` | ✅ **100%** |
-| `unwrap()` in production paths | ✅ **0** |
-| `todo!()` / `unreachable!()` | ✅ **0** |
-
-**Module-level quality: patterns are ~90% compliant but 8 unfixed anti-patterns bring the score down hard.**
-
----
-
-### 2. Python SDK — Score: 78/100
-
-**What's Great:**
-- 139 public methods, all documented, all tested
-- Clean auth flow with token refresh, multi-host failover, circuit breaker
-- 57 test files, 3,337 test methods — comprehensive coverage
-- Good error mapping (`_SQL_ERROR_MAP`, `_REDUCER_ERROR_MAP`)
-- `trace_span!` integration for observability
-- Compounder subsystem (14 methods, 62 tests)
-
-**What's Wrong:**
-
-| Issue | Count | Impact |
-|-------|-------|--------|
-| `import` inside function bodies | **15+** | Style, re-import overhead (mitigated by import cache) |
-| Silent `except RuntimeError: pass` | **18+** | 🚨 Masks real failures — worst in `store()`, `store_batch()`, `create_note()`, `update_note()` |
-| Direct HTTP calls bypassing retry | **5 methods** | `ping()`, `check_embedder_health()`, Tantivy calls — no circuit breaker protection |
-| Recursive retry in failover | **1** | `_request_with_retry()` calls itself recursively on failover — stack depth risk |
-| `Any` type annotations | **6 fields** | `plugin_manager: Any`, `event_bus: Any`, etc. — should be proper Protocols |
-| Rust reducers NOT covered by SDK | **~77 (48%)** | Full list: auth, replication, sessions, peers, connectors, messages, harmonics, context deltas, change events, proxy metrics |
-| `httpx.Client` created in `__init__` | **1** | Created before auth handshake — will fail on network-unavailable startup |
-
-**Rust Reducer Coverage Gap (77 missing):**
-- **auth.rs**: `register`, `login`, `logout`, `update_account`, `deactivate_account`, `promote_admin`, `demote_admin`, `set_initial_admin`, `list_admins` — 0/9 covered
-- **replication.rs**: ALL 10 — 0/10 covered
-- **session.rs**: `create_session`, `join_session`, `leave_session`, `update_session_summary`, `delete_session_steps` — 5 missing
-- **peer.rs**: ALL 3 — 0/3 covered
-- **connector.rs**: ALL 3 — 0/3 covered
-- **message.rs**: ALL 2 — 0/2 covered
-- **harmonic_belief.rs**: ALL 3 — 0/3 covered
-- **change_event.rs**: ALL 3 — 0/3 covered
-- **context_delta.rs**: ALL 2 — 0/2 covered
-- Various others: ~28 more single-method gaps
-
-**Quality Grid:**
-
-| Dimension | Score | Why |
-|-----------|:-----:|-----|
-| Type hints | 18/20 | Mostly complete, some `Any` looseners |
-| Docstrings | 14/18 | ~90% coverage, ~25 methods terse/missing |
-| Error handling | 10/18 | Good mapping, but 18+ silent `except: pass` is 🚨 |
-| Architecture | 14/16 | Clean, but redundant HTTP paths |
-| Rust coverage | 6/12 | Only 52% of reducers exposed |
-| Testing | 16/16 | 3,337 tests across 57 files — excellent |
+### Infrastructure
+- [x] STDB v2.6.1 server (upgraded from v2.4.1)
+- [x] Systemd services for STDB, embedder, Tantivy
+- [x] CLI tools (`stmem` — 30+ commands via compounder)
+- [x] Benchmark harness (benchmark_runner.py — 148 ops, 20 iterations)
+- [x] Python SDK: 506/510 unit tests pass (4 pre-existing failures)
+- [x] Backup/restore pipeline
 
 ---
 
-### 3. TypeScript SDK — Score: 38/100
+## ═══════════════════════════════════════════════
+## PHASE 1: P0 BLOCKERS (blocking publish / release)
+## ═══════════════════════════════════════════════
 
-**The weakest layer by far.**
+### 1.1 Rebuild and publish WASM module
+**Status:** Blocked — we upgraded STDB server to v2.6.1, Cargo.toml is set to `version = "2.6"`, but:
+- [ ] `cargo update -p spacetimedb` needs to run to resolve lockfile
+- [ ] Build: `CARGO_BUILD_JOBS=2 cargo build --release --target wasm32-wasip1`
+- [ ] Publish: `echo "y" | spacetimedb-cli publish -s local-3001 -b <wasm> <db-id>`
+- [ ] Verify reducer list still matches (`spacetimedb-cli logs`)
 
-| Dimension | Score | Detail |
-|-----------|:-----:|--------|
-| Method parity (vs Python) | 30/100 | 71 methods vs 139 = 51% |
-| Type safety | 25/100 | `strict: true` enabled but **38 `any` uses**, 21 `Promise<any[]>` returns |
-| JSDoc coverage | 5/100 | **1 method out of 71 has JSDoc** (1.4%) |
-| Error handling | 20/100 | No typed errors, 5 silent `catch {}` blocks |
-| Testing | 15/100 | 1 file, 62 tests vs 57 files, 3,337 in Python |
-| Security | 0/100 | **SQL injection risk** — raw string interpolation with single-char escape |
-| Build/CI | 70/100 | Builds clean, npm publish configured but not published |
-| Architecture | 35/100 | 1,156-line monolith, no modular structure |
+**Why blocked:** WASM can't be published until Cargo.lock resolves v2.6 (the lockfile was resolved against v2.4.1 and my manual deps might conflict).
 
-**Missing Features (~68 methods not in TS):**
-- Documents (create/get/list/delete)
-- Decay/feedback (set_decay_model, get_decay_config, recommend, reputation)
-- Profiles (upsert, get, list, search, context)
-- Entity linking (create_entity_link, add_alias, resolve_entity)
-- API keys (create/deactivate/list)
-- Backup/restore
-- Directory (create, list, traverse, link/unlink)
-- Advanced KG (pagerank, communities, citations, stats, bridge nodes)
-- Context packs (list packs, entries, deltas)
-- Infrastructure (ping, health, metrics, embedder check)
+### 1.2 Fix 4 failing Python unit tests
+**Status:** Pre-existing failures, all related to Mock infrastructure
+- [ ] `test_update_memory` — `_circuit_open_until` attribute missing on Mock(Client)
+- [ ] `test_check_embedder_health_error_status` — same Mock issue
+- [ ] `test_create_note_with_embed` — `UnboundLocalError: note_id` in Tantivy path
+- [ ] `test_context_in_search_results` — `_circuit_open_until` Mock issue
 
-**Not published to npm.** `npm publish` workflow exists but `NPM_TOKEN` hasn't been set in GitHub secrets.
+**Root cause:** Mock(Client) doesn't call `__init__` which sets `_circuit_open_until`. Fix: add the attribute to the Mock spec, or refactor initialization to a helper method.
 
----
-
-### 4. Test Suite Reality
-
-| What | Count | Status |
-|------|:-----:|--------|
-| Python unit tests | 247 | ✅ All pass |
-| Python adapter tests (live STDB) | 837 | ✅ Pass (1 fail: memory_revision table) |
-| Python integration tests (no STDB) | 3,319 collected | ⏸️ Skip without STDB |
-| Rust tests | — | ❌ Still can't run (module doesn't compile) |
-| TypeScript tests | 62 | ✅ All pass (mocked fetch) |
-| **What's NOT tested** | | |
-| E2E / deep tests | **0** | No E2E test marker exists |
-| Load / stress | **0** | No benchmark automation |
-| STDB 2% fatal error | **0** | Not reproducible |
-| Multi-region / failover | **0** | Not tested |
-| Frontend | — | No frontend to test |
+### 1.3 Commit and push uncommitted changes
+**Files touched but not committed (from prior sessions):**
+- `server/spacetimedb/src/tag.rs` — `list_tags_by_memory`, `update_tag` reducers
+- `server/spacetimedb/src/consolidation.rs` — `memory_tag` import
+- `server/spacetimedb/src/hybrid_query.rs` — `memory_tag` import, stray `"` fix
+- `server/spacetimedb/src/workspace.rs` — `memory`, `memory_revision`, `tag`, `memory_tag` imports
+- `server/spacetimedb/src/memory.rs` — `memory_revision` import
+- `server/spacetimedb/Cargo.toml` — pinned to `=2.4.1`, need to set back to `2.6`
+- `sdk/typescript/client.ts` — `listTagsByMemory`, `updateTag` methods
+- `IMPROVEMENTS.md`, `PERFORMANCE.md` — updated benchmark results
 
 ---
 
-### 5. Competitive Feature Parity
+## ═══════════════════════════════════════════════
+## PHASE 2: P1 PERFORMANCE (critical for usability)
+## ═══════════════════════════════════════════════
 
-| Competitor | Spacetime-Memory Score | Our Differentiators | Their Edge |
-|------------|:----------------------:|---------------------|------------|
-| **mem0** | **92%** ✅ (adapter proven) | KG, notes, adapters, frontend | Simpler setup, bigger community |
-| **Graphiti** | **95%** ✅ (adapter proven) | Self-hosted, notes, communities | Bi-temporal facts, Neo4j integration |
-| **Zep** | **97%** ✅ (best adapter) | Self-hosted, KG, frontend | Managed cloud, simpler API |
-| **LangChain Memory** | **65%** ⚠️ (different category) | Everything | Conversation buffers only |
-| **Honcho** | **95%** ✅ (adapter proven) | KG, communities, frontend | Reasoning pipeline, chat endpoint |
-| **Hindsight** | **95%** ✅ (adapter now 100%) | KG, notes, tours, communities | LLM wrapper, biomimetic retrieval |
-| **CrewAI Memory** | **40%** ⚠️ (minimal feature set) | Everything | Agent-native, zero-config |
+### 2.1 Fix semantic strategy in hybrid_search reducer — 5s → sub-second
+**Impact:** Every semantic search pays 5s for cosine similarity in WASM.
 
-**7 Unique Differentiators** (no competitor has these):
-1. Drop-in adapter layer (transparent backend swap)
-2. Note/Wiki system with `[[wikilinks]]`, backlinks, blocks
-3. Context packs (compressed LLM context)
-4. Guided tours (KG node walkthroughs)
-5. Cross-knowledge contradiction checking
-6. Memory trust system (tiers + feedback + decay)
-7. 7-strategy search fusion (semantic + BM25 + graph + temporal + MMR + cross-encoder + LLM)
+**Root cause:** `hybrid_query.rs:237` iterates `search_index` table, parses 1024-dim JSON embeddings, computes cosine similarity, does memory lookups — all in WASM. For 60 memories: 60× parse JSON (~1.8s) + 60× cosine sim (~0.3s) + 120× memory lookups (~0.6s) + 60× hybrid_result inserts.
 
-**Competitive Gaps vs Best-in-Class:**
-- **No bi-temporal facts** (Graphiti has this)
-- **No reasoning pipeline** (Honcho has this)
-- **No LLM wrapper** (Hindsight has this)
-- **No published benchmarks** (Mem0, Hindsight, Supermemory all publish)
-- **No managed cloud** (Everyone has one)
-- **No native vector index** (brute-force <100K only)
-- **No multi-modal RAG** (PDF/OCR/video)
+**Fix options (pick one):**
+- **(a) Client-side semantic** — skip `"semantic"` from reducer strategies, query `search_index` via `_query`, compute cosine similarity in Python. Removes 5s WASM work. Adds ~20ms Python + network latency.
+- **(b) Cache embeddings** — store parsed embedding as inline f64 array in search_index instead of JSON string. Reduces parse time from ~30ms to ~0ms.
+- **(c) HNSW/IVF index** — add a vector index in Tantivy sidecar. Most complex but best at scale.
 
----
+**Recommendation:** Option (a). It's ~20 lines of Python, removes the 5s bottleneck entirely, and Tantivy's `search_index` query is fast. The SDK already has the embedding from `_embed()`.
 
-### 6. STDB Best Practices — Re-audited
+### 2.2 Fix _enrich_content N+1 — verify fully resolved
+**Status:** Fixed in `2fbb363f` — changed from N individual `_query()` calls to using content from hybrid_result rows + batch confidence query. 506 tests pass.
+- [ ] Re-run 20-iteration benchmark to confirm semantic search stays ~2.5s (was 7.5s before fix)
 
-| Practice | Old Score (June 27) | Actual (June 29) | Delta |
-|----------|:-------------------:|:----------------:|:-----:|
-| Writes through reducers only | 100% | ✅ 100% | — |
-| Read through query_table for private tables | 100% | ✅ 100% | — |
-| Result-table pattern | 100% | ✅ 100% | — |
-| Auth guards on content reducers | 97.5% (155/159) | ✅ 98.8% (158/160) | +1.3% |
-| `ctx.timestamp` not `SystemTime` | 100% | ✅ 100% | — |
-| `MAX_RESULTS` cap on iterators | 100% | ❌ **~60%** | **−40%** |
-| Reducers return `Result<(), String>` | 100% | ✅ 100% | — |
-| **Compliance** | **98%** | **~85%** | **−13%** |
+### 2.3 Benchmark semantic retrieval quality
+**Status:** BM25 keyword eval exists (P@5=40.0%). Hybrid eval was "N/A" because embedder was unreachable.
+- [ ] Run `python3 scripts/benchmark_runner.py` now that embedder + Tantivy are live
+- [ ] Record P@5, R@5, MRR for hybrid mode
+- [ ] Record P@5, R@5, MRR for +LLM reranking mode
+- [ ] Compare against historical baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960)
 
-**The unbounded `.iter()` violations are the biggest STDB practice failure.** Every iteration risks reducer timeouts on large tables. 8+ locations across 5 files need `.take(MAX_RESULTS)`.
+### 2.4 Benchmark with Tantivy indexing active
+**Status:** The benchmark runner stores via `_call("store_memory", ...)` which bypasses `_tantivy_index()`. Tantivy has 0 documents for test workspace.
+- [ ] Update benchmark to use `c.store()` instead of `c._call("store_memory", ...)` during seed phase
+- [ ] Re-run search benchmarks to measure Tantivy contribution
+- [ ] Expected: keyword search speed improves (Tantivy ~1ms vs BM25 in WASM ~28ms)
+
+### 2.5 Fix Tantivy search query handling
+**Status:** Single-token queries work (e.g., "fox" → found). Multi-token queries return wrong/worse results because `TermQuery` bypasses Tantivy's query parser.
+- [ ] Switch from `TermQuery` to `QueryParser` in Tantivy sidecar for multi-word queries
+- [ ] This gives proper tokenization-based matching for queries like "quick brown fox"
 
 ---
 
-### 7. Honest Overall Score: ~67%
+## ═══════════════════════════════════════════════
+## PHASE 3: P2 FEATURE PARITY
+## ═══════════════════════════════════════════════
 
-| Domain | Score | Δ from June 27 | Key Issue |
-|--------|:-----:|:--------------:|-----------|
-| **Rust quality** | **58/100** | −37 | 8 anti-patterns (unbounded iter, duplicate auth, etc.) |
-| **Python SDK** | **78/100** | −18 | Silent excepts, 52% Rust coverage, imports-in-functions |
-| **TypeScript SDK** | **38/100** | −40 | 51% parity, SQL injection, 1.4% JSDoc, no npm publish |
-| **Test coverage** | **80/100** | — | 3,337 tests good, but 0 E2E, 0 load, 0 stress |
-| **Competitive parity** | **92/100** | — | Adapters proven, 7 unique features, gaps documented |
-| **STDB compliance** | **85/100** | −13 | Unbounded iter is the #1 STDB sin |
-| **Infrastructure** | **60/100** | −18 | No CI for TS, no npm publish, 168MB stale venv, module doesn't compile |
-| **Weighted Overall** | **~67%** | **−22%** | **Previous 89% was inflated** |
+### 3.1 TS SDK parity — 0 missing methods
+**Status:** TS SDK has ~108 methods. Python SDK has ~140 public + 15 compounder.
+- [ ] Audit missing methods by category:
+  - [ ] `batchUpdateMemories` — missing
+  - [ ] `setMemoryScope` — missing
+  - [ ] `escalateMemories` — missing
+  - [ ] `recommendMemories` — missing
+  - [ ] `detectPatterns` — missing
+  - [ ] `deltaSync` — missing
+  - [ ] `searchWithFilters` — missing
+  - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
+  - [ ] `updateMemoryTier` — missing
+  - [ ] `setMemoryScope` — missing
+  - [ ] `batchDeleteMemories` — exists
+  - [ ] `batchTagMemories` / `batchUntagMemories` — missing
+  - [ ] `getEdgeHistory` — missing
+  - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
+  - [ ] `computePageRank` — exists
+  - [ ] `computeCommunityHierarchy` — exists
+  - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
+  - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
+  - [ ] `extractEntities` — exists
+  - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
+  - [ ] `logResonanceSession` — exists
+  - [ ] `createEntityLink` / `addAlias` / `resolveEntity` — missing
+  - [ ] `getNode` — exists
+  - [ ] `getNoteByDate` — exists
+  - [ ] `getNoteByTitle` — exists
+  - [ ] `getBacklinks` / `getOutgoingLinks` — missing
+  - [ ] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — missing
+  - [ ] `searchSessionsSemantic` — missing
+  - [ ] `getPeerReputation` — missing
+  - [ ] `registerConnector` / `updateConnector` / `deleteConnector` — missings
+  - [ ] Compounder class (15 methods) — does not exist in TS
+- [x] `listTagsByMemory` — already added in prior session (uncommitted)
+- [x] `updateTag` — already added in prior session (uncommitted)
 
-### What Changed From Previous Assessment
+**Estimate:** ~40 missing methods. Each is 5-15 lines. ~4-8 hours.
 
-| Previous Claim (June 28) | Actual (June 29) | Delta |
-|--------------------------|------------------|:-----:|
-| "STDB Best Practices: 98%" | ~85% | −13% |
-| "Rust Build: 95%" | **58/100** | −37 |
-| "Python Quality: 96%" | 78/100 | −18 |
-| "TS SDK ~78% Python parity" | **51% parity, 38/100 quality** | −40 |
-| "Adapter Parity: 92%" | 92% still accurate | — |
-| "Frontend: 0%" | Still 0% | — |
-| **"Weighted Overall: ~89%"** | **~67%** | **−22%** |
+### 3.2 Python SDK `store_batch` — verify batch semantics
+**Status:** `store_batch()` exists at line 1371. But the Tantivy indexing is done sequentially inside the loop, not as a batch Tantivy call.
+- [ ] Check if Tantivy sidecar has a batch index endpoint
+- [ ] If not, add one (POST /index/batch)
+- [ ] Update `store_batch()` to use single batch Tantivy call
+
+### 3.3 Bi-temporal fact tracking (Graphiti parity)
+**Status:** Not started. Graphiti's main differentiator is temporal facts with valid_from/valid_to.
+- [ ] Add `valid_from: i64` and `valid_to: i64` to Memory struct
+- [ ] Add `auto_invalidate(old_fact, new_fact)` reducer
+- [ ] Expose in Python SDK: `search(query, temporal_filter={from: ..., to: ...})`
+- [ ] Expose in TS SDK
+
+**Estimate:** 1 week.
+
+### 3.4 Cross-encoder reranking
+**Status:** SDK has `_rerank()` at line 1603 but it catches `ImportError` for `numpy` and falls through silently. numpy is not installed.
+- [ ] Extract cross-encoder model or use a different approach
+- [ ] Fix: ensure numpy is a dependency, or use a pure-Python fallback
+- [ ] Enable cross-encoder by default in search() fusion
+
+### 3.5 npm publish
+**Status:** Blocked by NPM_TOKEN
+- [ ] Add NPM_TOKEN to GitHub secrets (`NPM_TOKEN`)
+- [ ] Configure `.npmrc` in CI
+- [ ] Run `npm publish` from `sdk/typescript/`
+- [ ] Also publish `sdk/python/` to PyPI? (requires PYPI_TOKEN)
 
 ---
 
-### 8. Structural Debt — Fresh Audit (June 29)
+## ═══════════════════════════════════════════════
+## PHASE 4: P3 POLISH & BUG FIXES
+## ═══════════════════════════════════════════════
 
-| # | Item | Severity | Effort | Commit |
-|---|------|----------|--------|--------|
-| 1 | **Unbounded `.iter()` in 8+ locations** — reduce timeout risk | **P0** | 1-2h | ❌ OPEN |
-| 2 | **Duplicate `require_auth()` in context_directory.rs** — copy-paste bug affecting 7 reducers | **P0** | 10min | ❌ OPEN |
-| 3 | **"reader" → "viewer" in knowledge_graph.rs:1143** — broken permission check | **P0** | 2min | ❌ OPEN |
-| 4 | **uuid_v7().expect() panic path** — graceful fallback needed | **P1** | 5min | ❌ OPEN |
-| 5 | **Silent `unwrap_or_default()` on serde_json** — add logging to 4 locations | **P1** | 15min | ❌ OPEN |
-| 6 | **Python SDK: 18+ silent `except: pass`** — masquerading failures | **P1** | 1h | ❌ OPEN |
-| 7 | **TypeScript SDK: SQL injection** — raw string interpolation | **P1** | 30min | ❌ OPEN |
-| 8 | **Python SDK: 5 methods bypass retry circuit** — inconsistency | **P2** | 30min | ❌ OPEN |
-| 9 | **Python SDK: 77 uncovered Rust reducers** — big feature gap | **P2** | 4-8h | ❌ OPEN |
-| 10 | **TS SDK: 38 `any` uses** — type safety erosion | **P2** | 1h | ❌ OPEN |
-| 11 | **TS SDK: 1.4% JSDoc** — undocumentable | **P2** | 30min | ❌ OPEN |
-| 12 | **TS SDK: not published to npm** — blocks TS adoption | **P2** | 15min (add NPM_TOKEN) | ❌ OPEN |
-| 13 | **Python SDK: `import` inside 15+ functions** — style violation | **P3** | 30min | ❌ OPEN |
-| 14 | **Module doesn't compile** — STDB v2.6 API migration | P0 | **was fixed Jun 28 but ???** | ✅ NEEDS RE-VERIFY |
-| 15 | **No frontend** — zero web UI | P0 | 1-2 weeks | ❌ MISSING |
-| 16 | **No E2E tests** — no deep/integration marker | **P2** | 2-4h | ❌ OPEN |
-| 17 | **No benchmarks published** — biggest credibility gap | **P1** | 1-2 weeks | ❌ OPEN |
-| 18 | **168MB stale upstream venv** — `.upstream-venv/` | P3 | 10min | ❌ OPEN |
+### 4.1 Test coverage gaps
+**Status:** 60+ test files, but coverage is uneven.
+- [ ] **Rust module** — 0 unit tests across 36 source files. All tests are Python-side integration tests. Rust has no #[cfg(test)] modules except `hybrid_query.rs:1245` (3 unit tests for query_hash + parse_embedding_json + cosine_similarity).
+- [ ] **TS SDK** — 1 test file (`tests/client.test.ts`). 71 tests pass. No E2E tests.
+- [ ] **Python SDK** — 60+ test files, but many are thin. Connector tests are stubs (most can't run without live credentials).
+- [ ] **Edge cases** — test_empty_search, test_special_characters, test_unicode_in_memory, test_very_large_content, test_concurrent_writes, test_network_partition
 
-**Total open debt items: 18 (3 critical P0, 5 P1, 6 P2, 4 P3)**
+### 4.2 Security hardening
+- [ ] Key rotation support (ability to change JWT signing keys without data loss)
+- [ ] Rate limiting on auth endpoints (register/login)
+- [ ] SQL injection audit — `_sql` endpoint takes raw SQL strings. The SDK's `_esc()` escapes identifiers but doesn't prevent SQL injection from compromised clients.
+- [ ] Table privacy audit — 25 public tables out of 85. Are any of the public tables exposing data they shouldn't? `user` table is public — exposes peer IDs, account names. `query_result` is public — exposes ALL query results (currently empty until queried). `hybrid_result` is public.
+- [ ] API key scope limits — currently sk- keys can admin the entire system. No workspace-scoped keys.
+
+### 4.3 Schema migrations
+- [ ] `hybrid_query.rs` — the schema comments say "Score Normalization REMOVED — Python SDK does it now" but the comment at line 516 says "Removed Jun 2026" — reference is already stale
+- [ ] The `maintenance_schedule` table has `scheduled(run_maintenance)` — the scheduled reducer runs `run_maintenance` which triggers decay + dedup. Verify this works with v2.6 scheduler.
+- [ ] Schema evolution policy — when adding fields, do we use `COALESCE`/default, or do we migrate?
+
+### 4.4 Code quality
+- [ ] 21 TODOs/FIXMEs across the codebase
+  - `note.rs:136` — "TODO: handle concurrent note block updates"
+  - `lib.rs:15` — "TODO: organize module structure"
+  - `client.py:128` — "TODO: configure log level"
+  - `orgmode.py:70` — "FIXME: extract method"
+- [ ] Unused imports in several Rust files (warnings on build)
+- [ ] `client.py` is ~5,200 lines — needs module split
+- [ ] Python `_request_with_retry` shares circuit breaker across STDB + Tantivy — Tantivy failures trip the breaker for STDB
+
+### 4.5 Documentation
+- [ ] README.md — claims "full Mem0/Zep/Graphiti parity" but doesn't list caveats  
+- [ ] ROADMAP.md is the REAL_ROADMAP — rename to unify
+- [ ] No API reference docs for Python SDK (docstrings exist but no generated docs)
+- [ ] No API reference docs for TS SDK
+- [ ] No deployment guide beyond SETUP.md
+- [ ] No connector setup guide (Discord token, Notion API key, etc.)
+- [ ] No migration guide for upgrading from v2.4 to v2.6
+
+### 4.6 Connector issues
+- [ ] Connector tests require live credentials — no mock mode
+- [ ] `connectors/base.py` is confusing — "connector" means "sync connector" (Discord, Notion, GitHub, Slack, RSS, Twitter, webhook, orgmode), NOT "parity adapter" (Mem0, Zep, etc.)
+- [ ] No Telegram connector (mentioned in the prompt template)
+- [ ] Orgsync connector may have bugs (orgmode.py:70 "FIXME")
+
+### 4.7 Monitoring & Observability
+- [ ] No alerting when embedder/Tantivy sidecar is down
+- [ ] The `proxy_metrics_snapshot` table exists but no dashboard for it
+- [ ] No memory usage trends (the 2.6GB embedder RAM usage isn't tracked)
+- [ ] No request latency percentile tracking (current benchmark is manual)
+- [ ] No error rate alerting (SDK silently degrades when embedder is down)
 
 ---
 
-### 9. The Path to 85% (Next Actions)
+## ═══════════════════════════════════════════════
+## PHASE 5: P4 NICE-TO-HAVE
+## ═══════════════════════════════════════════════
 
-| # | Item | Effort | Impact |
-|---|------|--------|--------|
-| 1 | Fix 5 Rust anti-patterns (unbounded iter, duplicate auth, reader typo, uuid panic, silent serde) | 2h | +15 pts |
-| 2 | Fix Python SDK: eliminate silent except:pass, add retry to 5 methods | 1h | +8 pts |
-| 3 | Fix TS SDK: add JSDoc (70 methods), fix SQL injection, eliminate `any`, publish to npm | 4h | +12 pts |
-| 4 | Add missing 77 Rust reducers to Python SDK | 8h | +10 pts |
-| 5 | Add E2E test marker + 10 deep tests | 4h | +5 pts |
-| 6 | Build frontend (React/Vite) | 1-2 weeks | +10 pts |
-| 7 | Publish benchmark scores (LongMemEval, LoCoMo, BEAM) | 1-2 weeks | +5 pts |
+### 5.1 Advanced features
+- [ ] **Multi-modal memory** — store/store_batch could accept image attachments
+- [ ] **Memory encryption at rest** — STDB doesn't support this, but we could encrypt content before storing
+- [ ] **Structured output** — `search(return_schema=...)` for LLM-friendly results
+- [ ] **Bulk export** — export workspace as Obsidian vault (markdown files + KG as JSON)
+- [ ] **WebSocket subscriptions** — real-time memory updates via STDB subscriptions
 
-**Near-term ceiling with items 1-4: ~80%**
-**Long-term ceiling with all 7: ~90%**
-**95%+ requires frontend + benchmarks + managed service**
+### 5.2 Compounder enhancements
+- [ ] **TS Compounder class** — doesn't exist. ~15 methods to port.
+- [ ] **Compounder E2E tests** — `test_compounder_integration.py` exists but likely stale.
+- [ ] **Ripple effect detection** — when a source is updated, which entities/nodes need re-summarization?
+
+### 5.3 Adapter development
+- [ ] **Mem0 TS adapter** — doesn't exist. Python-only currently.
+- [ ] **Graphiti TS adapter** — doesn't exist. Python-only.
+- [ ] **Zep TS adapter** — doesn't exist. Python-only.
+- [ ] **Adapter E2E harness** — current adapter tests mock the STDB layer but don't test wire compatibility
+
+### 5.4 Academic benchmarks
+- [ ] **LongMemEval** — long-context memory benchmark. 2+ weeks to set up.
+- [ ] **LoCoMo** — long context memorization. 2+ weeks.
+- [ ] **BEAM** — belief-based evaluation. 2+ weeks.
+- [ ] These were mentioned in earlier backlog (IMPROVEMENTS.md) but dropped due to cost/benefit.
+
+### 5.5 perf
+- [ ] **WASM `hybrid_search` benchmark as CI gate** — fail CI if p50 > 2x baseline
+- [ ] **Pre-warm memory caches** — reduce WASM first-call latency
+- [ ] **Tantivy warmup on startup** — index existing memories on boot
+- [ ] **Embedder GPU acceleration** — CUDA/ROCm support (currently CPU-only ONNX)
 
 ---
 
-### 10. What's Actually SOLID (No Change From Previous Audit)
+## ═══════════════════════════════════════════════
+## SUMMARY STATS
+## ═══════════════════════════════════════════════
 
-- **139 Python SDK methods** — all documented, all tested
-- **6 competitor drop-in adapters** — proven, no other project does this
-- **133 MCP tools** — full HTTP + SSE coverage
-- **37 CLI subcommands** — complete feature coverage
-- **Knowledge graph** — working, <20ms, with citations
-- **7 unique features** — notes/wiki, context packs, tours, contradiction checking, trust system, 7-strategy search, adapters
-- **Competitive positioning** — broadest single-system feature set
-- **Tantivy BM25** — 269 indexes, healthy on port 9091
-- **Embedding pipeline** — bge-m3 via proxy, 1024-dim, healthy
+| Metric | Value |
+|--------|-------|
+| Rust WASM reducers | 175+ (36 source files) |
+| STDB tables | 85 (25 public, 60 private) |
+| Python SDK methods | ~140 public + 15 compounder |
+| TS SDK methods | ~108 public |
+| Python tests | 506/510 passing (4 pre-existing failures) |
+| TS tests | 71/71 passing |
+| Rust unit tests | 3 (in hybrid_query.rs) |
+| Connectors | 8 (Discord, GitHub, Notion, Slack, RSS, Twitter, Webhook, Orgmode) |
+| Adapters (API-compatible) | 4 (Mem0, Zep, LangGraph, Honcho) |
+| Sidecars | 2 (Embedder :9090, Tantivy :9091) |
+| Scripts | ~25 (benchmarks, eval, consolidation, replication) |
+| Benchmark ops | 148 with 20 iterations = 0 failures |
+| Eval queries | 25 with ground-truth IDs |
+| Uncommitted changes | 8+ files (Rust imports, TS methods, Cargo.toml) |
+| TODO/FIXME markers | 21 across codebase |
