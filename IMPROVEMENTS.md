@@ -8,14 +8,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P3: Python SDK — user management wrappers (add_user, get_user, update_user, delete_user, list_users, get_user_sessions)
-Rust `server/spacetimedb/src/user.rs` has 6 reducers for user CRUD + session
-lookup, but the Python SDK `client.py` has zero typed wrappers for any of them.
-The CLI backup/restore bypasses with raw `_call()`. Add proper typed methods.
-Files: sdk/python/spacetime_memory/client.py
-Difficulty: Easy
-Est: 20min
-
 ### P2: STDB v2.6.x: NoteRecord TS interface — missing fields
 `NoteRecord` in `sdk/typescript/client.ts` is missing 5 fields present in the
 Rust `Note` table: `note_date`, `embedding_json`, `backlink_count`,
@@ -35,6 +27,15 @@ Est: 10min
 ---
 
 ## Recently Completed
+
+### P3: Python SDK — user management wrappers (add_user, get_user, update_user, delete_user, list_users, get_user_sessions) (July 2, 2026)
+Added 6 typed methods to `Client` covering all user CRUD reducers from
+`user.rs`. Each follows the reducer + SQL-read pattern used by existing
+SDK methods. Includes `get_user_sessions` with result table SELECT.
+Commit: 337e2a05
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 20min
 
 ### P2: Dynamic OTel Prometheus metrics reader — add_metric_reader/remove_metric_reader runtime APIs (July 2, 2026)
 Added `setup_otel_metrics()` that creates OTel instruments and registers an
