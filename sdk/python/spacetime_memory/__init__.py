@@ -13,7 +13,13 @@ from .client import (
 from .compounder import Compounder
 from . import sdks
 from .agent_orchestrator import AgentOrchestrator
-from .metrics import MetricsCollector
+from .metrics import (
+    MetricsCollector,
+    setup_otel_metrics,
+    collect_otel_metrics,
+    remove_otel_metric_readers,
+    is_otel_metrics_active,
+)
 from .tracer import Tracer, get_tracer, start_span
 
 __all__ = [
@@ -22,6 +28,10 @@ __all__ = [
     "sdks",
     "AgentOrchestrator",
     "MetricsCollector",
+    "setup_otel_metrics",
+    "collect_otel_metrics",
+    "remove_otel_metric_readers",
+    "is_otel_metrics_active",
     "Tracer",
     "get_tracer",
     "start_span",
