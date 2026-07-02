@@ -8,19 +8,29 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P3: `harmonic_belief` reducers — SDK method coverage
-`store_harmonic_beliefs`, `clear_harmonic_beliefs`, `log_resonance_session`
-reducers in `harmonic_belief.rs` lack Python SDK and TypeScript SDK wrappers.
-Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+### P2: Dynamic Prometheus metrics reader — leverage OTel v1.43.0 add_metric_reader
+OTel Python v1.43.0 added `add_metric_reader` / `remove_metric_reader` runtime
+APIs. The spacetime-memory SDK's `MetricsCollector` could dynamically register
+a Prometheus reader at startup instead of relying on a static export endpoint,
+enabling live metric collection in agent runner environments.
+Files: sdk/python/spacetime_memory/client.py, sdk/python/spacetime_memory/tracer.py
+Difficulty: Medium
+Est: 30min
+
+### P3: STDB v2.6.x TypeScript optional field migration
+STDB v2.6.1 changed TypeScript generated types for Option<T> from required keys
+with undefined to truly optional keys (`foo?: string`). The TypeScript SDK types
+(MemoryRecord, etc.) may generate warnings under v2.6.1+ — audit and update.
+Files: sdk/typescript/client.ts
 Difficulty: Easy
 Est: 15min
 
-### P3: `entity_linking` reducers — SDK method coverage (CHECK — may already have methods)
-`create_entity_link`, `add_alias`, `resolve_entity` reducers in
-`entity_linking.rs` need Python and TypeScript SDK wrappers.
+### P3: `harmonic_belief` reducers — SDK method coverage
+`store_harmonic_beliefs`, `clear_harmonic_beliefs`, `log_resonance_session`
+reducers in `harmonic_belief.rs` lacked Python SDK and TypeScript SDK wrappers.
 Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
 Difficulty: Easy
-Est: 10min
+Est: 15min
 
 ---
 
