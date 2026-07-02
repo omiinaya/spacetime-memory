@@ -8,15 +8,6 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P2: Dynamic Prometheus metrics reader — leverage OTel v1.43.0 add_metric_reader
-OTel Python v1.43.0 added `add_metric_reader` / `remove_metric_reader` runtime
-APIs. The spacetime-memory SDK's `MetricsCollector` could dynamically register
-a Prometheus reader at startup instead of relying on a static export endpoint,
-enabling live metric collection in agent runner environments.
-Files: sdk/python/spacetime_memory/client.py, sdk/python/spacetime_memory/tracer.py
-Difficulty: Medium
-Est: 30min
-
 ### P3: STDB v2.6.x TypeScript optional field migration
 STDB v2.6.1 changed TypeScript generated types for Option<T> from required keys
 with undefined to truly optional keys (`foo?: string`). The TypeScript SDK types
@@ -35,6 +26,17 @@ Est: 15min
 ---
 
 ## Recently Completed
+
+### P2: Dynamic OTel Prometheus metrics reader — add_metric_reader/remove_metric_reader runtime APIs (July 2, 2026)
+Added `setup_otel_metrics()` that creates OTel instruments and registers an
+`InMemoryMetricReader` via `MeterProvider.add_metric_reader()` for live
+metric collection in agent runner environments. Includes `collect_otel_metrics()`,
+`remove_otel_metric_readers()`, and runtime status checks. Supports custom
+readers (e.g. `PeriodicExportingMetricReader` for OTLP export).
+Commit: ba8b6f24
+Files: sdk/python/spacetime_memory/metrics.py, __init__.py, tests/test_metrics.py
+Difficulty: Medium
+Est: 30min
 
 ### P3: Add connector, entity_extraction, harmonic_belief SDK wrappers + CLI commands (July 1, 2026)
 Added full SDK + CLI coverage for 7 reducers across three modules that were
@@ -87,15 +89,6 @@ Est: 30min
 Added new `temporal_search_with_weight` reducer. Commit: fa97ee0d
 Difficulty: Medium
 Est: 1-2h
-
-### P3: Add `batch_delete_memories` reducer + SDK methods (July 1, 2026)
-Bulk deletion reducer + Python + TS SDK wrappers. Commit: 09da711a
-Difficulty: Medium
-Est: 15min
-
-### P2: Python `batch_update_memories` SDK method (July 1, 2026)
-Verified exists at line 2705. Item was stale. Difficulty: Easy
-Est: 5min
 
 ---
 
