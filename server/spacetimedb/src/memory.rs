@@ -8,6 +8,7 @@ use crate::change_event;
 use crate::tracing::TracingSpanKind;
 use crate::trace_span;
 
+
 /// A memory entry storing world facts, experiences, or mental models
 /// for an AI agent within a workspace.
 #[table(accessor = memory)]

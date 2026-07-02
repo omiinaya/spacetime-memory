@@ -5,6 +5,7 @@ use crate::context_directory::{context_directory, directory_memory_link};
 use crate::hybrid_query::{cosine_similarity, parse_embedding_json};
 use crate::knowledge_graph::{kg_community, kg_edge, kg_node};
 use crate::memory::memory;
+use crate::tag::memory_tag;
 use crate::memory_feedback;
 use crate::note::{note, note_block};
 use crate::profile::profile;

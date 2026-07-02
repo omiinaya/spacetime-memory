@@ -4191,6 +4191,123 @@ class Client:
         )
 
     # -----------------------------------------------------------------------
+    # User management
+    # -----------------------------------------------------------------------
+
+    def add_user(
+        self,
+        user_id: str,
+        email: str = "",
+        first_name: str = "",
+        last_name: str = "",
+        metadata_json: str = "",
+    ) -> dict[str, Any]:
+        """Add a new user.
+
+        The user table is public (readable via SQL) but mutations go through
+        this reducer for auth enforcement.
+
+        Args:
+            user_id: Unique identifier for the user.
+            email: Optional email address.
+            first_name: Optional first name.
+            last_name: Optional last name.
+            metadata_json: Optional JSON blob for custom metadata.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("add_user", [user_id, email, first_name, last_name, metadata_json])
+
+    def get_user(self, user_id: str) -> dict[str, Any]:
+        """Verify a user exists (reducer checks auth, then client reads the
+        public ``user`` table).
+
+        Args:
+            user_id: The user to look up.
+
+        Returns:
+            The user row, or raises :class:`NotFoundError` if absent.
+        """
+        self._call("get_user", [user_id])
+        rows = self._sql(
+            "SELECT user_id, email, first_name, last_name, metadata_json, "
+            "created_at, updated_at "
+            f"FROM \"user\" WHERE user_id = '{_esc(user_id)}'"
+        )
+        if not rows:
+            raise NotFoundError(f"User '{user_id}' not found")
+        return rows[0]
+
+    def update_user(
+        self,
+        user_id: str,
+        email: str = "",
+        first_name: str = "",
+        last_name: str = "",
+        metadata_json: str = "",
+    ) -> dict[str, Any]:
+        """Update an existing user. Empty strings are treated as "don't update"
+        (the Rust reducer preserves the existing value).
+
+        Args:
+            user_id: The user to update.
+            email: New email (empty = unchanged).
+            first_name: New first name (empty = unchanged).
+            last_name: New last name (empty = unchanged).
+            metadata_json: New metadata JSON (empty = unchanged).
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("update_user", [user_id, email, first_name, last_name, metadata_json])
+
+    def delete_user(self, user_id: str) -> dict[str, Any]:
+        """Delete a user by user_id.
+
+        Args:
+            user_id: The user to delete.
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call("delete_user", [user_id])
+
+    def list_users(self) -> list[dict[str, Any]]:
+        """List all users. The reducer verifies authentication; then the
+        client reads the public ``user`` table directly.
+
+        Returns:
+            List of user rows.
+        """
+        self._call("list_users", [])
+        return self._sql(
+            "SELECT user_id, email, first_name, last_name, metadata_json, "
+            "created_at, updated_at FROM \"user\""
+        )
+
+    def get_user_sessions(self, user_id: str) -> list[dict[str, Any]]:
+        """Get all sessions for a user.
+
+        Calls the ``get_user_sessions`` reducer which populates the public
+        ``user_session_result`` table with session metadata.
+
+        Args:
+            user_id: The user to look up sessions for.
+
+        Returns:
+            List of session records (query_id, user_id, session_id,
+            session_name, workspace_id, created_at).
+        """
+        query_id = f"user_sessions:{user_id}"
+        self._call("get_user_sessions", [user_id])
+        return self._sql(
+            "SELECT query_id, user_id, session_id, session_name, "
+            "workspace_id, created_at FROM user_session_result WHERE "
+            f"query_id = '{_esc(query_id)}'"
+        )
+
+    # -----------------------------------------------------------------------
     # Peer queries
     # -----------------------------------------------------------------------
 

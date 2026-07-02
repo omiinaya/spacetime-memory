@@ -1,4 +1,4 @@
-# Spacetime Memory — Improvement Backlog (July 1, 2026)
+# Spacetime Memory — Improvement Backlog (July 2, 2026)
 
 Living queue managed by the continuous-improvement cron. The cron reads this file,
 cleans up completed items, researches new improvement opportunities, adds them,
@@ -8,20 +8,29 @@ and works the top pending item each tick.
 
 ## Pending
 
-### P3: STDB v2.6.x TypeScript optional field migration
-STDB v2.6.1 changed TypeScript generated types for Option<T> from required keys
-with undefined to truly optional keys (`foo?: string`). The TypeScript SDK types
-(MemoryRecord, etc.) may generate warnings under v2.6.1+ — audit and update.
+### P3: Python SDK — user management wrappers (add_user, get_user, update_user, delete_user, list_users, get_user_sessions)
+Rust `server/spacetimedb/src/user.rs` has 6 reducers for user CRUD + session
+lookup, but the Python SDK `client.py` has zero typed wrappers for any of them.
+The CLI backup/restore bypasses with raw `_call()`. Add proper typed methods.
+Files: sdk/python/spacetime_memory/client.py
+Difficulty: Easy
+Est: 20min
+
+### P2: STDB v2.6.x: NoteRecord TS interface — missing fields
+`NoteRecord` in `sdk/typescript/client.ts` is missing 5 fields present in the
+Rust `Note` table: `note_date`, `embedding_json`, `backlink_count`,
+`block_ref_count`, `version` (Option<u32> → `version?: number`). The STDB
+v2.6.1 change makes Option<T> truly optional in TS, so audit all interfaces.
 Files: sdk/typescript/client.ts
 Difficulty: Easy
 Est: 15min
 
-### P3: `harmonic_belief` reducers — SDK method coverage
-`store_harmonic_beliefs`, `clear_harmonic_beliefs`, `log_resonance_session`
-reducers in `harmonic_belief.rs` lacked Python SDK and TypeScript SDK wrappers.
-Files: sdk/python/spacetime_memory/client.py, sdk/typescript/client.ts
+### P3: Add `create_insight` + `delete_insight` typed Python SDK methods
+Rust `insight.rs` has these reducers but Python SDK only has them via raw
+`_call()` in the CLI backup restore path. No typed SDK method exists.
+Files: sdk/python/spacetime_memory/client.py
 Difficulty: Easy
-Est: 15min
+Est: 10min
 
 ---
 
@@ -77,18 +86,6 @@ Eliminates O(n) network round-trips for bulk tagging/untagging operations.
 Commit: 4a1b3bd3
 Difficulty: Medium
 Est: 20min
-
-### P3: Enhanced `dedup_memories` — merge tags, KG edges, entities (July 1, 2026)
-Enhanced the `dedup_memories` reducer to fully migrate MemoryTag associations,
-KG edges and entities_json arrays from the duplicate to the survivor.
-Commit: 82c30702
-Difficulty: Medium
-Est: 30min
-
-### P2: Time-weighted memory retrieval — `temporal_search_with_weight` (July 1, 2026)
-Added new `temporal_search_with_weight` reducer. Commit: fa97ee0d
-Difficulty: Medium
-Est: 1-2h
 
 ---
 
