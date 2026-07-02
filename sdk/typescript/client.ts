@@ -2048,6 +2048,156 @@ export class Client {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // Connector Configuration
+  // ---------------------------------------------------------------------
+
+  /**
+   * Register a new connector configuration.
+   * @param name - Connector name
+   * @param connectorType - Connector type (e.g. "slack", "discord", "webhook")
+   * @param configJson - JSON configuration string
+   * @param workspaceId - Workspace ID
+   * @param scheduleSecs - Polling interval in seconds
+   */
+  async registerConnector(
+    name: string,
+    connectorType: string,
+    configJson: string,
+    workspaceId: string,
+    scheduleSecs: number,
+  ): Promise<void> {
+    return this._call("register_connector", [
+      name,
+      connectorType,
+      configJson,
+      workspaceId,
+      scheduleSecs,
+    ]);
+  }
+
+  /**
+   * Update an existing connector configuration.
+   * @param id - Connector ID
+   * @param name - Connector name
+   * @param connectorType - Connector type
+   * @param configJson - JSON configuration string
+   * @param workspaceId - Workspace ID
+   * @param scheduleSecs - Polling interval in seconds
+   * @param isActive - Whether the connector is active
+   */
+  async updateConnector(
+    id: string,
+    name: string,
+    connectorType: string,
+    configJson: string,
+    workspaceId: string,
+    scheduleSecs: number,
+    isActive: boolean,
+  ): Promise<void> {
+    return this._call("update_connector", [
+      id,
+      name,
+      connectorType,
+      configJson,
+      workspaceId,
+      scheduleSecs,
+      isActive,
+    ]);
+  }
+
+  /**
+   * Delete a connector configuration.
+   * @param id - Connector ID
+   */
+  async deleteConnector(id: string): Promise<void> {
+    return this._call("delete_connector", [id]);
+  }
+
+  // ---------------------------------------------------------------------
+  // Entity Extraction
+  // ---------------------------------------------------------------------
+
+  /**
+   * Extract entities from text content and create KG nodes.
+   * @param workspaceId - Workspace ID
+   * @param content - Text content to scan for entity mentions
+   */
+  async extractEntities(workspaceId: string, content: string): Promise<void> {
+    return this._call("extract_entities", [workspaceId, content]);
+  }
+
+  // ---------------------------------------------------------------------
+  // Harmonic Beliefs
+  // ---------------------------------------------------------------------
+
+  /**
+   * Store harmonized beliefs from one resonance round.
+   * @param workspaceId - Workspace ID
+   * @param peerId - Peer identity
+   * @param beliefsJson - JSON array of belief objects
+   * @param clusterId - Cluster ID
+   */
+  async storeHarmonicBeliefs(
+    workspaceId: string,
+    peerId: string,
+    beliefsJson: string,
+    clusterId: string,
+  ): Promise<void> {
+    return this._call("store_harmonic_beliefs", [
+      workspaceId,
+      peerId,
+      beliefsJson,
+      clusterId,
+    ]);
+  }
+
+  /**
+   * Clear stale beliefs for a workspace.
+   * @param workspaceId - Workspace ID
+   * @param minConfidence - Minimum confidence threshold to keep
+   */
+  async clearHarmonicBeliefs(
+    workspaceId: string,
+    minConfidence: number,
+  ): Promise<void> {
+    return this._call("clear_harmonic_beliefs", [workspaceId, minConfidence]);
+  }
+
+  /**
+   * Log a resonance session summary.
+   * @param workspaceId - Workspace ID
+   * @param peerId - Peer identity
+   * @param clusterCount - Number of clusters identified
+   * @param beliefsGenerated - Number of beliefs generated
+   * @param contradictionsResolved - Number of contradictions resolved
+   * @param harmonyScoreAvg - Average harmony score
+   * @param durationMs - Session duration in milliseconds
+   */
+  async logResonanceSession(
+    workspaceId: string,
+    peerId: string,
+    clusterCount: number,
+    beliefsGenerated: number,
+    contradictionsResolved: number,
+    harmonyScoreAvg: number,
+    durationMs: number,
+  ): Promise<void> {
+    return this._call("log_resonance_session", [
+      workspaceId,
+      peerId,
+      clusterCount,
+      beliefsGenerated,
+      contradictionsResolved,
+      harmonyScoreAvg,
+      durationMs,
+    ]);
+  }
+
+  // ---------------------------------------------------------------------
+  // Entity Linking
+  // ---------------------------------------------------------------------
+
   /**
    * Add an alias to an existing entity link.
    * @param entityLinkId - Entity link ID

@@ -4679,6 +4679,97 @@ class Client:
         )
 
     # -------------------------------------------------------------------
+    # Connector Configuration
+    # -------------------------------------------------------------------
+
+    def register_connector(
+        self,
+        name: str,
+        connector_type: str,
+        config_json: str,
+        workspace_id: str,
+        schedule_secs: int,
+    ) -> None:
+        """Register a new connector configuration."""
+        self._call(
+            "register_connector",
+            [name, connector_type, config_json, workspace_id, schedule_secs],
+        )
+
+    def update_connector(
+        self,
+        id: str,
+        name: str,
+        connector_type: str,
+        config_json: str,
+        workspace_id: str,
+        schedule_secs: int,
+        is_active: bool,
+    ) -> None:
+        """Update an existing connector configuration."""
+        self._call(
+            "update_connector",
+            [id, name, connector_type, config_json, workspace_id, schedule_secs, is_active],
+        )
+
+    def delete_connector(self, id: str) -> None:
+        """Delete a connector configuration."""
+        self._call("delete_connector", [id])
+
+    # -------------------------------------------------------------------
+    # Entity Extraction
+    # -------------------------------------------------------------------
+
+    def extract_entities(self, workspace_id: str, content: str) -> None:
+        """Extract entities from text content and create KG nodes."""
+        self._call("extract_entities", [workspace_id, content])
+
+    # -------------------------------------------------------------------
+    # Harmonic Beliefs
+    # -------------------------------------------------------------------
+
+    def store_harmonic_beliefs(
+        self,
+        workspace_id: str,
+        peer_id: str,
+        beliefs_json: str,
+        cluster_id: str,
+    ) -> None:
+        """Store harmonized beliefs from one resonance round."""
+        self._call(
+            "store_harmonic_beliefs",
+            [workspace_id, peer_id, beliefs_json, cluster_id],
+        )
+
+    def clear_harmonic_beliefs(self, workspace_id: str, min_confidence: float) -> None:
+        """Clear stale beliefs for a workspace."""
+        self._call("clear_harmonic_beliefs", [workspace_id, min_confidence])
+
+    def log_resonance_session(
+        self,
+        workspace_id: str,
+        peer_id: str,
+        cluster_count: int,
+        beliefs_generated: int,
+        contradictions_resolved: int,
+        harmony_score_avg: float,
+        duration_ms: int,
+    ) -> None:
+        """Log a resonance session summary."""
+        self._call(
+            "log_resonance_session",
+            [
+                workspace_id,
+                peer_id,
+                cluster_count,
+                beliefs_generated,
+                contradictions_resolved,
+                harmony_score_avg,
+                duration_ms,
+            ],
+        )
+
+    # -------------------------------------------------------------------
     # Entity Linking
     # -------------------------------------------------------------------
 

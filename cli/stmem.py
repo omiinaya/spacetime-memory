@@ -2219,10 +2219,41 @@ def connector_register(name: str, conn_type: str, config: str, workspace_id: str
     except json.JSONDecodeError as e:
         console.print(f"[red]Invalid config JSON: {e}[/red]")
         sys.exit(1)
-    result = client._call("register_connector", [name, conn_type, config, workspace_id, interval])
+    result = client.register_connector(name, conn_type, config, workspace_id, interval)
     console.print(f"[green]Connector '{name}' registered.[/green]")
     if result.get("id"):
         console.print(f"  ID: {result['id']}")
+
+
+@connector.command(name="update")
+@click.option("--id", "conn_id", required=True, help="Connector ID")
+@click.option("--name", required=True, help="Connector name")
+@click.option("--type", "conn_type", required=True, help="Connector type: rss, github, twitter, slack, discord")
+@click.option("--config", default="{}", help="JSON config blob for the connector")
+@click.option("--workspace-id", required=True, help="Target workspace ID")
+@click.option("--interval", default=300, type=int, help="Poll interval (seconds)")
+@click.option("--active/--inactive", default=True, help="Whether the connector is active")
+def connector_update(conn_id: str, name: str, conn_type: str, config: str,
+                     workspace_id: str, interval: int, active: bool) -> None:
+    """Update an existing connector configuration."""
+    client = _sdk_client()
+    try:
+        import json
+        json.loads(config)
+    except json.JSONDecodeError as e:
+        console.print(f"[red]Invalid config JSON: {e}[/red]")
+        sys.exit(1)
+    client.update_connector(conn_id, name, conn_type, config, workspace_id, interval, active)
+    console.print(f"[green]Connector '{name}' updated.[/green]")
+
+
+@connector.command(name="delete")
+@click.argument("conn_id")
+def connector_delete(conn_id: str) -> None:
+    """Delete a connector configuration by ID."""
+    client = _sdk_client()
+    client.delete_connector(conn_id)
+    console.print(f"[green]Connector '{conn_id}' deleted.[/green]")
 
 
 @connector.command(name="list")
@@ -2261,6 +2292,82 @@ def connector_start(db_poll: int) -> None:
 
 
         sys.exit(1)
+
+
+# ===================================================================
+# entity — entity extraction from text
+# ===================================================================
+
+
+@cli.group()
+def entity() -> None:
+    """Extract entities from text content into the knowledge graph."""
+
+
+@entity.command(name="extract")
+@click.argument("workspace_id")
+@click.argument("content")
+def entity_extract(workspace_id: str, content: str) -> None:
+    """Extract entities from text content and create KG nodes."""
+    client = _sdk_client()
+    client.extract_entities(workspace_id, content)
+    console.print("[green]Entities extracted.[/green]")
+
+
+# ===================================================================
+# harmonic — harmonic beliefs & resonance
+# ===================================================================
+
+
+@cli.group()
+def harmonic() -> None:
+    """Manage harmonic beliefs and resonance sessions."""
+
+
+@harmonic.command(name="store")
+@click.argument("workspace_id")
+@click.option("--peer-id", required=True, help="Peer identity string")
+@click.option("--beliefs", required=True, help="JSON array of belief objects (or JSON file path with @prefix)")
+@click.option("--cluster-id", required=True, help="Cluster ID")
+def harmonic_store(workspace_id: str, peer_id: str, beliefs: str, cluster_id: str) -> None:
+    """Store harmonized beliefs from one resonance round."""
+    client = _sdk_client()
+    # Support @filepath syntax like curl
+    if beliefs.startswith("@"):
+        with open(beliefs[1:]) as f:
+            beliefs = f.read()
+    client.store_harmonic_beliefs(workspace_id, peer_id, beliefs, cluster_id)
+    console.print(f"[green]Harmonic beliefs stored for cluster {cluster_id}.[/green]")
+
+
+@harmonic.command(name="clear")
+@click.argument("workspace_id")
+@click.option("--min-confidence", default=0.0, type=float, help="Min confidence to keep")
+def harmonic_clear(workspace_id: str, min_confidence: float) -> None:
+    """Clear stale beliefs below a confidence threshold."""
+    client = _sdk_client()
+    client.clear_harmonic_beliefs(workspace_id, min_confidence)
+    console.print("[green]Stale harmonic beliefs cleared.[/green]")
+
+
+@harmonic.command(name="log")
+@click.argument("workspace_id")
+@click.option("--peer-id", required=True, help="Peer identity")
+@click.option("--clusters", type=int, default=0, help="Number of clusters identified")
+@click.option("--beliefs", "beliefs_generated", type=int, default=0, help="Beliefs generated")
+@click.option("--contradictions", type=int, default=0, help="Contradictions resolved")
+@click.option("--harmony-avg", type=float, default=0.0, help="Average harmony score")
+@click.option("--duration-ms", type=int, default=0, help="Session duration in ms")
+def harmonic_log(workspace_id: str, peer_id: str, clusters: int,
+                 beliefs_generated: int, contradictions: int,
+                 harmony_avg: float, duration_ms: int) -> None:
+    """Log a resonance session summary."""
+    client = _sdk_client()
+    client.log_resonance_session(
+        workspace_id, peer_id, clusters, beliefs_generated,
+        contradictions, harmony_avg, duration_ms,
+    )
+    console.print("[green]Resonance session logged.[/green]")
 
 
 # ===================================================================
