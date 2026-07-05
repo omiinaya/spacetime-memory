@@ -5,8 +5,6 @@ use crate::{now_micros, uuid_v4_uniq};
 use crate::tracing::TracingSpanKind;
 use crate::auth::require_auth;
 use crate::workspace::check_space_access;
-use crate::trace_span;
-use crate::tracing::TracingSpanKind;
 
 /// A note — markdown document with wikilink backlinking support.
 #[table(accessor = note)]

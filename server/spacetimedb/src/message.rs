@@ -30,7 +30,7 @@ pub fn send_message(
     content_type: String,
     metadata_json: String,
 ) -> Result<(), String> {
-    trace_span!(ctx, "send_message", TracingSpanKind::Write, &_workspace_id, {
+    trace_span!(ctx, "send_message", TracingSpanKind::Write, "", {
         let _account = require_auth(ctx)?;
         // Verify session exists + caller has permission
         let caller = ctx.sender().to_hex();

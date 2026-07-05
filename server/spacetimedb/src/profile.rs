@@ -218,7 +218,7 @@ pub fn add_fact(
 
         let fact = Fact {
             id,
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             peer_id,
             fact_type,
             category,
