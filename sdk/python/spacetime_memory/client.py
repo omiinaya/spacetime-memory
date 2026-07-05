@@ -1448,45 +1448,68 @@ class Client:
         ):
             self._call("store_memory_batch", [json.dumps(clean_items)])
 
-        # Index each item with its embedding
+        # Batch-index all items with embeddings via single reducer calls.
+        # Query back the inserted memories by content prefix, then call
+        # index_entity_batch and index_terms_batch instead of N individual calls.
+        entity_items = []
+        terms_items = []
+
         for i, item in enumerate(clean_items):
             emb = emb_list[i] if i < len(emb_list) else None
             if emb:
-                mems = self._query(
-                    "memory",
-                    workspace_id=workspace_id,
-                    filter_dict={"content": item["content"][:100]},
-                    columns=["id"],
-                )
-                if mems:
-                    # Take most recent (server returns unsorted; sort client-side)
-                    mems.sort(key=lambda m: m.get("created_at", 0), reverse=True)
+                entity_items.append({
+                    "workspace_id": workspace_id,
+                    "entity_type": "memory",
+                    "entity_id": "",  # filled below after query
+                    "content": item["content"],
+                    "embedding_json": json.dumps(emb),
+                })
+                terms_items.append({
+                    "workspace_id": workspace_id,
+                    "entity_type": "memory",
+                    "entity_id": "",  # filled below after query
+                    "content": item["content"],
+                })
 
-                    self._call(
-                        "index_entity",
-                        [
-                            workspace_id,
-                            "memory",
-                            mems[0]["id"],
-                            item["content"],
-                            json.dumps(emb),
-                        ],
-                    )
-                    # Populate BM25 inverted index
-                    self._call(
-                        "index_terms",
-                        [
-                            workspace_id,
-                            "memory",
-                            mems[0]["id"],
-                            item["content"],
-                        ],
-                    )
-                    # Entity extraction
+        if entity_items:
+            # Query all matching memories in one batch — match by content prefix
+            mems = self._query(
+                "memory",
+                workspace_id=workspace_id,
+                columns=["id", "content"],
+            )
+            # Build a map from content[:100] -> most recent memory id
+            content_to_id: dict[str, str] = {}
+            for m in sorted(
+                mems,
+                key=lambda x: x.get("created_at", 0),
+                reverse=True,
+            ):
+                key = m.get("content", "")[:100]
+                if key not in content_to_id:
+                    content_to_id[key] = m["id"]
+
+            # Fill in entity_ids
+            for ei, ti in zip(entity_items, terms_items):
+                mid = content_to_id.get(ei["content"][:100], "")
+                ei["entity_id"] = mid
+                ti["entity_id"] = mid
+
+            # Single batch call to index_entity_batch (all items with embeddings)
+            self._call("index_entity_batch", [json.dumps(entity_items)])
+
+            # Single batch call to index_terms_batch (only items with matched IDs)
+            valid_terms = [t for t in terms_items if t["entity_id"]]
+            if valid_terms:
+                self._call("index_terms_batch", [json.dumps(valid_terms)])
+
+            # Entity extraction is LLM-based — still per-item (not a reducer)
+            for ei in entity_items:
+                if ei["entity_id"]:
                     self._extract_and_store_entities(
                         workspace_id,
-                        mems[0]["id"],
-                        item["content"],
+                        ei["entity_id"],
+                        ei["content"],
                     )
 
         return [{"status": "ok"} for _ in clean_items]
