@@ -78,6 +78,64 @@ pub fn index_entity(
     Ok(())
 }
 
+/// Input item for batch index_entity_batch.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct IndexEntityItem {
+    pub workspace_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub content: String,
+    pub embedding_json: String,
+}
+
+/// Batch variant of `index_entity`. Inserts all `SearchIndex` rows in a
+/// single reducer call, avoiding N sequential round-trips.
+#[reducer]
+pub fn index_entity_batch(
+    ctx: &ReducerContext,
+    items_json: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let items: Vec<IndexEntityItem> = serde_json::from_str(&items_json)
+        .map_err(|e| format!("Invalid index_entity_batch JSON: {}", e))?;
+    let now = now_micros(ctx);
+
+    // Validate all entity_types upfront
+    for item in &items {
+        match item.entity_type.as_str() {
+            "memory" | "node" | "chunk" | "peer" | "note" => {}
+            _ => {
+                return Err(format!(
+                    "Invalid entity_type '{}': must be 'memory', 'node', 'chunk', 'peer', or 'note'",
+                    item.entity_type
+                ));
+            }
+        }
+    }
+
+    for item in &items {
+        let id = uuid_v7(ctx);
+        let tokens = item.content.split_whitespace().count() as u32;
+        let entry = SearchIndex {
+            id: id.clone(),
+            workspace_id: item.workspace_id.clone(),
+            entity_type: item.entity_type.clone(),
+            entity_id: item.entity_id.clone(),
+            content: item.content.clone(),
+            embedding_json: if item.embedding_json.is_empty() {
+                String::from("[]")
+            } else {
+                item.embedding_json.clone()
+            },
+            bm25_text: item.content.clone(),
+            tokens,
+            created_at: now,
+        };
+        ctx.db.search_index().insert(entry);
+    }
+    Ok(())
+}
+
 #[reducer]
 pub fn remove_from_index(
     ctx: &ReducerContext,
@@ -237,17 +295,86 @@ pub fn index_terms(
 
     // Insert one TermIndex row per unique term
     for (term, tf) in freq {
-        let id = format!("ti:{}:{}:{}", workspace_id, entity_id, term);
+    let id = format!("ti:{}:{}:{}", workspace_id, entity_id, term);
+    ctx.db.term_index().insert(TermIndex {
+        id,
+        term,
+        workspace_id: workspace_id.clone(),
+        entity_type: entity_type.clone(),
+        entity_id: entity_id.clone(),
+        term_frequency: tf,
+        doc_length,
+    });
+    }
+
+    Ok(())
+    }
+
+    /// Input item for batch index_terms_batch.
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    pub struct IndexTermsItem {
+    pub workspace_id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub content: String,
+    }
+
+    /// Batch variant of `index_terms`. Accepts multiple items and inserts
+    /// all `TermIndex` rows in a single reducer call.
+    ///
+    /// For each item: removes any existing term index entries for that
+    /// entity, then inserts one row per unique term.  Uses the same
+    /// tokenization and stopword filtering as `index_terms`.
+    #[reducer]
+    pub fn index_terms_batch(
+    ctx: &ReducerContext,
+    items_json: String,
+    ) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let items: Vec<IndexTermsItem> = serde_json::from_str(&items_json)
+    .map_err(|e| format!("Invalid index_terms_batch JSON: {}", e))?;
+
+    for item in &items {
+    // Remove any existing term index entries for this entity
+    let old: Vec<String> = ctx
+        .db
+        .term_index()
+        .iter().take(crate::MAX_RESULTS)
+        .filter(|ti| ti.entity_type == item.entity_type && ti.entity_id == item.entity_id)
+        .map(|ti| ti.id.clone())
+        .collect();
+    for id in old {
+        ctx.db.term_index().id().delete(&id);
+    }
+
+    let terms = tokenize(&item.content);
+    if terms.is_empty() {
+        continue;
+    }
+
+    let doc_length = terms.len() as u32;
+
+    // Count term frequencies
+    use std::collections::HashMap;
+    let mut freq: HashMap<String, u32> = HashMap::new();
+    for t in &terms {
+        *freq.entry(t.clone()).or_insert(0) += 1;
+    }
+
+    // Insert one TermIndex row per unique term
+    for (term, tf) in freq {
+        let id = format!("ti:{}:{}:{}", item.workspace_id, item.entity_id, term);
         ctx.db.term_index().insert(TermIndex {
             id,
             term,
-            workspace_id: workspace_id.clone(),
-            entity_type: entity_type.clone(),
-            entity_id: entity_id.clone(),
+            workspace_id: item.workspace_id.clone(),
+            entity_type: item.entity_type.clone(),
+            entity_id: item.entity_id.clone(),
             term_frequency: tf,
             doc_length,
         });
     }
+    }
 
     Ok(())
-}
+    }

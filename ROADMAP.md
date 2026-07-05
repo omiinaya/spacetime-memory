@@ -129,8 +129,9 @@
 - [ ] Compare against historical baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960)
 
 ### 2.4 Benchmark with Tantivy indexing active
-**Status:** The benchmark runner stores via `_call("store_memory", ...)` which bypasses `_tantivy_index()`. Tantivy has 0 documents for test workspace.
-- [ ] Update benchmark to use `c.store()` instead of `c._call("store_memory", ...)` during seed phase
+**Status:** The benchmark runner (`sdk/python/scripts/benchmark_runner.py`) now uses `c.store()` instead of `_call("store_memory", ...)`, which triggers Tantivy indexing on seed.
+**Commit:** `f94ea1f7` — replaced `_call("store_memory", ...)` calls with `c.store()` in latency benchmarks and eval memory seed.
+- [x] Update benchmark to use `c.store()` instead of `c._call("store_memory", ...)` during seed phase
 - [ ] Re-run search benchmarks to measure Tantivy contribution
 - [ ] Expected: keyword search speed improves (Tantivy ~1ms vs BM25 in WASM ~28ms)
 
