@@ -1,6 +1,14 @@
 # ============================================================================
 # Spacetime Memory — Multi-stage Docker Build
 # ============================================================================
+# GPU support (optional):
+#   docker build --build-arg EMBEDDER_FEATURES=cuda .
+#   docker build --build-arg EMBEDDER_FEATURES=rocm .
+# Requires appropriate base image with CUDA/ROCm toolchain.
+# Default: CPU-only (tract-onnx)
+# ============================================================================
+ARG EMBEDDER_FEATURES=""
+
 # Stage 1: Build the ONNX embedder sidecar (Rust binary, listens :9090)
 # ============================================================================
 FROM rust:1-slim AS embedder-builder
@@ -12,12 +20,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libs
 COPY server/embedder/Cargo.toml server/embedder/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 # Pre-fetch dependencies with retry logic
-RUN for i in 1 2 3; do cargo build --release 2>/dev/null && break; sleep 15; done || true
+RUN for i in 1 2 3; do cargo build --release $(echo "$EMBEDDER_FEATURES" | sed 's/[^,]*/--features=&/g') 2>/dev/null && break; sleep 15; done || true
 COPY server/embedder/src/ src/
 # Force rebuild of our actual code with retry for network flakes
 RUN touch src/main.rs && \
     for i in 1 2 3; do \
-        cargo build --release && break; \
+        cargo build --release $(echo "$EMBEDDER_FEATURES" | sed 's/[^,]*/--features=&/g') && break; \
         echo "Embedder build attempt $i failed, retrying in 15s..."; sleep 15; \
     done
 
