@@ -234,12 +234,12 @@
 
 ### 4.3 Schema migrations
 - [ ] `hybrid_query.rs` — the schema comments say "Score Normalization REMOVED — Python SDK does it now" but the comment at line 516 says "Removed Jun 2026" — reference is already stale
-- [ ] The `maintenance_schedule` table has `scheduled(run_maintenance)` — the scheduled reducer runs `run_maintenance` which triggers decay + dedup. Verify this works with v2.6 scheduler.
+- [x] The `maintenance_schedule` table has `scheduled(run_maintenance)` — the scheduled reducer runs `run_maintenance` which triggers decay + dedup. Fixed: removed stale `require_admin` from scheduled reducer (scheduler calls with module identity, not a registered admin account). Works with v2.6 scheduler.
 - [ ] Schema evolution policy — when adding fields, do we use `COALESCE`/default, or do we migrate?
 
 ### 4.4 Code quality
 - [ ] 21 TODOs/FIXMEs across the codebase
-  - `note.rs:136` — "TODO: handle concurrent note block updates"
+  - `note.rs:208` — "TODO: handle concurrent note block updates" ✓ (added expected_version param to update_note)
   - `lib.rs:15` — "TODO: organize module structure"
   - `client.py:128` — "TODO: configure log level"
   - `orgmode.py:70` — "FIXME: extract method"

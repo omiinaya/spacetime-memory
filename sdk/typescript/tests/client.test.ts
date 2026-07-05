@@ -352,10 +352,10 @@ describe("Client", () => {
 
     it("updateNote calls update_note reducer", async () => {
       mockReducerOk();
-      await client.updateNote("note-1", "New content");
+      await client.updateNote("note-1", "My Title", "New content");
       const [url, req] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain("call/update_note");
-      expect(JSON.parse(req.body)).toEqual(["note-1", "New content"]);
+      expect(JSON.parse(req.body)).toEqual(["note-1", "My Title", "New content", "[]", 0]);
     });
 
     it("deleteNote calls delete_note reducer", async () => {
