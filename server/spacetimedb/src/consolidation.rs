@@ -70,6 +70,7 @@ pub fn consolidate_memories(
         strength: 0.7,
         version: 1,
         valid_from: 0,
+        valid_to: 0,
         parent_directory_id: String::new(),
         consolidated_to: String::new(),
         trust_score: 0.5,

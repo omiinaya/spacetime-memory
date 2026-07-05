@@ -450,6 +450,7 @@ fn apply_incoming_insert(
                 strength: data.get("strength").and_then(|v| v.as_f64()).unwrap_or(0.5),
                 version: data.get("version").and_then(|v| v.as_u64()).map(|v| v as u32).unwrap_or(0),
                 valid_from: data.get("valid_from").and_then(|v| v.as_i64()).unwrap_or(0),
+                valid_to: data.get("valid_to").and_then(|v| v.as_i64()).unwrap_or(0),
                 parent_directory_id: data.get("parent_directory_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 consolidated_to: data.get("consolidated_to").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 trust_score: data.get("trust_score").and_then(|v| v.as_f64()).unwrap_or(0.5),
