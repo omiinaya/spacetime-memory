@@ -5,6 +5,10 @@ zero PyTorch dependency. Tokenizer loaded via the ``tokenizers`` library
 (already installed by the Rust embedder sidecar). Thread affinity warnings
 are fixed by setting explicit ``intra_op_num_threads`` on the ONNX session.
 
+Install dependencies::
+
+    pip install spacetime-memory[rerank]
+
 Usage::
 
     from spacetime_memory.cross_encoder import CrossEncoderReranker
