@@ -205,6 +205,7 @@ pub fn update_note(
     title: String,
     content: String,
     embedding_json: String,
+    expected_version: u32,
 ) -> Result<(), String> {
     // We need workspace_id before trace_span, so we look it up first
     let ws_id = ctx
@@ -228,6 +229,15 @@ pub fn update_note(
         let caller = ctx.sender().to_hex();
         check_space_access(ctx, &note.workspace_id, &caller, "editor")?;
 
+        // Optimistic concurrency guard: if expected_version > 0, verify it matches
+        let current_version = note.version.unwrap_or(0);
+        if expected_version > 0 && expected_version != current_version {
+            return Err(format!(
+                "Concurrent note update detected: expected version {}, but note is at version {}. Re-read the note and retry.",
+                expected_version, current_version
+            ));
+        }
+
         let final_title = if title.is_empty() {
             extract_title_from_markdown(&content)
         } else {
@@ -240,7 +250,7 @@ pub fn update_note(
         note.title = final_title;
         note.content = content.clone();
         note.updated_at = now;
-        note.version = Some(note.version.unwrap_or(0) + 1);
+        note.version = Some(current_version + 1);
         if !embedding_json.is_empty() {
             note.embedding_json = embedding_json;
         }
