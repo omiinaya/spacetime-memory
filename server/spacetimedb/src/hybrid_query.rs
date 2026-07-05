@@ -4,7 +4,6 @@ use crate::auth::require_admin;
 
 use crate::knowledge_graph::{kg_edge, kg_node};
 use crate::memory::memory;
-use crate::tag::memory_tag;
 use crate::retrieval::{
     search_index, term_index, bm25_idf, bm25_score,
 };
@@ -976,7 +975,7 @@ pub fn compute_god_nodes(
 
 /// Cross-workspace semantic session search.
 ///
-/// Iterates all indexed memories (entity_type=\"memory\") across ALL workspaces,
+/// Iterates all indexed memories (entity_type="memory") across ALL workspaces,
 /// computes cosine similarity against ``query_embedding_json``, groups by
 /// workspace to find each session's best match, and stores the top-*limit*
 /// results in the ``SessionSearchResult`` table.
