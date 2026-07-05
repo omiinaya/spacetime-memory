@@ -228,7 +228,7 @@
 ### 4.2 Security hardening
 - [ ] Key rotation support (ability to change JWT signing keys without data loss)
 - [ ] Rate limiting on auth endpoints (register/login)
-- [ ] SQL injection audit — `_sql` endpoint takes raw SQL strings. The SDK's `_esc()` escapes identifiers but doesn't prevent SQL injection from compromised clients.
+- [X] SQL injection audit — `_sql` endpoint takes raw SQL strings. The SDK's `_esc()` escapes identifiers but doesn't prevent SQL injection from compromised clients.
 - [ ] Table privacy audit — 25 public tables out of 85. Are any of the public tables exposing data they shouldn't? `user` table is public — exposes peer IDs, account names. `query_result` is public — exposes ALL query results (currently empty until queried). `hybrid_result` is public.
 - [ ] API key scope limits — currently sk- keys can admin the entire system. No workspace-scoped keys.
 

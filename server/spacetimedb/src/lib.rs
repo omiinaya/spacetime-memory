@@ -30,6 +30,7 @@ pub mod proxy_metrics;
 pub mod harmonic_belief;
 pub mod change_event;
 pub mod tracing;
+pub mod key_rotation;
 
 /// Maximum number of rows any read reducer will return.
 /// This caps all `.iter()` scans to prevent OOM/timeout on large tables.
