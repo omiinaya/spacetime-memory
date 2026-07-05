@@ -15,8 +15,8 @@ This audit examines 36 public tables for data exposure risks. The core vulnerabi
 |------|-------|-----------|
 | **CRITICAL** | 1 | Full-entity public table containing raw encryption keys — `workspace_encryption_key` |
 | **HIGH** | 5 | Full-entity public tables or result tables with PII / full content + no caller scoping |
-| **MEDIUM** | 9 | Result tables with query_id-only scoping — no caller identity enforcement |
-| **LOW** | 26 | Aggregate stats, operational metrics, or structural metadata — acceptable |
+| **MEDIUM** | 11 | Result tables with query_id-only scoping — no caller identity enforcement |
+| **LOW** | 24 | Aggregate stats, operational metrics, or structural metadata — acceptable |
 
 ## CRITICAL Risk Tables
 
@@ -139,6 +139,30 @@ This audit examines 36 public tables for data exposure risks. The core vulnerabi
 **Problem:** Contains replication state in `json_data`. Query type "unsynced" could expose which data hasn't synced. "peers" type lists replication endpoints.
 
 **Fix:** Add `caller_identity` scoping or restrict to admin-only.
+
+### 13. `jwt_signing_key_result` (key_rotation.rs:70 — `#[table(accessor = jwt_signing_key_result, public)]`)
+
+**Fields:** `key_version`, `name`, `key_id`, `is_current`, `is_trusted`, `created_at`, `retired_at`, `expires_at`
+
+**Problem:** Public result table for signing key metadata. Reducers are admin-gated (`require_admin`), but the table itself is public — any client can query all rows directly via SQL. Exposes key rotation state, key IDs, and versioning information.
+
+**Fix:** Make table private, or add `caller_identity` scoping so only the admin caller sees their own query results.
+
+### 14. `key_rotation_event` (key_rotation.rs:364 — `#[table(accessor = key_rotation_event, public)]`)
+
+**Fields:** `event_type`, `detail`, `created_at`
+
+**Problem:** Event log for key rotation actions. `detail` field contains human-readable descriptions of key registration, revocation, and purge operations — could leak internal state and operational patterns.
+
+**Fix:** Add `caller_identity` scoping or restrict via admin-only result table.
+
+### 15. `jwk_set_result` (key_rotation.rs:377 — `#[table(accessor = jwk_set_result, public)]`)
+
+**Fields:** `payload` (full JWK Set JSON), `created_at`
+
+**Problem:** Public result table containing the full JWK Set of trusted signing keys. The reducer is admin-gated but the table is directly queryable by any client.
+
+**Fix:** Although JWK public keys are inherently non-secret, the table should still be admin-scoped for consistency. Make private or add caller identity enforcement.
 
 ## LOW Risk Tables (acceptable as-is or minor concerns)
 
