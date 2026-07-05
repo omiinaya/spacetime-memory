@@ -42,6 +42,11 @@ def mock_client():
     c._embed = MagicMock(return_value=[0.1] * 384)
     c._query_cache = None
     c._binary_cache = {}
+    c._circuit_open_until = 0.0
+    c._consecutive_failures = 0
+    c._circuit_breaker_threshold = 5
+    c._circuit_breaker_reset_secs = 30.0
+    c.max_retries = 3
     c.plugin_manager = None
     c.event_bus = None
     c.embedder_url = "http://localhost:9090"

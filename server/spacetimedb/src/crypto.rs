@@ -1,4 +1,6 @@
 use spacetimedb::*;
+use aes_gcm::{Aes256Gcm, Key, Nonce};
+use aes_gcm::aead::{Aead, KeyInit};
 
 use crate::auth::require_auth;
 use crate::auth::require_admin;
@@ -39,19 +41,17 @@ fn generate_key(ctx: &ReducerContext) -> [u8; 32] {
 }
 
 /// Encrypt plaintext with AES-256-GCM using the given key hex.
+/// Uses OsRng for nonce generation (works outside reducers).
 /// Returns hex-encoded nonce || ciphertext || tag.
 pub fn encrypt_field(plaintext: &str, key_hex: &str) -> Result<String, String> {
     let key_bytes = hex_to_key(key_hex)?;
-    let key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = aes_gcm::Aes256Gcm::new(key);
+    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(key);
 
-    // Use a deterministic nonce based on the plaintext — we have no RNG outside reducers.
-    // This is safe: AES-256-GCM with a fixed nonce per plaintext is fine as long as
-    // the same plaintext always produces the same ciphertext (deterministic encryption).
-    // For uniqueness, we use first 12 bytes of SHA-256(plaintext).
-    use sha2::Digest;
-    let hash = sha2::Sha256::digest(plaintext.as_bytes());
-    let nonce = aes_gcm::Nonce::from_slice(&hash[..NONCE_LEN]);
+    let mut nonce_bytes = [0u8; 12];
+    use rand::RngCore;
+    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
 
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_bytes())
@@ -66,9 +66,9 @@ pub fn encrypt_field(plaintext: &str, key_hex: &str) -> Result<String, String> {
 }
 
 /// Decrypt a hex-encoded packed ciphertext with AES-256-GCM.
-pub fn decrypt_field(cipherb64: &str, key_hex: &str) -> Result<String, String> {
+pub fn decrypt_field(cipher_hex: &str, key_hex: &str) -> Result<String, String> {
     let key_bytes = hex_to_key(key_hex)?;
-    let packed = hex::decode(cipherb64).map_err(|e| format!("Invalid hex ciphertext: {}", e))?;
+    let packed = hex::decode(cipher_hex).map_err(|e| format!("Invalid hex ciphertext: {}", e))?;
 
     if packed.len() < NONCE_LEN + 16 {
         return Err(format!(
@@ -78,9 +78,9 @@ pub fn decrypt_field(cipherb64: &str, key_hex: &str) -> Result<String, String> {
         ));
     }
 
-    let key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = aes_gcm::Aes256Gcm::new(key);
-    let nonce = aes_gcm::Nonce::from_slice(&packed[..NONCE_LEN]);
+    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(key);
+    let nonce = Nonce::from_slice(&packed[..NONCE_LEN]);
     let ciphertext = &packed[NONCE_LEN..];
 
     let plaintext = cipher
@@ -96,16 +96,17 @@ pub fn looks_encrypted(s: &str) -> bool {
     s.len() >= 56 && s.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// Encrypt a field using a reducer context (generates proper random nonce).
+/// Encrypt a field using the reducer-context RNG for the nonce.
+/// This is the version to call from reducers (uses STDB RNG, not thread_rng).
 pub fn encrypt_field_in_reducer(ctx: &ReducerContext, plaintext: &str, key_hex: &str) -> Result<String, String> {
     let key_bytes = hex_to_key(key_hex)?;
-    let key = aes_gcm::Key::<aes_gcm::Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = aes_gcm::Aes256Gcm::new(key);
+    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let cipher = Aes256Gcm::new(key);
 
     use spacetimedb::rand::RngCore;
     let mut nonce_bytes = [0u8; 12];
     ctx.rng().fill_bytes(&mut nonce_bytes);
-    let nonce = aes_gcm::Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
 
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_bytes())
@@ -176,9 +177,12 @@ pub fn set_workspace_encryption_enabled(
 }
 
 /// Rotate the encryption key for a workspace.
-/// New memories use the new key. Run `reencrypt_workspace_memories` after to re-key existing ones.
+/// New memories use the new key. Run `encrypt_existing_memories` after to re-key existing ones.
 #[reducer]
-pub fn rotate_workspace_encryption_key(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
+pub fn rotate_workspace_encryption_key(
+    ctx: &ReducerContext,
+    workspace_id: String,
+) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
     let mut key = ctx
         .db
@@ -217,19 +221,25 @@ pub fn get_decrypted_memory(ctx: &ReducerContext, memory_id: String) -> Result<(
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
 
-    let mem = ctx.db.memory().id().find(&memory_id)
+    let mem = ctx
+        .db
+        .memory()
+        .id()
+        .find(&memory_id)
         .ok_or_else(|| format!("Memory '{}' not found", memory_id))?;
 
     check_space_access(ctx, &mem.workspace_id, &caller, "viewer")?;
 
-    let key = ctx.db.workspace_encryption_key().workspace_id().find(&mem.workspace_id);
+    let key = ctx
+        .db
+        .workspace_encryption_key()
+        .workspace_id()
+        .find(&mem.workspace_id);
 
     let (content, summary) = if let Some(ref k) = key {
         if k.enabled && looks_encrypted(&mem.content) {
-            let c = decrypt_field(&mem.content, &k.key_hex)
-                .unwrap_or_else(|_| mem.content.clone());
-            let s = decrypt_field(&mem.summary, &k.key_hex)
-                .unwrap_or_else(|_| mem.summary.clone());
+            let c = decrypt_field(&mem.content, &k.key_hex).unwrap_or_else(|_| mem.content.clone());
+            let s = decrypt_field(&mem.summary, &k.key_hex).unwrap_or_else(|_| mem.summary.clone());
             (c, s)
         } else {
             (mem.content.clone(), mem.summary.clone())
@@ -239,7 +249,10 @@ pub fn get_decrypted_memory(ctx: &ReducerContext, memory_id: String) -> Result<(
     };
 
     // Clear old results for this caller
-    let old: Vec<_> = ctx.db.decrypted_memory_result().iter()
+    let old: Vec<_> = ctx
+        .db
+        .decrypted_memory_result()
+        .iter()
         .filter(|r| r.caller == caller)
         .map(|r| r.id.clone())
         .collect();
@@ -247,7 +260,11 @@ pub fn get_decrypted_memory(ctx: &ReducerContext, memory_id: String) -> Result<(
         ctx.db.decrypted_memory_result().id().delete(id);
     }
 
-    let result_id = crate::uuid_v4_uniq(ctx, |id| ctx.db.decrypted_memory_result().id().find(id).is_none(), 3);
+    let result_id = crate::uuid_v4_uniq(
+        ctx,
+        |id| ctx.db.decrypted_memory_result().id().find(id).is_none(),
+        3,
+    );
     ctx.db.decrypted_memory_result().insert(DecryptedMemoryResult {
         id: result_id,
         caller,
@@ -270,14 +287,21 @@ pub fn get_decrypted_memory(ctx: &ReducerContext, memory_id: String) -> Result<(
 #[reducer]
 pub fn encrypt_existing_memories(ctx: &ReducerContext, workspace_id: String) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
-    let key = ctx.db.workspace_encryption_key().workspace_id().find(&workspace_id)
+    let key = ctx
+        .db
+        .workspace_encryption_key()
+        .workspace_id()
+        .find(&workspace_id)
         .ok_or_else(|| format!("No encryption key found for workspace '{}'", workspace_id))?;
 
     if !key.enabled {
         return Err(format!("Encryption is disabled for workspace '{}'", workspace_id));
     }
 
-    let memories: Vec<_> = ctx.db.memory().iter()
+    let memories: Vec<_> = ctx
+        .db
+        .memory()
+        .iter()
         .filter(|m| m.workspace_id == workspace_id)
         .collect();
 
@@ -286,28 +310,26 @@ pub fn encrypt_existing_memories(ctx: &ReducerContext, workspace_id: String) -> 
         if looks_encrypted(&mem.content) {
             continue; // Already encrypted
         }
-        match encrypt_field_in_reducer(ctx, &mem.content, &key.key_hex) {
-            Ok(enc_content) => {
-                match encrypt_field_in_reducer(ctx, &mem.summary, &key.key_hex) {
-                    Ok(enc_summary) => {
-                        mem.content = enc_content;
-                        mem.summary = enc_summary;
-                        mem.updated_at = crate::now_micros(ctx);
-                        ctx.db.memory().id().update(mem);
-                        count += 1;
-                    }
-                    Err(e) => return Err(format!("Failed to encrypt summary: {}", e)),
-                }
-            }
-            Err(e) => return Err(format!("Failed to encrypt content: {}", e)),
-        }
+        let enc_content = encrypt_field_in_reducer(ctx, &mem.content, &key.key_hex)?;
+        let enc_summary = encrypt_field_in_reducer(ctx, &mem.summary, &key.key_hex)?;
+        mem.content = enc_content;
+        mem.summary = enc_summary;
+        mem.updated_at = crate::now_micros(ctx);
+        ctx.db.memory().id().update(mem);
+        count += 1;
     }
 
     if count > 0 {
         crate::change_event::log_change(
-            ctx, &workspace_id, "encryption", "encrypt_batch",
+            ctx,
+            &workspace_id,
+            "encryption",
+            "encrypt_batch",
             &format!("{}_encrypted", workspace_id),
-            &format!("{{\"workspace_id\":\"{}\",\"encrypted_count\":{}}}", workspace_id, count),
+            &format!(
+                "{{\"workspace_id\":\"{}\",\"encrypted_count\":{}}}",
+                workspace_id, count
+            ),
         );
     }
 
