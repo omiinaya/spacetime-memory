@@ -1,7 +1,6 @@
 use spacetimedb::*;
 use crate::auth::require_admin;
 use crate::{now_micros, uuid_v4_uniq, MAX_RESULTS};
-use p256::pkcs8::DecodePublicKey;
 use p256::elliptic_curve::sec1::ToEncodedPoint;
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -213,7 +212,6 @@ pub fn register_signing_key(
 #[reducer]
 pub fn list_signing_keys(ctx: &ReducerContext) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
-    let now = now_micros(ctx);
     let query_id = format!("list_keys:{}", ctx.sender().to_hex());
 
     // Clear previous results
@@ -272,7 +270,7 @@ pub fn revoke_signing_key(ctx: &ReducerContext, key_id: String) -> Result<(), St
     key.is_current = false;
     key.is_trusted = false;
     key.retired_at = now;
-    ctx.db.jwt_signing_key().id().update(key);
+    ctx.db.jwt_signing_key().id().update(key.clone());
 
     // Log the revocation event
     let event_id = uuid_v4_uniq(ctx, |id| ctx.db.key_rotation_event().id().find(id).is_none(), 3);
@@ -401,9 +399,6 @@ pub struct JwkSetResult {
 #[reducer]
 pub fn get_jwks(ctx: &ReducerContext) -> Result<(), String> {
     let _admin = require_admin(ctx)?;
-
-    use base64::Engine;
-    let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
     let trusted_keys: Vec<JwtSigningKey> = ctx.db.jwt_signing_key().iter()
         .take(MAX_RESULTS)
