@@ -646,9 +646,12 @@ pub struct MaintenanceSchedule {
 
 /// Periodic maintenance: expire timed-out memories, decay weak ones.
 /// Runs via SpacetimeDB scheduler (every 5 minutes, configured in `init`).
+/// NOTE: No `require_admin` here — this reducer is called by the STDB
+/// scheduler with the module identity, which is not a registered admin.
+/// The scheduler-mediated invocation is itself the auth gate:
+/// only the scheduler can produce a `MaintenanceSchedule` argument.
 #[reducer]
 pub fn run_maintenance(ctx: &ReducerContext, _arg: MaintenanceSchedule) -> Result<(), String> {
-    let _admin = crate::auth::require_admin(ctx)?;
     _run_maintenance(ctx)
 }
 
