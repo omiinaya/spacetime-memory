@@ -86,11 +86,9 @@ def run(label, fn, n=N):
 
 # Seed some memories for search benchmarks
 print("Seeding test memories...")
-# Use _call directly to bypass Tantivy indexing (not running on this test setup)
 for i in range(50):
-    c._call("store_memory", [WORKSPACE_ID, "", "", "experience", 
-                            f"Benchmark test memory number {i} for keyword and semantic searches. This is a test payload.",
-                            "", "[]", 0.8, "", ""])
+    c.store(WORKSPACE_ID,
+            content=f"Benchmark test memory number {i} for keyword and semantic searches. This is a test payload.")
 print(f"  Seeded 50 memories.")
 # Also index terms for BM25 keyword search
 for mem in c._query("memory", workspace_id=WORKSPACE_ID, columns=["id", "content"]):
