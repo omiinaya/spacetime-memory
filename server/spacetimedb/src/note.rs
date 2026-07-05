@@ -439,8 +439,14 @@ pub fn update_note_block(
         // Update block text content / source
         if !block_content.is_empty() && block_content != block.content {
             let old_source = block.source.clone();
-            block.content = block_content.clone();
-            block.source = block_content;
+            let old_content = std::mem::replace(&mut block.content, block_content.clone());
+            // Preserve markdown formatting: replace old content within source
+            if let Some(pos) = block.source.find(&old_content) {
+                block.source.replace_range(pos..pos + old_content.len(), &block_content);
+            } else {
+                // Fallback: old content not found in source, use full replacement
+                block.source = block_content.clone();
+            }
             if let Some(pos) = new_content.find(&old_source) {
                 new_content.replace_range(pos..pos + old_source.len(), &block.source);
                 content_updated = true;
