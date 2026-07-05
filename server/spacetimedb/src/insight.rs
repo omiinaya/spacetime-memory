@@ -42,7 +42,7 @@ pub fn create_insight(
 
     let ins = Insight {
         id: id.clone(),
-        workspace_id,
+        workspace_id: workspace_id.clone(),
         peer_id,
         content,
         insight_type,

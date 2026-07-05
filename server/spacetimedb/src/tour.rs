@@ -47,7 +47,7 @@ pub fn create_tour(
         let id = uuid_v7(ctx);
         ctx.db.tour().insert(Tour {
             id: id.clone(),
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             title,
             description,
             created_at: now,

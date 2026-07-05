@@ -18,6 +18,8 @@ hmac = "0.12"
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 p256 = { version = "0.13", default-features = false, features = ["pem", "sha2", "arithmetic"] }
 base64 = "0.22"
+aes-gcm = "0.10"
+rand = "0.8"
 
 [dev-dependencies]
 # Test utilities — these compile on host target (not wasm32)

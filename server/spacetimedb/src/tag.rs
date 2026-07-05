@@ -44,7 +44,7 @@ pub fn create_tag(
 
         let tag = Tag {
             id: id.clone(),
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             name,
             color,
             created_at: now,

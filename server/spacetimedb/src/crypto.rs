@@ -4,6 +4,7 @@ use aes_gcm::aead::{Aead, KeyInit};
 
 use crate::auth::require_auth;
 use crate::auth::require_admin;
+use crate::memory::memory;
 use crate::workspace::check_space_access;
 
 /// AES-256-GCM encrypted fields are returned as hex-encoded strings.
@@ -150,7 +151,7 @@ pub fn init_workspace_encryption(ctx: &ReducerContext, workspace_id: String) -> 
         workspace_id,
         key_hex,
         created_at: crate::now_micros(ctx),
-        created_by: caller,
+        created_by: caller.to_string(),
         enabled: true,
     });
 
@@ -253,7 +254,7 @@ pub fn get_decrypted_memory(ctx: &ReducerContext, memory_id: String) -> Result<(
         .db
         .decrypted_memory_result()
         .iter()
-        .filter(|r| r.caller == caller)
+        .filter(|r| r.caller == caller.to_string())
         .map(|r| r.id.clone())
         .collect();
     for id in old {
@@ -267,7 +268,7 @@ pub fn get_decrypted_memory(ctx: &ReducerContext, memory_id: String) -> Result<(
     );
     ctx.db.decrypted_memory_result().insert(DecryptedMemoryResult {
         id: result_id,
-        caller,
+        caller: caller.to_string(),
         memory_id,
         content,
         summary,

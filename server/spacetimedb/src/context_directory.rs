@@ -78,7 +78,7 @@ pub fn create_directory(
 
     let dir = ContextDirectory {
         id: id.clone(),
-        workspace_id,
+        workspace_id: workspace_id.clone(),
         name,
         path,
         parent_id,
@@ -259,7 +259,7 @@ pub fn get_directory(
         let id = uuid_v7(ctx);
         ctx.db.directory_result().insert(DirectoryResult {
             id,
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             query_hash: path_or_id,
             entity_type: "directory".to_string(),
             entity_id: dir.id.clone(),
@@ -282,7 +282,7 @@ pub fn get_directory(
         let id = uuid_v7(ctx);
         ctx.db.directory_result().insert(DirectoryResult {
             id,
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             query_hash: dir.id.clone(),
             entity_type: "directory".to_string(),
             entity_id: dir.id.clone(),
@@ -344,7 +344,7 @@ pub fn link_memory_to_directory(
         id,
         directory_id,
         memory_id,
-        workspace_id,
+        workspace_id: workspace_id.clone(),
     });
 
     Ok(())

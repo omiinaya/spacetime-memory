@@ -50,7 +50,7 @@ pub fn create_peer(
 
         ctx.db.peer().insert(Peer {
             id: id.clone(),
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             name,
             peer_type,
             metadata: if metadata_json.is_empty() {

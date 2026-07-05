@@ -5016,6 +5016,94 @@ class Client:
         "connector_config",
     ]
 
+    # -------------------------------------------------------------------
+    # Memory Encryption at Rest
+    # -------------------------------------------------------------------
+
+    def init_workspace_encryption(self, workspace_id: str) -> dict[str, str]:
+        """Initialise AES-256-GCM encryption for a workspace.
+
+        Generates a new encryption key and enables encryption. Memories
+        stored after this call will be encrypted before being written to
+        SpacetimeDB. Existing plaintext memories are NOT automatically
+        encrypted — call ``encrypt_existing_memories()`` after init.
+
+        Idempotent: returns an error if encryption is already initialised.
+
+        Args:
+            workspace_id: The workspace to encrypt.
+
+        Returns:
+            Dict with status result from the reducer.
+        """
+        return self._call("init_workspace_encryption", [workspace_id])
+
+    def set_workspace_encryption_enabled(
+        self, workspace_id: str, enabled: bool
+    ) -> dict[str, str]:
+        """Enable or disable memory encryption for a workspace.
+
+        When disabled, new memories are stored in plaintext. Existing
+        encrypted memories are not automatically decrypted — they remain
+        in their encrypted form in the database.
+
+        Args:
+            workspace_id: The workspace to modify.
+            enabled: True to enable encryption, False to disable.
+
+        Returns:
+            Dict with status result from the reducer.
+        """
+        return self._call(
+            "set_workspace_encryption_enabled", [workspace_id, enabled]
+        )
+
+    def rotate_workspace_encryption_key(self, workspace_id: str) -> dict[str, str]:
+        """Rotate the encryption key for a workspace.
+
+        New memories will use the new key. Call ``encrypt_existing_memories()``
+        after rotation to re-encrypt existing memories with the new key.
+
+        Args:
+            workspace_id: The workspace whose key should be rotated.
+
+        Returns:
+            Dict with status result from the reducer.
+        """
+        return self._call("rotate_workspace_encryption_key", [workspace_id])
+
+    def encrypt_existing_memories(self, workspace_id: str) -> dict[str, str]:
+        """Re-encrypt all unencrypted memories in a workspace.
+
+        Useful after initial encryption setup or key rotation. Encrypts
+        any memories whose content is still in plaintext using the current
+        workspace encryption key.
+
+        Requires encryption to be enabled for the workspace.
+
+        Args:
+            workspace_id: The workspace whose memories should be encrypted.
+
+        Returns:
+            Dict with status result from the reducer.
+        """
+        return self._call("encrypt_existing_memories", [workspace_id])
+
+    def get_decrypted_memory(self, memory_id: str) -> dict[str, str]:
+        """Fetch a memory with its content and summary decrypted.
+
+        Calls the ``get_decrypted_memory`` reducer which decrypts the
+        stored ciphertext using the workspace key. Results are written
+        to the ``decrypted_memory_result`` table for the calling identity.
+
+        Args:
+            memory_id: The ID of the memory to decrypt and return.
+
+        Returns:
+            Dict with status result from the reducer.
+        """
+        return self._call("get_decrypted_memory", [memory_id])
+
     def backup(self, output_path: str | None = None) -> dict[str, Any]:
         """Export all user data tables to a JSON file.
 

@@ -290,7 +290,7 @@ pub fn create_api_key(
         ctx.db.api_key_result().insert(ApiKeyResult {
             id: uuid_v4_uniq(ctx, |id| ctx.db.api_key_result().id().find(id).is_none(), 3),
             api_key_id: id.clone(),
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             name,
             permissions,
             is_active: true,

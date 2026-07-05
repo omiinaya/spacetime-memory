@@ -173,7 +173,7 @@ pub fn create_note(
 
         let note = Note {
             id: id.clone(),
-            workspace_id,
+            workspace_id: workspace_id.clone(),
             title: final_title,
             content: content.clone(),
             note_date,
