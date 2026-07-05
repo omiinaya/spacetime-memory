@@ -26,6 +26,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from spacetime_memory import Client
+from spacetime_memory.client import _esc
 
 logger = logging.getLogger(__name__)
 
@@ -2191,7 +2192,7 @@ def synthesize_mental_models(workspace_id: str, memory_ids_json: str) -> str:
 def get_mental_model(id: str) -> str:
     """Get a single mental model by its ID."""
     client = get_client()
-    rows = client._sql(f"SELECT * FROM mental_model WHERE id = '{id}'")
+    rows = client._sql(f"SELECT * FROM mental_model WHERE id = '{_esc(id)}'")
     return json.dumps(rows, default=str)
 
 
@@ -2205,9 +2206,9 @@ def list_mental_models(workspace_id: str, status: str = "") -> str:
         status: Optional filter: "pending", "completed", "failed", or empty for all
     """
     client = get_client()
-    where = f"workspace_id = '{workspace_id}'"
+    where = f"workspace_id = '{_esc(workspace_id)}'"
     if status:
-        where += f" AND status = '{status}'"
+        where += f" AND status = '{_esc(status)}'"
     rows = client._sql(f"SELECT * FROM mental_model WHERE {where} ORDER BY created_at DESC")
     return json.dumps(rows, default=str)
 
