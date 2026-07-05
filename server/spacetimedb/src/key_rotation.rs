@@ -1,6 +1,29 @@
 use spacetimedb::*;
 use crate::auth::require_admin;
 use crate::{now_micros, uuid_v4_uniq, MAX_RESULTS};
+use p256::pkcs8::DecodePublicKey;
+use p256::elliptic_curve::sec1::ToEncodedPoint;
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+/// Parse an EC P-256 public key PEM and return the base64url-encoded
+/// x and y coordinates for JWK representation.
+fn pubkey_pem_to_jwk_coords(pem: &str) -> Result<(String, String), String> {
+    use p256::PublicKey;
+    use base64::Engine;
+
+    let pubkey = PublicKey::from_public_key_pem(pem)
+        .map_err(|e| format!("Invalid EC P-256 public key PEM: {}", e))?;
+    let point = pubkey.to_encoded_point(false); // uncompressed
+    let x_bytes = point.x().ok_or("Missing x coordinate")?;
+    let y_bytes = point.y().ok_or("Missing y coordinate")?;
+
+    let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    Ok((
+        engine.encode(x_bytes),
+        engine.encode(y_bytes),
+    ))
+}
 
 // ── Tables ────────────────────────────────────────────────────────────
 
@@ -151,13 +174,35 @@ pub fn register_signing_key(
     ctx.db.jwt_signing_key_result().insert(JwtSigningKeyResult {
         id: uuid_v4_uniq(ctx, |id| ctx.db.jwt_signing_key_result().id().find(id).is_none(), 3),
         key_version: max_version + 1,
-        name: String::new(),
-        key_id: String::new(),
+        name: name.clone(),
+        key_id: key_id.clone(),
         is_current: true,
         is_trusted: true,
         created_at: now,
         retired_at: 0,
         expires_at,
+    });
+
+    // Log the rotation event
+    let event_id = uuid_v4_uniq(ctx, |id| ctx.db.key_rotation_event().id().find(id).is_none(), 3);
+    ctx.db.key_rotation_event().insert(KeyRotationEvent {
+        id: event_id,
+        event_type: "register".to_string(),
+        detail: format!(
+            "Registered key '{}' (kid={}, version={}){}",
+            name,
+            key_id,
+            max_version + 1,
+            if current_keys.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "; retired previous current key ({} retired keys)",
+                    current_keys.len()
+                )
+            },
+        ),
+        created_at: now,
     });
 
     Ok(())
@@ -228,6 +273,15 @@ pub fn revoke_signing_key(ctx: &ReducerContext, key_id: String) -> Result<(), St
     key.is_trusted = false;
     key.retired_at = now;
     ctx.db.jwt_signing_key().id().update(key);
+
+    // Log the revocation event
+    let event_id = uuid_v4_uniq(ctx, |id| ctx.db.key_rotation_event().id().find(id).is_none(), 3);
+    ctx.db.key_rotation_event().insert(KeyRotationEvent {
+        id: event_id,
+        event_type: "revoke".to_string(),
+        detail: format!("Revoked signing key '{}' (name={})", key_id, key.name),
+        created_at: now,
+    });
 
     Ok(())
 }
@@ -316,4 +370,94 @@ pub struct KeyRotationEvent {
     pub event_type: String,
     pub detail: String,
     pub created_at: i64,
+}
+
+/// JWK Set result — populated by the `get_jwks` reducer.
+/// Stores the full JWK Set JSON that clients can fetch via SQL.
+#[table(accessor = jwk_set_result, public)]
+#[derive(Debug, Clone)]
+pub struct JwkSetResult {
+    #[primary_key]
+    pub id: String,
+    /// The JWK Set JSON payload.
+    pub payload: String,
+    /// Timestamp (micros) when this result was generated.
+    pub created_at: i64,
+}
+
+/// Return all trusted signing keys as a JWK Set (RFC 7517).
+///
+/// The result is written to the `jwk_set_result` table as a single row
+/// with the full JWK Set JSON payload.  Clients should call this reducer,
+/// then query `SELECT * FROM jwk_set_result ORDER BY created_at DESC LIMIT 1`.
+///
+/// This endpoint enables JWT verification against any trusted signing key,
+/// which is essential for zero-downtime key rotation: tokens signed with
+/// old (but still trusted) keys continue to verify even after the current
+/// signing key has been rotated.
+///
+/// Each key's `kid` in the JWK Set matches the `kid` header in the JWT,
+/// so verifiers can select the correct key to check the signature.
+#[reducer]
+pub fn get_jwks(ctx: &ReducerContext) -> Result<(), String> {
+    let _admin = require_admin(ctx)?;
+
+    use base64::Engine;
+    let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    let trusted_keys: Vec<JwtSigningKey> = ctx.db.jwt_signing_key().iter()
+        .take(MAX_RESULTS)
+        .filter(|k: &JwtSigningKey| k.is_trusted)
+        .collect();
+
+    // Build JWK array entries
+    let mut jwk_keys: Vec<serde_json::Value> = Vec::new();
+    for key in &trusted_keys {
+        match pubkey_pem_to_jwk_coords(&key.public_key_pem) {
+            Ok((x, y)) => {
+                jwk_keys.push(serde_json::json!({
+                    "kty": "EC",
+                    "crv": "P-256",
+                    "kid": key.key_id,
+                    "use": "sig",
+                    "alg": "ES256",
+                    "x": x,
+                    "y": y,
+                }));
+            }
+            Err(e) => {
+                // Skip keys we can't parse, log the issue
+                let event_id = uuid_v4_uniq(ctx, |id| ctx.db.key_rotation_event().id().find(id).is_none(), 3);
+                ctx.db.key_rotation_event().insert(KeyRotationEvent {
+                    id: event_id,
+                    event_type: "jwks_warn".to_string(),
+                    detail: format!("Skipped key '{}' in JWKS: {}", key.key_id, e),
+                    created_at: now_micros(ctx),
+                });
+            }
+        }
+    }
+
+    let jwks = serde_json::json!({
+        "keys": jwk_keys,
+    });
+
+    let now = now_micros(ctx);
+    let result_id = uuid_v4_uniq(ctx, |id| ctx.db.jwk_set_result().id().find(id).is_none(), 3);
+
+    // Clear old results
+    let old: Vec<_> = ctx.db.jwk_set_result().iter().take(MAX_RESULTS)
+        .map(|r: JwkSetResult| r.id)
+        .collect();
+    for id in old {
+        ctx.db.jwk_set_result().id().delete(&id);
+    }
+
+    ctx.db.jwk_set_result().insert(JwkSetResult {
+        id: result_id,
+        payload: jwks.to_string(),
+        created_at: now,
+    });
+
+    Ok(())
 }
