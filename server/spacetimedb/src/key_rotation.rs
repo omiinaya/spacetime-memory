@@ -133,7 +133,7 @@ pub fn register_signing_key(
 
     // Compute the next version number
     let max_version = ctx.db.jwt_signing_key().iter().take(MAX_RESULTS)
-        .map(|k: &JwtSigningKey| k.key_version)
+        .map(|k: JwtSigningKey| k.key_version)
         .max()
         .unwrap_or(0);
 
@@ -259,7 +259,7 @@ pub fn revoke_signing_key(ctx: &ReducerContext, key_id: String) -> Result<(), St
     // Prevent revoking the only current key
     if key.is_current {
         let other_current = ctx.db.jwt_signing_key().iter().take(MAX_RESULTS)
-            .any(|k: &JwtSigningKey| k.is_current && k.key_id != key_id);
+            .any(|k: JwtSigningKey| k.is_current && k.key_id != key_id);
         if !other_current {
             return Err(
                 "Cannot revoke the only current signing key. Register a new key first."
