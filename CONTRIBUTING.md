@@ -66,6 +66,48 @@ spacetime publish spacetime-memory -p server/spacetimedb/ --yes  # Deploy module
 make test-unit                                        # Verify setup
 ```
 
+### JWT Key Rotation
+
+The project supports zero-downtime JWT signing key rotation. This enables
+changing the ECDSA P-256 key used to sign tokens without invalidating
+existing sessions or losing data.
+
+**Quick rotation** (generate + register + update symlinks):
+```bash
+python scripts/rotate-keys.py rotate --name "ecdsa-p256-2026-rotation-1"
+```
+
+**Step-by-step:**
+```bash
+# 1. Generate a new key pair
+python scripts/rotate-keys.py generate --name "ecdsa-p256-2026-rotation-1"
+# Note: this creates data/id_ecdsa_pkcs8_<kid>.pem + .pub
+
+# 2. Register it with the WASM module (this automatically retires the old key)
+python scripts/rotate-keys.py register --key-id <kid> --update-config
+
+# 3. Restart SpacetimeDB to pick up the new key path
+systemctl --user restart spacetimedb
+
+# 4. (Optional) Revoke the old key once all tokens have expired
+python scripts/rotate-keys.py revoke <old-kid>
+```
+
+**Key management commands:**
+| Command | Description |
+|---------|-------------|
+| `python scripts/rotate-keys.py list` | List all registered keys |
+| `python scripts/rotate-keys.py current` | Show current signing key |
+| `python scripts/rotate-keys.py revoke <kid>` | Revoke a compromised key |
+| `python scripts/rotate-keys.py purge` | Clean up expired keys |
+
+**Architecture:**
+- The WASM module stores all trusted signing keys in the `jwt_signing_key` table.
+- Only ONE key is ``is_current`` (used for signing new tokens).
+- Old keys remain ``is_trusted`` so previously-signed tokens continue to verify.
+- The `kid` JWT header identifies which key signed the token.
+- Once all tokens from the old key have expired, it can be retired.
+
 For detailed development instructions, see [AGENTS.md](AGENTS.md) (Development Guide section) or [`docs/development.md`](docs/development.md).
 
 ### Available Make Targets
