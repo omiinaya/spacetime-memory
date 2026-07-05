@@ -252,7 +252,7 @@ pub fn get_directory(
     workspace_id: String,
     path_or_id: String,
 ) -> Result<(), String> {
-    trace_span!(ctx, "get_directory", TracingSpanKind::Read, &workspace_id, {
+    trace_span!(ctx, "get_directory", TracingSpanKind::Read, &workspace_id.clone(), {
     let _account = require_auth(ctx)?;
     // Try lookup by id first
     if let Some(dir) = ctx.db.context_directory().id().find(&path_or_id) {
