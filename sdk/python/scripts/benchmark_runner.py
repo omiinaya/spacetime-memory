@@ -117,11 +117,11 @@ print("LATENCY BENCHMARKS")
 print("─" * 60)
 
 # 1
-run("memory.store (single, short) [no embed]", lambda: c._call("store_memory", [WORKSPACE_ID, "", "", "experience", "Short test memory", "", "[]", 0.8, "", ""]))
+run("memory.store (single, short) [no embed]", lambda: c.store(WORKSPACE_ID, content="Short test memory", memory_type="experience"))
 # 2
-run("memory.store (single, long) [no embed]", lambda: c._call("store_memory", [WORKSPACE_ID, "", "", "experience", "Long " * 200 + "test memory", "", "[]", 0.8, "", ""]))
+run("memory.store (single, long) [no embed]", lambda: c.store(WORKSPACE_ID, content="Long " * 200 + "test memory", memory_type="experience"))
 # 3
-run("memory.store (batch 10) [no embed]", lambda: [c._call("store_memory", [WORKSPACE_ID, "", "", "experience", f"Batch item {i}", "", "[]", 0.8, "", ""]) for i in range(10)], n=min(N, 10))
+run("memory.store (batch 10) [no embed]", lambda: [c.store(WORKSPACE_ID, content=f"Batch item {i}", memory_type="experience") for i in range(10)], n=min(N, 10))
 # 4
 run("search.keyword (top-5)", lambda: c.search(WORKSPACE_ID, "test", limit=5, semantic=False))
 # 5
@@ -180,14 +180,9 @@ eval_queries = [
     {"query": "Space technology", "relevant_contents": ["SpaceX successfully launched another Falcon 9 rocket carrying Starlink satellites into orbit."]},
 ]
 
-# Store eval memories (bypassing Tantivy for speed — no Tantivy server running)
+# Store eval memories — uses c.store() which auto-indexes BM25 terms
 for m in eval_memories:
-    c._call("store_memory", [WORKSPACE_ID, "", "", m["type"], m["content"], "", "[]", 0.8, "", ""])
-    # Also index terms for BM25
-    for mem in c._query("memory", workspace_id=WORKSPACE_ID, columns=["id", "content"]):
-        if mem["content"] == m["content"]:
-            c._call("index_terms", [WORKSPACE_ID, "memory", mem["id"], mem["content"]])
-            break
+    c.store(WORKSPACE_ID, content=m["content"], memory_type=m["type"])
 
 # Wait for indexing
 time.sleep(3)
