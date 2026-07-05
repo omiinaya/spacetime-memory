@@ -1,8 +1,12 @@
 use spacetimedb::*;
 
+use crate::trace_span;
 use crate::{now_micros, uuid_v4_uniq};
+use crate::tracing::TracingSpanKind;
 use crate::auth::require_auth;
 use crate::workspace::check_space_access;
+use crate::trace_span;
+use crate::tracing::TracingSpanKind;
 
 /// A note — markdown document with wikilink backlinking support.
 #[table(accessor = note)]
@@ -150,46 +154,48 @@ pub fn create_note(
     note_date: String,
     embedding_json: String,
 ) -> Result<(), String> {
-    require_auth(ctx)?;
-    let caller = ctx.sender().to_hex();
-    check_space_access(ctx, &workspace_id, &caller, "editor")?;
-    let now = now_micros(ctx);
-    let id = uuid_v4_uniq(ctx, |id| ctx.db.note().id().find(id).is_none(), 3);
+    trace_span!(ctx, "create_note", TracingSpanKind::Write, &workspace_id, {
+        require_auth(ctx)?;
+        let caller = ctx.sender().to_hex();
+        check_space_access(ctx, &workspace_id, &caller, "editor")?;
+        let now = now_micros(ctx);
+        let id = uuid_v4_uniq(ctx, |id| ctx.db.note().id().find(id).is_none(), 3);
 
-    // Normalise note_date: if non-empty, must be YYYY-MM-DD
-    if !note_date.is_empty() && !is_date_format(&note_date) {
-        return Err(format!("Invalid note_date '{}': must be empty or YYYY-MM-DD", note_date));
-    }
+        // Normalise note_date: if non-empty, must be YYYY-MM-DD
+        if !note_date.is_empty() && !is_date_format(&note_date) {
+            return Err(format!("Invalid note_date '{}': must be empty or YYYY-MM-DD", note_date));
+        }
 
-    // Extract title from first # heading if title is empty
-    let final_title = if title.is_empty() {
-        extract_title_from_markdown(&content)
-    } else {
-        title
-    };
+        // Extract title from first # heading if title is empty
+        let final_title = if title.is_empty() {
+            extract_title_from_markdown(&content)
+        } else {
+            title
+        };
 
-    let note = Note {
-        id: id.clone(),
-        workspace_id,
-        title: final_title,
-        content: content.clone(),
-        note_date,
-        embedding_json: if embedding_json.is_empty() { String::from("[]") } else { embedding_json },
-        backlink_count: 0,
-        block_ref_count: 0,
-        created_at: now,
-        updated_at: now,
-        is_active: true,
-        version: Some(1),
-    };
+        let note = Note {
+            id: id.clone(),
+            workspace_id,
+            title: final_title,
+            content: content.clone(),
+            note_date,
+            embedding_json: if embedding_json.is_empty() { String::from("[]") } else { embedding_json },
+            backlink_count: 0,
+            block_ref_count: 0,
+            created_at: now,
+            updated_at: now,
+            is_active: true,
+            version: Some(1),
+        };
 
-    ctx.db.note().insert(note);
+        ctx.db.note().insert(note);
 
-    // Parse blocks and backlinks
-    parse_note_blocks_inner(ctx, &id, &content, now);
-    resolve_backlinks(&ctx, &id, &content, now);
+        // Parse blocks and backlinks
+        parse_note_blocks_inner(ctx, &id, &content, now);
+        resolve_backlinks(&ctx, &id, &content, now);
 
-    Ok(())
+        Ok(())
+    })
 }
 
 #[reducer]
@@ -200,49 +206,70 @@ pub fn update_note(
     content: String,
     embedding_json: String,
 ) -> Result<(), String> {
-    require_auth(ctx)?;
-    let now = now_micros(ctx);
-
-    let mut note = ctx
+    // We need workspace_id before trace_span, so we look it up first
+    let ws_id = ctx
         .db
         .note()
         .id()
         .find(&id)
-        .ok_or_else(|| format!("Note '{}' not found", id))?;
-    let caller = ctx.sender().to_hex();
-    check_space_access(ctx, &note.workspace_id, &caller, "editor")?;
+        .ok_or_else(|| format!("Note '{}' not found", id))?
+        .workspace_id
+        .clone();
+    trace_span!(ctx, "update_note", TracingSpanKind::Write, &ws_id, {
+        require_auth(ctx)?;
+        let now = now_micros(ctx);
 
-    let final_title = if title.is_empty() {
-        extract_title_from_markdown(&content)
-    } else {
-        title
-    };
+        let mut note = ctx
+            .db
+            .note()
+            .id()
+            .find(&id)
+            .ok_or_else(|| format!("Note '{}' not found", id))?;
+        let caller = ctx.sender().to_hex();
+        check_space_access(ctx, &note.workspace_id, &caller, "editor")?;
 
-    // Save revision snapshot before modifying
-    record_note_revision(ctx, &note, &final_title, &content);
+        let final_title = if title.is_empty() {
+            extract_title_from_markdown(&content)
+        } else {
+            title
+        };
 
-    note.title = final_title;
-    note.content = content.clone();
-    note.updated_at = now;
-    note.version = Some(note.version.unwrap_or(0) + 1); // Increment version on each update
-    if !embedding_json.is_empty() {
-        note.embedding_json = embedding_json;
-    }
-    ctx.db.note().id().update(note);
+        // Save revision snapshot before modifying
+        record_note_revision(ctx, &note, &final_title, &content);
 
-    // Re-parse backlinks: delete old ones, insert new ones
-    clear_backlinks(ctx, &id);
-    resolve_backlinks(&ctx, &id, &content, now);
+        note.title = final_title;
+        note.content = content.clone();
+        note.updated_at = now;
+        note.version = Some(note.version.unwrap_or(0) + 1);
+        if !embedding_json.is_empty() {
+            note.embedding_json = embedding_json;
+        }
+        ctx.db.note().id().update(note);
 
-    // Re-parse blocks
-    clear_blocks(ctx, &id);
-    parse_note_blocks_inner(ctx, &id, &content, now);
+        // Re-parse backlinks: delete old ones, insert new ones
+        clear_backlinks(ctx, &id);
+        resolve_backlinks(&ctx, &id, &content, now);
 
-    Ok(())
+        // Re-parse blocks
+        clear_blocks(ctx, &id);
+        parse_note_blocks_inner(ctx, &id, &content, now);
+
+        Ok(())
+    })
 }
 
 #[reducer]
 pub fn delete_note(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    // We need workspace_id before trace_span, so we look it up first
+    let ws_id = ctx
+        .db
+        .note()
+        .id()
+        .find(&id)
+        .ok_or_else(|| format!("Note '{}' not found", id))?
+        .workspace_id
+        .clone();
+    trace_span!(ctx, "delete_note", TracingSpanKind::Write, &ws_id, {
     require_auth(ctx)?;
     let note = ctx
         .db
@@ -271,6 +298,8 @@ pub fn delete_note(ctx: &ReducerContext, id: String) -> Result<(), String> {
 
     ctx.db.note().id().delete(&id);
     Ok(())
+
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +308,8 @@ pub fn delete_note(ctx: &ReducerContext, id: String) -> Result<(), String> {
 
 #[reducer]
 pub fn parse_note_blocks(ctx: &ReducerContext, note_id: String) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
+    trace_span!(ctx, "parse_note_blocks", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
     let note = ctx
         .db
         .note()
@@ -289,7 +319,8 @@ pub fn parse_note_blocks(ctx: &ReducerContext, note_id: String) -> Result<(), St
     let now = now_micros(ctx);
     clear_blocks(ctx, &note_id);
     parse_note_blocks_inner(ctx, &note_id, &note.content, now);
-    Ok(())
+        Ok(())
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -597,8 +628,6 @@ fn find_block_refs(text: &str) -> Vec<(String, bool)> {
 
 // ---------------------------------------------------------------------------
 // Backlink helpers
-// ---------------------------------------------------------------------------
-
 fn clear_backlinks(ctx: &ReducerContext, note_id: &str) {
     let old_links: Vec<_> = ctx
         .db
@@ -966,7 +995,7 @@ fn resolve_backlinks(ctx: &ReducerContext, source_id: &str, content: &str, now: 
         let matches: Vec<_> = ctx
             .db
             .note()
-            .iter().take(crate::MAX_RESULTS)
+            .iter()
             .take(crate::MAX_RESULTS)
             .filter(|n: &Note| n.title == target_title && n.id != source_id)
             .map(|n| n.id.clone())

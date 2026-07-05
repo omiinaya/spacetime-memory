@@ -80,14 +80,13 @@
 **Why blocked:** WASM can't be published until Cargo.lock resolves v2.6 (the lockfile was resolved against v2.4.1 and my manual deps might conflict).
 
 ### 1.2 Fix 4 failing Python unit tests
-**Status:** FIXED (commit 6b477a74 — Hardening pass: fix stale test mocks)
-- [x] `test_update_memory` — `_circuit_open_until` attribute missing on Mock(Client)
-- [x] `test_check_embedder_health_error_status` — same Mock issue
-- [x] `test_create_note_with_embed` — `UnboundLocalError: note_id` in Tantivy path
-- [x] `test_context_in_search_results` — `_circuit_open_until` Mock issue
+**Status:** Pre-existing failures, all related to Mock infrastructure
+- [ ] `test_update_memory` — `_circuit_open_until` attribute missing on Mock(Client)
+- [ ] `test_check_embedder_health_error_status` — same Mock issue
+- [ ] `test_create_note_with_embed` — `UnboundLocalError: note_id` in Tantivy path
+- [ ] `test_context_in_search_results` — `_circuit_open_until` Mock issue
 
 **Root cause:** Mock(Client) doesn't call `__init__` which sets `_circuit_open_until`. Fix: add the attribute to the Mock spec, or refactor initialization to a helper method.
-**Resolution:** Commit 6b477a74 added missing mock attributes (`_query_cache`, `_bge_model_cache`, `_e5_model_cache`, `_binary_cache`, `plugin_manager`, `event_bus`, `embedder_url`, `tantivy_url`) to conftest.py fixtures, fixed `mock_http_client` json lambdas, and patched `_tantivy_search` mock side effects across test files. All 4 tests pass.
 
 ### 1.3 Commit and push uncommitted changes
 **Files touched but not committed (from prior sessions):**
@@ -130,9 +129,8 @@
 - [ ] Compare against historical baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960)
 
 ### 2.4 Benchmark with Tantivy indexing active
-**Status:** The benchmark runner (`sdk/python/scripts/benchmark_runner.py`) now uses `c.store()` instead of `_call("store_memory", ...)`, which triggers Tantivy indexing on seed.
-**Commit:** `f94ea1f7` — replaced `_call("store_memory", ...)` calls with `c.store()` in latency benchmarks and eval memory seed.
-- [x] Update benchmark to use `c.store()` instead of `c._call("store_memory", ...)` during seed phase
+**Status:** The benchmark runner stores via `_call("store_memory", ...)` which bypasses `_tantivy_index()`. Tantivy has 0 documents for test workspace.
+- [ ] Update benchmark to use `c.store()` instead of `c._call("store_memory", ...)` during seed phase
 - [ ] Re-run search benchmarks to measure Tantivy contribution
 - [ ] Expected: keyword search speed improves (Tantivy ~1ms vs BM25 in WASM ~28ms)
 
@@ -193,8 +191,8 @@
 - [ ] Update `store_batch()` to use single batch Tantivy call
 
 ### 3.3 Bi-temporal fact tracking (Graphiti parity)
-**Status:** `valid_from`/`valid_to` fields added to Memory struct and all constructors. Remaining: auto_invalidate reducer, SDK exposure.
-- [x] Add `valid_from: i64` and `valid_to: i64` to Memory struct
+**Status:** Not started. Graphiti's main differentiator is temporal facts with valid_from/valid_to.
+- [ ] Add `valid_from: i64` and `valid_to: i64` to Memory struct
 - [ ] Add `auto_invalidate(old_fact, new_fact)` reducer
 - [ ] Expose in Python SDK: `search(query, temporal_filter={from: ..., to: ...})`
 - [ ] Expose in TS SDK
@@ -202,9 +200,9 @@
 **Estimate:** 1 week.
 
 ### 3.4 Cross-encoder reranking
-**Status:** ✅ Complete. ONNX cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is extracted to `server/embedder/model/ms-marco-MiniLM-L-6-v2-cross.onnx` (91MB) with tokenizer. Enabled by default (`cross_encoder=True`) in `search()` fusion pipeline. Falls back gracefully with warning if model files or deps are missing. Dependencies available via `pip install spacetime-memory[rerank]`.
+**Status:** Done. `cross_encoder.py` module uses ONNX (ms-marco-MiniLM-L-6-v2) with numpy/onnxruntime/tokenizers. Extracted to `pip install spacetime-memory[cross-encoder]` optional extras group. `cross_encoder=True` is default in `search()` — falls back gracefully with a warning if the extra isn't installed. All 15 tests pass.
 - [x] Extract cross-encoder model or use a different approach
-- [x] Fix: ensure numpy is a dependency, or use a pure-Python fallback  
+- [x] Fix: ensure numpy is a dependency, or use a pure-Python fallback
 - [x] Enable cross-encoder by default in search() fusion
 
 ### 3.5 npm publish
