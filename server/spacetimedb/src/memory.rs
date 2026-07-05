@@ -268,8 +268,12 @@ pub fn update_memory(
         // Save revision snapshot before modifying
         record_revision(ctx, &mem, &content, &summary, confidence);
 
-        mem.content = content;
-        mem.summary = summary;
+        // Encrypt content and summary if workspace encryption is active
+        let enc_content = encrypt_if_enabled(ctx, &mem.workspace_id, &content)?;
+        let enc_summary = encrypt_if_enabled(ctx, &mem.workspace_id, &summary)?;
+
+        mem.content = enc_content;
+        mem.summary = enc_summary;
         mem.confidence = confidence;
         mem.version += 1; // Increment version on each update
         mem.updated_at = now_micros(ctx);
@@ -490,4 +494,14 @@ pub fn get_user_memories(
     }
 
     Ok(())
+}
+
+/// Helper: if encryption is enabled for the workspace, encrypt the field.
+/// If encryption is not enabled or no key exists, returns the plaintext unchanged.
+fn encrypt_if_enabled(ctx: &ReducerContext, workspace_id: &str, plaintext: &str) -> Result<String, String> {
+    let maybe_key = ctx.db.workspace_encryption_key().workspace_id().find(workspace_id);
+    match maybe_key {
+        Some(k) if k.enabled => encrypt_field_in_reducer(ctx, plaintext, &k.key_hex),
+        _ => Ok(plaintext.to_string()),
+    }
 }

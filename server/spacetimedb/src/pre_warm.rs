@@ -7,6 +7,7 @@ use crate::consolidation::{backup_entry, consolidation_log, maintenance_schedule
 use crate::context_compression::context_pack;
 use crate::context_delta::delta_pack;
 use crate::context_directory::{context_directory, directory_memory_link, directory_result};
+use crate::crypto::{decrypted_memory_result, workspace_encryption_key};
 use crate::document::{doc_chunk, document};
 use crate::entity_linking::entity_link;
 use crate::graph_traversal::{bridge_result, graph_traversal_result, kg_stats_result, shortest_path_result};
@@ -35,7 +36,7 @@ use crate::tour::{tour, tour_stop};
 use crate::tracing::tracing_span;
 use crate::user::{user, user_session_result};
 use crate::workspace::{
-    space_member_result, space_permission, workspace, workspace_context_result, workspace_config as ws_config,
+    space_member_result, space_permission, workspace, workspace_context_result,
     workspace_memory_stats_result,
 };
 
@@ -71,6 +72,7 @@ pub fn pre_warm_caches(ctx: &ReducerContext) {
     pre_warm_single(ctx, "consolidation_log", |ctx| ctx.db.consolidation_log().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "context_directory", |ctx| ctx.db.context_directory().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "context_pack", |ctx| ctx.db.context_pack().iter().take(0).for_each(drop));
+    pre_warm_single(ctx, "decrypted_memory_result", |ctx| ctx.db.decrypted_memory_result().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "delta_pack", |ctx| ctx.db.delta_pack().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "directory_content_result", |ctx| ctx.db.directory_content_result().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "directory_memory_link", |ctx| ctx.db.directory_memory_link().iter().take(0).for_each(drop));
@@ -137,6 +139,7 @@ pub fn pre_warm_caches(ctx: &ReducerContext) {
     pre_warm_single(ctx, "user_memory_result", |ctx| ctx.db.user_memory_result().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "user_session_result", |ctx| ctx.db.user_session_result().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "workspace", |ctx| ctx.db.workspace().iter().take(0).for_each(drop));
+    pre_warm_single(ctx, "workspace_encryption_key", |ctx| ctx.db.workspace_encryption_key().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "workspace_config", |ctx| ctx.db.workspace_config().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "workspace_context_result", |ctx| ctx.db.workspace_context_result().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "workspace_memory_stats_result", |ctx| ctx.db.workspace_memory_stats_result().iter().take(0).for_each(drop));
