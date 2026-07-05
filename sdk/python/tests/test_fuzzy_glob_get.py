@@ -20,6 +20,10 @@ def mock_client():
     c._sql = MagicMock(return_value=[])
     c._query = MagicMock(return_value=[])
     c._embed = MagicMock(return_value=[0.1] * 384)
+    c._circuit_open_until = 0.0
+    c._consecutive_failures = 0
+    c._circuit_breaker_threshold = 5
+    c._circuit_breaker_reset_secs = 30.0
     return c
 
 
