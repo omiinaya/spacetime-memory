@@ -203,7 +203,7 @@ pub fn generate_context_pack(
         let (pack_json, token_count, _) =
             build_full_pack(ctx, &workspace_id, &peer_id, token_budget);
 
-        upsert_context_pack(ctx, workspace_id, query_hash, pack_json, token_count, now);
+        upsert_context_pack(ctx, workspace_id.clone(), query_hash, pack_json, token_count, now);
 
         Ok(())
     } else {
@@ -285,7 +285,7 @@ pub fn generate_context_pack(
         let (pack_json, token_count, _) =
             build_full_pack(ctx, &workspace_id, &peer_id, token_budget);
 
-        upsert_context_pack(ctx, workspace_id, query_hash, pack_json, token_count, now);
+        upsert_context_pack(ctx, workspace_id.clone(), query_hash, pack_json, token_count, now);
 
         Ok(())
     }

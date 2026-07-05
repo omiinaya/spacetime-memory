@@ -187,7 +187,7 @@ pub fn log_resonance_session(
     let id = uuid_v7(ctx);
     ctx.db.resonance_log().insert(ResonanceLog {
         id,
-        workspace_id,
+        workspace_id: workspace_id.clone(),
         cluster_count,
         beliefs_generated,
         contradictions_resolved,

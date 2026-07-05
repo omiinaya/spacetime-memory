@@ -77,7 +77,7 @@ pub fn create_document(
 
     let doc = Document {
         id: id.clone(),
-        workspace_id,
+        workspace_id: workspace_id.clone(),
         title,
         content,
         content_type,

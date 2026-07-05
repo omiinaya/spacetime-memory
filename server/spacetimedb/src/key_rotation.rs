@@ -2,6 +2,7 @@ use spacetimedb::*;
 use crate::auth::require_admin;
 use crate::{now_micros, uuid_v4_uniq, MAX_RESULTS};
 use p256::elliptic_curve::sec1::ToEncodedPoint;
+use p256::pkcs8::DecodePublicKey;
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ pub fn register_signing_key(
 
     // Check for duplicate key_id
     let dup = ctx.db.jwt_signing_key().iter().take(MAX_RESULTS)
-        .any(|k: &JwtSigningKey| k.key_id == key_id);
+        .any(|k: JwtSigningKey| k.key_id == key_id);
     if dup {
         return Err(format!("Key ID '{}' is already registered", key_id));
     }
@@ -148,7 +149,8 @@ pub fn register_signing_key(
     let current_keys: Vec<_> = ctx.db.jwt_signing_key().iter().take(MAX_RESULTS)
         .filter(|k: &JwtSigningKey| k.is_current)
         .collect();
-    for mut old_key in current_keys {
+    for old_key in &current_keys {
+        let mut old_key = old_key.clone();
         old_key.is_current = false;
         old_key.retired_at = now;
         ctx.db.jwt_signing_key().id().update(old_key);
@@ -158,8 +160,8 @@ pub fn register_signing_key(
     ctx.db.jwt_signing_key().insert(JwtSigningKey {
         id: id.clone(),
         key_version: max_version + 1,
-        name,
-        key_id,
+        name: name.clone(),
+        key_id: key_id.clone(),
         public_key_pem,
         private_key_path,
         is_current: true,

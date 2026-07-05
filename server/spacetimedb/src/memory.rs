@@ -7,6 +7,8 @@ use crate::workspace::check_space_access;
 use crate::change_event;
 use crate::tracing::TracingSpanKind;
 use crate::trace_span;
+use crate::crypto::encrypt_field_in_reducer;
+use crate::crypto::workspace_encryption_key;
 
 
 /// A memory entry storing world facts, experiences, or mental models
@@ -145,15 +147,20 @@ pub fn store_memory_batch(ctx: &ReducerContext, items_json: String) -> Result<()
         let now = now_micros(ctx);
         for item in items {
             check_space_access(ctx, &item.workspace_id, &caller, "editor")?;
-        let id = uuid_v4_uniq(ctx, |id| ctx.db.memory().id().find(id).is_none(), 3);
+            let id = uuid_v4_uniq(ctx, |id| ctx.db.memory().id().find(id).is_none(), 3);
+
+            // Encrypt content and summary if workspace encryption is enabled
+            let enc_content = encrypt_if_enabled(ctx, &item.workspace_id, &item.content)?;
+            let enc_summary = encrypt_if_enabled(ctx, &item.workspace_id, &item.summary)?;
+
             let mem = Memory {
                 id: id.clone(),
                 workspace_id: item.workspace_id.clone(),
                 peer_id: item.peer_id,
                 observer_id: item.observer_id,
                 memory_type: item.memory_type,
-                content: item.content,
-                summary: item.summary,
+                content: enc_content,
+                summary: enc_summary,
                 context: String::new(),
                 entities_json: item.entities_json,
                 confidence: item.confidence,
@@ -206,14 +213,18 @@ pub fn store_memory(
         let id = uuid_v4_uniq(ctx, |id| ctx.db.memory().id().find(id).is_none(), 3);
         let ws_id = workspace_id.clone();
 
+        // Encrypt content and summary if workspace encryption is enabled
+        let enc_content = encrypt_if_enabled(ctx, &ws_id, &content)?;
+        let enc_summary = encrypt_if_enabled(ctx, &ws_id, &summary)?;
+
         let mem = Memory {
             id: id.clone(),
             workspace_id,
             peer_id,
             observer_id,
             memory_type,
-            content,
-            summary,
+            content: enc_content,
+            summary: enc_summary,
             context: String::new(),
             entities_json,
             confidence,
@@ -499,7 +510,7 @@ pub fn get_user_memories(
 /// Helper: if encryption is enabled for the workspace, encrypt the field.
 /// If encryption is not enabled or no key exists, returns the plaintext unchanged.
 fn encrypt_if_enabled(ctx: &ReducerContext, workspace_id: &str, plaintext: &str) -> Result<String, String> {
-    let maybe_key = ctx.db.workspace_encryption_key().workspace_id().find(workspace_id);
+    let maybe_key = ctx.db.workspace_encryption_key().workspace_id().find(workspace_id.to_string());
     match maybe_key {
         Some(k) if k.enabled => encrypt_field_in_reducer(ctx, plaintext, &k.key_hex),
         _ => Ok(plaintext.to_string()),
