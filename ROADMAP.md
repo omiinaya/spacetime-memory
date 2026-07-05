@@ -239,7 +239,7 @@
 
 ### 4.4 Code quality
 - [ ] 21 TODOs/FIXMEs across the codebase
-  - `note.rs:136` — "TODO: handle concurrent note block updates"
+  - `note.rs:208` — "TODO: handle concurrent note block updates" ✓ (added expected_version param to update_note)
   - `lib.rs:15` — "TODO: organize module structure"
   - `client.py:128` — "TODO: configure log level"
   - `orgmode.py:70` — "FIXME: extract method"
