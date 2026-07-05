@@ -301,7 +301,7 @@
 
 ### 5.5 perf
 - [ ] **WASM `hybrid_search` benchmark as CI gate** — fail CI if p50 > 2x baseline
-- [ ] **Pre-warm memory caches** — reduce WASM first-call latency
+- [x] **Pre-warm memory caches** — reduce WASM first-call latency
 - [ ] **Tantivy warmup on startup** — index existing memories on boot
 - [ ] **Embedder GPU acceleration** — CUDA/ROCm support (currently CPU-only ONNX)
 
