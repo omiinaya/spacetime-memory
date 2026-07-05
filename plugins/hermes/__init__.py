@@ -605,8 +605,8 @@ class SpacetimeMemoryProvider(MemoryProvider):
                 rows = client._sql(
                     "SELECT id, title, content, note_date, backlink_count, updated_at "
                     "FROM note WHERE is_active = true "
-                    f"AND workspace_id = '{self._workspace_id}' "
-                    "AND (title LIKE '%{q}%' OR content LIKE '%{q}%') "
+                    f"AND workspace_id = '{_esc(self._workspace_id)}' "
+                    f"AND (title LIKE '%{_esc(query)}%' OR content LIKE '%{_esc(query)}%') "
                     "ORDER BY updated_at DESC "
                     f"LIMIT {limit}"
                 )
@@ -637,8 +637,8 @@ class SpacetimeMemoryProvider(MemoryProvider):
                 nodes = client._sql(
                     "SELECT id, label, node_type, summary "
                     "FROM kg_node WHERE "
-                    f"workspace_id = '{self._workspace_id}' AND "
-                    f"label LIKE '%{query}%' "
+                    f"workspace_id = '{_esc(self._workspace_id)}' AND "
+                    f"label LIKE '%{_esc(query)}%' "
                     "LIMIT 20"
                 )
             else:
@@ -671,7 +671,7 @@ class SpacetimeMemoryProvider(MemoryProvider):
         try:
             existing = client._sql(
                 "SELECT id, peer_id, static_facts_json, dynamic_context_json "
-                f"FROM profile WHERE peer_id = '{peer_id}'"
+                f"FROM profile WHERE peer_id = '{_esc(peer_id)}'"
             )
 
             if fact:
@@ -689,7 +689,7 @@ class SpacetimeMemoryProvider(MemoryProvider):
             profiles = client._sql(
                 "SELECT id, peer_id, static_facts_json, dynamic_context_json, "
                 "preferences_json, tags_json "
-                f"FROM profile WHERE peer_id = '{peer_id}'"
+                f"FROM profile WHERE peer_id = '{_esc(peer_id)}'"
             )
 
             self._record_success()
