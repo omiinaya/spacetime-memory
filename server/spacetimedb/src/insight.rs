@@ -120,7 +120,7 @@ pub fn synthesize_mental_models(
 
     let model = MentalModel {
         id: id.clone(),
-        workspace_id,
+        workspace_id: workspace_id.clone(),
         model_type: "mental_model".to_string(),
         content: "Synthesis requested. Run mental_model_synthesis.py to generate LLM output.".to_string(),
         source_memory_ids: memory_ids_json,
@@ -132,6 +132,7 @@ pub fn synthesize_mental_models(
 
     ctx.db.mental_model().insert(model);
     Ok(())
+})
 }
 
 #[reducer]
