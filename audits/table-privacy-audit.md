@@ -231,15 +231,20 @@ This is a low-risk, non-breaking schema addition — it adds granular access con
 
 | Priority | Table | Effort | Impact |
 |----------|-------|--------|--------|
+| **P0** | `workspace_encryption_key` | Make private | **Prevents total encryption bypass** |
 | **P0** | `user` | Make private + create caller-scoped result table | Prevents PII exposure |
 | **P1** | `query_result` | Add caller_identity | Closes the generic data leak |
 | **P1** | `change_event_result` | Add caller_identity | Prevents change-watching |
+| **P1** | `decrypted_memory_result` | Add caller_identity | Protects decrypted memory content |
 | **P2** | `profile_context_result` | Add caller_identity | Protects peer profiles |
 | **P2** | `user_memory_result` | Add caller_identity | Protects user-scoped memories |
 | **P3** | `tracing_span` | Remove/obfuscate `caller` field | Reduces identity leakage |
 | **P3** | `session_step_result` | Add caller_identity | Protects agent reasoning |
 | **P3** | `hybrid_result` | Add caller_identity | Protects search results |
+| **P3** | `jwt_signing_key_result` | Make private or add caller_identity | Protects key rotation metadata |
+| **P3** | `jwk_set_result` | Make private or add caller_identity | Scopes JWK set to admin |
 | **P4** | `fact_result` | Add caller_identity | Protects fact data |
 | **P4** | `session_search_result` | Add caller_identity | Protects session search |
 | **P4** | `replication_result` | Add caller_identity | Protects replication state |
 | **P4** | `user_session_result` | Add caller_identity | Protects session enumeration |
+| **P4** | `key_rotation_event` | Add caller_identity or admin-scope | Protects rotation event details |
