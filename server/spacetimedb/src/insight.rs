@@ -125,7 +125,6 @@ pub fn synthesize_mental_models(
 
     ctx.db.mental_model().insert(model);
     Ok(())
-    })
 }
 
 #[reducer]
