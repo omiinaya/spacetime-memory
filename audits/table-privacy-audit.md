@@ -3,7 +3,7 @@
 > **Date:** 2026-07-05
 > **Scope:** All SpacetimeDB tables in spacetime-memory server module
 > **Total tables:** ~85 across all modules
-> **Public tables:** 36 (confirmed via `#[table(..., public)]` annotations)
+> **Public tables:** 41 (confirmed via `#[table(..., public)]` annotations)
 
 ## Summary
 
@@ -13,9 +13,22 @@ This audit examines 36 public tables for data exposure risks. The core vulnerabi
 
 | Risk | Count | Root Cause |
 |------|-------|-----------|
-| **HIGH** | 4 | Full-entity public tables or result tables with PII / full content + no caller scoping |
-| **MEDIUM** | 8 | Result tables with query_id-only scoping — no caller identity enforcement |
-| **LOW** | 24 | Aggregate stats, operational metrics, or structural metadata — acceptable |
+| **CRITICAL** | 1 | Full-entity public table containing raw encryption keys — `workspace_encryption_key` |
+| **HIGH** | 5 | Full-entity public tables or result tables with PII / full content + no caller scoping |
+| **MEDIUM** | 9 | Result tables with query_id-only scoping — no caller identity enforcement |
+| **LOW** | 26 | Aggregate stats, operational metrics, or structural metadata — acceptable |
+
+## CRITICAL Risk Tables
+
+### 0. `workspace_encryption_key` (crypto.rs:20 — `#[table(accessor = workspace_encryption_key, public)]`)
+
+**Fields:** `workspace_id`, `key_hex` (AES-256 raw key), `created_by`, `enabled`, `created_at`
+
+**Problem:** This is a **full entity table** (not a result table) marked public. Any client connected to SpacetimeDB can query every row — getting the raw AES-256 encryption keys for all workspaces. This completely defeats the purpose of at-rest encryption: any connected identity can decrypt any encrypted memory.
+
+**Exposure:** Complete breach of all workspace encryption. Every encrypted memory becomes readable.
+
+**Fix:** Make `workspace_encryption_key` table **private** immediately. The reducers (`init_workspace_encryption`, `rotate_workspace_encryption_key`, `set_workspace_encryption_enabled`) already gate on `require_admin` — the only reason this table needs to be public is if the admin panel queries it directly via SQL. That should be done through an admin-gated result table instead.
 
 ## HIGH Risk Tables
 
@@ -52,6 +65,14 @@ This audit examines 36 public tables for data exposure risks. The core vulnerabi
 **Problem:** Full memory content written to a public result table. The `user_scope` field is a data attribute, not an access control mechanism — any client can read any user's memories by iterating the table.
 
 **Fix:** Add `caller_identity` scoping. Clear stale results at reducer start.
+
+### 5. `decrypted_memory_result` (crypto.rs:201 — `#[table(accessor = decrypted_memory_result, public)]`)
+
+**Fields:** `caller`, `memory_id`, `content`, `summary`, `confidence`, `memory_type`, `is_active`, `created_at`, `tier`
+
+**Problem:** Result table for the `get_decrypted_memory` reducer. Contains decrypted memory content and summary. Although the reducer clears stale rows for the caller, any connected client can query any row in the table while it exists.
+
+**Fix:** Add `caller_identity` scoping as the reference pattern. The existing `caller` field is data-only — it must be enforced at the SDK query layer.
 
 ## MEDIUM Risk Tables
 
