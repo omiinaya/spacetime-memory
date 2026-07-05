@@ -185,10 +185,10 @@
 **Estimate:** ~40 missing methods. Each is 5-15 lines. ~4-8 hours.
 
 ### 3.2 Python SDK `store_batch` — verify batch semantics
-**Status:** `store_batch()` exists at line 1371. But the Tantivy indexing is done sequentially inside the loop, not as a batch Tantivy call.
-- [ ] Check if Tantivy sidecar has a batch index endpoint
-- [ ] If not, add one (POST /index/batch)
-- [ ] Update `store_batch()` to use single batch Tantivy call
+**Status:** `store_batch()` now uses a single batch Tantivy call. Added ``/index/batch`` endpoint to the Tantivy sidecar (``index_batch`` handler) that groups items by workspace, batch-deletes old docs, batch-adds new ones, and commits once per workspace. Updated `store_batch()` to call ``_tantivy_index_batch()`` after the STDB reducers.
+- [x] Check if Tantivy sidecar has a batch index endpoint
+- [x] If not, add one (POST /index/batch)
+- [x] Update `store_batch()` to use single batch Tantivy call
 
 ### 3.3 Bi-temporal fact tracking (Graphiti parity)
 **Status:** Not started. Graphiti's main differentiator is temporal facts with valid_from/valid_to.
