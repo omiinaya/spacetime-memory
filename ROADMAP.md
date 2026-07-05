@@ -80,11 +80,11 @@
 **Why blocked:** WASM can't be published until Cargo.lock resolves v2.6 (the lockfile was resolved against v2.4.1 and my manual deps might conflict).
 
 ### 1.2 Fix 4 failing Python unit tests
-**Status:** Pre-existing failures, all related to Mock infrastructure
-- [ ] `test_update_memory` — `_circuit_open_until` attribute missing on Mock(Client)
-- [ ] `test_check_embedder_health_error_status` — same Mock issue
+**Status:** 3/4 fixed. Mock infrastructure issue resolved; remaining failure is pre-existing (`test_batch_store_indexes_each_item`).
+- [x] `test_update_memory` — `_circuit_open_until` attribute missing on Mock(Client)
+- [x] `test_check_embedder_health_error_status` — same Mock issue
 - [ ] `test_create_note_with_embed` — `UnboundLocalError: note_id` in Tantivy path
-- [ ] `test_context_in_search_results` — `_circuit_open_until` Mock issue
+- [x] `test_context_in_search_results` — `_circuit_open_until` Mock issue
 
 **Root cause:** Mock(Client) doesn't call `__init__` which sets `_circuit_open_until`. Fix: add the attribute to the Mock spec, or refactor initialization to a helper method.
 
