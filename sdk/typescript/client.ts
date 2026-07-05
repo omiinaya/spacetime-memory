@@ -218,6 +218,10 @@ export interface SearchOptions {
   tier?: string;
   limit?: number;
   semantic?: boolean;
+  /** If True (default), passes top results through the MCP cross-encoder reranker
+   *  for discriminative relevance scoring. Falls back gracefully if MCP server is
+   *  unavailable. */
+  crossEncoder?: boolean;
 }
 
 /** Options for listMemories() method. */
@@ -1090,6 +1094,14 @@ export class Client {
         if (r.entity_type === "memory") r.memory_content = memMap[eid] ?? "";
         else if (r.entity_type === "node") r.memory_content = nodeMap[eid] ?? "";
         else r.memory_content = "";
+      }
+      const crossEncoder = opts?.crossEncoder ?? true;
+      if (crossEncoder) {
+        try {
+          rows = await this.crossEncoderRerank(query, rows, { topK: rows.length });
+        } catch {
+          // Cross-encoder unavailable - fall back gracefully
+        }
       }
       return rows.slice(0, limit) as SearchResult[];
     }
