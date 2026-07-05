@@ -21,6 +21,11 @@ struct IndexRequest {
 }
 
 #[derive(Deserialize)]
+struct IndexBatchRequest {
+    items: Vec<IndexRequest>,
+}
+
+#[derive(Deserialize)]
 struct SearchRequest {
     workspace_id: String,
     query: String,
