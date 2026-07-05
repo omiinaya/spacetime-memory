@@ -3,13 +3,20 @@
 Generates ES256 (ECDSA P-256) tokens compatible with SpacetimeDB's
 JWT authentication system.
 
+Supports key rotation via the ``kid`` header, allowing the node to
+identify which signing key was used.
+
 Usage:
     token = generate_token("/path/to/private_key.pem")
     client = Client(..., token=token)
+
+    # With key ID (for rotation support)
+    token = generate_token("/path/to/private_key.pem", key_id="abc123def456")
 """
 
 from __future__ import annotations
 
+import hashlib
 import time
 from pathlib import Path
 from typing import Any
@@ -24,6 +31,7 @@ def generate_token(
     private_key_path: str | Path,
     identity_hex: str | None = None,
     expires_in: int = 86400 * 365,  # 1 year
+    key_id: str | None = None,
 ) -> str:
     """Generate an ES256 JWT token for SpacetimeDB authentication.
 
@@ -33,6 +41,10 @@ def generate_token(
             If None, generates a fresh identity (c200...) using the
             same algorithm SpacetimeDB uses.
         expires_in: Token validity in seconds (default: 1 year).
+        key_id: Optional key ID (``kid`` JWT header). Set this to the
+            key fingerprint registered via ``register_signing_key``
+            so the node can identify which signing key was used during
+            key rotation. If omitted, no ``kid`` header is included.
 
     Returns:
         A signed JWT token string.
@@ -50,12 +62,16 @@ def generate_token(
     now = int(time.time())
     payload: dict[str, Any] = {
         "sub": identity_hex,
-        "iss": identity_hex,  # SpacetimeDB v2.4 requires 'iss' claim
+        "iss": identity_hex,  # SpacetimeDB v2.4+ requires 'iss' claim
         "iat": now,
         "exp": now + expires_in,
     }
 
-    token = pyjwt.encode(payload, private_key_pem, algorithm="ES256")
+    headers: dict[str, str] = {}
+    if key_id:
+        headers["kid"] = key_id
+
+    token = pyjwt.encode(payload, private_key_pem, algorithm="ES256", headers=headers)
     return token
 
 

@@ -1,4 +1,27 @@
 [certificate-authority]
+# ══════════════════════════════════════════════════════════════════════
+# JWT SIGNING KEY ROTATION
+# ══════════════════════════════════════════════════════════════════════
+#
+# The SpacetimeDB node reads the private key at `jwt-priv-key-path` to
+# verify JWT tokens.  The symlink `data/id_ecdsa_pkcs8.pem` points to
+# the CURRENT active key (in data/id_ecdsa_pkcs8_<kid>.pem).
+#
+# To rotate:
+#   1. Generate a new key:  python scripts/rotate-keys.py generate
+#   2. Register it:         python scripts/rotate-keys.py register --key-id <kid> --update-config
+#   3. Restart the node to pick up the new key path
+#   4. Old tokens remain valid because the WASM module's
+#      jwt_signing_key table tracks all trusted keys.
+#
+# Key files follow the naming conventions:
+#   data/id_ecdsa_pkcs8_<key_id>.pem    — PKCS#8 private key
+#   data/id_ecdsa_<key_id>.pub          — SubjectPublicKeyInfo public key
+#   data/id_ecdsa_pkcs8.pem             — symlink → current private key
+#   data/id_ecdsa.pub                   — symlink → current public key
+#
+# For full instructions see scripts/rotate-keys.py --help.
+# ══════════════════════════════════════════════════════════════════════
 jwt-priv-key-path = "/home/user/spacetime-memory/data/id_ecdsa_pkcs8.pem"
 jwt-pub-key-path = "/home/user/spacetime-memory/data/id_ecdsa.pub"
 

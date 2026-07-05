@@ -1622,13 +1622,19 @@ export class Client {
   /**
    * Update a note's content.
    * @param noteId - Note ID
+   * @param title - New title (empty = auto-extract from first # heading)
    * @param content - New markdown content
+   * @param embeddingJson - Pre-computed embedding JSON (empty = "[]")
+   * @param expectedVersion - Pass the version you read to guard against concurrent updates (0 = skip check)
    */
   async updateNote(
     noteId: string,
-    content: string
+    title: string = "",
+    content: string = "",
+    embeddingJson: string = "[]",
+    expectedVersion: number = 0,
   ): Promise<void> {
-    return this._call("update_note", [noteId, content]);
+    return this._call("update_note", [noteId, title, content, embeddingJson, expectedVersion]);
   }
 
   /**

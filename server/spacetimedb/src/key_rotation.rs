@@ -217,7 +217,8 @@ pub fn revoke_signing_key(ctx: &ReducerContext, key_id: String) -> Result<(), St
             .any(|k: &JwtSigningKey| k.is_current && k.key_id != key_id);
         if !other_current {
             return Err(
-                "Cannot revoke the only current signing key. Register a new key first.".to_string()
+                "Cannot revoke the only current signing key. Register a new key first."
+                    .to_string(),
             );
         }
     }
