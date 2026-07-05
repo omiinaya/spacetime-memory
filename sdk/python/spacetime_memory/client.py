@@ -4436,14 +4436,20 @@ class Client:
         title: str = "",
         content: str = "",
         embed: bool = True,
+        expected_version: int = 0,
     ) -> dict[str, Any]:
-        """Update a note. Re-embeds if content changes and *embed* is True."""
+        """Update a note. Re-embeds if content changes and *embed* is True.
+
+        Pass *expected_version* to enable optimistic concurrency control.
+        If the note has been modified since you last read it, the reducer
+        returns an error and you should re-read, re-apply, and retry.
+        """
         embedding_json = "[]"
         if embed and content.strip():
             emb = self._embed(content[:1024])
             if emb:
                 embedding_json = json.dumps(emb)
-        result = self._call("update_note", [note_id, title, content, embedding_json])
+        result = self._call("update_note", [note_id, title, content, embedding_json, expected_version])
 
         # Re-index the note in search_index (best-effort)
         if result.get("status") == "ok" and content.strip():
