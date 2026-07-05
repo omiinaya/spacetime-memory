@@ -2,6 +2,8 @@ use spacetimedb::*;
 use crate::auth::require_auth;
 
 use crate::{now_micros, uuid_v4_uniq};
+use crate::trace_span;
+use crate::tracing::TracingSpanKind;
 
 /// A profile accumulates static facts and dynamic context about a peer.
 #[table(accessor = profile)]
@@ -30,74 +32,78 @@ pub fn upsert_profile(
     preferences_json: String,
     tags_json: String,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let now = now_micros(ctx);
+    trace_span!(ctx, "upsert_profile", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let now = now_micros(ctx);
 
-    // Attempt to find existing profile for this peer
-    let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
+        // Attempt to find existing profile for this peer
+        let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
 
-    if let Some(mut p) = existing {
-        p.static_facts_json = static_facts_json;
-        p.dynamic_context_json = dynamic_context_json;
-        p.preferences_json = preferences_json;
-        p.tags_json = tags_json;
-        p.updated_at = now;
-        ctx.db.profile().id().update(p);
-    } else {
-        // Create new profile
-        let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
-        let p = Profile {
-            id: id.clone(),
-            peer_id,
-            static_facts_json,
-            dynamic_context_json,
-            preferences_json,
-            tags_json,
-            updated_at: now,
-        };
-        ctx.db.profile().insert(p);
-    }
+        if let Some(mut p) = existing {
+            p.static_facts_json = static_facts_json;
+            p.dynamic_context_json = dynamic_context_json;
+            p.preferences_json = preferences_json;
+            p.tags_json = tags_json;
+            p.updated_at = now;
+            ctx.db.profile().id().update(p);
+        } else {
+            // Create new profile
+            let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
+            let p = Profile {
+                id: id.clone(),
+                peer_id,
+                static_facts_json,
+                dynamic_context_json,
+                preferences_json,
+                tags_json,
+                updated_at: now,
+            };
+            ctx.db.profile().insert(p);
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 #[reducer]
 pub fn add_profile_fact(ctx: &ReducerContext, peer_id: String, fact: String) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let now = now_micros(ctx);
+    trace_span!(ctx, "add_profile_fact", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let now = now_micros(ctx);
 
-    let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
+        let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
 
-    if let Some(mut p) = existing {
-        // Append fact to static_facts_json array — use serde_json for safety
-        let mut facts: Vec<String> = match serde_json::from_str(&p.static_facts_json) {
-            Ok(v) => v,
-            Err(e) => {
-                log::info!("Failed to parse static_facts_json: {}", e);
-                Vec::new()
-            }
-        };
-        facts.push(fact);
-        p.static_facts_json = serde_json::to_string(&facts).unwrap_or_else(|_| "[]".to_string());
-        p.updated_at = now;
-        ctx.db.profile().id().update(p);
-    } else {
-        // Create a new profile with just this fact
-        let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
-        let facts = format!("[\"{}\"]", fact.replace('"', "\\\""));
-        let p = Profile {
-            id: id.clone(),
-            peer_id,
-            static_facts_json: facts,
-            dynamic_context_json: String::from("[]"),
-            preferences_json: String::from("{}"),
-            tags_json: String::from("[]"),
-            updated_at: now,
-        };
-        ctx.db.profile().insert(p);
-    }
+        if let Some(mut p) = existing {
+            // Append fact to static_facts_json array — use serde_json for safety
+            let mut facts: Vec<String> = match serde_json::from_str(&p.static_facts_json) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::info!("Failed to parse static_facts_json: {}", e);
+                    Vec::new()
+                }
+            };
+            facts.push(fact);
+            p.static_facts_json = serde_json::to_string(&facts).unwrap_or_else(|_| "[]".to_string());
+            p.updated_at = now;
+            ctx.db.profile().id().update(p);
+        } else {
+            // Create a new profile with just this fact
+            let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
+            let facts = format!("[\"{}\"]", fact.replace('"', "\\\""));
+            let p = Profile {
+                id: id.clone(),
+                peer_id,
+                static_facts_json: facts,
+                dynamic_context_json: String::from("[]"),
+                preferences_json: String::from("{}"),
+                tags_json: String::from("[]"),
+                updated_at: now,
+            };
+            ctx.db.profile().insert(p);
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 #[reducer]
@@ -106,41 +112,43 @@ pub fn add_dynamic_context(
     peer_id: String,
     context: String,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let now = now_micros(ctx);
+    trace_span!(ctx, "add_dynamic_context", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let now = now_micros(ctx);
 
-    let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
+        let existing = ctx.db.profile().iter().take(crate::MAX_RESULTS).find(|p| p.peer_id == peer_id);
 
-    if let Some(mut p) = existing {
-        // Append context entry to dynamic_context_json — use serde_json for safety
-        let mut entries: Vec<String> = match serde_json::from_str(&p.dynamic_context_json) {
-            Ok(v) => v,
-            Err(e) => {
-                log::info!("Failed to parse dynamic_context_json: {}", e);
-                Vec::new()
-            }
-        };
-        entries.push(context);
-        p.dynamic_context_json = serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string());
-        p.updated_at = now;
-        ctx.db.profile().id().update(p);
-    } else {
-        // Create a new profile with just this context entry
-        let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
-        let context_entry = serde_json::to_string(&vec![&context]).unwrap_or_else(|_| "[]".to_string());
-        let p = Profile {
-            id: id.clone(),
-            peer_id,
-            static_facts_json: String::from("[]"),
-            dynamic_context_json: context_entry,
-            preferences_json: String::from("{}"),
-            tags_json: String::from("[]"),
-            updated_at: now,
-        };
-        ctx.db.profile().insert(p);
-    }
+        if let Some(mut p) = existing {
+            // Append context entry to dynamic_context_json — use serde_json for safety
+            let mut entries: Vec<String> = match serde_json::from_str(&p.dynamic_context_json) {
+                Ok(v) => v,
+                Err(e) => {
+                    log::info!("Failed to parse dynamic_context_json: {}", e);
+                    Vec::new()
+                }
+            };
+            entries.push(context);
+            p.dynamic_context_json = serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string());
+            p.updated_at = now;
+            ctx.db.profile().id().update(p);
+        } else {
+            // Create a new profile with just this context entry
+            let id = uuid_v4_uniq(ctx, |id| ctx.db.profile().id().find(id).is_none(), 3);
+            let context_entry = serde_json::to_string(&vec![&context]).unwrap_or_else(|_| "[]".to_string());
+            let p = Profile {
+                id: id.clone(),
+                peer_id,
+                static_facts_json: String::from("[]"),
+                dynamic_context_json: context_entry,
+                preferences_json: String::from("{}"),
+                tags_json: String::from("[]"),
+                updated_at: now,
+            };
+            ctx.db.profile().insert(p);
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 // =========================================================================
@@ -195,35 +203,37 @@ pub fn add_fact(
     source: String,
     tier: String,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let now = now_micros(ctx);
-    let id = uuid_v4_uniq(ctx, |id| ctx.db.fact().id().find(id).is_none(), 3);
+    trace_span!(ctx, "add_fact", TracingSpanKind::Write, &workspace_id, {
+        let _account = require_auth(ctx)?;
+        let now = now_micros(ctx);
+        let id = uuid_v4_uniq(ctx, |id| ctx.db.fact().id().find(id).is_none(), 3);
 
-    // Determine expires_at: L0=30d, L1=90d, L2=365d from now (in micros)
-    let expires_offset: i64 = match tier.as_str() {
-        "L0" => 30 * 86400 * 1_000_000,
-        "L1" => 90 * 86400 * 1_000_000,
-        "L2" => 365 * 86400 * 1_000_000,
-        _ => 90 * 86400 * 1_000_000,
-    };
+        // Determine expires_at: L0=30d, L1=90d, L2=365d from now (in micros)
+        let expires_offset: i64 = match tier.as_str() {
+            "L0" => 30 * 86400 * 1_000_000,
+            "L1" => 90 * 86400 * 1_000_000,
+            "L2" => 365 * 86400 * 1_000_000,
+            _ => 90 * 86400 * 1_000_000,
+        };
 
-    let fact = Fact {
-        id,
-        workspace_id,
-        peer_id,
-        fact_type,
-        category,
-        content,
-        confidence,
-        source,
-        tier,
-        is_active: true,
-        created_at: now,
-        expires_at: now + expires_offset,
-        updated_at: now,
-    };
-    ctx.db.fact().insert(fact);
-    Ok(())
+        let fact = Fact {
+            id,
+            workspace_id,
+            peer_id,
+            fact_type,
+            category,
+            content,
+            confidence,
+            source,
+            tier,
+            is_active: true,
+            created_at: now,
+            expires_at: now + expires_offset,
+            updated_at: now,
+        };
+        ctx.db.fact().insert(fact);
+        Ok(())
+    })
 }
 
 #[reducer]
@@ -235,55 +245,59 @@ pub fn update_fact(
     category: String,
     tier: String,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let now = now_micros(ctx);
-    let existing = ctx.db.fact().id().find(&fact_id);
+    trace_span!(ctx, "update_fact", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let now = now_micros(ctx);
+        let existing = ctx.db.fact().id().find(&fact_id);
 
-    match existing {
-        Some(mut fact) => {
-            if !content.is_empty() {
-                fact.content = content;
+        match existing {
+            Some(mut fact) => {
+                if !content.is_empty() {
+                    fact.content = content;
+                }
+                if confidence > 0.0 {
+                    fact.confidence = confidence;
+                }
+                if !category.is_empty() {
+                    fact.category = category;
+                }
+                if !tier.is_empty() {
+                    fact.tier = tier;
+                    // Recompute expires_at based on new tier
+                    let expires_offset: i64 = match fact.tier.as_str() {
+                        "L0" => 30 * 86400 * 1_000_000,
+                        "L1" => 90 * 86400 * 1_000_000,
+                        "L2" => 365 * 86400 * 1_000_000,
+                        _ => 90 * 86400 * 1_000_000,
+                    };
+                    fact.expires_at = now + expires_offset;
+                }
+                fact.updated_at = now;
+                ctx.db.fact().id().update(fact);
+                Ok(())
             }
-            if confidence > 0.0 {
-                fact.confidence = confidence;
-            }
-            if !category.is_empty() {
-                fact.category = category;
-            }
-            if !tier.is_empty() {
-                fact.tier = tier;
-                // Recompute expires_at based on new tier
-                let expires_offset: i64 = match fact.tier.as_str() {
-                    "L0" => 30 * 86400 * 1_000_000,
-                    "L1" => 90 * 86400 * 1_000_000,
-                    "L2" => 365 * 86400 * 1_000_000,
-                    _ => 90 * 86400 * 1_000_000,
-                };
-                fact.expires_at = now + expires_offset;
-            }
-            fact.updated_at = now;
-            ctx.db.fact().id().update(fact);
-            Ok(())
+            None => Err(format!("Fact '{}' not found", fact_id)),
         }
-        None => Err(format!("Fact '{}' not found", fact_id)),
-    }
+    })
 }
 
 #[reducer]
 pub fn delete_fact(ctx: &ReducerContext, fact_id: String) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let now = now_micros(ctx);
-    let existing = ctx.db.fact().id().find(&fact_id);
+    trace_span!(ctx, "delete_fact", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+        let now = now_micros(ctx);
+        let existing = ctx.db.fact().id().find(&fact_id);
 
-    match existing {
-        Some(mut fact) => {
-            fact.is_active = false;
-            fact.updated_at = now;
-            ctx.db.fact().id().update(fact);
-            Ok(())
+        match existing {
+            Some(mut fact) => {
+                fact.is_active = false;
+                fact.updated_at = now;
+                ctx.db.fact().id().update(fact);
+                Ok(())
+            }
+            None => Err(format!("Fact '{}' not found", fact_id)),
         }
-        None => Err(format!("Fact '{}' not found", fact_id)),
-    }
+    })
 }
 
 #[reducer]
