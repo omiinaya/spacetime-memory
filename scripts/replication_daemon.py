@@ -22,6 +22,7 @@ from typing import Any
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 from spacetime_memory import Client
+from spacetime_memory.client import _esc
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -251,8 +252,8 @@ class ReplicationDaemon:
             rows = c._sql(
                 "SELECT * FROM replication_result "
                 "WHERE query_type = 'unsynced' "
-                "AND workspace_id = '{}' "
-                "ORDER BY created_at DESC LIMIT 1".format(workspace_id)
+                f"AND workspace_id = '{_esc(workspace_id)}' "
+                "ORDER BY created_at DESC LIMIT 1"
             )
             if not rows:
                 return []
