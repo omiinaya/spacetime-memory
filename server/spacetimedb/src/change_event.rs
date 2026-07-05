@@ -3,6 +3,8 @@ use crate::auth::require_auth;
 use crate::auth::require_admin;
 
 use crate::{now_micros, uuid_v4_uniq, uuid_v7};
+use crate::tracing::TracingSpanKind;
+use crate::trace_span;
 
 // ---------------------------------------------------------------------------
 // ChangeEvent — real-time change data capture (CDC) table
@@ -119,48 +121,50 @@ pub fn get_changes_since(
     ctx: &ReducerContext,
     since_cursor: i64,
 ) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let now = now_micros(ctx);
+    trace_span!(ctx, "get_changes_since", TracingSpanKind::Read, "", {
+        let _account = require_auth(ctx)?;
+        let now = now_micros(ctx);
 
-    let mut events: Vec<ChangeEvent> = ctx
-        .db
-        .change_event()
-        .iter().take(crate::MAX_RESULTS)
-        .filter(|e| e.created_at > since_cursor)
-        .take(crate::MAX_RESULTS)
-        .collect();
+        let mut events: Vec<ChangeEvent> = ctx
+            .db
+            .change_event()
+            .iter().take(crate::MAX_RESULTS)
+            .filter(|e| e.created_at > since_cursor)
+            .take(crate::MAX_RESULTS)
+            .collect();
 
-    // Sort ascending by created_at
-    events.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        // Sort ascending by created_at
+        events.sort_by(|a, b| a.created_at.cmp(&b.created_at));
 
-    let next_cursor = events
-        .last()
-        .map(|e| e.created_at)
-        .unwrap_or(since_cursor);
+        let next_cursor = events
+            .last()
+            .map(|e| e.created_at)
+            .unwrap_or(since_cursor);
 
-    let result_id = uuid_v7(ctx);
-    let result = ChangeEventResult {
-        id: result_id.clone(),
-        since_cursor,
-        events_json: serde_json::to_string(&events)
-            .unwrap_or_else(|_| "[]".to_string()),
-        next_cursor,
-        created_at: now,
-    };
-    ctx.db.change_event_result().insert(result);
+        let result_id = uuid_v7(ctx);
+        let result = ChangeEventResult {
+            id: result_id.clone(),
+            since_cursor,
+            events_json: serde_json::to_string(&events)
+                .unwrap_or_else(|_| "[]".to_string()),
+            next_cursor,
+            created_at: now,
+        };
+        ctx.db.change_event_result().insert(result);
 
-    // Clean up stale results for the same cursor
-    let stale: Vec<_> = ctx
-        .db
-        .change_event_result()
-        .iter().take(crate::MAX_RESULTS)
-        .filter(|r| r.since_cursor == since_cursor && r.id != result_id)
-        .collect();
-    for r in stale {
-        ctx.db.change_event_result().id().delete(&r.id);
-    }
+        // Clean up stale results for the same cursor
+        let stale: Vec<_> = ctx
+            .db
+            .change_event_result()
+            .iter().take(crate::MAX_RESULTS)
+            .filter(|r| r.since_cursor == since_cursor && r.id != result_id)
+            .collect();
+        for r in stale {
+            ctx.db.change_event_result().id().delete(&r.id);
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 /// Query the latest cursor value (highest created_at in change_event).

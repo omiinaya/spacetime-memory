@@ -1,7 +1,9 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
+use crate::trace_span;
 use crate::{now_micros, uuid_v4_uniq};
+use crate::tracing::TracingSpanKind;
 use crate::workspace::check_space_access;
 
 /// An insight represents a Hindsight reflect-style reasoning result.
@@ -31,6 +33,7 @@ pub fn create_insight(
     source_memory_ids_json: String,
     confidence: f64,
 ) -> Result<(), String> {
+    trace_span!(ctx, "create_insight", TracingSpanKind::Write, &workspace_id, {
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
@@ -50,10 +53,12 @@ pub fn create_insight(
 
     ctx.db.insight().insert(ins);
     Ok(())
+})
 }
 
 #[reducer]
 pub fn delete_insight(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    trace_span!(ctx, "delete_insight", TracingSpanKind::Write, "", {
     let _account = require_auth(ctx)?;
     let insight = ctx
         .db
@@ -66,6 +71,7 @@ pub fn delete_insight(ctx: &ReducerContext, id: String) -> Result<(), String> {
 
     ctx.db.insight().id().delete(&id);
     Ok(())
+})
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +106,7 @@ pub fn synthesize_mental_models(
     workspace_id: String,
     memory_ids_json: String,
 ) -> Result<(), String> {
+    trace_span!(ctx, "synthesize_mental_models", TracingSpanKind::Write, &workspace_id, {
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
