@@ -699,13 +699,13 @@ def memory_list(ctx: click.Context, workspace_id: str, memory_type: str | None, 
         with console.status(f"Fetching memories for workspace '{workspace_id}'..."):
             if tier:
                 clauses = [
-                    f"workspace_id = '{workspace_id}'",
+                    f"workspace_id = '{_esc(workspace_id)}'",
                     "is_active = true",
                 ]
                 if memory_type:
-                    clauses.append(f"memory_type = '{memory_type}'")
+                    clauses.append(f"memory_type = '{_esc(memory_type)}'")
                 if tier:
-                    clauses.append(f"tier = '{tier}'")
+                    clauses.append(f"tier = '{_esc(tier)}'")
                 where = " AND ".join(clauses)
                 rows = client._sql(f"SELECT * FROM memory WHERE {where}")
                 rows.sort(key=lambda r: r.get("created_at", 0), reverse=True)
@@ -2724,7 +2724,7 @@ def mental_list(status: str) -> None:
     client = _sdk_client()
     where = "1=1"
     if status:
-        where = f"status = '{status}'"
+        where = f"status = '{_esc(status)}'"
     with console.status("Fetching mental models..."):
         rows = client._sql(f"SELECT * FROM mental_model WHERE {where} ORDER BY created_at DESC")
     print_table(rows, title="Mental Models")
