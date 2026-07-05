@@ -14,7 +14,7 @@ use crate::graph_traversal::{bridge_result, graph_traversal_result, kg_stats_res
 use crate::harmonic_belief::{harmonic_belief, resonance_log};
 use crate::hybrid_query::{god_node, hybrid_result, session_search_result};
 use crate::insight::{insight, mental_model};
-use crate::key_rotation::{jwt_signing_key, jwt_signing_key_result, key_rotation_event};
+use crate::key_rotation::{jwt_signing_key, jwt_signing_key_result, key_rotation_event, jwk_set_result};
 use crate::knowledge_graph::{
     citation, citation_result, community_hierarchy, edge_history_result, hierarchy_cluster, kg_community, kg_edge,
     kg_node, pagerank_result,
@@ -92,6 +92,7 @@ pub fn pre_warm_caches(ctx: &ReducerContext) {
     pre_warm_single(ctx, "jwt_signing_key", |ctx| ctx.db.jwt_signing_key().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "jwt_signing_key_result", |ctx| ctx.db.jwt_signing_key_result().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "key_rotation_event", |ctx| ctx.db.key_rotation_event().iter().take(0).for_each(drop));
+    pre_warm_single(ctx, "jwk_set_result", |ctx| ctx.db.jwk_set_result().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "kg_community", |ctx| ctx.db.kg_community().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "kg_edge", |ctx| ctx.db.kg_edge().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "kg_node", |ctx| ctx.db.kg_node().iter().take(0).for_each(drop));
