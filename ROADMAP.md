@@ -201,10 +201,10 @@
 **Estimate:** 1 week.
 
 ### 3.4 Cross-encoder reranking
-**Status:** SDK has `_rerank()` at line 1603 but it catches `ImportError` for `numpy` and falls through silently. numpy is not installed.
-- [ ] Extract cross-encoder model or use a different approach
-- [ ] Fix: ensure numpy is a dependency, or use a pure-Python fallback
-- [ ] Enable cross-encoder by default in search() fusion
+**Status:** ✅ Complete. ONNX cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is extracted to `server/embedder/model/ms-marco-MiniLM-L-6-v2-cross.onnx` (91MB) with tokenizer. Enabled by default (`cross_encoder=True`) in `search()` fusion pipeline. Falls back gracefully with warning if model files or deps are missing. Dependencies available via `pip install spacetime-memory[rerank]`.
+- [x] Extract cross-encoder model or use a different approach
+- [x] Fix: ensure numpy is a dependency, or use a pure-Python fallback  
+- [x] Enable cross-encoder by default in search() fusion
 
 ### 3.5 npm publish
 **Status:** Blocked by NPM_TOKEN
