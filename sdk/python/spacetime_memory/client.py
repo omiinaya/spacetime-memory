@@ -830,6 +830,31 @@ class Client:
         except (httpx.ConnectError, httpx.TimeoutException, RuntimeError):
             return False
 
+    def _tantivy_index_batch(
+        self,
+        items: list[dict[str, str]],
+    ) -> bool:
+        """Index multiple documents into the Tantivy BM25 sidecar in a single HTTP call.
+
+        Args:
+            items: List of dicts, each with keys: workspace_id, entity_id, content, entity_type.
+
+        Returns:
+            True if the batch call succeeded (HTTP < 400).
+        """
+        if not items:
+            return True
+        try:
+            resp = self._request_with_retry(
+                "POST",
+                f"{self.tantivy_url}/index/batch",
+                json={"items": items},
+                timeout=max(5.0 * len(items), 30.0),
+            )
+            return resp.status_code < 400
+        except (httpx.ConnectError, httpx.TimeoutException, RuntimeError):
+            return False
+
     def _tantivy_search(
         self,
         workspace_id: str,
@@ -1380,6 +1405,10 @@ class Client:
         than N sequential ``store()`` calls when the embedder sidecar is
         the bottleneck.
 
+        After the STDB reducer, indexes all items into the Tantivy BM25
+        sidecar in a single batch HTTP call (``/index/batch``) instead of
+        N sequential calls.
+
         Args:
             workspace_id: Target workspace UUID.
             items: List of dicts, each with:
@@ -1502,6 +1531,19 @@ class Client:
             valid_terms = [t for t in terms_items if t["entity_id"]]
             if valid_terms:
                 self._call("index_terms_batch", [json.dumps(valid_terms)])
+
+            # Single batch Tantivy index call — all items with matched IDs in one HTTP request
+            tantivy_items = []
+            for ei in entity_items:
+                if ei["entity_id"]:
+                    tantivy_items.append({
+                        "workspace_id": workspace_id,
+                        "entity_id": ei["entity_id"],
+                        "content": ei["content"],
+                        "entity_type": ei["entity_type"],
+                    })
+            if tantivy_items:
+                self._tantivy_index_batch(tantivy_items)
 
             # Entity extraction is LLM-based — still per-item (not a reducer)
             for ei in entity_items:

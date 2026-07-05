@@ -758,6 +758,9 @@ fn _run_maintenance(ctx: &ReducerContext) -> Result<(), String> {
 
 /// Module initialiser — sets up scheduled maintenance tasks on first publish.
 /// Scheduled_id 0,1 = recurring (every 5 min for expire, every 60 min for decay).
+///
+/// Also pre-warms all 86 table accessors so the WASM module doesn't pay
+/// lazy-compilation latency on the first real reducer call to each table.
 #[reducer(init)]
 pub fn init(ctx: &ReducerContext) {
     use spacetimedb::TimeDuration;
@@ -775,6 +778,11 @@ pub fn init(ctx: &ReducerContext) {
         scheduled_id: 1,
         scheduled_at: one_hour.into(),
     });
+
+    // Pre-warm all table accessors — touch each table so the WASM runtime
+    // compiles and caches every accessor function eagerly instead of lazily
+    // on first reducer call. This eliminates the first-call latency tax.
+    crate::pre_warm::pre_warm_caches(ctx);
 }
 
 // ── Backup / Restore ──────────────────────────────────────────────────────
