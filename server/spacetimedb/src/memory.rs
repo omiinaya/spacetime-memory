@@ -46,8 +46,10 @@ pub struct Memory {
     pub strength: f64,
     /// Version number (incremented on updates)
     pub version: u32,
-    /// Temporal validity; 0 = always valid
+    /// Temporal validity start; 0 = always valid
     pub valid_from: i64,
+    /// Temporal validity end; 0 = always valid
+    pub valid_to: i64,
 
     // ---- OpenViking: Hierarchy ----
     /// Points to a ContextDirectory; empty "" if not organised
