@@ -78,6 +78,51 @@ pub fn index_entity(
     Ok(())
 }
 
+/// Batch version of `index_entity` — indexes multiple entities in a single reducer call.
+///
+/// Accepts a JSON array of (workspace_id, entity_type, entity_id, content, embedding_json) tuples.
+#[reducer]
+pub fn index_entity_batch(
+    ctx: &ReducerContext,
+    items_json: String,
+) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let items: Vec<(String, String, String, String, String)> =
+        serde_json::from_str(&items_json).map_err(|e| format!("Invalid batch JSON: {e}"))?;
+
+    let now = now_micros(ctx);
+    for (workspace_id, entity_type, entity_id, content, embedding_json) in items {
+        // Validate entity_type
+        match entity_type.as_str() {
+            "memory" | "node" | "chunk" | "peer" | "note" => {}
+            _ => {
+                return Err(format!(
+                    "Invalid entity_type '{}': must be 'memory', 'node', 'chunk', 'peer', or 'note'",
+                    entity_type
+                ));
+            }
+        }
+        let tokens = content.split_whitespace().count() as u32;
+        let id = uuid_v7(ctx);
+        ctx.db.search_index().insert(SearchIndex {
+            id,
+            workspace_id,
+            entity_type,
+            entity_id,
+            content: content.clone(),
+            embedding_json: if embedding_json.is_empty() {
+                String::from("[]")
+            } else {
+                embedding_json
+            },
+            bm25_text: content,
+            tokens,
+            created_at: now,
+        });
+    }
+    Ok(())
+}
+
 #[reducer]
 pub fn remove_from_index(
     ctx: &ReducerContext,

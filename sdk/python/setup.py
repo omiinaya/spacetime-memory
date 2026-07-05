@@ -19,6 +19,11 @@ setup(
             "click>=8.1",
             "rich>=13.0",
         ],
+        "cross-encoder": [
+            "numpy>=1.24",
+            "onnxruntime>=1.20",
+            "tokenizers>=0.21",
+        ],
         "dev": [
             "pytest>=7",
             "pytest-asyncio>=0.21",
@@ -36,6 +41,9 @@ setup(
             "feedparser>=6",
             "click>=8.1",
             "rich>=13.0",
+            "numpy>=1.24",
+            "onnxruntime>=1.20",
+            "tokenizers>=0.21",
         ],
     },
     python_requires=">=3.10",

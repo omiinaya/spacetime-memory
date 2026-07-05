@@ -182,7 +182,7 @@ eval_queries = [
 
 # Store eval memories (bypassing Tantivy for speed — no Tantivy server running)
 for m in eval_memories:
-    c._call("store_memory", [WORKSPACE_ID, "", "", m["type"], m["content"], "", "[]", 0.8, "", ""])
+    c.store(WORKSPACE_ID, content=m["content"], memory_type=m["type"])
     # Also index terms for BM25
     for mem in c._query("memory", workspace_id=WORKSPACE_ID, columns=["id", "content"]):
         if mem["content"] == m["content"]:

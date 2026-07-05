@@ -200,10 +200,10 @@
 **Estimate:** 1 week.
 
 ### 3.4 Cross-encoder reranking
-**Status:** SDK has `_rerank()` at line 1603 but it catches `ImportError` for `numpy` and falls through silently. numpy is not installed.
-- [ ] Extract cross-encoder model or use a different approach
-- [ ] Fix: ensure numpy is a dependency, or use a pure-Python fallback
-- [ ] Enable cross-encoder by default in search() fusion
+**Status:** Done. `cross_encoder.py` module uses ONNX (ms-marco-MiniLM-L-6-v2) with numpy/onnxruntime/tokenizers. Extracted to `pip install spacetime-memory[cross-encoder]` optional extras group. `cross_encoder=True` is default in `search()` — falls back gracefully with a warning if the extra isn't installed. All 15 tests pass.
+- [x] Extract cross-encoder model or use a different approach
+- [x] Fix: ensure numpy is a dependency, or use a pure-Python fallback
+- [x] Enable cross-encoder by default in search() fusion
 
 ### 3.5 npm publish
 **Status:** Blocked by NPM_TOKEN
