@@ -1,5 +1,7 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
+use crate::trace_span;
+use crate::tracing::TracingSpanKind;
 
 use crate::{memory::memory, now_micros, uuid_v7};
 
@@ -69,6 +71,7 @@ pub fn create_directory(
     parent_id: String,
     description: String,
 ) -> Result<(), String> {
+    trace_span!(ctx, "create_directory", TracingSpanKind::Write, &workspace_id, {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
     let id = uuid_v7(ctx);
@@ -86,10 +89,12 @@ pub fn create_directory(
 
     ctx.db.context_directory().insert(dir);
     Ok(())
+    })
 }
 
 #[reducer]
 pub fn delete_directory(ctx: &ReducerContext, id: String) -> Result<(), String> {
+    trace_span!(ctx, "delete_directory", TracingSpanKind::Write, "", {
     let _account = require_auth(ctx)?;
     // Check it exists
     let _dir = ctx
@@ -101,6 +106,7 @@ pub fn delete_directory(ctx: &ReducerContext, id: String) -> Result<(), String> 
 
     ctx.db.context_directory().id().delete(&id);
     Ok(())
+    })
 }
 
 /// Get immediate children of a directory. If `include_memories` is true,
@@ -111,6 +117,7 @@ pub fn get_children(
     directory_id: String,
     include_memories: bool,
 ) -> Result<(), String> {
+    trace_span!(ctx, "get_children", TracingSpanKind::Read, "", {
     let _account = require_auth(ctx)?;
     // Verify directory exists
     let dir = ctx
@@ -171,6 +178,7 @@ pub fn get_children(
     }
 
     Ok(())
+    })
 }
 
 /// BFS traversal to get all descendants of `root_directory_id`.
@@ -182,6 +190,7 @@ pub fn traverse_recursive(
     workspace_id: String,
     root_directory_id: String,
 ) -> Result<(), String> {
+    trace_span!(ctx, "traverse_recursive", TracingSpanKind::Read, &workspace_id, {
     let _account = require_auth(ctx)?;
     // Verify root directory exists
     let _root = ctx
@@ -232,6 +241,7 @@ pub fn traverse_recursive(
     }
 
     Ok(())
+    })
 }
 
 /// Get a directory by either its id or its path (scoped to workspace_id).
@@ -242,6 +252,7 @@ pub fn get_directory(
     workspace_id: String,
     path_or_id: String,
 ) -> Result<(), String> {
+    trace_span!(ctx, "get_directory", TracingSpanKind::Read, &workspace_id, {
     let _account = require_auth(ctx)?;
     // Try lookup by id first
     if let Some(dir) = ctx.db.context_directory().id().find(&path_or_id) {
@@ -288,6 +299,7 @@ pub fn get_directory(
         "ContextDirectory not found for id or path: '{}'",
         path_or_id
     ))
+    })
 }
 
 /// Link a memory to a directory.
@@ -298,6 +310,7 @@ pub fn link_memory_to_directory(
     memory_id: String,
     workspace_id: String,
 ) -> Result<(), String> {
+    trace_span!(ctx, "link_memory_to_directory", TracingSpanKind::Write, &workspace_id, {
     let _account = require_auth(ctx)?;
     // Verify directory exists
     ctx.db
@@ -335,6 +348,7 @@ pub fn link_memory_to_directory(
     });
 
     Ok(())
+    })
 }
 
 /// Unlink a memory from a directory.
@@ -344,6 +358,7 @@ pub fn unlink_memory_from_directory(
     directory_id: String,
     memory_id: String,
 ) -> Result<(), String> {
+    trace_span!(ctx, "unlink_memory_from_directory", TracingSpanKind::Write, "", {
     let _account = require_auth(ctx)?;
     // Find the link row
     let link = ctx
@@ -360,4 +375,5 @@ pub fn unlink_memory_from_directory(
 
     ctx.db.directory_memory_link().id().delete(&link.id);
     Ok(())
+    })
 }

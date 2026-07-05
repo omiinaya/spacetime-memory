@@ -1,7 +1,9 @@
 use spacetimedb::*;
 use crate::auth::require_auth;
 
+use crate::trace_span;
 use crate::{now_micros, uuid_v7};
+use crate::tracing::TracingSpanKind;
 use crate::workspace::check_space_access;
 
 /// A harmonized belief produced by the SHMR resonance engine.
@@ -51,6 +53,7 @@ pub fn store_harmonic_beliefs(
     cluster_id: String,
     iteration: u32,
 ) -> Result<(), String> {
+    trace_span!(ctx, "store_harmonic_beliefs", TracingSpanKind::Write, &workspace_id, {
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
@@ -119,6 +122,7 @@ pub fn store_harmonic_beliefs(
     }
 
     Ok(())
+})
 }
 
 /// Clear stale beliefs for a workspace (optional cleanup).
@@ -128,6 +132,7 @@ pub fn clear_harmonic_beliefs(
     workspace_id: String,
     min_confidence: f64,
 ) -> Result<(), String> {
+    trace_span!(ctx, "clear_harmonic_beliefs", TracingSpanKind::Write, &workspace_id, {
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "admin")?;
@@ -144,6 +149,7 @@ pub fn clear_harmonic_beliefs(
     }
 
     Ok(())
+})
 }
 
 /// Record a resonance session for monitoring/debugging.
@@ -172,6 +178,7 @@ pub fn log_resonance_session(
     harmony_score_avg: f64,
     duration_ms: u64,
 ) -> Result<(), String> {
+    trace_span!(ctx, "log_resonance_session", TracingSpanKind::Write, &workspace_id, {
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "editor")?;
@@ -190,4 +197,5 @@ pub fn log_resonance_session(
     });
 
     Ok(())
+})
 }
