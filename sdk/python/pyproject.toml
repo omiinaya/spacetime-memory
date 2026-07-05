@@ -38,11 +38,6 @@ otel = [
     "opentelemetry-sdk>=1.28",
     "opentelemetry-exporter-otlp-proto-http>=1.28",
 ]
-rerank = [
-    "numpy>=1.24",
-    "onnxruntime>=1.20",
-    "tokenizers>=0.21",
-]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
@@ -50,7 +45,9 @@ dev = [
     "click>=8",
     "feedparser>=6",
     "ruff>=0.6",
-    "spacetime-memory[rerank]",
+    "numpy>=1.24",
+    "onnxruntime>=1.20",
+    "tokenizers>=0.21",
 ]
 docs = [
     "mkdocs>=1.6",
