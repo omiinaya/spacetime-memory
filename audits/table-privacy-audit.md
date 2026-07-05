@@ -2,12 +2,12 @@
 
 > **Date:** 2026-07-05
 > **Scope:** All SpacetimeDB tables in spacetime-memory server module
-> **Total tables:** ~85 across all modules
+> **Total tables:** 89 across all modules
 > **Public tables:** 41 (confirmed via `#[table(..., public)]` annotations)
 
 ## Summary
 
-This audit examines 36 public tables for data exposure risks. The core vulnerability pattern is: **public result tables that lack `caller_identity` scoping** — allowing any connected client to read another user's query results by iterating the table.
+This audit examines 41 public tables for data exposure risks. The core vulnerability pattern is: **public result tables that lack `caller_identity` scoping** — allowing any connected client to read another user's query results by iterating the table.
 
 ### Three Risk Classes
 
