@@ -317,20 +317,213 @@ pub fn delete_note(ctx: &ReducerContext, id: String) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 #[reducer]
-pub fn parse_note_blocks(ctx: &ReducerContext, note_id: String) -> Result<(), String> {
+pub fn parse_note_blocks(ctx: &ReducerContext, note_id: String, expected_version: u32) -> Result<(), String> {
     trace_span!(ctx, "parse_note_blocks", TracingSpanKind::Write, "", {
         let _account = require_auth(ctx)?;
-    let note = ctx
+        let note = ctx
+            .db
+            .note()
+            .id()
+            .find(&note_id)
+            .ok_or_else(|| format!("Note '{}' not found", note_id))?;
+
+        // Optimistic concurrency guard: if expected_version > 0, verify it matches
+        let current_version = note.version.unwrap_or(0);
+        if expected_version > 0 && expected_version != current_version {
+            return Err(format!(
+                "Concurrent block re-parse detected: expected version {}, but note is at version {}. Re-read the note and retry.",
+                expected_version, current_version
+            ));
+        }
+
+        let now = now_micros(ctx);
+        clear_blocks(ctx, &note_id);
+        parse_note_blocks_inner(ctx, &note_id, &note.content, now);
+        Ok(())
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Individual block update reducer
+// ---------------------------------------------------------------------------
+
+/// Update a single block's metadata (task_state, properties_json, content, is_active)
+/// with optimistic concurrency control via the parent note's version.
+///
+/// This avoids re-parsing the entire note when only block-level metadata changes
+/// (e.g., toggling a task checkbox, updating block properties).
+///
+/// When task_state is provided, the parent note's content is also updated to
+/// keep the markdown source in sync (e.g., `[ ]` <-> `[x]`).
+#[reducer]
+pub fn update_note_block(
+    ctx: &ReducerContext,
+    note_id: String,
+    block_id: String,
+    expected_note_version: u32,
+    task_state: String,
+    properties_json: String,
+    block_content: String,
+    is_active: Option<bool>,
+) -> Result<(), String> {
+    // Need workspace_id before trace_span
+    let ws_id = ctx
         .db
         .note()
         .id()
         .find(&note_id)
-        .ok_or_else(|| format!("Note '{}' not found", note_id))?;
-    let now = now_micros(ctx);
-    clear_blocks(ctx, &note_id);
-    parse_note_blocks_inner(ctx, &note_id, &note.content, now);
+        .ok_or_else(|| format!("Note '{}' not found", note_id))?
+        .workspace_id
+        .clone();
+
+    trace_span!(ctx, "update_note_block", TracingSpanKind::Write, &ws_id, {
+        require_auth(ctx)?;
+        let caller = ctx.sender().to_hex();
+        check_space_access(ctx, &ws_id, &caller, "editor")?;
+        let now = now_micros(ctx);
+
+        // Verify note exists and check version (optimistic concurrency)
+        let mut note = ctx
+            .db
+            .note()
+            .id()
+            .find(&note_id)
+            .ok_or_else(|| format!("Note '{}' not found", note_id))?;
+
+        let current_version = note.version.unwrap_or(0);
+        if expected_note_version > 0 && expected_note_version != current_version {
+            return Err(format!(
+                "Concurrent note block update detected: expected version {}, but note is at version {}. Re-read the note and retry.",
+                expected_note_version, current_version
+            ));
+        }
+
+        // Find the block
+        let mut block = ctx
+            .db
+            .note_block()
+            .id()
+            .find(&block_id)
+            .ok_or_else(|| format!("Block '{}' not found in note '{}'", block_id, note_id))?;
+
+        // Verify block belongs to the specified note
+        if block.note_id != note_id {
+            return Err(format!(
+                "Block '{}' does not belong to note '{}'", block_id, note_id
+            ));
+        }
+
+        // Save revision snapshot before modifying
+        record_note_revision(ctx, &note, &note.title, &note.content);
+
+        let mut content_updated = false;
+        let mut new_content = note.content.clone();
+
+        // Update task_state and keep note markdown in sync
+        if !task_state.is_empty() && task_state != block.task_state {
+            let old_state = std::mem::replace(&mut block.task_state, task_state.clone());
+
+            if apply_task_state_to_content(
+                &mut new_content,
+                &block.source,
+                &old_state,
+                &task_state,
+            ) {
+                content_updated = true;
+            }
+        }
+
+        // Update properties_json
+        if !properties_json.is_empty() && properties_json != block.properties_json {
+            block.properties_json = properties_json;
+        }
+
+        // Update block text content / source
+        if !block_content.is_empty() && block_content != block.content {
+            let old_source = block.source.clone();
+            block.content = block_content.clone();
+            block.source = block_content;
+            if let Some(pos) = new_content.find(&old_source) {
+                new_content.replace_range(pos..pos + old_source.len(), &block.source);
+                content_updated = true;
+            }
+        }
+
+        // Update active state
+        if let Some(active) = is_active {
+            block.is_active = active;
+        }
+
+        ctx.db.note_block().id().update(block);
+
+        // Persist content changes and bump note version
+        if content_updated {
+            note.content = new_content;
+        }
+        note.version = Some(current_version + 1);
+        note.updated_at = now;
+        ctx.db.note().id().update(note);
+
         Ok(())
     })
+}
+
+/// Apply a task_state transition to the note content by modifying the markdown
+/// representation of the targeted block (e.g., `[ ]` <-> `[x]`).
+fn apply_task_state_to_content(
+    content: &mut String,
+    block_source: &str,
+    old_state: &str,
+    new_state: &str,
+) -> bool {
+    let start = match content.find(block_source) {
+        Some(pos) => pos,
+        None => return false,
+    };
+
+    let source_slice = &content[start..start + block_source.len()];
+
+    let updated = match (old_state, new_state) {
+        // Checkbox toggle: [ ] <-> [x]
+        ("todo", "done") | ("done", "todo") | ("none", "todo") | ("none", "done") => {
+            if let Some(ck_pos) = source_slice.find('[') {
+                let actual_pos = start + ck_pos;
+                if actual_pos + 3 <= content.len() {
+                    let slice = &content[actual_pos..actual_pos + 3];
+                    let replacement = if new_state == "done" { "[x]" } else { "[ ]" };
+                    if slice == "[ ]" || slice == "[x]" || slice == "[X]" {
+                        content.replace_range(actual_pos..actual_pos + 3, replacement);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+        // Inline TODO <-> DONE / LATER <-> NOW etc.
+        _ if !old_state.is_empty() && !new_state.is_empty()
+            && old_state != "none" && new_state != "none" =>
+        {
+            let old_upper = old_state.to_uppercase();
+            let new_upper = new_state.to_uppercase();
+            let old_marker = format!("{} ", old_upper);
+            let new_marker = format!("{} ", new_upper);
+            if let Some(m_pos) = source_slice.find(&old_marker) {
+                let actual_pos = start + m_pos;
+                content.replace_range(actual_pos..actual_pos + old_marker.len(), &new_marker);
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    };
+
+    updated
 }
 
 // ---------------------------------------------------------------------------
