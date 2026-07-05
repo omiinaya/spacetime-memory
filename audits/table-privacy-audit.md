@@ -2,7 +2,7 @@
 
 > **Date:** 2026-07-05
 > **Scope:** All SpacetimeDB tables in spacetime-memory server module
-> **Total tables:** 84 (49 private + 35 public)
+> **Total tables:** 83 (47 private + 36 public)
 
 ## Summary
 
