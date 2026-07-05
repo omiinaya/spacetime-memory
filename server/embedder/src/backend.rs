@@ -2,7 +2,7 @@
 // Embedding backend abstraction + GPU (CUDA/ROCm) backend via ort
 // ---------------------------------------------------------------------------
 
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 /// Shared embedding backend interface.
 pub trait EmbeddingBackend: Send + Sync {
@@ -16,7 +16,7 @@ pub trait EmbeddingBackend: Send + Sync {
 // ---------------------------------------------------------------------------
 
 pub struct TractCpuBackend {
-    model: Mutex<Arc<tract_onnx::prelude::SimplePlan<
+    model: Mutex<std::sync::Arc<tract_onnx::tract_core::plan::SimplePlan<
         tract_onnx::prelude::TypedFact,
         Box<dyn tract_onnx::prelude::TypedOp>,
     >>>,
@@ -39,7 +39,6 @@ impl TractCpuBackend {
             .unwrap()
             .into_runnable()
             .unwrap();
-        let model = Arc::new(model);
 
         // Probe dimension and input count
         let dummy_ids: Vec<i64> = vec![101i64, 200, 102];
@@ -57,9 +56,12 @@ impl TractCpuBackend {
                     (sv.shape()[2], 3)
                 }
                 Err(_) => {
-                    let di2 = Tensor::from_shape(&[1, 3], &dummy_ids).unwrap();
-                    let dm2 = Tensor::from_shape(&[1, 3], &dummy_mask).unwrap();
-                    let mut m = model.run(tvec!(di2.into(), dm2.into())).unwrap();
+                    let di2 =
+                        Tensor::from_shape(&[1, 3], &dummy_ids).unwrap();
+                    let dm2 =
+                        Tensor::from_shape(&[1, 3], &dummy_mask).unwrap();
+                    let mut m =
+                        model.run(tvec!(di2.into(), dm2.into())).unwrap();
                     let val = m.remove(0);
                     let sv = val.to_plain_array_view::<f32>().unwrap();
                     (sv.shape()[2], 2)
@@ -81,16 +83,10 @@ impl EmbeddingBackend for TractCpuBackend {
     fn compute_embedding(&self, text: &str) -> Vec<f32> {
         use tract_onnx::prelude::*;
 
-        let encoding = self
-            .tokenizer
-            .encode(text, true)
-            .unwrap();
+        let encoding = self.tokenizer.encode(text, true).unwrap();
 
-        let ids: Vec<i64> = encoding
-            .get_ids()
-            .iter()
-            .map(|&id| id as i64)
-            .collect();
+        let ids: Vec<i64> =
+            encoding.get_ids().iter().map(|&id| id as i64).collect();
         let mask: Vec<i64> = encoding
             .get_attention_mask()
             .iter()
@@ -99,13 +95,12 @@ impl EmbeddingBackend for TractCpuBackend {
         let seq_len = ids.len();
 
         let input_ids = Tensor::from_shape(&[1, seq_len], &ids).unwrap();
-        let attention_mask = Tensor::from_shape(&[1, seq_len], &mask).unwrap();
+        let attention_mask =
+            Tensor::from_shape(&[1, seq_len], &mask).unwrap();
 
         let guard = match self.model.lock() {
             Ok(g) => g,
-            Err(_) => {
-                return vec![0.0f32; self.dimension];
-            }
+            Err(_) => return vec![0.0f32; self.dimension],
         };
         let result = match if self.num_inputs >= 3 {
             let type_ids: Vec<i64> = vec![0i64; seq_len];
@@ -145,7 +140,7 @@ impl EmbeddingBackend for TractCpuBackend {
 
 #[cfg(any(feature = "cuda", feature = "rocm"))]
 pub struct OrtBackend {
-    session: ort::Session,
+    session: ort::session::Session,
     tokenizer: tokenizers::Tokenizer,
     dimension: usize,
     model_name: String,
@@ -160,33 +155,22 @@ impl OrtBackend {
         use_gpu: bool,
     ) -> Self {
         // Initialise ONNX Runtime environment
-        let _env = ort::init().expect("Failed to initialise ONNX Runtime");
+        ort::init().expect("Failed to initialise ONNX Runtime");
 
-        let mut builder = ort::Session::builder()
-            .expect("Failed to create ONNX Runtime session builder")
-            .with_model_from_file(model_path)
-            .expect("Failed to load ONNX model");
+        // Build session with execution providers
+        let mut builder = ort::session::builder::SessionBuilder::new()
+            .expect("Failed to create ONNX Runtime session builder");
 
-        // Register execution providers in priority order:
-        // GPU provider first (if use_gpu is true), then CPU fallback.
         if use_gpu {
-            #[cfg(feature = "cuda")]
-            {
-                eprintln!("[ort] Registering CUDA execution provider");
-                builder = builder
-                    .with_execution_providers([ort::ep::cuda::CUDA::default()])
-                    .expect("Failed to register CUDA execution provider");
-            }
-            #[cfg(feature = "rocm")]
-            {
-                eprintln!("[ort] Registering ROCm execution provider");
-                builder = builder
-                    .with_execution_providers([ort::ep::rocm::ROCm::default()])
-                    .expect("Failed to register ROCm execution provider");
-            }
+            // Register GPU provider first (higher priority), then CPU fallback.
+            builder = builder
+                .with_execution_providers([gpu_execution_provider()])
+                .expect("Failed to register GPU execution provider");
         }
 
-        let session = builder;
+        let session = builder
+            .commit_from_file(model_path)
+            .expect("Failed to load ONNX model via ort");
 
         // Probe dimension with a dummy input
         let dummy_ids: Vec<i64> = vec![101i64, 200, 102];
@@ -195,37 +179,31 @@ impl OrtBackend {
         let dimension = {
             let input_tensor = ort::ndarray::Array2::from_shape_vec(
                 (1, 3),
-                dummy_ids.iter().map(|&x| x as i64).collect(),
+                dummy_ids.iter().copied().collect(),
             )
             .unwrap();
             let mask_tensor = ort::ndarray::Array2::from_shape_vec(
                 (1, 3),
-                dummy_mask.iter().map(|&x| x as i64).collect(),
+                dummy_mask.iter().copied().collect(),
             )
             .unwrap();
             let outputs = session
                 .run(ort::inputs![input_tensor.view(), mask_tensor.view()].unwrap())
-                .expect("Failed to probe model dimension");
+                .expect("Failed to probe model dimension via ort");
             let output = outputs[0]
                 .try_extract_tensor::<f32>()
                 .expect("Failed to extract probe output");
             output.shape()[2]
         };
 
+        let provider_name = if use_gpu {
+            gpu_provider_name()
+        } else {
+            "CPU"
+        };
         eprintln!(
             "[ort] Model loaded: {} dimension={} provider={}",
-            model_path,
-            dimension,
-            if use_gpu {
-                #[cfg(feature = "cuda")]
-                { "CUDA" }
-                #[cfg(feature = "rocm")]
-                { "ROCm" }
-                #[cfg(not(any(feature = "cuda", feature = "rocm")))]
-                { "CPU" }
-            } else {
-                "CPU (fallback)"
-            },
+            model_path, dimension, provider_name,
         );
 
         OrtBackend {
@@ -237,19 +215,35 @@ impl OrtBackend {
     }
 }
 
+#[cfg(feature = "cuda")]
+fn gpu_execution_provider() -> Box<dyn ort::ep::ExecutionProvider> {
+    eprintln!("[ort] Creating CUDA execution provider");
+    Box::new(ort::ep::cuda::CUDA::default())
+}
+
+#[cfg(feature = "rocm")]
+fn gpu_execution_provider() -> Box<dyn ort::ep::ExecutionProvider> {
+    eprintln!("[ort] Creating ROCm execution provider");
+    Box::new(ort::ep::rocm::ROCm::default())
+}
+
+#[cfg(feature = "cuda")]
+fn gpu_provider_name() -> &'static str {
+    "CUDA"
+}
+
+#[cfg(feature = "rocm")]
+fn gpu_provider_name() -> &'static str {
+    "ROCm"
+}
+
 #[cfg(any(feature = "cuda", feature = "rocm"))]
 impl EmbeddingBackend for OrtBackend {
     fn compute_embedding(&self, text: &str) -> Vec<f32> {
-        let encoding = self
-            .tokenizer
-            .encode(text, true)
-            .unwrap();
+        let encoding = self.tokenizer.encode(text, true).unwrap();
 
-        let ids: Vec<i64> = encoding
-            .get_ids()
-            .iter()
-            .map(|&id| id as i64)
-            .collect();
+        let ids: Vec<i64> =
+            encoding.get_ids().iter().map(|&id| id as i64).collect();
         let mask: Vec<i64> = encoding
             .get_attention_mask()
             .iter()
@@ -257,7 +251,7 @@ impl EmbeddingBackend for OrtBackend {
             .collect();
         let seq_len = ids.len();
 
-        // Build input tensors as ndarray (ort-native format)
+        // Build input tensors as ndarray
         let input_ids = ort::ndarray::Array2::from_shape_vec(
             (1, seq_len),
             ids,
@@ -265,14 +259,13 @@ impl EmbeddingBackend for OrtBackend {
         .unwrap();
         let attention_mask = ort::ndarray::Array2::from_shape_vec(
             (1, seq_len),
-            mask,
+            mask.clone(),
         )
         .unwrap();
 
-        let outputs = match self
-            .session
-            .run(ort::inputs![input_ids.view(), attention_mask.view()].unwrap())
-        {
+        let outputs = match self.session.run(
+            ort::inputs![input_ids.view(), attention_mask.view()].unwrap(),
+        ) {
             Ok(o) => o,
             Err(e) => {
                 eprintln!("[ort] Inference error: {:?}", e);
@@ -289,14 +282,14 @@ impl EmbeddingBackend for OrtBackend {
         let hidden_dim = shape[2];
         let seq_len_out = shape[1];
 
-        // Build attention mask as ndarray for mean pooling
+        // Build mask ndarray for mean pooling
         let mask_arr = ort::ndarray::Array2::from_shape_vec(
             (1, seq_len),
             mask,
         )
         .unwrap();
 
-        // Mean-pool manually
+        // Mean pool
         let mask_sum: f32 = mask_arr.sum();
         if mask_sum == 0.0 {
             return vec![0.0f32; hidden_dim];
@@ -306,7 +299,6 @@ impl EmbeddingBackend for OrtBackend {
         for j in 0..hidden_dim {
             let mut sum = 0.0f32;
             for i in 0..seq_len_out {
-                // output is stored as flat ArrayViewD
                 let idx = i * hidden_dim + j;
                 sum += output[idx] * mask_arr[[0, i]] as f32;
             }
@@ -334,15 +326,13 @@ impl EmbeddingBackend for OrtBackend {
 }
 
 // ---------------------------------------------------------------------------
-// Shared mean-pool + normalize (used by tract backend, also exposed for ort)
+// Shared mean-pool + normalize (used by tract backend)
 // ---------------------------------------------------------------------------
 
 fn mean_pool_and_normalize(
     last_hidden_state: &tract_onnx::prelude::TValue,
     attention_mask: &tract_onnx::prelude::TValue,
 ) -> Vec<f32> {
-    use tract_onnx::prelude::*;
-
     let state = last_hidden_state.to_plain_array_view::<f32>().unwrap();
     let mask = attention_mask.to_plain_array_view::<i64>().unwrap();
 
