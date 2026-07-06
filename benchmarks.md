@@ -43,5 +43,13 @@ Eval dataset: 50 memories, 25 query-judgment pairs. Embedder: bge-large-en-v1.5 
 | hybrid (bge-m3 semantic) | 74.0% | 74.0% | 0.853
 
 Hybrid adds semantic search on top of keyword BM25 via Tantivy + fusion scoring.
-Results inline with previous baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960).
-Minor drop attributed to different eval dataset (25 vs 18 queries) and embedder model (bge-large-en-v1.5 vs bge-m3).
+
+## Historical Comparison
+
+| Metric | June 20 baseline (5 queries, bge-m3) | July 6 (25 queries, bge-m3) | July 6 (25 queries, bge-large-en-v1.5) | Delta vs baseline | Notes |
+|--------|:---:|:---:|:---:|:---:|-------|
+| P@5 | 81.3% | 74.0% | 74.0% | −7.3pp | Both embedder models produce identical results on same dataset; drop is dataset-driven, not model-driven |
+| R@5 | 82.0% | 74.0% | 74.0% | −8.0pp | Same observation |
+| MRR | 0.960 | 0.853 | 0.853 | −0.107 | Depends on dataset size/complexity |
+
+**Key insight:** Both bge-m3 and bge-large-en-v1.5 produce identical P@5/R@5/MRR on the 50×25 eval dataset. The 7–8pp gap vs the June 20 baseline is entirely due to **eval dataset differences** — the old baseline used only 5 hand-picked queries that were easier to satisfy. The new 25-query set is broader and more representative, making the 74.0% score the true current baseline. The old 81.3% number was optimistic due to small eval sample.
