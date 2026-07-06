@@ -186,7 +186,7 @@
   - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
   - [x] `computePageRank` — exists
   - [ ] `computeCommunityHierarchy` — exists
-  - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
+  - [x] `suggestMerges` / `approveMerge` / `rejectMerge` — server reducer + MCP tool + Python SDK + TS SDK + web UI + tests
   - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
   - [ ] `extractEntities` — exists
   - [x] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
