@@ -1,6 +1,6 @@
 # Performance Benchmarks
 
-**Generated:** 2026-07-01 04:12 UTC
+**Generated:** 2026-07-06 13:49 UTC
 **Host:** 127.0.0.1:3001
 **DB:** `c200199768b8fc59738604c1b9e9dbbf89014d2f39a8993f5836f194f5dfe68b`
 **Iterations:** 20 per op (3 for semantic — expensive)
@@ -59,4 +59,5 @@
 1. **For faster semantic search**: The remaining bottleneck is the 1.5s WASM `hybrid_search` reducer. A keyword-only index in Tantivy with the search done client-side would bypass this entirely.
 2. **For Tantivy integration**: Ensure `c.store()` is called instead of `_call("store_memory", ...)` — Tantivy indexing happens in `c.store()` and is transparent.
 3. **For embedder**: bge-large-en-v1.5 (1024-dim) at :9090 works well. 250ms per embedding. No issues.
-4. **Batch stores**: Currently N sequential reducer calls. A `store_batch` reducer on the Rust side would cut overhead.
+4. **Tantivy BM25 sidecar**: Keyword search is **7255× faster** with the Tantivy sidecar (0.7ms vs 5.1s p50). Quality delta is modest (+0.7pp P@5) — both Tantivy and the client-side fallback use BM25-like token matching. The latency improvement is the headline contribution: Tantivy reduces keyword search from ~5s (serial STDB queries + substring matching) to <1ms (Rust BM25 index).
+5. **Batch stores**: Currently N sequential reducer calls. A `store_batch` reducer on the Rust side would cut overhead.
