@@ -170,7 +170,7 @@
   - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
   - [ ] `logResonanceSession` — exists
   - [ ] `createEntityLink` / `addAlias` / `resolveEntity` — missing
-  - [ ] `getNode` — exists
+  - [x] `getNode` — exists
   - [ ] `getNoteByDate` — exists
   - [ ] `getNoteByTitle` — exists
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
