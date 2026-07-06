@@ -182,9 +182,9 @@
   - [ ] `setMemoryScope` — missing
   - [ ] `batchDeleteMemories` — exists
   - [ ] `batchTagMemories` / `batchUntagMemories` — missing
-  - [ ] `getEdgeHistory` — missing
+  - [x] `getEdgeHistory` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
   - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
-  - [ ] `computePageRank` — exists
+  - [x] `computePageRank` — exists
   - [ ] `computeCommunityHierarchy` — exists
   - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
   - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist

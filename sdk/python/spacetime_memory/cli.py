@@ -813,6 +813,34 @@ def memory_batch_update(workspace_id: str, memory_ids: str, content: str,
         print_json(result)
 
 
+@memory.command(name="delete")
+@click.argument("memory_id")
+def memory_delete(memory_id: str) -> None:
+    """Deactivate a single memory (soft delete). Idempotent."""
+    client = _sdk_client()
+    with console.status(f"Deleting memory '{memory_id[:16]}...'..."):
+        result = client.delete_memory(memory_id)
+    _quiet_print(f"[green]Memory '{memory_id[:16]}...' deactivated.[/green]")
+    if result and isinstance(result, dict):
+        print_json(result)
+
+
+@memory.command(name="batch-delete")
+@click.argument("memory_ids")
+def memory_batch_delete(memory_ids: str) -> None:
+    """Batch-deactivate multiple memories. MEMORY_IDS is a comma-separated list of IDs."""
+    client = _sdk_client()
+    ids = [m.strip() for m in memory_ids.split(",") if m.strip()]
+    if not ids:
+        console.print("[yellow]No memory IDs provided.[/yellow]")
+        return
+    with console.status(f"Batch deleting {len(ids)} memories..."):
+        result = client.batch_delete_memories(ids)
+    _quiet_print(f"[green]Batch deleted {len(ids)} memories.[/green]")
+    if result:
+        print_json(result)
+
+
 @memory.command(name="history")
 @click.argument("memory_id")
 def memory_history(memory_id: str) -> None:
