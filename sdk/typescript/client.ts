@@ -71,6 +71,7 @@ export interface NoteRecord {
   workspace_id: string;
   title: string;
   content: string;
+  note_date: string;
   is_active?: boolean;
   created_at?: number;
   updated_at?: number;
