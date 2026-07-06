@@ -172,7 +172,7 @@
   - [ ] `createEntityLink` / `addAlias` / `resolveEntity` — missing
   - [x] `getNode` — exists
   - [x] `getNoteByDate` — exists
-  - [ ] `getNoteByTitle` — exists
+  - [x] `getNoteByTitle` — exists
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
   - [ ] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — missing
   - [ ] `searchSessionsSemantic` — missing
