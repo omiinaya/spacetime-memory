@@ -2423,12 +2423,50 @@ class Client:
             )
             return results
 
-        # Non-semantic (keyword) fallback
-        rows = self._keyword_fallback(
-            workspace_id, query, memory_type, tier, limit, before=before, after=after
-        )
+        # Non-semantic (keyword) search via Tantivy BM25 sidecar (~1ms vs ~28ms WASM BM25)
+        # Replaces the old _keyword_fallback which did client-side substring matching.
+        tantivy_hits = self._tantivy_search(workspace_id, query, limit=limit)
+        rows = []
+        seen_ids: set[str] = set()
+        for th in tantivy_hits:
+            eid = th.get("entity_id", "")
+            if eid and eid not in seen_ids:
+                seen_ids.add(eid)
+                rows.append(
+                    {
+                        "entity_id": eid,
+                        "entity_type": th.get("entity_type", "memory"),
+                        "content": th.get("content", ""),
+                        "score": float(th.get("score", 0.0)),
+                        "workspace_id": workspace_id,
+                    }
+                )
+            if len(rows) >= limit:
+                break
+        if not rows and query:
+            # Fallback: client-side substring matching if Tantivy is unreachable
+            logger.warning(
+                "Tantivy sidecar returned no results for query=%r — falling back to _keyword_fallback",
+                query,
+            )
+            rows = self._keyword_fallback(
+                workspace_id, query, memory_type, tier, limit, before=before, after=after
+            )
         if entity_types is not None and entity_types:
             rows = [r for r in rows if r.get("entity_type") in entity_types]
+        # ── Date range filter (before/after) — only needed in non-semantic path ──
+        if before is not None or after is not None:
+            filtered = []
+            for r in rows:
+                ts = r.get("created_at")
+                if ts is None:
+                    continue
+                if before is not None and not (ts < before):
+                    continue
+                if after is not None and not (ts > after):
+                    continue
+                filtered.append(r)
+            rows = filtered
         return rows
 
     def detect_patterns(
