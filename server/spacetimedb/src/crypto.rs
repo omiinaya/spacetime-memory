@@ -130,6 +130,184 @@ fn hex_to_key(hex_str: &str) -> Result<[u8; 32], String> {
     Ok(key)
 }
 
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: a valid 64-char hex key (32 bytes) for testing.
+    fn test_key_hex() -> &'static str {
+        "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f809"
+    }
+
+    /// Another valid key for wrong-key tests.
+    fn other_key_hex() -> &'static str {
+        "deadbeefcafebabedeadbeefcafebabedeadbeefcafebabedeadbeefcafebabe00"
+    }
+
+    // ── hex_to_key ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_hex_to_key_valid() {
+        let key = hex_to_key(test_key_hex()).unwrap();
+        assert_eq!(key.len(), 32);
+    }
+
+    #[test]
+    fn test_hex_to_key_wrong_length() {
+        let err = hex_to_key("abcd").unwrap_err();
+        assert!(err.contains("32 bytes"));
+    }
+
+    #[test]
+    fn test_hex_to_key_invalid_hex() {
+        let err = hex_to_key("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz").unwrap_err();
+        assert!(err.contains("Invalid key hex"));
+    }
+
+    #[test]
+    fn test_hex_to_key_empty() {
+        let err = hex_to_key("").unwrap_err();
+        assert!(err.contains("32 bytes"));
+    }
+
+    // ── encrypt / decrypt roundtrip ─────────────────────────────────────────
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let plaintext = "Hello, world!";
+        let cipher = encrypt_field(plaintext, test_key_hex()).unwrap();
+        assert!(cipher.len() > 56);
+        let decrypted = decrypt_field(&cipher, test_key_hex()).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_empty_string() {
+        let plaintext = "";
+        let cipher = encrypt_field(plaintext, test_key_hex()).unwrap();
+        assert!(cipher.len() > 56);
+        let decrypted = decrypt_field(&cipher, test_key_hex()).unwrap();
+        assert_eq!(decrypted, "");
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_long_string() {
+        let plaintext = "A".repeat(10_000);
+        let cipher = encrypt_field(&plaintext, test_key_hex()).unwrap();
+        let decrypted = decrypt_field(&cipher, test_key_hex()).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_special_chars() {
+        let plaintext = "Hello, 世界! 🔐 \n\t\r\0 test";
+        let cipher = encrypt_field(plaintext, test_key_hex()).unwrap();
+        let decrypted = decrypt_field(&cipher, test_key_hex()).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    // ── wrong key / tampered data ───────────────────────────────────────────
+
+    #[test]
+    fn test_decrypt_wrong_key_fails() {
+        let plaintext = "secret data";
+        let cipher = encrypt_field(plaintext, test_key_hex()).unwrap();
+        let err = decrypt_field(&cipher, other_key_hex()).unwrap_err();
+        assert!(err.contains("wrong key") || err.contains("Decryption failed"));
+    }
+
+    #[test]
+    fn test_decrypt_short_ciphertext() {
+        let err = decrypt_field("abcd", test_key_hex()).unwrap_err();
+        assert!(err.contains("too short"));
+    }
+
+    #[test]
+    fn test_decrypt_invalid_hex() {
+        let err = decrypt_field("not-hex-at-all!!!!!", test_key_hex()).unwrap_err();
+        assert!(err.contains("Invalid hex"));
+    }
+
+    #[test]
+    fn test_decrypt_empty_ciphertext() {
+        let err = decrypt_field("", test_key_hex()).unwrap_err();
+        assert!(err.contains("Invalid hex") || err.contains("too short"));
+    }
+
+    // ── encrypt with invalid key ────────────────────────────────────────────
+
+    #[test]
+    fn test_encrypt_invalid_key() {
+        let err = encrypt_field("hello", "bad-key").unwrap_err();
+        assert!(err.contains("Invalid key hex") || err.contains("Key must be 32 bytes"));
+    }
+
+    #[test]
+    fn test_encrypt_empty_key() {
+        let err = encrypt_field("hello", "").unwrap_err();
+        assert!(err.contains("Invalid key hex") || err.contains("Key must be 32 bytes"));
+    }
+
+    // ── looks_encrypted ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_looks_encrypted_long_enough_hex() {
+        // 64 hex chars = 32 bytes, well over 56 threshold
+        assert!(looks_encrypted("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"));
+    }
+
+    #[test]
+    fn test_looks_encrypted_too_short() {
+        assert!(!looks_encrypted("abcd"));
+        assert!(!looks_encrypted(""));
+        // 55 chars is below the 56 threshold
+        assert!(!looks_encrypted("a".repeat(55).as_str()));
+    }
+
+    #[test]
+    fn test_looks_encrypted_boundary_56() {
+        // Exactly 56 hex chars should return true
+        assert!(looks_encrypted("a".repeat(56).as_str()));
+    }
+
+    #[test]
+    fn test_looks_encrypted_non_hex_chars() {
+        // Non-hex characters (even if long enough)
+        assert!(!looks_encrypted("z".repeat(56).as_str()));
+        assert!(!looks_encrypted("abcdefghijklmnopqrstuvwxyz".repeat(3).as_str()));
+    }
+
+    #[test]
+    fn test_looks_encrypted_mixed_case_hex() {
+        // Uppercase hex is valid
+        assert!(looks_encrypted("A".repeat(56).as_str()));
+        assert!(looks_encrypted("ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789"));
+    }
+
+    #[test]
+    fn test_encrypted_output_looks_encrypted() {
+        let cipher = encrypt_field("test", test_key_hex()).unwrap();
+        assert!(looks_encrypted(&cipher));
+    }
+
+    // ── deterministic failure modes ─────────────────────────────────────────
+
+    #[test]
+    fn test_decrypt_corrupted_ciphertext() {
+        let plaintext = "important secret";
+        let cipher = encrypt_field(plaintext, test_key_hex()).unwrap();
+        // Flip a bit in the middle of the hex string
+        let mut chars: Vec<char> = cipher.chars().collect();
+        let idx = chars.len() / 2;
+        chars[idx] = if chars[idx] == 'a' { 'b' } else { 'a' };
+        let corrupted: String = chars.into_iter().collect();
+        let err = decrypt_field(&corrupted, test_key_hex()).unwrap_err();
+        assert!(err.contains("Decryption failed") || err.contains("wrong key"));
+    }
+}
+
 // ─── Reducers ───────────────────────────────────────────────────────────────
 
 /// Initialise encryption for a workspace.

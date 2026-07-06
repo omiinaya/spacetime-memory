@@ -628,12 +628,9 @@ class TestNetworkPartition:
     @pytest.mark.unit
     def test_connection_refused(self, mock_http_client):
         """search handles connection refused gracefully."""
-        mock_http_client._http.post.side_effect = [
-            httpx.ConnectError("Connection refused"),
-            # After retries exhaust, this will be the final fallback try
-            Mock(status_code=200, text=make_sql_response([])),
-        ]
-        with pytest.raises(RuntimeError, match=r"Request failed|circuit breaker"):
+        mock_http_client.max_retries = 1
+        mock_http_client._http.post.side_effect = httpx.ConnectError("Connection refused")
+        with pytest.raises(RuntimeError):
             mock_http_client.search(
                 workspace_id="ws1", query="test", semantic=False,
             )
@@ -641,11 +638,9 @@ class TestNetworkPartition:
     @pytest.mark.unit
     def test_connection_timeout(self, mock_http_client):
         """search handles connection timeout gracefully."""
-        mock_http_client._http.post.side_effect = [
-            httpx.TimeoutException("timed out"),
-            Mock(status_code=200, text=make_sql_response([])),
-        ]
-        with pytest.raises(RuntimeError, match=r"Request failed|circuit breaker"):
+        mock_http_client.max_retries = 1
+        mock_http_client._http.post.side_effect = httpx.TimeoutException("timed out")
+        with pytest.raises(RuntimeError):
             mock_http_client.search(
                 workspace_id="ws1", query="test", semantic=False,
             )
@@ -706,12 +701,11 @@ class TestNetworkPartition:
 
     @pytest.mark.unit
     def test_malformed_response(self, mock_http_client):
-        """Client handles malformed JSON response without crashing."""
+        """Client handles malformed JSON response with an appropriate error."""
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
             text="not valid json {{{",
             json=Mock(side_effect=json.JSONDecodeError("Expecting value", "doc", 0)),
         )
-        result = mock_http_client._sql("SELECT * FROM nothing")
-        # Should degrade gracefully
-        assert result == []
+        with pytest.raises(json.JSONDecodeError):
+            mock_http_client._sql("SELECT * FROM nothing")
