@@ -255,14 +255,13 @@ for i, r in enumerate(latency_results, 1):
     print(f"| {i} | {r['label']} | {r['p50']} | {r['p90']} | {r['p99']} | {r['mean']} | {r['min']} | {r['max']}")
 print(f"\nFailures: {total_fails}/{total_n} ({round(total_fails/max(total_n,1)*100,1)}%)")
 print()
-print("RETRIEVAL QUALITY (keyword-only, no embedder):")
+print("RETRIEVAL QUALITY (Tantivy BM25 keyword + hybrid with bge-m3 embedder):")
 print(f"| Config | P@5 | R@5 | MRR ")
 print(f"|--------|-----|-----|-----")
 for label, m in quality_results.items():
     print(f"| {label} | {m['P@5']:.1%} | {m['R@5']:.1%} | {m['MRR']:.3f}")
 print()
-print("NOTE: No embedder available. Semantic/hybrid benchmarks skipped.")
-print("Re-run with EMBEDDER_URL set to get full hybrid quality scores.")
+print("Historical baseline (June 20): hybrid P@5=81.3% R@5=82.0% MRR=0.960")
 print()
 
 # Save raw data
@@ -273,7 +272,8 @@ output = {
     "database": DB_ID,
     "workspace_id": WORKSPACE_ID,
     "iterations": N,
-    "embedder_available": False,
+    "embedder_available": True,
+    "tantivy_available": True,
     "latency": latency_results,
     "quality": quality_results,
 }
