@@ -1275,19 +1275,24 @@ class Client:
             workspace_id=workspace_id,
         )
 
+        # Index into Tantivy BM25 sidecar regardless of embedder availability.
+        # The memory_id is resolved by content match after the store_memory reducer.
+        mems_after = self._query(
+            "memory", workspace_id=workspace_id, filter_dict={}, columns=["id", "content"]
+        )
+        memory_id_tantivy = ""
+        for m in reversed(mems_after):
+            if m.get("content", "") == content:
+                memory_id_tantivy = m["id"]
+                break
+        if memory_id_tantivy:
+            self._tantivy_index(workspace_id, memory_id_tantivy, content, "memory")
+
         # If the embedder is reachable, index embeddings in the sidecar
         emb = self._embed(content)
         if emb:
-            # Resolve the memory ID by content match — more reliable than
-            # peer_id query which can return a different concurrent store.
-            mems = self._query(
-                "memory", workspace_id=workspace_id, filter_dict={}, columns=["id", "content"]
-            )
-            memory_id = ""
-            for m in reversed(mems):
-                if m.get("content", "") == content:
-                    memory_id = m["id"]
-                    break
+            # Use the already-resolved memory_id
+            memory_id = memory_id_tantivy
             if memory_id:
                 # Compute and cache MIB binary vector (32x compression)
                 from .binary_vectors import binarize
@@ -1316,9 +1321,6 @@ class Client:
                         content,
                     ],
                 )
-
-                # Index into Tantivy BM25 sidecar (real Okapi BM25)
-                self._tantivy_index(workspace_id, memory_id, content, "memory")
 
                 # Entity extraction: LLM first, fall back to regex
                 self._extract_and_store_entities(workspace_id, memory_id, content)
