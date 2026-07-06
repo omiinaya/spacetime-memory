@@ -88,16 +88,16 @@
 
 **Root cause(s):** (1) Mock(Client) doesn't call `__init__` which sets `_circuit_open_until`. Fixed by adding the attribute to Mock fixtures. (2) In `create_note`, `note_id` was initialized inside the try block (after `_query`), so when `_query` raised `RuntimeError` on no-STDB connection, the except handler's log message referenced `note_id` before assignment → `UnboundLocalError`. Fixed by moving `note_id = ""` before the try block (commit 8492ee59).
 
-### 1.3 Commit and push uncommitted changes
+|### 1.3 Commit and push uncommitted changes
 **Files touched but not committed (from prior sessions):**
-- `server/spacetimedb/src/tag.rs` — `list_tags_by_memory`, `update_tag` reducers
-- `server/spacetimedb/src/consolidation.rs` — `memory_tag` import
-- `server/spacetimedb/src/hybrid_query.rs` — `memory_tag` import, stray `"` fix
-- `server/spacetimedb/src/workspace.rs` — `memory`, `memory_revision`, `tag`, `memory_tag` imports
-- `server/spacetimedb/src/memory.rs` — `memory_revision` import
-- `server/spacetimedb/Cargo.toml` — pinned to `=2.4.1`, need to set back to `2.6`
-- `sdk/typescript/client.ts` — `listTagsByMemory`, `updateTag` methods
-- `IMPROVEMENTS.md`, `PERFORMANCE.md` — updated benchmark results
+|- [x] `server/spacetimedb/src/tag.rs` — `list_tags_by_memory`, `update_tag` reducers
+|- [x] `server/spacetimedb/src/consolidation.rs` — `memory_tag` import
+|- [x] `server/spacetimedb/src/hybrid_query.rs` — `memory_tag` import, stray `"` fix
+|- [x] `server/spacetimedb/src/workspace.rs` — `memory`, `memory_revision`, `tag`, `memory_tag` imports
+|- [x] `server/spacetimedb/src/memory.rs` — `memory_revision` import
+|- [x] `server/spacetimedb/Cargo.toml` — pinned to `=2.4.1`, need to set back to `2.6`
+|- [x] `sdk/typescript/client.ts` — `listTagsByMemory`, `updateTag` methods
+|- [x] `IMPROVEMENTS.md`, `PERFORMANCE.md` — updated benchmark results
 
 ---
 
