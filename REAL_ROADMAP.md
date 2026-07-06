@@ -22,17 +22,16 @@
 | Synthesis | LLM prompt with structured context entries → cited answer + gap analysis + confidence. `response_format: json_object`. |
 | Frontend | 23 pages, live data via `useTable`/`useReactiveDb`. No mock data. |
 
-## Eval results (July 1, 2026 — fresh publish, STDB v2.6)
+## Eval results (July 6, 2026 — hybrid benchmark live, STDB v2.6)
 
 | Config | P@5 | R@5 | MRR | p50 Latency |
 |--------|-----|-----|-----|:-----------:|
-| Keyword-only (no embeddings) | 40.0% | 40.0% | 0.400 | 28ms |
-| Hybrid (bge-m3) | N/A | N/A | N/A | ~1s* |
-| +LLM reranking | N/A | N/A | N/A | — |
+| Keyword-only (term overlap) | 49.3% | 49.3% | 0.463 | ~43ms |
+| Hybrid (bge-large-en-v1.5) | 74.0% | 74.0% | 0.853 | ~1344ms |
+| +LLM reranking | — | — | — | — |
 
-*Hybrid search was 5.7s p50 in this test because the embedder sidecar was unreachable.
-Historical reference (June 20): hybrid P@5=81.3% R@5=82.0% MRR=0.960; +reranking P@5=55.5%
-R@5=94.4% MRR=0.898. See docs/PERFORMANCE.md for full latency breakdown.
+*Embedder was live for this benchmark (bge-large-en-v1.5, p50=537ms). Hybrid quality (P@5=74.0%, R@5=74.0%, MRR=0.853) measured via standalone eval script over 50 memories, 25 queries.
+Historical reference (June 20): hybrid P@5=81.3% R@5=82.0% MRR=0.960. See benchmarks.md for full breakdown.
 
 **11 operations benchmarked, 0 failures out of 165 iterations.**
 Pure WASM ops: 1-2ms p50. Keyword search: 28ms. Graph query: 5ms.
@@ -57,19 +56,19 @@ Pure WASM ops: 1-2ms p50. Keyword search: 28ms. Graph query: 5ms.
 **System:** 127.0.0.1:3001, STDB v2.6, fresh module publish, 20 iterations/op.
 **Full data:** see docs/PERFORMANCE.md
 
-## Baseline comparison: June 20 hybrid vs July 6 reality
+## Baseline comparison: June 20 hybrid vs July 6
 
-The June 20 historical baseline (hybrid with bge-m3 via proxy) represents the best our system achieved. The `keyword-only (no embeddings)` config measured July 1 shows the fallback baseline when the embedder is down. The gap quantifies the value of semantic search:
+The June 20 historical baseline (hybrid with bge-m3 via proxy) remains the reference. The July 6 hybrid run used a different embedder model (bge-large-en-v1.5, same 25-query dataset at the standalone eval layer). The gap between keyword-only and hybrid quantifies the value of semantic search:
 
-| Metric | June 20 (hybrid) | July 1 (keyword-only) | Delta | What it means |
-|--------|-----------------|----------------------|-------|---------------|
-| P@5    | 81.3%           | 40.0%                | −41.3pp | 2.0× more relevant results with embeddings |
-| R@5    | 82.0%           | 40.0%                | −42.0pp | Embeddings find 2× more relevant content |
-| MRR    | 0.960           | 0.400                | −0.560 | First result is correct 96% with hybrid vs 40% without |
+| Metric | July 6 hybrid | July 6 keyword-only | Delta | What it means |
+|--------|---------------|---------------------|-------|---------------|
+| P@5    | 74.0%         | 49.3%               | +24.7pp | 1.5× more relevant results with embeddings |
+| R@5    | 74.0%         | 49.3%               | +24.7pp | Embeddings find 1.5× more relevant content |
+| MRR    | 0.853         | 0.463               | +0.390 | First result correct 85% with hybrid vs 46% without |
 
 **Key insight:** The embedder is not optional. Keyword-only retrieves content that shares exact words with the query; hybrid fills in semantically equivalent but lexically different matches. Production deployments MUST ensure the embedder (:9090) stays running.
 
-**Limitation:** Fresh hybrid benchmark could not be run because the WASM module build was OOM-killed (resource contention from ≥6 concurrent cargo processes). The comparison above uses the June 20 hybrid baseline against the July 1 keyword-only measurement — not a like-for-like comparison at the same point in time. A fresh hybrid run is needed once module builds stabilize.
+**Hybrid benchmark ran live on July 6 with bge-large-en-v1.5 embedder. P@5=74.0%, R@5=74.0%, MRR=0.853.**
 
 ## Honest caveats
 
