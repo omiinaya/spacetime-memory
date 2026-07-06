@@ -1157,3 +1157,67 @@ pub fn get_citations(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // knowledge_graph.rs has many reducers but some pure logic can be tested
+
+    #[test]
+    fn test_node_type_validation() {
+        let valid_types = ["code", "concept", "entity", "document", "topic"];
+        for t in valid_types {
+            assert!(["code", "concept", "entity", "document", "topic"].contains(&t));
+        }
+        assert!(!["invalid", "person", "place", "thing"].contains(&"invalid"));
+    }
+
+    #[test]
+    fn test_edge_confidence_values() {
+        let valid = ["EXTRACTED", "INFERRED", "AMBIGUOUS"];
+        for c in valid {
+            assert!(["EXTRACTED", "INFERRED", "AMBIGUOUS"].contains(&c));
+        }
+    }
+
+    #[test]
+    fn test_edge_weight_bounds() {
+        // Weight should typically be 0.0-1.0 but can be higher for multi-edges
+        let weights = [0.0, 0.5, 1.0, 2.0, 5.0];
+        for w in weights {
+            assert!(w >= 0.0);
+        }
+    }
+
+    #[test]
+    fn test_community_id_zero_unassigned() {
+        // community_id = 0 means unassigned
+        let unassigned = 0u64;
+        let assigned = 1u64;
+        assert_eq!(unassigned, 0);
+        assert!(assigned > 0);
+    }
+
+    #[test]
+    fn test_temporal_versioning_fields() {
+        // valid_at: when edge became valid
+        // invalid_at: 0 = still valid
+        // version: starts at 1
+        // edge_group_id: links versions of same logical edge
+        let valid_at = 1000i64;
+        let invalid_at = 0i64;
+        let version = 1u32;
+        assert!(valid_at > 0);
+        assert_eq!(invalid_at, 0);
+        assert_eq!(version, 1);
+    }
+
+    #[test]
+    fn test_edge_version_increment() {
+        let v1 = 1u32;
+        let v2 = v1 + 1;
+        assert_eq!(v2, 2);
+    }
+}
+

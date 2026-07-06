@@ -731,3 +731,265 @@ mod tests {
         assert!(names.contains(&"Beta LLC"));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── is_company_suffix tests ─────────────────────────────────────────────
+
+    #[test]
+    fn test_is_company_suffix_known_suffixes() {
+        assert!(is_company_suffix("Inc"));
+        assert!(is_company_suffix("Corp"));
+        assert!(is_company_suffix("LLC"));
+        assert!(is_company_suffix("Ltd"));
+        assert!(is_company_suffix("GmbH"));
+        assert!(is_company_suffix("SaaS"));
+        assert!(is_company_suffix("AI"));
+        assert!(is_company_suffix("Labs"));
+        assert!(is_company_suffix("Technologies"));
+        assert!(is_company_suffix("Ventures"));
+        assert!(is_company_suffix("Capital"));
+        assert!(is_company_suffix("Partners"));
+        assert!(is_company_suffix("Group"));
+        assert!(is_company_suffix("Holdings"));
+        assert!(is_company_suffix("Enterprises"));
+        assert!(is_company_suffix("Studios"));
+        assert!(is_company_suffix("Software"));
+        assert!(is_company_suffix("Systems"));
+        assert!(is_company_suffix("Networks"));
+        assert!(is_company_suffix("Analytics"));
+        assert!(is_company_suffix("Robotics"));
+    }
+
+    #[test]
+    fn test_is_company_suffix_case_insensitive() {
+        assert!(is_company_suffix("inc"));
+        assert!(is_company_suffix("INC"));
+        assert!(is_company_suffix("Inc"));
+        assert!(is_company_suffix("iNc"));
+    }
+
+    #[test]
+    fn test_is_company_suffix_unknown_returns_false() {
+        assert!(!is_company_suffix("Company"));
+        assert!(!is_company_suffix("Solutions"));
+        assert!(!is_company_suffix("Services"));
+        assert!(!is_company_suffix("Test"));
+        assert!(!is_company_suffix(""));
+    }
+
+    // ── is_proper_word tests ────────────────────────────────────────────────
+
+    #[test]
+    fn test_is_proper_word_valid() {
+        assert!(is_proper_word("John"));
+        assert!(is_proper_word("Apple"));
+        assert!(is_proper_word("Microsoft"));
+        assert!(is_proper_word("A"));
+        assert!(is_proper_word("Ab"));
+    }
+
+    #[test]
+    fn test_is_proper_word_invalid_lowercase() {
+        assert!(!is_proper_word("john"));
+        assert!(!is_proper_word("apple"));
+    }
+
+    #[test]
+    fn test_is_proper_word_invalid_mixed_case() {
+        assert!(!is_proper_word("JohnDoe"));
+        assert!(!is_proper_word("McDonald"));
+        assert!(!is_proper_word("iPhone"));
+    }
+
+    #[test]
+    fn test_is_proper_word_invalid_empty() {
+        assert!(!is_proper_word(""));
+    }
+
+    #[test]
+    fn test_is_proper_word_invalid_starts_with_lowercase() {
+        assert!(!is_proper_word("john"));
+        assert!(!is_proper_word("jOHN"));
+    }
+
+    // ── entity_score tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_entity_score_noise_words_zero() {
+        let noise = ["the", "and", "for", "with", "this", "that", "from", "have",
+                     "been", "was", "are", "has", "had", "not", "but", "its", "his",
+                     "her", "she", "they", "will", "would", "could", "should", "there",
+                     "their", "about", "which", "when", "where", "what", "into", "over"];
+        for word in noise {
+            assert_eq!(entity_score(word), 0, "Word '{}' should score 0", word);
+        }
+    }
+
+    #[test]
+    fn test_entity_score_short_words_zero() {
+        assert_eq!(entity_score("a"), 0);
+        assert_eq!(entity_score("an"), 0);
+        assert_eq!(entity_score("to"), 0);
+        assert_eq!(entity_score("of"), 0);
+    }
+
+    #[test]
+    fn test_entity_score_valid_words_one() {
+        assert_eq!(entity_score("Apple"), 1);
+        assert_eq!(entity_score("Microsoft"), 1);
+        assert_eq!(entity_score("Technology"), 1);
+        assert_eq!(entity_score("Innovation"), 1);
+    }
+
+    #[test]
+    fn test_entity_score_case_insensitive_noise() {
+        assert_eq!(entity_score("THE"), 0);
+        assert_eq!(entity_score("And"), 0);
+        assert_eq!(entity_score("FOR"), 0);
+    }
+
+    // ── extract_people tests ────────────────────────────────────────────────
+
+    #[test]
+    fn test_extract_people_simple_two_word_names() {
+        let text = "John Smith works at Google. Jane Doe is his colleague.";
+        let people = extract_people(text);
+        assert_eq!(people.len(), 2);
+        assert_eq!(people[0].name, "John Smith");
+        assert_eq!(people[0].entity_type, "person");
+        assert_eq!(people[1].name, "Jane Doe");
+        assert_eq!(people[1].entity_type, "person");
+    }
+
+    #[test]
+    fn test_extract_people_filters_noise() {
+        let text = "The And For With This That From Have Been Was Are Has Had Not But Its His Her She They Will Would Could Should There Their About Which When Where What Into Over.";
+        let people = extract_people(text);
+        // Should not extract noise word pairs
+        assert_eq!(people.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_people_filters_single_letter_first() {
+        let text = "I The A New John Smith";
+        let people = extract_people(text);
+        // "I The" and "A New" should be filtered (first word len <= 1 or second <= 2)
+        assert_eq!(people.len(), 1);
+        assert_eq!(people[0].name, "John Smith");
+    }
+
+    #[test]
+    fn test_extract_people_overlapping_not_duplicated() {
+        let text = "John Smith Jones works here.";
+        // "John Smith" and "Smith Jones" are both valid pairs
+        let people = extract_people(text);
+        assert!(people.len() >= 1);
+    }
+
+    #[test]
+    fn test_extract_people_empty_text() {
+        let people = extract_people("");
+        assert_eq!(people.len(), 0);
+    }
+
+    // ── extract_single_words tests ──────────────────────────────────────────
+
+    #[test]
+    fn test_extract_single_words_tech_names() {
+        let text = "I use Python and Rust for programming. Also Docker and Kubernetes.";
+        let words = extract_single_words(text);
+        let names: Vec<_> = words.iter().map(|w| w.name.as_str()).collect();
+        assert!(names.contains(&"Python"));
+        assert!(names.contains(&"Rust"));
+        assert!(names.contains(&"Docker"));
+        assert!(names.contains(&"Kubernetes"));
+    }
+
+    #[test]
+    fn test_extract_single_words_skips_sentence_starters() {
+        let text = "Hello world. This is a test. Apple makes phones.";
+        let words = extract_single_words(text);
+        let names: Vec<_> = words.iter().map(|w| w.name.as_str()).collect();
+        // "Hello" is first word of sentence - skipped
+        // "This" is first word of sentence - skipped
+        // "Apple" is not first word (after "is a test.")
+        assert!(!names.contains(&"Hello"));
+        assert!(!names.contains(&"This"));
+        assert!(names.contains(&"Apple"));
+    }
+
+    #[test]
+    fn test_extract_single_words_filters_common_words() {
+        let text = "This That What When Where Which There Their They Then Than Thus Them Here Have Been From Very Just Also Some Each Many More Most Only Over Such Will With Like Last Next First Second Other After Before Based Used Made Said Known Shown Given Still Even Well Back Down Left Right";
+        let words = extract_single_words(text);
+        assert_eq!(words.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_single_words_min_length() {
+        let text = "A B C Go Go Go Go Go";
+        let words = extract_single_words(text);
+        // "Go" is length 2, should be filtered by min length 3
+        assert_eq!(words.len(), 0);
+    }
+
+    // ── extract_acronyms tests ──────────────────────────────────────────────
+
+    #[test]
+    fn test_extract_acronyms_valid() {
+        let text = "NASA and FBI work with AI and ML models. HTTP API uses JSON.";
+        let acronyms = extract_acronyms(text);
+        let names: Vec<_> = acronyms.iter().map(|a| a.name.as_str()).collect();
+        assert!(names.contains(&"NASA"));
+        assert!(names.contains(&"FBI"));
+        assert!(names.contains(&"AI"));
+        assert!(names.contains(&"ML"));
+        assert!(names.contains(&"HTTP"));
+        assert!(names.contains(&"API"));
+        assert!(names.contains(&"JSON"));
+    }
+
+    #[test]
+    fn test_extract_acronyms_filters_noise() {
+        let text = "THE AND FOR NOT BUT ITS OUT ARE HAS HAD CAN ALL ANY NEW OLD BIG TOP";
+        let acronyms = extract_acronyms(text);
+        assert_eq!(acronyms.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_acronyms_length_bounds() {
+        let text = "A AB ABC ABCD ABCDE ABCDEF ABCDEFG";
+        let acronyms = extract_acronyms(text);
+        let names: Vec<_> = acronyms.iter().map(|a| a.name.as_str()).collect();
+        // 2-6 chars valid
+        assert!(names.contains(&"AB"));
+        assert!(names.contains(&"ABC"));
+        assert!(names.contains(&"ABCD"));
+        assert!(names.contains(&"ABCDE"));
+        assert!(names.contains(&"ABCDEF"));
+        // 1 char and 7 char should be filtered
+        assert!(!names.contains(&"A"));
+        assert!(!names.contains(&"ABCDEFG"));
+    }
+
+    #[test]
+    fn test_extract_acronyms_mixed_case_rejected() {
+        let text = "Nasa Fbi Ai Ml";
+        let acronyms = extract_acronyms(text);
+        assert_eq!(acronyms.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_acronyms_with_digits() {
+        let text = "HTTP2 TLS13 USB3";
+        let acronyms = extract_acronyms(text);
+        let names: Vec<_> = acronyms.iter().map(|a| a.name.as_str()).collect();
+        assert!(names.contains(&"HTTP2"));
+        assert!(names.contains(&"TLS13"));
+        assert!(names.contains(&"USB3"));
+    }
+}
+
