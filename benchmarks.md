@@ -1,8 +1,24 @@
 # Performance Benchmarks
 
-Results from 2026-07-06 08:25 UTC
+Results from 2026-07-06 09:17 UTC
 
-## Reference Results
+## Focused Semantic Benchmark (N+1 fix verification)
+
+Verification of _enrich_content N+1 fix: 20 iterations, inline bge-m3 embedder, fresh workspace seeded with 50 memories.
+
+| # | Operation | p50 (ms) | p90 (ms) | p99 (ms) | Mean (ms) | Min (ms) | Max (ms) | n
+|---|-----------|---------:|---------:|---------:|----------:|---------:|---------:|--:
+| 1 | embed-only (bge-m3) | 494.2 | 536.4 | 545.8 | 507.3 | 483.5 | 546.8 | 5
+| 2 | search.keyword (top-5) | 40.0 | 52.3 | 65.2 | 43.2 | 39.4 | 66.9 | 20
+| 3 | search.semantic (top-10, w/ embedder) | 859.9 | 882.1 | 1482.6 | 899.0 | 838.0 | 1616.4 | 20
+| 4 | graph.query | 7.3 | 8.6 | 10.3 | 7.6 | 7.0 | 10.4 | 20
+| 5 | ping (round-trip) | 0.8 | 0.9 | 1.0 | 0.8 | 0.8 | 1.1 | 20
+
+Semantic search **899ms mean** — well under the 2.5s target. N+1 fix confirmed effective (was ~7.5s before fix). 0 failures across 85 operations.
+
+## Reference Results (Full Suite)
+
+Full suite results from 2026-07-06 08:25 UTC.
 
 | # | Operation | p50 (ms) | p90 (ms) | p99 (ms) | Mean (ms) | Min (ms) | Max (ms)
 |---|-----------|---------:|---------:|---------:|----------:|---------:|---------:
