@@ -2356,13 +2356,49 @@ def connector_list() -> None:
     if not rows:
         console.print("[yellow]No connectors registered.[/yellow]")
         return
-    headers = ["Name", "Type", "Workspace", "Interval", "Active", "ID"]
     table_data = [
-        [r["name"], r["connector_type"], r["workspace_id"][:12]+"...",
-         f"{r['schedule_secs']}s", "Y" if r["is_active"] else "N", r["id"][:16]]
+        dict(
+            name=r["name"],
+            type=r["connector_type"],
+            workspace=r["workspace_id"][:12] + "...",
+            interval=f"{r['schedule_secs']}s",
+            active="Y" if r["is_active"] else "N",
+            id=r["id"][:16],
+        )
         for r in rows
     ]
-    print_table(table_data, headers=headers, title="Connectors")
+    print_table(table_data, title="Connectors")
+
+
+@connector.command(name="update")
+@click.option("--id", "conn_id", required=True, help="Connector ID")
+@click.option("--name", required=True, help="Connector name")
+@click.option("--type", "conn_type", required=True, help="Connector type: rss, github, twitter, slack, discord")
+@click.option("--config", default="{}", help="JSON config blob for the connector")
+@click.option("--workspace-id", required=True, help="Target workspace ID")
+@click.option("--interval", default=300, type=int, help="Poll interval (seconds)")
+@click.option("--active/--inactive", default=True, help="Whether the connector is active")
+def connector_update(conn_id: str, name: str, conn_type: str, config: str,
+                     workspace_id: str, interval: int, active: bool) -> None:
+    """Update an existing connector configuration."""
+    client = _sdk_client()
+    try:
+        import json
+        json.loads(config)
+    except json.JSONDecodeError as e:
+        console.print(f"[red]Invalid config JSON: {e}[/red]")
+        sys.exit(1)
+    client.update_connector(conn_id, name, conn_type, config, workspace_id, interval, active)
+    console.print(f"[green]Connector '{name}' updated.[/green]")
+
+
+@connector.command(name="delete")
+@click.argument("conn_id")
+def connector_delete(conn_id: str) -> None:
+    """Delete a connector configuration by ID."""
+    client = _sdk_client()
+    client.delete_connector(conn_id)
+    console.print(f"[green]Connector '{conn_id}' deleted.[/green]")
 
 
 @connector.command(name="start")
