@@ -169,7 +169,7 @@
   - [ ] `extractEntities` — exists
   - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
   - [ ] `logResonanceSession` — exists
-  - [ ] `createEntityLink` / `addAlias` / `resolveEntity` — missing
+  - [x] `createEntityLink` / `addAlias` / `resolveEntity` — now fixed; TS createEntityLink had wrong signature (3 args instead of 5), fixed to match server reducer
   - [x] `getNode` — exists
   - [x] `getNoteByDate` — exists
   - [x] `getNoteByTitle` — exists

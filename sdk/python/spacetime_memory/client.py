@@ -5014,6 +5014,7 @@ class Client:
         "backlink",
         "merge_suggestion",
         "connector_config",
+        "entity_link",
     ]
 
     # -------------------------------------------------------------------

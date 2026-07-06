@@ -2226,17 +2226,25 @@ export class Client {
   }
 
   /**
-   * Create an entity link that maps an alias to an identity.
+   * Create a canonical entity link for entity resolution.
+   *
+   * Entity links map a canonical name to an entity within a workspace,
+   * enabling resolution of aliases and nicknames. The server creates
+   * an ``EntityLink`` record with an empty alias list; aliases can be
+   * added later via ``addAlias``.
+   *
    * @param workspaceId - Workspace ID
-   * @param name - Entity name
-   * @param identity - Identity to link to
+   * @param name - Canonical entity name
+   * @param entityType - Entity type (e.g. "person", "org", "concept", "product")
+   * @param description - Optional human-readable description
    */
   async createEntityLink(
     workspaceId: string,
     name: string,
-    identity: string
+    entityType: string,
+    description: string = ""
   ): Promise<void> {
-    return this._call("create_entity_link", [workspaceId, name, identity]);
+    return this._call("create_entity_link", [workspaceId, name, "[]", entityType, description]);
   }
 
   /**
