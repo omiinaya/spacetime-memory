@@ -189,7 +189,7 @@
   - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
   - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
   - [ ] `extractEntities` — exists
-  - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
+  - [x] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
   - [ ] `logResonanceSession` — exists
   - [x] `createEntityLink` / `addAlias` / `resolveEntity` — now fixed; TS createEntityLink had wrong signature (3 args instead of 5), fixed to match server reducer
   - [x] `getNode` — exists
