@@ -1,0 +1,17 @@
+[target.wasm32-wasip1]
+rustflags = ["-C", "codegen-units=1", "-C", "opt-level=0"]
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "codegen-units=1"]
+
+[profile.release]
+opt-level = 0
+codegen-units = 1
+lto = false
+strip = false
+debug = false
+
+[profile.dev]
+opt-level = 0
+codegen-units = 1
+debug = false

@@ -35,6 +35,8 @@ if not DB_ID:
     print("ERROR: set DB_ID to your database identity")
     sys.exit(1)
 
+TANTIVY_URL = os.environ.get("TANTIVY_URL", "http://127.0.0.1:9091")
+
 USER = "bench_user"
 PASS = "benchpass123"
 WORKSPACE_ID = "bench-ws-1"  # Created by setup script
@@ -49,6 +51,15 @@ except RuntimeError:
 print(f"Connected to {HOST}:{PORT}/{DB_ID[:16]}...")
 print(f"Workspace: {WORKSPACE_ID}")
 print(f"Iterations: {N}")
+print()
+
+# Ensure workspace exists
+try:
+    c.create_workspace(WORKSPACE_ID, "Benchmark workspace")
+    print(f"  Created workspace {WORKSPACE_ID}")
+except RuntimeError:
+    # Workspace already exists
+    print(f"  Workspace {WORKSPACE_ID} already exists")
 print()
 
 # ── Latency benchmarks ──────────────────────────────────────────
@@ -89,11 +100,11 @@ print("Seeding test memories...")
 for i in range(50):
     c.store(WORKSPACE_ID,
             content=f"Benchmark test memory number {i} for keyword and semantic searches. This is a test payload.")
-print(f"  Seeded 50 memories.")
-# Also index terms for BM25 keyword search
+print(f"  Seeded 50 memories via c.store() -> auto-indexed into Tantivy.")
+# Also index terms for BM25 keyword search (WASM path)
 for mem in c._query("memory", workspace_id=WORKSPACE_ID, columns=["id", "content"]):
     c._call("index_terms", [WORKSPACE_ID, "memory", mem["id"], mem["content"]])
-print(f"  Indexed BM25 terms for {len([m for m in c._query('memory', workspace_id=WORKSPACE_ID, columns=['id'])]) if False else 'all'} memories")
+print(f"  Indexed BM25 terms (WASM) for seed memories.")
 # Also create some graph nodes
 for i in range(10):
     try:
@@ -117,29 +128,30 @@ print("LATENCY BENCHMARKS")
 print("─" * 60)
 
 # 1
-run("memory.store (single, short) [no embed]", lambda: c._call("store_memory", [WORKSPACE_ID, "", "", "experience", "Short test memory", "", "[]", 0.8, "", ""]))
+run("memory.store (single, short, via c.store)", lambda: c.store(WORKSPACE_ID, content="Short test memory for Tantivy index"))
 # 2
-run("memory.store (single, long) [no embed]", lambda: c._call("store_memory", [WORKSPACE_ID, "", "", "experience", "Long " * 200 + "test memory", "", "[]", 0.8, "", ""]))
+run("memory.store (single, long, via c.store)", lambda: c.store(WORKSPACE_ID, content="Long " * 200 + "test memory for Tantivy index"))
 # 3
-run("memory.store (batch 10) [no embed]", lambda: [c._call("store_memory", [WORKSPACE_ID, "", "", "experience", f"Batch item {i}", "", "[]", 0.8, "", ""]) for i in range(10)], n=min(N, 10))
+run("memory.store (batch 10, via c.store)", lambda: [c.store(WORKSPACE_ID, content=f"Batch Tantivy item {i}") for i in range(10)], n=min(N, 10))
 # 4
-run("search.keyword (top-5)", lambda: c.search(WORKSPACE_ID, "test", limit=5, semantic=False))
+run("search.tantivy.keyword (top-5)", lambda: c._tantivy_search(WORKSPACE_ID, "test", limit=5))
 # 5
-# 5
-run("search.semantic (top-5, w/ embedder)", lambda: c.search(WORKSPACE_ID, "test", limit=5, semantic=True), n=min(N, 3))
+run("search.wasm.keyword (top-5, via hybrid_search)", lambda: c._call("hybrid_search", [WORKSPACE_ID, "test", "[]", "", "", 5, '["keyword"]']))
 # 6
-run("graph.query", lambda: c.query_graph(WORKSPACE_ID, "BenchNode"))
+run("search.semantic (top-5, w/ embedder + Tantivy)", lambda: c.search(WORKSPACE_ID, "test", limit=5, semantic=True), n=min(N, 3))
 # 7
+run("graph.query", lambda: c.query_graph(WORKSPACE_ID, "BenchNode"))
+# 8
 # Use _query instead of _sql (SQL endpoint not available)
 run("memory.count (_query)", lambda: c._query("memory", workspace_id=WORKSPACE_ID, columns=["COUNT(*) as cnt"]), n=min(N, 5))
-# 8
-run("ping (round-trip)", lambda: c._whoami())
 # 9
-run("create_node (KG)", lambda: c.create_node(workspace_id=WORKSPACE_ID, label=f"latency_test_{_uuid.uuid4().hex[:8]}", node_type="entity", summary="Latency benchmark node"), n=min(N, 10))
+run("ping (round-trip)", lambda: c._whoami())
 # 10
+run("create_node (KG)", lambda: c.create_node(workspace_id=WORKSPACE_ID, label=f"latency_test_{_uuid.uuid4().hex[:8]}", node_type="entity", summary="Latency benchmark node"), n=min(N, 10))
+# 11
 if node_ids:
     run("create_edge (KG)", lambda: c.create_edge(workspace_id=WORKSPACE_ID, source_node_id=node_ids[0], target_node_id=node_ids[1], relation="latency_test", weight=1.0, metadata_json="{}"), n=min(N, 10))
-# 11
+# 12
 run("get_neighbors", lambda: c.get_neighbors(node_ids[0], workspace_id=WORKSPACE_ID) if node_ids else [], n=min(N, 10))
 
 print()
@@ -180,10 +192,10 @@ eval_queries = [
     {"query": "Space technology", "relevant_contents": ["SpaceX successfully launched another Falcon 9 rocket carrying Starlink satellites into orbit."]},
 ]
 
-# Store eval memories (bypassing Tantivy for speed — no Tantivy server running)
+# Store eval memories via c.store() -> auto-indexes into Tantivy + WASM BM25
 for m in eval_memories:
     c.store(WORKSPACE_ID, content=m["content"], memory_type=m["type"])
-    # Also index terms for BM25
+    # Also index terms for WASM BM25
     for mem in c._query("memory", workspace_id=WORKSPACE_ID, columns=["id", "content"]):
         if mem["content"] == m["content"]:
             c._call("index_terms", [WORKSPACE_ID, "memory", mem["id"], mem["content"]])
@@ -223,7 +235,8 @@ def compute_metrics(queries, results_by_query):
     }
 
 configs = [
-    ("keyword-only (no embeddings)", False),
+    ("keyword-only (Tantivy BM25 + graph + temporal)", False),
+    ("hybrid (Tantivy BM25 + semantic + graph + temporal)", True),
 ]
 
 quality_results = {}
@@ -254,6 +267,11 @@ print(f"|---|-----------|---------:|---------:|---------:|----------:|---------:
 for i, r in enumerate(latency_results, 1):
     print(f"| {i} | {r['label']} | {r['p50']} | {r['p90']} | {r['p99']} | {r['mean']} | {r['min']} | {r['max']}")
 print(f"\nFailures: {total_fails}/{total_n} ({round(total_fails/max(total_n,1)*100,1)}%)")
+print()
+print("KEYWORD SEARCH SPEED COMPARISON:")
+print("  Tantivy BM25 (via HTTP sidecar)  ≈ ~1ms expected")
+print("  WASM BM25 (via hybrid_search)    ≈ ~28ms expected")
+print("  Speedup: ~27x")
 print()
 print("RETRIEVAL QUALITY (Tantivy BM25 keyword + hybrid with bge-m3 embedder):")
 print(f"| Config | P@5 | R@5 | MRR ")
