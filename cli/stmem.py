@@ -1946,6 +1946,106 @@ def cross_link_cmd(workspace: str, dry_run: bool) -> None:
         print_json(result)
 
 
+# ── Merge Operations ────────────────────────────────────────────────────────
+
+@cli.command(name="suggest-merges")
+@click.option("--workspace", "-w", default="default", help="Workspace ID")
+@click.option("--threshold", "-t", default=0.8, type=float,
+              help="Minimum cosine similarity threshold (default: 0.8)")
+def suggest_merges_cmd(workspace: str, threshold: float) -> None:
+    """Scan active memories and suggest near-duplicate merges.
+
+    Compares all active memory embeddings pairwise in the workspace.
+    Pairs with cosine similarity >= threshold AND edit distance <= 30 %
+    are recorded as MergeSuggestion rows with status "pending".
+    Previous pending suggestions for the workspace are cleared first.
+    """
+    client = _sdk_client()
+    with console.status(
+        f"Scanning workspace '{workspace}' for merge candidates..."
+    ):
+        result = client.suggest_merges(workspace, threshold)
+
+    if result.get("status") == "ok":
+        suggestions = client._query("merge_suggestion",
+                                    filter_dict={"workspace_id": workspace, "status": "pending"})
+        console.print(
+            f"[green]Merge scan complete:[/green] "
+            f"[cyan]{len(suggestions)}[/cyan] candidate(s) found "
+            f"(threshold: {threshold})"
+        )
+        if suggestions:
+            table = Table(title="Merge Candidates", box=box.ROUNDED)
+            table.add_column("ID", style="dim")
+            table.add_column("Source → Target", style="cyan")
+            table.add_column("Cos. Sim.", style="yellow")
+            table.add_column("Edit Dist.", style="yellow")
+            for s in suggestions[:20]:
+                sid = s.get("id", "?")[:12]
+                preview = s.get("content_overlap_preview", "")[:80]
+                cos_sim = f"{s.get('cosine_similarity', 0):.4f}"
+                edit_dist = f"{s.get('edit_distance', 0):.4f}"
+                table.add_row(sid, preview, cos_sim, edit_dist)
+            _quiet_print("")
+            console.print(table)
+            _quiet_print(
+                "  [dim]Use [cyan]stmem approve-merge <id>[/cyan] "
+                "or [cyan]stmem reject-merge <id>[/cyan][/dim]"
+            )
+    else:
+        console.print("[red]Merge scan failed.[/red]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
+@cli.command(name="approve-merge")
+@click.argument("suggestion_id")
+def approve_merge_cmd(suggestion_id: str) -> None:
+    """Approve a pending merge suggestion.
+
+    Deactivates the source memory and consolidates it into the target
+    (survivor) memory. The source is marked inactive with a pointer
+    to the target.
+    """
+    client = _sdk_client()
+    with console.status(f"Approving merge {suggestion_id[:16]}..."):
+        result = client.approve_merge(suggestion_id)
+
+    if result.get("status") == "ok":
+        console.print(
+            f"[green]Merge approved:[/green] {suggestion_id[:16]}... "
+            f"— source deactivated, target reinforced."
+        )
+    else:
+        console.print("[red]Merge approval failed.[/red]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
+@cli.command(name="reject-merge")
+@click.argument("suggestion_id")
+def reject_merge_cmd(suggestion_id: str) -> None:
+    """Reject a pending merge suggestion without merging.
+
+    Simply marks the suggestion as "rejected" — no memories are changed.
+    """
+    client = _sdk_client()
+    with console.status(f"Rejecting merge {suggestion_id[:16]}..."):
+        result = client.reject_merge(suggestion_id)
+
+    if result.get("status") == "ok":
+        console.print(
+            f"[green]Merge rejected:[/green] {suggestion_id[:16]}..."
+        )
+    else:
+        console.print("[red]Merge rejection failed.[/red]")
+
+    if _current_output_format == "json":
+        print_json(result)
+
+
 # ── Suggest Connections ───────────────────────────────────────────────────────
 
 @cli.command(name="suggest-connections")

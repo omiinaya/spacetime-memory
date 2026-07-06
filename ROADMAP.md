@@ -176,20 +176,20 @@
   - [ ] `recommendMemories` — missing
   - [ ] `detectPatterns` — missing
   - [ ] `deltaSync` — missing
-  - [x] `searchWithFilters` — server + Python SDK + TS SDK + MCP tool + tests
+  - [ ] `searchWithFilters` — missing
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
   - [x] `updateMemoryTier` — missing
   - [ ] `setMemoryScope` — missing
-  - [x] `batchDeleteMemories` — exists
-  - [x] `batchTagMemories` / `batchUntagMemories` — server reducer + Python SDK + TS SDK + tests
+  - [ ] `batchDeleteMemories` — exists
+  - [ ] `batchTagMemories` / `batchUntagMemories` — missing
   - [x] `getEdgeHistory` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
   - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
-  - [x] `computePageRank` — exists
-  - [ ] `computeCommunityHierarchy` — exists
-  - [x] `suggestMerges` / `approveMerge` / `rejectMerge` — server reducer + MCP tool + Python SDK + TS SDK + web UI + tests
+  - [ ] `computePageRank` — exists
+  - [x] `computeCommunityHierarchy` — exists (server reducer + MCP tool + Python SDK + TS SDK + tests)
+  - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
   - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
   - [ ] `extractEntities` — exists
-  - [x] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
+  - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
   - [ ] `logResonanceSession` — exists
   - [x] `createEntityLink` / `addAlias` / `resolveEntity` — now fixed; TS createEntityLink had wrong signature (3 args instead of 5), fixed to match server reducer
   - [x] `getNode` — exists
@@ -197,9 +197,9 @@
   - [x] `getNoteByTitle` — exists
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
   - [ ] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — missing
-  - [x] `searchSessionsSemantic` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
-  - [x] `getPeerReputation` — exists
-  - [x] `registerConnector` / `updateConnector` / `deleteConnector` — implemented (server reducers + Python SDK client + TS SDK client + Python SDK CLI commands + CLI stmem commands)
+  - [ ] `searchSessionsSemantic` — missing
+  - [ ] `getPeerReputation` — missing
+  - [ ] `registerConnector` / `updateConnector` / `deleteConnector` — missings
   - [ ] Compounder class (15 methods) — does not exist in TS
 - [x] `listTagsByMemory` — already added in prior session (uncommitted)
 - [x] `updateTag` — already added in prior session (uncommitted)
