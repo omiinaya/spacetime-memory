@@ -165,7 +165,7 @@
   - [x] `batchUpdateMemories` — done
   - [x] `setMemoryScope` — exists
   - [x] `escalateMemories` — exists (reducer + Python SDK + TS SDK + CLI + tests)
-  - [ ] `recommendMemories` — missing
+  - [x] `recommendMemories` — exists (reducer + Python SDK + TS SDK + CLI + MCP + tests)
   - [x] `detectPatterns` — exists (Python SDK + TS SDK + MCP + CLI + tests)
   - [ ] `deltaSync` — missing
   - [ ] `searchWithFilters` — missing
