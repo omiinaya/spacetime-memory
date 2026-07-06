@@ -10,8 +10,8 @@ for prefix in (".", "..", "/home/user/spacetime-memory"):
 os.environ.pop("OPENAI_API_KEY", None)
 os.environ.pop("LITELLM_MASTER_KEY", None)
 os.environ["OPENAI_API_KEY"] = "REDACTED"
-os.environ["OPENAI_BASE_URL"] = "http://localhost:4000/v1"
-os.environ["EMBEDDING_MODEL"] = "bge-m3"
+os.environ["OPENAI_BASE_URL"] = "http://127.0.0.1:9090"
+os.environ["EMBEDDING_MODEL"] = "bge-large-en-v1.5"
 
 from spacetime_memory import Client
 
