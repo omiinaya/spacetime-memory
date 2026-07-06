@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-06T07:36:06Z",
+  "timestamp": "2026-07-06T07:42:11Z",
   "host": "localhost",
   "port": 3001,
   "database": "c2003cfb7133e87cf8c4",
@@ -73,5 +73,17 @@
       "min": 0.9,
       "max": 2.7
     }
-  ]
+  ],
+  "quality": {
+    "keyword-only (term overlap)": {
+      "P@5": 0.4933,
+      "R@5": 0.4933,
+      "MRR": 0.4627
+    },
+    "hybrid (bge-m3 semantic)": {
+      "P@5": 0.74,
+      "R@5": 0.74,
+      "MRR": 0.8533
+    }
+  }
 }
