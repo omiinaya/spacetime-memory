@@ -180,7 +180,7 @@
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
   - [x] `updateMemoryTier` — missing
   - [ ] `setMemoryScope` — missing
-  - [ ] `batchDeleteMemories` — exists
+  - [x] `batchDeleteMemories` — exists
   - [x] `batchTagMemories` / `batchUntagMemories` — server reducer + Python SDK + TS SDK + tests
   - [x] `getEdgeHistory` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
   - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
