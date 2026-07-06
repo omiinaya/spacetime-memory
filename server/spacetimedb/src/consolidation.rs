@@ -8,6 +8,7 @@ use crate::memory::memory;
 use crate::memory_feedback;
 use crate::note::{note, note_block};
 use crate::profile::profile;
+use crate::tag::memory_tag;
 use crate::retrieval::search_index;
 use crate::workspace::workspace;
 

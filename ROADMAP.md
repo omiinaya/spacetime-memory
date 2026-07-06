@@ -80,13 +80,13 @@
 **Why blocked:** WASM can't be published until Cargo.lock resolves v2.6 (the lockfile was resolved against v2.4.1 and my manual deps might conflict).
 
 ### 1.2 Fix 4 failing Python unit tests
-**Status:** 3/4 fixed. Mock infrastructure issue resolved; remaining failure is pre-existing (`test_batch_store_indexes_each_item`).
+**Status:** 4/4 fixed. See root cause notes below.
 - [x] `test_update_memory` — `_circuit_open_until` attribute missing on Mock(Client)
 - [x] `test_check_embedder_health_error_status` — same Mock issue
-- [ ] `test_create_note_with_embed` — `UnboundLocalError: note_id` in Tantivy path
+- [x] `test_create_note_with_embed` — `UnboundLocalError: note_id` in Tantivy path
 - [x] `test_context_in_search_results` — `_circuit_open_until` Mock issue
 
-**Root cause:** Mock(Client) doesn't call `__init__` which sets `_circuit_open_until`. Fix: add the attribute to the Mock spec, or refactor initialization to a helper method.
+**Root cause(s):** (1) Mock(Client) doesn't call `__init__` which sets `_circuit_open_until`. Fixed by adding the attribute to Mock fixtures. (2) In `create_note`, `note_id` was initialized inside the try block (after `_query`), so when `_query` raised `RuntimeError` on no-STDB connection, the except handler's log message referenced `note_id` before assignment → `UnboundLocalError`. Fixed by moving `note_id = ""` before the try block (commit 8492ee59).
 
 ### 1.3 Commit and push uncommitted changes
 **Files touched but not committed (from prior sessions):**
