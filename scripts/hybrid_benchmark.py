@@ -124,8 +124,9 @@ def main():
     avg_query_time = sum(query_times) / len(query_times)
 
     m = compute_metrics(queries, results, memories_by_id)
+    hybrid_metrics = m  # avoid name collision with for-m loops below
     print(f"  [hybrid (bge-m3 semantic)]")
-    print(f"    P@5={m['P@5']:.1%}  R@5={m['R@5']:.1%}  MRR={m['MRR']:.3f}")
+    print(f"    P@5={hybrid_metrics['P@5']:.1%}  R@5={hybrid_metrics['R@5']:.1%}  MRR={hybrid_metrics['MRR']:.3f}")
     print(f"    seed={seed_time:.1f}s  {avg_query_time*1000:.0f}ms/q")
 
     # ── Also compute keyword-only using BM25-like scoring ──
@@ -163,7 +164,7 @@ def main():
     print(f"{'Strategy':<40} {'P@5':>8} {'R@5':>8} {'MRR':>8}")
     print("-" * 64)
     print(f"{'keyword-only (term overlap)':<40} {kw['P@5']:>7.1%} {kw['R@5']:>7.1%} {kw['MRR']:>7.3f}")
-    print(f"{'hybrid (bge-m3 semantic)':<40} {m['P@5']:>7.1%} {m['R@5']:>7.1%} {m['MRR']:>7.3f}")
+    print(f"{'hybrid (bge-m3 semantic)':<40} {hybrid_metrics['P@5']:>7.1%} {hybrid_metrics['R@5']:>7.1%} {hybrid_metrics['MRR']:>7.3f}")
     print()
 
     # ── Save results to benchmark JSON ──
@@ -189,9 +190,9 @@ def main():
             "MRR": kw["MRR"],
         },
         "hybrid (bge-m3 semantic)": {
-            "P@5": m["P@5"],
-            "R@5": m["R@5"],
-            "MRR": m["MRR"],
+            "P@5": hybrid_metrics["P@5"],
+            "R@5": hybrid_metrics["R@5"],
+            "MRR": hybrid_metrics["MRR"],
         },
     }
     report["embedder_available"] = True
@@ -223,9 +224,9 @@ def main():
             "MRR": kw["MRR"],
         },
         "hybrid (bge-m3 semantic)": {
-            "P@5": m["P@5"],
-            "R@5": m["R@5"],
-            "MRR": m["MRR"],
+            "P@5": hybrid_metrics["P@5"],
+            "R@5": hybrid_metrics["R@5"],
+            "MRR": hybrid_metrics["MRR"],
         },
     }
     e_report["embedder_available"] = True
