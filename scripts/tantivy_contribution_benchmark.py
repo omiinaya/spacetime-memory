@@ -148,21 +148,18 @@ print("-" * 60)
 print("PHASE 2: Latency — WITHOUT Tantivy (STDB BM25 fallback)")
 print("-" * 60)
 
-# Create a client with an invalid Tantivy URL to force fallback
-c_no_tantivy = Client(host=HOST, port=PORT, database=DB)
-c_no_tantivy.tantivy_url = "http://127.0.0.1:18991"  # non-existent port
-try:
-    c_no_tantivy._call("login", ["bench_user_tantivy", "benchpass123"])
-except RuntimeError:
-    pass
-
+# Temporarily disable Tantivy — same client avoids peer identity mismatch
 latency_without = []
 def run_without(label, fn, n=N):
     r = measure(label, fn, n=n)
     latency_without.append(r)
     print(f"  [{len(latency_without):2d}] {label:40s}  p50={r['p50']:>6.1f}ms  p90={r['p90']:>6.1f}ms  mean={r['mean']:>6.1f}ms  (n={r['n']})")
 
-run_without("keyword (Tantivy-off) top-5", lambda: c_no_tantivy.search(ws_id, "test", limit=5, semantic=False))
+# Use the same client with Tantivy disabled via invalid URL - avoids peer identity issues
+_saved_url = c.tantivy_url
+c.tantivy_url = "http://127.0.0.1:18991"
+run_without("keyword (Tantivy-off) top-5", lambda: c.search(ws_id, "test", limit=5, semantic=False))
+c.tantivy_url = _saved_url
 
 print()
 print("LATENCY COMPARISON (Tantivy ON vs OFF):")
@@ -205,13 +202,16 @@ print("-" * 60)
 
 results_without = {}
 t0 = time.time()
+_saved_url2 = c.tantivy_url
+c.tantivy_url = "http://127.0.0.1:18991"
 for q in eval_queries:
     try:
-        r = c_no_tantivy.search(ws_id, q["query"], limit=20, semantic=False)
+        r = c.search(ws_id, q["query"], limit=20, semantic=False)
         results_without[q["query"]] = r
     except Exception as e:
         print(f"  FAIL: {q['query'][:40]} — {e}")
         results_without[q["query"]] = []
+c.tantivy_url = _saved_url2
 query_time_without = time.time() - t0
 
 m_without = compute_metrics(eval_queries, results_without, memories_by_id)
