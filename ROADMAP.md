@@ -197,7 +197,7 @@
   - [x] `getNoteByTitle` — exists
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
   - [ ] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — missing
-  - [ ] `searchSessionsSemantic` — missing
+  - [x] `searchSessionsSemantic` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
   - [ ] `getPeerReputation` — missing
   - [ ] `registerConnector` / `updateConnector` / `deleteConnector` — missings
   - [ ] Compounder class (15 methods) — does not exist in TS
