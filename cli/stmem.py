@@ -2467,13 +2467,18 @@ def connector_list() -> None:
     if not rows:
         console.print("[yellow]No connectors registered.[/yellow]")
         return
-    headers = ["Name", "Type", "Workspace", "Interval", "Active", "ID"]
     table_data = [
-        [r["name"], r["connector_type"], r["workspace_id"][:12]+"...",
-         f"{r['schedule_secs']}s", "Y" if r["is_active"] else "N", r["id"][:16]]
+        dict(
+            name=r["name"],
+            type=r["connector_type"],
+            workspace=r["workspace_id"][:12] + "...",
+            interval=f"{r['schedule_secs']}s",
+            active="Y" if r["is_active"] else "N",
+            id=r["id"][:16],
+        )
         for r in rows
     ]
-    print_table(table_data, headers=headers, title="Connectors")
+    print_table(table_data, title="Connectors")
 
 
 @connector.command(name="start")

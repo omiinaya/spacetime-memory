@@ -199,7 +199,7 @@
   - [ ] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — missing
   - [x] `searchSessionsSemantic` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
   - [x] `getPeerReputation` — exists
-  - [ ] `registerConnector` / `updateConnector` / `deleteConnector` — missings
+  - [x] `registerConnector` / `updateConnector` / `deleteConnector` — implemented (server reducers + Python SDK client + TS SDK client + Python SDK CLI commands + CLI stmem commands)
   - [ ] Compounder class (15 methods) — does not exist in TS
 - [x] `listTagsByMemory` — already added in prior session (uncommitted)
 - [x] `updateTag` — already added in prior session (uncommitted)
