@@ -198,7 +198,7 @@
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
   - [ ] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — missing
   - [x] `searchSessionsSemantic` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
-  - [ ] `getPeerReputation` — missing
+  - [x] `getPeerReputation` — exists
   - [ ] `registerConnector` / `updateConnector` / `deleteConnector` — missings
   - [ ] Compounder class (15 methods) — does not exist in TS
 - [x] `listTagsByMemory` — already added in prior session (uncommitted)
