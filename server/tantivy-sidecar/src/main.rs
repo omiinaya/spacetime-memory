@@ -1,4 +1,4 @@
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{extract::State, routing::{get, post}, Json, Router};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -52,6 +52,15 @@ struct HealthResponse {
     workspace_count: usize,
 }
 
+#[derive(Serialize)]
+struct WarmupResponse {
+    status: String,
+    memories_indexed: usize,
+    nodes_indexed: usize,
+    errors: usize,
+    message: String,
+}
+
 // ---------------------------------------------------------------------------
 // Application state — one index per workspace
 // ---------------------------------------------------------------------------
@@ -69,6 +78,9 @@ struct WorkspaceIndex {
 struct AppState {
     workspaces: DashMap<String, Arc<WorkspaceIndex>>,
     index_dir: PathBuf,
+    tantivy_url: String,
+    stdb_url: String,
+    stdb_db: String,
 }
 
 type SharedState = Arc<AppState>;
@@ -83,8 +95,7 @@ fn build_schema() -> Schema {
     builder.add_text_field("entity_id", STRING | STORED);
     builder.add_text_field(
         "content",
-        TEXT
-            | STORED,
+        TEXT | STORED,
     );
     builder.add_text_field("entity_type", STRING | STORED);
     builder.build()
@@ -352,16 +363,91 @@ async fn delete_doc(
     })))
 }
 
+async fn warmup(
+    state: State<SharedState>,
+) -> Result<Json<WarmupResponse>, String> {
+    // Run the Python reindex script
+    let script_path = std::env::var("REINDEX_SCRIPT")
+        .unwrap_or_else(|_| "/app/scripts/reindex-tantivy.py".to_string());
+    let tantivy_url = &state.tantivy_url;
+    let stdb_url = &state.stdb_url;
+    let stdb_db = &state.stdb_db;
+
+    println!("Tantivy sidecar: starting warmup via {}", script_path);
+
+    let output = tokio::process::Command::new("python3")
+        .arg(&script_path)
+        .arg("--tantivy-url")
+        .arg(tantivy_url)
+        .env("SPACETIMEDB_HOST", stdb_url.trim_start_matches("http://").trim_start_matches("https://"))
+        .env("SPACETIMEDB_PORT", "3001")
+        .env("SPACETIMEDB_DB", stdb_db)
+        .output()
+        .await
+        .map_err(|e| format!("Failed to spawn warmup script: {e}"))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("Tantivy warmup completed:\n{}", stdout);
+        
+        // Parse the output to extract counts (best effort)
+        let mut memories = 0;
+        let mut nodes = 0;
+        let mut errors = 0;
+        for line in stdout.lines() {
+            if line.contains("Indexed") && line.contains("memories") {
+                if let Some(num_str) = line.split_whitespace().find(|s| s.chars().all(|c| c.is_ascii_digit())) {
+                    memories = num_str.parse().unwrap_or(0);
+                }
+            } else if line.contains("✗") || line.contains("Failed") || line.contains("error") {
+                errors += 1;
+            }
+        }
+        
+        Ok(Json(WarmupResponse {
+            status: "ok".into(),
+            memories_indexed: memories,
+            nodes_indexed: nodes,
+            errors,
+            message: "Warmup completed successfully".into(),
+        }))
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("Tantivy warmup failed:\n{}", stderr);
+        Ok(Json(WarmupResponse {
+            status: "error".into(),
+            memories_indexed: 0,
+            nodes_indexed: 0,
+            errors: 1,
+            message: format!("Warmup script failed: {}", stderr),
+        }))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 #[tokio::main]
 async fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let warmup_on_start = args.contains(&"--warmup".to_string());
+
     let index_dir = std::env::var("TANTIVY_INDEX_DIR")
         .unwrap_or_else(|_| "data/tantivy".to_string());
     let index_dir = PathBuf::from(index_dir);
     std::fs::create_dir_all(&index_dir).expect("Failed to create index directory");
+
+    let tantivy_port: u16 = std::env::var("TANTIVY_PORT")
+        .unwrap_or_else(|_| "9091".to_string())
+        .parse()
+        .expect("TANTIVY_PORT must be a valid port number");
+    let tantivy_url = format!("http://0.0.0.0:{}", tantivy_port);
+
+    let stdb_url = std::env::var("SPACETIMEDB_URL")
+        .unwrap_or_else(|_| "http://localhost:3001".to_string());
+    let stdb_db = std::env::var("SPACETIMEDB_DB")
+        .unwrap_or_else(|_| "spacetime-memory".to_string());
 
     println!("Tantivy sidecar: index directory = {:?}", index_dir);
 
@@ -390,24 +476,72 @@ async fn main() {
     let state = Arc::new(AppState {
         workspaces,
         index_dir,
+        tantivy_url: tantivy_url.clone(),
+        stdb_url,
+        stdb_db,
     });
 
+    // Run warmup on startup if requested
+    if warmup_on_start {
+        println!("Tantivy sidecar: running warmup on startup...");
+        let state_clone = state.clone();
+        tokio::spawn(async move {
+            // Give the server a moment to start accepting connections
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            if let Err(e) = run_warmup(state_clone).await {
+                eprintln!("Tantivy warmup failed: {}", e);
+            }
+        });
+    }
+
     let app = Router::new()
-        .route("/health", axum::routing::get(health))
+        .route("/health", get(health))
         .route("/index", post(index_doc))
         .route("/index/batch", post(index_batch))
         .route("/search", post(search))
         .route("/delete", post(delete_doc))
+        .route("/warmup", post(warmup))
         .with_state(state);
 
-    let port: u16 = std::env::var("TANTIVY_PORT")
-        .unwrap_or_else(|_| "9091".to_string())
-        .parse()
-        .expect("TANTIVY_PORT must be a valid port number");
-
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("0.0.0.0:{}", tantivy_port);
     println!("Tantivy sidecar: listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn run_warmup(state: SharedState) -> Result<(), String> {
+    let script_path = std::env::var("REINDEX_SCRIPT")
+        .unwrap_or_else(|_| "/app/scripts/reindex-tantivy.py".to_string());
+    let tantivy_url = &state.tantivy_url;
+    let stdb_url = &state.stdb_url;
+    let stdb_db = &state.stdb_db;
+
+    // Extract host from stdb_url (remove http:// or https://)
+    let stdb_host = stdb_url
+        .trim_start_matches("http://")
+        .trim_start_matches("https://");
+
+    println!("Tantivy sidecar: starting warmup via {}", script_path);
+
+    let output = tokio::process::Command::new("python3")
+        .arg(&script_path)
+        .arg("--tantivy-url")
+        .arg(tantivy_url)
+        .env("SPACETIMEDB_HOST", stdb_host)
+        .env("SPACETIMEDB_PORT", "3001")
+        .env("SPACETIMEDB_DB", stdb_db)
+        .output()
+        .await
+        .map_err(|e| format!("Failed to spawn warmup script: {e}"))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("Tantivy warmup completed:\n{}", stdout);
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("Tantivy warmup failed:\n{}", stderr);
+        Err(format!("Warmup script failed: {}", stderr))
+    }
 }

@@ -81,7 +81,10 @@ done || true  # set -e guard
 # 4  Start the Tantivy BM25 sidecar in the background
 # --------------------------------------------------------------------------
 echo "==> Starting Tantivy BM25 sidecar ..."
-tantivy-sidecar &
+export REINDEX_SCRIPT="/app/scripts/reindex-tantivy.py"
+export SPACETIMEDB_URL="http://localhost:3001"
+export SPACETIMEDB_DB="$MODULE_NAME"
+tantivy-sidecar --warmup &
 TANTIVY_PID=$!
 
 # Wait for Tantivy to become ready
@@ -112,7 +115,7 @@ else
 fi
 
 # --------------------------------------------------------------------------
-# 5  Startup complete — print banner
+# 6  Startup complete — print banner
 # --------------------------------------------------------------------------
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
@@ -126,7 +129,7 @@ echo "╚═══════════════════════�
 echo ""
 
 # --------------------------------------------------------------------------
-# 6  Trap signals and shut down gracefully
+# 7  Trap signals and shut down gracefully
 # --------------------------------------------------------------------------
 cleanup() {
     echo ""

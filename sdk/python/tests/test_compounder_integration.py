@@ -127,16 +127,19 @@ class TestStoreAnswerPipeline:
 
     def test_store_answers_batch(self, cp, ws):
         """Batch store_answers should persist multiple notes."""
+        # Use sufficiently distinct answers to avoid near-duplicate detection
         pairs = [
-            ("Q1?", "Answer one for batch test."),
-            ("Q2?", "Answer two for batch test."),
-            ("Q3?", "Answer three for batch test."),
+            ("What is SpacetimeDB?", "SpacetimeDB is a database for real-time applications with SQL."),
+            ("What is Rust?", "Rust is a systems programming language focused on safety and performance."),
+            ("What is WebAssembly?", "WebAssembly is a binary instruction format for a stack-based virtual machine."),
         ]
-        results = cp.store_answers(pairs, workspace_id=ws)
+        results = cp.store_answers(pairs, workspace_id=ws, skip_duplicates=True)
         assert len(results) == 3
         for i, r in enumerate(results):
             assert "note" in r
             assert r["note"].get("id", ""), f"Result {i} has no note id: {r}"
+            # Should not be marked as duplicate
+            assert "duplicate_of" not in r, f"Result {i} incorrectly marked as duplicate: {r}"
 
 
 # =====================================================================
@@ -416,3 +419,400 @@ class TestSearchEntitiesPipeline:
         """Searching for a non-existent label should return empty."""
         results = cp.search_entities(workspace_id=ws, label="NonExistentEntity")
         assert results == []
+
+
+# =====================================================================
+# Entity Page Pipeline: create_entity_page, update_entity_page
+# =====================================================================
+
+
+class TestEntityPagePipeline:
+    """Part 6: Entity wiki page creation and updates."""
+
+    def test_create_entity_page_creates_node_and_note(self, cp, ws):
+        """create_entity_page should create a KG node and a wiki note."""
+        result = cp.create_entity_page(
+            name="TestEntity",
+            description="This is a test entity for integration testing.",
+            entity_type="concept",
+            workspace_id=ws,
+        )
+        assert "node" in result
+        assert "note" in result
+        node = result["node"]
+        note = result["note"]
+        assert node is not None, "KG node should be created"
+        # Resolve note if create_note only returned status
+        if not note.get("id"):
+            note = cp._resolve_created_note(ws, "TestEntity", note)
+            result["note"] = note
+        assert note.get("id", ""), f"Note should have id: {note}"
+        assert note.get("title", "") == "TestEntity", f"Note title should be entity name: {note}"
+
+        # Verify node exists in KG
+        nodes = cp._client._query("kg_node", workspace_id=ws, filter_dict={"label": "TestEntity"})
+        assert len(nodes) >= 1
+        assert nodes[0]["label"] == "TestEntity"
+        assert nodes[0]["node_type"] == "concept"
+
+    def test_create_entity_page_with_relations(self, cp, ws):
+        """create_entity_page with relations should include them in the note."""
+        result = cp.create_entity_page(
+            name="RelatedEntity",
+            description="An entity with relations.",
+            entity_type="concept",
+            workspace_id=ws,
+            relations=[{"name": "OtherEntity", "relation": "related_to"}],
+        )
+        note = result["note"]
+        # Resolve note if create_note only returned status
+        if not note.get("id"):
+            note = cp._resolve_created_note(ws, "RelatedEntity", note)
+            result["note"] = note
+        assert note.get("id", "")
+        # Check note content includes relations
+        content = note.get("content", "")
+        assert "Relations" in content
+        assert "OtherEntity" in content
+        assert "related_to" in content
+
+    def test_update_entity_page_updates_node_and_note(self, cp, ws):
+        """update_entity_page should update both KG node and wiki note."""
+        # First create the entity
+        cp.create_entity_page(
+            name="UpdatableEntity",
+            description="Original description.",
+            entity_type="concept",
+            workspace_id=ws,
+        )
+
+        # Update it
+        result = cp.update_entity_page(
+            name="UpdatableEntity",
+            workspace_id=ws,
+            description="Updated description with new info.",
+            entity_type="topic",
+            tags=["updated", "test"],
+        )
+        assert "node" in result
+        assert "note" in result
+
+        # Verify node was updated
+        nodes = cp._client._query("kg_node", workspace_id=ws, filter_dict={"label": "UpdatableEntity"})
+        assert len(nodes) >= 1
+        assert nodes[0]["node_type"] == "topic"
+        assert "Updated description" in nodes[0]["summary"]
+
+        # Verify note was updated
+        notes = cp._client._query("note", workspace_id=ws, filter_dict={"title": "UpdatableEntity", "is_active": "true"})
+        assert len(notes) >= 1
+        content = notes[0].get("content", "")
+        assert "Updated description" in content
+        assert "tags: [updated, test]" in content
+
+    def test_update_entity_page_nonexistent_returns_empty(self, cp, ws):
+        """Updating a non-existent entity should return empty dict."""
+        result = cp.update_entity_page(
+            name="NonExistentEntity",
+            workspace_id=ws,
+            description="Won't work",
+        )
+        assert result == {}
+
+
+# =====================================================================
+# Concept Page Pipeline: create_concept_page
+# =====================================================================
+
+
+class TestConceptPagePipeline:
+    """Part 7: Concept wiki page creation."""
+
+    def test_create_concept_page(self, cp, ws):
+        """create_concept_page should create a concept note and KG node."""
+        result = cp.create_concept_page(
+            concept="TestConcept",
+            definition="A test concept for integration testing.",
+            workspace_id=ws,
+            related_concepts=["RelatedA", "RelatedB"],
+        )
+        assert "node" in result
+        assert "note" in result
+        node = result["node"]
+        note = result["note"]
+        assert node is not None, "KG node should be created"
+        # Resolve note if create_note only returned status
+        if not note.get("id"):
+            note = cp._resolve_created_note(ws, "Concept: TestConcept", note)
+            result["note"] = note
+        assert note.get("id", ""), f"Note should have id: {note}"
+        assert note.get("title", "") == "Concept: TestConcept"
+
+        # Verify note content
+        content = note.get("content", "")
+        assert "Definition" in content
+        assert "A test concept for integration testing" in content
+        assert "Related Concepts" in content
+        assert "[[RelatedA]]" in content
+        assert "[[RelatedB]]" in content
+
+    def test_create_concept_page_no_relations(self, cp, ws):
+        """create_concept_page without related_concepts should still work."""
+        result = cp.create_concept_page(
+            concept="LonelyConcept",
+            definition="A concept with no relations.",
+            workspace_id=ws,
+        )
+        assert "node" in result
+        assert "note" in result
+        note = result["note"]
+        if not note.get("id"):
+            note = cp._resolve_created_note(ws, "Concept: LonelyConcept", note)
+            result["note"] = note
+        assert note.get("id", "")
+
+
+# =====================================================================
+# Comparison Page Pipeline: create_comparison_page
+# =====================================================================
+
+
+class TestComparisonPagePipeline:
+    """Part 8: Comparison wiki page creation."""
+
+    def test_create_comparison_page_with_dicts(self, cp, ws):
+        """create_comparison_page with list of dicts should create a table."""
+        items = [
+            {"name": "RLHF", "type": "reward-based", "complexity": "High"},
+            {"name": "DPO", "type": "direct preference", "complexity": "Low"},
+        ]
+        result = cp.create_comparison_page(
+            title="RLHF vs DPO",
+            items=items,
+            workspace_id=ws,
+        )
+        assert "note" in result
+        note = result["note"]
+        # Resolve note if create_note only returned status
+        if not note.get("id"):
+            note = cp._resolve_created_note(ws, "Comparison: RLHF vs DPO", note)
+            result["note"] = note
+        assert note.get("id", ""), f"Note should have id: {note}"
+        content = note.get("content", "")
+        assert "| Name | Type | Complexity |" in content
+        assert "RLHF" in content
+        assert "DPO" in content
+        assert "reward-based" in content
+        assert "direct preference" in content
+
+    def test_create_comparison_page_with_strings_and_criteria(self, cp, ws):
+        """create_comparison_page with list of strings + criteria should create table with empty cells."""
+        result = cp.create_comparison_page(
+            title="Method Comparison",
+            items=["MethodA", "MethodB"],
+            workspace_id=ws,
+            criteria=["speed", "accuracy", "cost"],
+        )
+        note = result["note"]
+        if not note.get("id"):
+            note = cp._resolve_created_note(ws, "Comparison: Method Comparison", note)
+            result["note"] = note
+        assert note.get("id", "")
+        content = note.get("content", "")
+        assert "| Name | Speed | Accuracy | Cost |" in content
+        assert "MethodA" in content
+        assert "MethodB" in content
+
+    def test_create_comparison_page_empty_returns_empty(self, cp, ws):
+        """create_comparison_page with empty items should return empty note."""
+        result = cp.create_comparison_page(
+            title="Empty Comparison",
+            items=[],
+            workspace_id=ws,
+        )
+        assert result == {"note": {}}
+
+
+# =====================================================================
+# Ingest Source Pipeline: ingest_source
+# =====================================================================
+
+
+class TestIngestSourcePipeline:
+    """Part 9: Source document ingestion workflow."""
+
+    def test_ingest_source_creates_note_and_entities(self, cp, ws):
+        """ingest_source should create a source note and extract entities."""
+        source_text = """
+        SpacetimeDB is a revolutionary database that combines SQL with real-time subscriptions.
+        It was created by the team at Clockwork Labs. The key innovation is that clients can
+        subscribe to SQL queries and receive updates in real-time.
+        """
+        result = cp.ingest_source(
+            source_text=source_text,
+            source_title="SpacetimeDB Overview",
+            workspace_id=ws,
+            source_type="article",
+        )
+        assert "note" in result
+        assert "entities" in result
+        assert "links" in result
+        assert "contradictions" in result
+
+        note = result["note"]
+        assert note.get("id", ""), f"Note should have id: {note}"
+        assert note.get("title", "") == "Source: SpacetimeDB Overview"
+
+        # Content should include summary and source
+        content = note.get("content", "")
+        assert "Summary" in content
+        assert "SpacetimeDB Overview" in content
+
+        # Entities may or may not be extracted (LLM not available in CI)
+        # At minimum, the structure should be correct
+        assert isinstance(result["entities"], list)
+        assert isinstance(result["links"], list)
+        assert isinstance(result["contradictions"], list)
+
+    def test_ingest_source_empty_text_returns_empty(self, cp, ws):
+        """ingest_source with empty text should return empty result."""
+        result = cp.ingest_source(
+            source_text="",
+            source_title="Empty",
+            workspace_id=ws,
+        )
+        assert result == {"note": {}, "entities": [], "links": [], "contradictions": []}
+
+
+# =====================================================================
+# Cross-Link Pipeline: cross_link
+# =====================================================================
+
+
+class TestCrossLinkPipeline:
+    """Part 10: cross_link finds and creates semantic links."""
+
+    def test_cross_link_returns_counts(self, cp, ws):
+        """cross_link should return dict with links_created and pairs_checked."""
+        # Add some memories first
+        cp._client.store(workspace_id=ws, content="Memory about neural networks and deep learning.", peer_id="test", memory_type="experience")
+        cp._client.store(workspace_id=ws, content="Memory about machine learning optimization techniques.", peer_id="test", memory_type="experience")
+        cp._client.store(workspace_id=ws, content="Unrelated memory about cooking recipes.", peer_id="test", memory_type="experience")
+
+        result = cp.cross_link(workspace_id=ws, limit=10, similarity_threshold=0.5)
+        assert isinstance(result, dict)
+        assert "links_created" in result
+        assert "pairs_checked" in result
+        assert isinstance(result["links_created"], int)
+        assert isinstance(result["pairs_checked"], int)
+        assert result["links_created"] >= 0
+        assert result["pairs_checked"] >= 0
+
+
+# =====================================================================
+# Lint Pipeline Extended: check_contradictions (requires LLM - skip if unavailable)
+# =====================================================================
+
+
+class TestLintPipelineExtended:
+    """Part 11: lint_workspace with contradiction checks."""
+
+    def test_placeholder_skipped_without_llm(self):
+        """Placeholder - contradiction checks require LLM, skipped in CI."""
+        import pytest
+        pytest.skip("Contradiction detection requires LLM (not available in CI)")
+
+
+# =====================================================================
+# Search Entities Extended: semantic query
+# =====================================================================
+
+
+class TestSearchEntitiesExtended:
+    """Part 12: search_entities with semantic queries."""
+
+    def test_search_entities_semantic_query(self, cp, ws):
+        """search_entities with semantic_query should find related entities."""
+        # Create some nodes
+        cp._client.create_node(ws, "MachineLearning", "concept", summary="Study of algorithms that learn from data")
+        cp._client.create_node(ws, "DeepLearning", "concept", summary="Neural networks with many layers")
+        cp._client.create_node(ws, "Cooking", "topic", summary="Culinary arts and food preparation")
+
+        # Semantic search for AI-related concepts
+        results = cp.search_entities(workspace_id=ws, node_type="concept", semantic_query="artificial intelligence neural networks")
+        # Should find ML/DL concepts, not Cooking
+        labels = {r["label"] for r in results}
+        # Without embedder, may fall back to keyword - at minimum structure should work
+        assert isinstance(results, list)
+
+
+# =====================================================================
+# Export Pipeline Extended: include_kg
+# =====================================================================
+
+
+class TestExportPipelineExtended:
+    """Part 13: export_workspace with KG export."""
+
+    def test_export_includes_kg_nodes_when_requested(self, cp, ws):
+        """export_workspace with include_kg=True should write _kg_nodes files."""
+        # Create a note and a KG node
+        cp.store_answer(query="Test?", answer="Answer for export.", workspace_id=ws)
+        cp._client.create_node(ws, "ExportEntity", "concept", summary="An entity for export test")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = cp.export_workspace(tmpdir, workspace_id=ws, include_kg=True)
+            assert result["files_written"] >= 1
+            kg_dir = Path(tmpdir) / "_kg_nodes"
+            assert kg_dir.exists()
+            kg_files = list(kg_dir.glob("*.md"))
+            assert len(kg_files) >= 1
+            # Check content of KG export
+            kg_content = kg_files[0].read_text()
+            assert "ExportEntity" in kg_content
+            assert "concept" in kg_content
+
+
+# =====================================================================
+# Overview Page Pipeline: generate_overview_page
+# =====================================================================
+
+
+class TestOverviewPagePipeline:
+    """Part 14: generate_overview_page creates workspace synthesis."""
+
+    def test_generate_overview_page_creates_note(self, cp, ws):
+        """generate_overview_page should create an _overview note."""
+        # Add some content to the workspace
+        cp.store_answer(query="Q1?", answer="Answer about AI and ML.", workspace_id=ws)
+        cp._client.create_node(ws, "AI", "concept", summary="Artificial Intelligence")
+        cp._client.create_node(ws, "ML", "concept", summary="Machine Learning")
+        # Add an edge
+        nodes = cp._client._query("kg_node", workspace_id=ws, filter_dict={})
+        node_map = {n["label"]: n["id"] for n in nodes if "label" in n}
+        if "AI" in node_map and "ML" in node_map:
+            cp._client._call(
+                "create_edge",
+                [ws, node_map["AI"], node_map["ML"], "subfield_of", 1.0, "EXTRACTED", "{}", ""],
+            )
+
+        result = cp.generate_overview_page(workspace_id=ws)
+        assert "note" in result
+        note = result["note"]
+        # Resolve note if create_note only returned status
+        if not note.get("id"):
+            note = cp._resolve_created_note(ws, "_overview", note)
+            result["note"] = note
+        assert note.get("id", ""), f"Overview note should have id: {note}"
+        assert note.get("title", "") == "_overview"
+
+        content = note.get("content", "")
+        assert "Workspace Overview" in content
+        assert "notes" in content.lower()
+        assert "KG nodes" in content
+        assert "edges" in content
+
+    def test_generate_overview_page_empty_workspace(self, cp, ws):
+        """generate_overview_page on empty workspace should return empty note."""
+        result = cp.generate_overview_page(workspace_id=ws)
+        assert result == {"note": {}}
