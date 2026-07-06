@@ -1,6 +1,6 @@
 # Performance Benchmarks
 
-Results from 2026-06-09 00:55 UTC
+Results from 2026-07-06 08:25 UTC
 
 ## Reference Results
 
@@ -16,3 +16,16 @@ Results from 2026-06-09 00:55 UTC
 | 8 | graph.query | 1.2 | 1.3 | 1.3 | 1.3 | 1.2 | 1.3
 | 9 | sql.read (COUNT) | 1.2 | 1.3 | 1.7 | 1.3 | 1.2 | 1.8
 | 10 | ping (round-trip) | 0.8 | 0.8 | 1.0 | 0.8 | 0.8 | 1.1
+
+## Retrieval Quality (July 6, 2026)
+
+Eval dataset: 50 memories, 25 query-judgment pairs. Embedder: bge-large-en-v1.5 (1024d).
+
+| Config | P@5 | R@5 | MRR
+|--------|-----|-----|-----
+| keyword-only (term overlap) | 49.3% | 49.3% | 0.463
+| hybrid (bge-m3 semantic) | 74.0% | 74.0% | 0.853
+
+Hybrid adds semantic search on top of keyword BM25 via Tantivy + fusion scoring.
+Results inline with previous baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960).
+Minor drop attributed to different eval dataset (25 vs 18 queries) and embedder model (bge-large-en-v1.5 vs bge-m3).

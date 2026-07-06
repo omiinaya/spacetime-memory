@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-07-06T08:25:16Z",
+  "host": "127.0.0.1",
+  "port": 3001,
+  "database": "c2003cfb7133e87cf8c4",
+  "workspace_id": "55d11cd57e4e47c1b2e2641c3b68d64a",
+  "iterations": 20,
+  "dataset": {
+    "memories": 50,
+    "queries": 25
+  },
+  "tantivy_available": true,
+  "embedder_available": true,
+  "latency": {
+    "keyword_tantivy_on": [
+      {
+        "label": "keyword (Tantivy-on) top-5",
+        "n": 20,
+        "fails": 0,
+        "p50": 42.3,
+        "p90": 45.9,
+        "p99": 54.5,
+        "mean": 43.6,
+        "min": 41.2,
+        "max": 55.0
+      }
+    ],
+    "keyword_tantivy_off": [
+      {
+        "label": "keyword (Tantivy-off) top-5",
+        "n": 0,
+        "fails": 20,
+        "p50": 0,
+        "p90": 0,
+        "p99": 0,
+        "mean": 0,
+        "min": 0,
+        "max": 0
+      }
+    ]
+  },
+  "quality": {
+    "keyword_tantivy_on": {
+      "P@5": 0.0,
+      "R@5": 0.0,
+      "MRR": 0.0
+    },
+    "keyword_tantivy_off": {
+      "P@5": 0.0,
+      "R@5": 0.0,
+      "MRR": 0.0
+    },
+    "hybrid_semantic": {
+      "P@5": 0.0,
+      "R@5": 0.0,
+      "MRR": 0.0
+    }
+  },
+  "tantivy_contribution": {
+    "P@5_delta_pp": 0.0,
+    "R@5_delta_pp": 0.0,
+    "MRR_delta": 0.0,
+    "latency_speedup_x": 0.0
+  },
+  "notes": "Tantivy ON: normal c.search(semantic=False) with Tantivy BM25 sidecar at :9091. Tantivy OFF: same client with tantivy_url set to invalid endpoint, falling back to _keyword_fallback (client-side substring match). Hybrid: c.search(semantic=True) uses embedder + Tantivy + graph + temporal fusion."
+}
