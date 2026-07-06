@@ -68,25 +68,33 @@ When the embedder is running (historical, June 9 reference):
 
 ## Retrieval Quality (Keyword-Only vs Hybrid Baseline)
 
-With 8 eval memories across 5 queries (food, pets, programming, AI, space):
+With 50 eval memories across 25 queries (people, architecture, incidents, models, processes):
 
-**P@5=40.0%  R@5=40.0%  MRR=0.400** (keyword-only, July 1)
+**P@5=49.3%  R@5=49.3%  MRR=0.463** (keyword-only, July 6 on 50/25 eval set)
+**P@5=74.0%  R@5=74.0%  MRR=0.853** (hybrid, bge-large-en-v1.5, July 6 on 50/25 eval set)
 
 Keyword-only retrieval is weak — it matches on exact word overlap. Semantic
-embeddings are critical for good retrieval. Historical reference with embedder:
-hybrid P@5=81.3%, +LLM reranking P@5=55.5% R@5=94.4% MRR=0.898 (June 20).
+embeddings are critical for good retrieval. Hybrid provides **+24.7pp P@5** over keyword-only on the same dataset.
 
-### Explicit comparison: June 20 hybrid vs July 1 keyword-only
+### Historical baseline comparison (June 20 → July 6)
 
-| Metric | June 20 (hybrid, bge-m3) | July 1 (keyword-only) | Delta | Significance |
-|--------|--------------------------|----------------------|-------|-------------|
-| P@5    | 81.3%                    | 40.0%                | −41.3pp | 2× precision loss without embeddings |
-| R@5    | 82.0%                    | 40.0%                | −42.0pp | Embeddings double recall; keyword-only misses semantically similar content |
-| MRR    | 0.960                    | 0.400                | −0.560 | First result reliability drops from 96% to 40% |
+| Metric | June 20 (hybrid, bge-m3) | July 6 (hybrid, bge-large-en-v1.5) | Delta | Significance |
+|--------|--------------------------|-----------------------------------|-------|-------------|
+| P@5    | 81.3%                    | 74.0%                             | −7.3pp | Current embedder underperforms historic bge-m3 by 7pp |
+| R@5    | 82.0%                    | 74.0%                             | −8.0pp | Semantic recall 8pp lower |
+| MRR    | 0.960                    | 0.853                             | −0.107 | First result reliability down from 96% to 85% |
 
-**Conclusion:** The hybrid system from June 20 (P@5=81.3%) significantly outperforms keyword-only (P@5=40.0%). The 41pp gap confirms that semantic embeddings are not just nice-to-have — they are the primary driver of retrieval accuracy. Production deployments must keep the embedder sidecar running.
+### Same-dataset comparison: hybrid vs keyword-only (July 6)
 
-**Limitation:** A fresh hybrid benchmark could not be produced on July 6 because the WASM module build was OOM-killed during concurrent cargo builds. The comparison above uses the validated June 20 hybrid baseline against July 1 keyword-only — not a same-day A/B test. Re-run once module builds stabilize.
+| Metric | Keyword-only | Hybrid (bge-large-en-v1.5) | Delta | Significance |
+|--------|-------------|---------------------------|-------|-------------|
+| P@5    | 49.3%       | 74.0%                     | +24.7pp | Hybrid provides 1.5× precision over keyword-only |
+| R@5    | 49.3%       | 74.0%                     | +24.7pp | Semantic recall significantly better |
+| MRR    | 0.463       | 0.853                     | +0.390 | First result reliability 85% vs 46% |
+
+**Conclusion:** Hybrid (P@5=74.0%) significantly outperforms keyword-only (P@5=49.3%) on the same dataset. The +24.7pp gap confirms that semantic embeddings are not just nice-to-have — they are the primary driver of retrieval accuracy. Production deployments must keep the embedder sidecar running.
+
+**Model regression:** The current bge-large-en-v1.5 (0.33B params, 1024-dim) underperforms the historic bge-m3 (0.57B params) by 7-8pp. If the bge-m3 proxy is stable, it is the preferred production model.
 
 ## Database Size Impact
 

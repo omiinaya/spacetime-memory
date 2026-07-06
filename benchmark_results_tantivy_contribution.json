@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-07-06T08:25:16Z",
+  "timestamp": "2026-07-06T08:28:31Z",
   "host": "127.0.0.1",
   "port": 3001,
   "database": "c2003cfb7133e87cf8c4",
-  "workspace_id": "55d11cd57e4e47c1b2e2641c3b68d64a",
+  "workspace_id": "8f8e7dcd864a4e22a58f9197d458db0d",
   "iterations": 20,
   "dataset": {
     "memories": 50,
@@ -17,12 +17,12 @@
         "label": "keyword (Tantivy-on) top-5",
         "n": 20,
         "fails": 0,
-        "p50": 42.3,
-        "p90": 45.9,
-        "p99": 54.5,
-        "mean": 43.6,
-        "min": 41.2,
-        "max": 55.0
+        "p50": 44.2,
+        "p90": 57.4,
+        "p99": 66.1,
+        "mean": 46.5,
+        "min": 41.7,
+        "max": 67.5
       }
     ],
     "keyword_tantivy_off": [
