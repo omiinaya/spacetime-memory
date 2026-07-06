@@ -163,7 +163,7 @@
 **Status:** TS SDK has ~108 methods. Python SDK has ~140 public + 15 compounder.
 - [ ] Audit missing methods by category:
   - [x] `batchUpdateMemories` — done
-  - [ ] `setMemoryScope` — missing
+  - [x] `setMemoryScope` — exists
   - [x] `escalateMemories` — exists (reducer + Python SDK + TS SDK + CLI + tests)
   - [ ] `recommendMemories` — missing
   - [ ] `detectPatterns` — missing
@@ -171,7 +171,7 @@
   - [ ] `searchWithFilters` — missing
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
   - [ ] `updateMemoryTier` — missing
-  - [ ] `setMemoryScope` — missing
+  - [x] `setMemoryScope` — exists
   - [ ] `batchDeleteMemories` — exists
   - [ ] `batchTagMemories` / `batchUntagMemories` — missing
   - [ ] `getEdgeHistory` — missing
