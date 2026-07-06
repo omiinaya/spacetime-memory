@@ -57,6 +57,20 @@ Pure WASM ops: 1-2ms p50. Keyword search: 28ms. Graph query: 5ms.
 **System:** 127.0.0.1:3001, STDB v2.6, fresh module publish, 20 iterations/op.
 **Full data:** see docs/PERFORMANCE.md
 
+## Baseline comparison: June 20 hybrid vs July 6 reality
+
+The June 20 historical baseline (hybrid with bge-m3 via proxy) represents the best our system achieved. The `keyword-only (no embeddings)` config measured July 1 shows the fallback baseline when the embedder is down. The gap quantifies the value of semantic search:
+
+| Metric | June 20 (hybrid) | July 1 (keyword-only) | Delta | What it means |
+|--------|-----------------|----------------------|-------|---------------|
+| P@5    | 81.3%           | 40.0%                | −41.3pp | 2.0× more relevant results with embeddings |
+| R@5    | 82.0%           | 40.0%                | −42.0pp | Embeddings find 2× more relevant content |
+| MRR    | 0.960           | 0.400                | −0.560 | First result is correct 96% with hybrid vs 40% without |
+
+**Key insight:** The embedder is not optional. Keyword-only retrieves content that shares exact words with the query; hybrid fills in semantically equivalent but lexically different matches. Production deployments MUST ensure the embedder (:9090) stays running.
+
+**Limitation:** Fresh hybrid benchmark could not be run because the WASM module build was OOM-killed (resource contention from ≥6 concurrent cargo processes). The comparison above uses the June 20 hybrid baseline against the July 1 keyword-only measurement — not a like-for-like comparison at the same point in time. A fresh hybrid run is needed once module builds stabilize.
+
 ## Honest caveats
 
 ### 1. Multi-user performance is unproven

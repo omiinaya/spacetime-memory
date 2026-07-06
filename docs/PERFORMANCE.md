@@ -66,15 +66,27 @@ When the embedder is running (historical, June 9 reference):
 - Semantic search: ~399ms (ONNX sidecar)
 - Hybrid search: ~1s p50
 
-## Retrieval Quality (Keyword-Only)
+## Retrieval Quality (Keyword-Only vs Hybrid Baseline)
 
 With 8 eval memories across 5 queries (food, pets, programming, AI, space):
 
-**P@5=40.0%  R@5=40.0%  MRR=0.400**
+**P@5=40.0%  R@5=40.0%  MRR=0.400** (keyword-only, July 1)
 
 Keyword-only retrieval is weak — it matches on exact word overlap. Semantic
 embeddings are critical for good retrieval. Historical reference with embedder:
-hybrid P@5=81.3%, +LLM reranking P@5=55.5%.
+hybrid P@5=81.3%, +LLM reranking P@5=55.5% R@5=94.4% MRR=0.898 (June 20).
+
+### Explicit comparison: June 20 hybrid vs July 1 keyword-only
+
+| Metric | June 20 (hybrid, bge-m3) | July 1 (keyword-only) | Delta | Significance |
+|--------|--------------------------|----------------------|-------|-------------|
+| P@5    | 81.3%                    | 40.0%                | −41.3pp | 2× precision loss without embeddings |
+| R@5    | 82.0%                    | 40.0%                | −42.0pp | Embeddings double recall; keyword-only misses semantically similar content |
+| MRR    | 0.960                    | 0.400                | −0.560 | First result reliability drops from 96% to 40% |
+
+**Conclusion:** The hybrid system from June 20 (P@5=81.3%) significantly outperforms keyword-only (P@5=40.0%). The 41pp gap confirms that semantic embeddings are not just nice-to-have — they are the primary driver of retrieval accuracy. Production deployments must keep the embedder sidecar running.
+
+**Limitation:** A fresh hybrid benchmark could not be produced on July 6 because the WASM module build was OOM-killed during concurrent cargo builds. The comparison above uses the validated June 20 hybrid baseline against July 1 keyword-only — not a same-day A/B test. Re-run once module builds stabilize.
 
 ## Database Size Impact
 
