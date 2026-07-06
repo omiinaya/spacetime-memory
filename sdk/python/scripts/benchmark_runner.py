@@ -53,6 +53,15 @@ print(f"Workspace: {WORKSPACE_ID}")
 print(f"Iterations: {N}")
 print()
 
+# Ensure workspace exists
+try:
+    c.create_workspace(WORKSPACE_ID, "Benchmark workspace")
+    print(f"  Created workspace {WORKSPACE_ID}")
+except RuntimeError:
+    # Workspace already exists
+    print(f"  Workspace {WORKSPACE_ID} already exists")
+print()
+
 # ── Latency benchmarks ──────────────────────────────────────────
 
 def measure(label, fn, n=N):
