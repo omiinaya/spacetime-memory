@@ -122,25 +122,33 @@
 - [ ] Re-run 20-iteration benchmark to confirm semantic search stays ~2.5s (was 7.5s before fix)
 
 ### 2.3 Benchmark semantic retrieval quality
-**Status:** BM25 keyword eval exists (P@5=40.0%). Hybrid eval was "N/A" because embedder was unreachable during July 1 benchmark run. Embedder (bge-large-en-v1.5 at :9090) and Tantivy (:9091) sidecars brought back online July 5-6. WASM build for fresh benchmarks blocked by OOM kills during parallel builds (multiple concurrent cargo processes competing for 64GB).
+**Status:** Hybrid eval completed July 6 (50 eval memories, 25 queries). Embedder (bge-large-en-v1.5 at :9090) and Tantivy (:9091) sidecars live. Current hybrid: P@5=74.0%, R@5=74.0%, MRR=0.853 with bge-large-en-v1.5 (1024-dim) via `hybrid_benchmark.py` (raw cosine similarity). Benchmark script runs directly against the embedder API — no WASM build dependency.
 
 **Historical baseline comparison (June 20 -> July 6):**
-| Metric | June 20 (hybrid, bge-m3) | July 1 (keyword-only) | Delta | Notes |
-|--------|--------------------------|----------------------|-------|-------|
-| P@5    | 81.3%                    | 40.0%                | −41.3pp | Hybrid embeddings provide 2× precision over keyword-only |
-| R@5    | 82.0%                    | 40.0%                | −42.0pp | Semantic recall significantly better |
-| MRR    | 0.960                    | 0.400                | −0.560 | First-hit ranking severely degraded without embeddings |
+| Metric | June 20 (hybrid, bge-m3) | July 6 (hybrid, bge-large-en-v1.5) | Delta | Notes |
+|--------|--------------------------|-----------------------------------|-------|-------|
+| P@5    | 81.3%                    | 74.0%                             | −7.3pp | Current embedder underperforms historic bge-m3 by 7pp |
+| R@5    | 82.0%                    | 74.0%                             | −8.0pp | Semantic recall 8pp lower with bge-large-en-v1.5 |
+| MRR    | 0.960                    | 0.853                             | −0.107 | First-hit ranking reliability down from 96% to 85% |
+
+**Embedder comparison vs keyword-only (same eval set, July 6):**
+| Metric | July 6 (keyword-only) | July 6 (hybrid, bge-large-en-v1.5) | Delta | Notes |
+|--------|-----------------------|-----------------------------------|-------|-------|
+| P@5    | 49.3%                 | 74.0%                             | +24.7pp | Hybrid provides 1.5× precision over keyword-only |
+| R@5    | 49.3%                 | 74.0%                             | +24.7pp | Semantic recall significantly better (+25pp) |
+| MRR    | 0.463                 | 0.853                             | +0.390 | First result reliability 85% vs 46% |
 
 **Analysis:**
-- Keyword-only at P@5=40.0% matches only on exact word overlap — acceptable for known-term lookup but misses semantically similar content.
-- Historical hybrid result (81.3%) was with bge-m3 via proxy. Current embedder is bge-large-en-v1.5 (1024-dim) which may produce different scores.
-- The 41pp gap confirms embedder is critical for production retrieval quality. Without it, 60% of top-5 results are irrelevant.
-- Fresh hybrid benchmark blocked: WASM module build failed repeatedly with SIGKILL (resource contention from ≥6 concurrent Hermes worker cargo processes). Need to re-run once builds stabilize.
+- Current bge-large-en-v1.5 (1024-dim) produces P@5=74.0% — below historic bge-m3 (81.3%). The −7.3pp gap is model-specific: bge-large-en-v1.5 (0.33B params) vs bge-m3 (0.57B params) may encode different semantic dimensions. The evaluation dataset also differs (50 memories/25 queries now vs 8/5 on June 20), so scores aren't strictly apples-to-apples.
+- Current keyword-only baseline rose from 40.0% (old 8/5 eval on July 1) to 49.3% (new 50/25 eval) — indicating the old eval was harder due to smaller sample.
+- Hybrid still significantly outperforms keyword-only on the same dataset: +24.7pp P@5, +24.7pp R@5, +0.390 MRR. Embedders remain critical.
+- The historic bge-m3 model is preferable for production if the proxy is stable — bge-large-en-v1.5 is a regression.
+- **Next:** Run `retrieval_benchmark.py` for end-to-end SpacetimeDB pipeline results (blocked by DB connectivity — `Client()` failed with authentication). Requires fixing DB identity or re-publishing module.
 
-- [ ] Run `python3 scripts/retrieval_benchmark.py` now that embedder + Tantivy are live (WASM build blocked by OOM — retry after parallel builds finish)
-- [ ] Record P@5, R@5, MRR for hybrid mode
+- [x] Run `python3 scripts/hybrid_benchmark.py` — results: hybrid P@5=74.0%, R@5=74.0%, MRR=0.853 (July 6)
+- [x] Record P@5, R@5, MRR for hybrid mode — **done: see tables above**
 - [ ] Record P@5, R@5, MRR for +LLM reranking mode
-- [x] Compare against historical baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960) — **analysis complete; see comparison table above**
+- [x] Compare against historical baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960) — **current hybrid is 7-8pp lower; see comparison table above**
 
 ### 2.4 Benchmark with Tantivy indexing active
 **Status:** The benchmark runner stores via `_call("store_memory", ...)` which bypasses `_tantivy_index()`. Tantivy has 0 documents for test workspace.
