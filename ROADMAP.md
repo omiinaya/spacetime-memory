@@ -166,7 +166,7 @@
   - [x] `setMemoryScope` — exists
   - [x] `escalateMemories` — exists (reducer + Python SDK + TS SDK + CLI + tests)
   - [ ] `recommendMemories` — missing
-  - [ ] `detectPatterns` — missing
+  - [x] `detectPatterns` — exists (Python SDK + TS SDK + MCP + CLI + tests)
   - [ ] `deltaSync` — missing
   - [ ] `searchWithFilters` — missing
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
