@@ -187,7 +187,7 @@
   - [x] `computePageRank` — exists
   - [ ] `computeCommunityHierarchy` — exists
   - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
-  - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
+  - [x] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
   - [x] `extractEntities` — exists
   - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
   - [ ] `logResonanceSession` — exists
