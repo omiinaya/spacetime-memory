@@ -49,8 +49,12 @@ print(f"DB:   {DB[:20]}...")
 print(f"Date: {time.strftime('%Y-%m-%d %H:%M UTC')}")
 print()
 
+import uuid
+bench_user = f"bench_user_{uuid.uuid4().hex[:8]}"
+
 c = Client(host=HOST, port=PORT, database=DB, token=None)
-c._call("login", ["bench_user", "benchpass123"])
+c._call("register", [bench_user, "Bench User", "benchpass123"])
+c._call("login", [bench_user, "benchpass123"])
 print(f"Identity: {c._whoami()}")
 
 ws_name = f"bench-{int(time.time())}"
