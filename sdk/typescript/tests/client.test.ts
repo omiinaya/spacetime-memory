@@ -583,10 +583,9 @@ describe("Client", () => {
 
     it("batchTagMemories skips call for empty array", async () => {
       mockReducerOk();
-      const fetchSpy = jest.spyOn(globalThis, "fetch");
+      globalThis.fetch = vi.fn();
       await client.batchTagMemories("tag-1", []);
-      expect(fetchSpy).not.toHaveBeenCalled();
-      fetchSpy.mockRestore();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
 
     it("batchUntagMemories calls batch_untag_memories reducer", async () => {
@@ -599,10 +598,9 @@ describe("Client", () => {
 
     it("batchUntagMemories skips call for empty array", async () => {
       mockReducerOk();
-      const fetchSpy = jest.spyOn(globalThis, "fetch");
+      globalThis.fetch = vi.fn();
       await client.batchUntagMemories("tag-1", []);
-      expect(fetchSpy).not.toHaveBeenCalled();
-      fetchSpy.mockRestore();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
   });
 
@@ -1104,6 +1102,97 @@ describe("Client", () => {
       await expect(
         client.crossEncoderRerank("q", [{ memory_content: "x" }]),
       ).rejects.toThrow("Unexpected MCP response format");
+    });
+  });
+
+  describe("workspace management", () => {
+    it("updateWorkspace calls update_workspace reducer", async () => {
+      mockReducerOk();
+      await client.updateWorkspace("ws-1", "new name", "new desc");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/update_workspace");
+      expect(JSON.parse(req.body)).toEqual(["ws-1", "new name", "new desc"]);
+    });
+
+    it("deleteWorkspace calls delete_workspace reducer", async () => {
+      mockReducerOk();
+      await client.deleteWorkspace("ws-1");
+      expect((globalThis.fetch as any).mock.calls[0][0]).toContain("call/delete_workspace");
+    });
+  });
+
+  describe("memory utilities", () => {
+    it("listMemories queries SQL with defaults", async () => {
+      mockSqlResponse([{ id: "mem-1", content: "hello" }]);
+      const result = await client.listMemories("ws-1");
+      expect(result).toHaveLength(1);
+      expect(result[0]).toHaveProperty("id", "mem-1");
+    });
+
+    it("listMemories with memoryType filter", async () => {
+      mockSqlResponse([{ id: "mem-2", content: "fact", memory_type: "fact" }]);
+      const result = await client.listMemories("ws-1", { memoryType: "fact" });
+      expect(result).toHaveLength(1);
+      expect(result[0]).toHaveProperty("memory_type", "fact");
+    });
+
+    it("batchDeleteMemories calls batch_delete_memories reducer", async () => {
+      mockReducerOk();
+      await client.batchDeleteMemories(["mem-1", "mem-2"]);
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/batch_delete_memories");
+      expect(JSON.parse(req.body)).toEqual(["[\"mem-1\",\"mem-2\"]"]);
+    });
+
+    it("batchDeleteMemories skips call for empty array", async () => {
+      globalThis.fetch = vi.fn();
+      await client.batchDeleteMemories([]);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it("reinforce calls reinforce_memory reducer", async () => {
+      mockReducerOk();
+      await client.reinforce("mem-1");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/reinforce_memory");
+      expect(JSON.parse(req.body)).toEqual(["mem-1"]);
+    });
+  });
+
+  describe("knowledge graph queries", () => {
+    it("getNode queries SQL and returns array", async () => {
+      mockSqlResponse([{ node_id: "n1", label: "test-node" }]);
+      const nodes = await client.getNode("n1");
+      expect(Array.isArray(nodes)).toBe(true);
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toHaveProperty("label", "test-node");
+    });
+  });
+
+  describe("tag updates", () => {
+    it("updateTag calls update_tag reducer", async () => {
+      mockReducerOk();
+      await client.updateTag("tag-1", "new-name", "#00ff00");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/update_tag");
+      expect(JSON.parse(req.body)).toEqual(["tag-1", "new-name", "#00ff00"]);
+    });
+  });
+
+  describe("ping", () => {
+    it("ping returns status ok on success", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: vi.fn().mockResolvedValue("ok"),
+      });
+      const result = await client.ping();
+      expect(result).toHaveProperty("status", "ok");
+    });
+
+    it("ping returns status error on failure", async () => {
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("network error"));
+      const result = await client.ping();
+      expect(result).toHaveProperty("status", "error");
     });
   });
 });
