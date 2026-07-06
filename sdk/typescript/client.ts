@@ -3152,12 +3152,18 @@ export class Client {
   }
 
   /**
-   * Search memories with advanced filters (memory type, tier, date range).
-   * Combines the search query with optional memory_type and tier filters.
+   * Search memories with advanced filters (memory type, tier, metadata, location).
+   * Combines keyword search with optional memory_type, tier, metadata, and
+   * location post-filters.
    * @param workspaceId - Workspace ID
    * @param query - Search query text
    * @param memoryType - Optional memory type filter
    * @param tier - Optional tier filter ("L0", "L1", "L2")
+   * @param metadataFilter - Optional JSON string of metadata key/value pairs
+   *   to match (e.g. '{"source": "wiki", "priority": "high"}'). Applied as
+   *   post-filter on metadata_json field.
+   * @param locationFilter - Optional location string for case-insensitive
+   *   substring matching against content and summary.
    * @param limit - Max results (default 20)
    * @returns Array of matching memory records
    */
@@ -3166,6 +3172,8 @@ export class Client {
     query: string,
     memoryType?: string,
     tier?: string,
+    metadataFilter?: string,
+    locationFilter?: string,
     limit?: number
   ): Promise<Record<string, unknown>[]> {
     let q = `SELECT * FROM memory WHERE workspace_id = :ws AND is_active = true`;
@@ -3185,6 +3193,41 @@ export class Client {
     q += ` ORDER BY created_at DESC`;
     const ll = limit ?? 20;
     let rows = await this._sqlExec(q, params, query ? { like: true } : undefined);
+
+    // Post-filter: metadata JSON matching
+    if (metadataFilter) {
+      let mf: Record<string, unknown>;
+      try {
+        mf = JSON.parse(metadataFilter);
+      } catch {
+        mf = {};
+      }
+      rows = rows.filter((r: Record<string, unknown>) => {
+        let meta: Record<string, unknown> = {};
+        const raw = r.metadata_json;
+        if (typeof raw === "string" && raw) {
+          try {
+            meta = JSON.parse(raw);
+          } catch {
+            meta = {};
+          }
+        } else if (typeof raw === "object" && raw !== null) {
+          meta = raw as Record<string, unknown>;
+        }
+        return Object.entries(mf).every(([k, v]) => meta[k] === v);
+      });
+    }
+
+    // Post-filter: location (case-insensitive substring in content/summary)
+    if (locationFilter) {
+      const loc = locationFilter.toLowerCase();
+      rows = rows.filter((r: Record<string, unknown>) => {
+        const content = String(r.content ?? "").toLowerCase();
+        const summary = String(r.summary ?? "").toLowerCase();
+        return content.includes(loc) || summary.includes(loc);
+      });
+    }
+
     return rows.slice(0, ll);
   }
 
