@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tantivy::collector::TopDocs;
-use tantivy::query::{BooleanQuery, Occur, Query, TermQuery};
+use tantivy::query::{BooleanQuery, Occur, Query, QueryParser, TermQuery};
 use tantivy::schema::*;
 use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument};
 
@@ -59,6 +59,7 @@ struct HealthResponse {
 struct WorkspaceIndex {
     reader: IndexReader,
     writer: Arc<std::sync::Mutex<IndexWriter>>,
+    index: Index,
     content_field: Field,
     workspace_field: Field,
     entity_id_field: Field,
@@ -123,6 +124,7 @@ fn open_or_create_index(
     Ok(Arc::new(WorkspaceIndex {
         reader,
         writer: Arc::new(std::sync::Mutex::new(writer)),
+        index,
         content_field,
         workspace_field,
         entity_id_field,
@@ -259,38 +261,27 @@ async fn search(
 
     let searcher = ws.reader.searcher();
 
-    // Build query: parse user text + filter on workspace_id.
-    // Construct a BooleanQuery with OR across all query terms —
-    // BM25 scoring naturally weights multi-term matches higher,
-    // so there's no precision loss from OR, but we gain recall when
-    // stemming or tokenization causes a term mismatch.
-    let mut subqueries: Vec<(Occur, Box<dyn Query>)> = Vec::new();
-
-    // Tokenize the user query the same way Tantivy indexes: split on
-    // non-alphanumeric, lowercase, skip stopwords and short tokens.
-    for token in req.query.split(|c: char| !c.is_alphanumeric()) {
-        if token.len() < 2 {
-            continue;
-        }
-        let term = Term::from_field_text(ws.content_field, &token.to_lowercase());
-        subqueries.push((Occur::Should, Box::new(TermQuery::new(term, IndexRecordOption::WithFreqs))));
-    }
-
-    if subqueries.is_empty() {
-        return Ok(Json(vec![]));
-    }
-
-    let text_query: Box<dyn Query> = Box::new(BooleanQuery::new(subqueries));
+    // Build query: use Tantivy's QueryParser for proper tokenization,
+    // stemming, and multi-word query support.
+    let query_parser = QueryParser::new(
+        ws.index.schema(),
+        vec![ws.content_field],
+        ws.index.tokenizers().clone(),
+    );
+    let text_query = match query_parser.parse_query(&req.query) {
+        Ok(q) => q,
+        Err(_) => return Ok(Json(vec![])),
+    };
 
     let workspace_term =
         Term::from_field_text(ws.workspace_field, &req.workspace_id);
     let workspace_query: Box<dyn Query> =
         Box::new(TermQuery::new(workspace_term, IndexRecordOption::Basic));
 
-    // Combine: workspace filter AND text query
+    // Combine: workspace filter AND parsed text query
     let combined: Box<dyn Query> = Box::new(BooleanQuery::new(vec![
         (Occur::Must, workspace_query),
-        (Occur::Must, Box::new(text_query)),
+        (Occur::Must, text_query),
     ]));
 
     let top_docs = searcher
