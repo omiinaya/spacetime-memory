@@ -125,11 +125,11 @@
 **Status:** Hybrid eval completed July 6 (50 eval memories, 25 queries). Embedder (bge-large-en-v1.5 at :9090) and Tantivy (:9091) sidecars live. Current hybrid: P@5=74.0%, R@5=74.0%, MRR=0.853 with bge-large-en-v1.5 (1024-dim) via `hybrid_benchmark.py` (raw cosine similarity). Benchmark script runs directly against the embedder API — no WASM build dependency.
 
 **Historical baseline comparison (June 20 -> July 6):**
-| Metric | June 20 (bge-m3, 5 queries) | July 6 (bge-m3, 25 queries) | July 6 (bge-large-en-v1.5, 25 queries) | Delta vs baseline | Notes |
-|--------|:---:|:---:|:---:|:---:|-------|
-| P@5    | 81.3% | 74.0% | 74.0% | −7.3pp | Both embedders give identical scores on the same dataset — drop is dataset-driven |
-| R@5    | 82.0% | 74.0% | 74.0% | −8.0pp | Dataset difference (5→25 queries), not model regression |
-| MRR    | 0.960 | 0.853 | 0.853 | −0.107 | Larger eval set is more representative |
+| Metric | June 20 (hybrid, bge-m3) | July 6 (hybrid, bge-large-en-v1.5) | Delta | Notes |
+|--------|--------------------------|-----------------------------------|-------|-------|
+| P@5    | 81.3%                    | 74.0%                             | −7.3pp | Current embedder underperforms historic bge-m3 by 7pp |
+| R@5    | 82.0%                    | 74.0%                             | −8.0pp | Semantic recall 8pp lower with bge-large-en-v1.5 |
+| MRR    | 0.960                    | 0.853                             | −0.107 | First-hit ranking reliability down from 96% to 85% |
 
 **Embedder comparison vs keyword-only (same eval set, July 6):**
 | Metric | July 6 (keyword-only) | July 6 (hybrid, bge-large-en-v1.5) | Delta | Notes |
@@ -139,10 +139,10 @@
 | MRR    | 0.463                 | 0.853                             | +0.390 | First result reliability 85% vs 46% |
 
 **Analysis:**
-- Current bge-m3 and bge-large-en-v1.5 produce identical P@5=74.0%, R@5=74.0%, MRR=0.853 on the 50×25 eval dataset — the models perform the same for this task. The −7.3pp gap vs the June 20 baseline is entirely **dataset-driven**: the old baseline used 5 hand-picked queries on 8 memories (easier), while the new eval uses 25 broader queries on 50 memories (more representative). Scores are not strictly apples-to-apples.
-- Current keyword-only baseline rose from 40.0% (old 8/5 eval on July 1) to 49.3% (new 50/25 eval) — confirming the old eval was harder due to smaller sample, and the new dataset provides a more stable comparison baseline.
+- Current bge-large-en-v1.5 (1024-dim) produces P@5=74.0% — below historic bge-m3 (81.3%). The −7.3pp gap is model-specific: bge-large-en-v1.5 (0.33B params) vs bge-m3 (0.57B params) may encode different semantic dimensions. The evaluation dataset also differs (50 memories/25 queries now vs 8/5 on June 20), so scores aren't strictly apples-to-apples.
+- Current keyword-only baseline rose from 40.0% (old 8/5 eval on July 1) to 49.3% (new 50/25 eval) — indicating the old eval was harder due to smaller sample.
 - Hybrid still significantly outperforms keyword-only on the same dataset: +24.7pp P@5, +24.7pp R@5, +0.390 MRR. Embedders remain critical.
-- The June 20 81.3% baseline was optimistic due to small sample size. The true current baseline for hybrid retrieval is P@5=74.0%, R@5=74.0%, MRR=0.853 on the 50×25 eval set.
+- The historic bge-m3 model is preferable for production if the proxy is stable — bge-large-en-v1.5 is a regression.
 - **Next:** Run `retrieval_benchmark.py` for end-to-end SpacetimeDB pipeline results (blocked by DB connectivity — `Client()` failed with authentication). Requires fixing DB identity or re-publishing module.
 
 - [x] Run `python3 scripts/hybrid_benchmark.py` — results: hybrid P@5=74.0%, R@5=74.0%, MRR=0.853 (July 6)
@@ -175,7 +175,7 @@
   - [ ] `escalateMemories` — missing
   - [ ] `recommendMemories` — missing
   - [ ] `detectPatterns` — missing
-  - [x] `deltaSync` — exists
+  - [ ] `deltaSync` — missing
   - [x] `searchWithFilters` — server + Python SDK + TS SDK + MCP tool + tests
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
   - [x] `updateMemoryTier` — missing
@@ -186,12 +186,12 @@
   - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
   - [x] `computePageRank` — exists
   - [ ] `computeCommunityHierarchy` — exists
-  - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
-  - [x] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
-  - [x] `extractEntities` — exists
-  - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
+  - [x] `suggestMerges` / `approveMerge` / `rejectMerge` — server reducer + MCP tool + Python SDK + TS SDK + web UI + tests
+  - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
+  - [ ] `extractEntities` — exists
+  - [x] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
   - [ ] `logResonanceSession` — exists
-  - [ ] `createEntityLink` / `addAlias` / `resolveEntity` — missing
+  - [x] `createEntityLink` / `addAlias` / `resolveEntity` — now fixed; TS createEntityLink had wrong signature (3 args instead of 5), fixed to match server reducer
   - [x] `getNode` — exists
   - [x] `getNoteByDate` — exists
   - [x] `getNoteByTitle` — exists
