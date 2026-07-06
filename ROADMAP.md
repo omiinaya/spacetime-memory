@@ -171,7 +171,7 @@
   - [ ] `logResonanceSession` — exists
   - [ ] `createEntityLink` / `addAlias` / `resolveEntity` — missing
   - [x] `getNode` — exists
-  - [ ] `getNoteByDate` — exists
+  - [x] `getNoteByDate` — exists
   - [ ] `getNoteByTitle` — exists
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
   - [ ] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — missing
