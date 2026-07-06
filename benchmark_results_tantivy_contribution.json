@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-07-06T11:32:17Z",
+  "timestamp": "2026-07-06T13:49:56Z",
   "host": "127.0.0.1",
   "port": 3001,
   "database": "c2003cfb7133e87cf8c4",
-  "workspace_id": "5e6ba64d7b9d47b1a46ca228e55ebba3",
+  "workspace_id": "e7ae4ae71c054b9f93e9cf31a57f7067",
   "iterations": 20,
   "dataset": {
     "memories": 50,
@@ -17,7 +17,7 @@
         "label": "keyword (Tantivy-on) top-5",
         "n": 20,
         "fails": 0,
-        "p50": 0.8,
+        "p50": 0.7,
         "p90": 0.8,
         "p99": 1.3,
         "mean": 0.8,
@@ -28,39 +28,39 @@
     "keyword_tantivy_off": [
       {
         "label": "keyword (Tantivy-off) top-5",
-        "n": 0,
-        "fails": 20,
-        "p50": 0,
-        "p90": 0,
-        "p99": 0,
-        "mean": 0,
-        "min": 0,
-        "max": 0
+        "n": 20,
+        "fails": 0,
+        "p50": 5078.5,
+        "p90": 6033.1,
+        "p99": 6214.6,
+        "mean": 5230.1,
+        "min": 4517.1,
+        "max": 6231.8
       }
     ]
   },
   "quality": {
     "keyword_tantivy_on": {
-      "P@5": 0.6333,
-      "R@5": 0.6333,
-      "MRR": 0.6447
+      "P@5": 0.4333,
+      "R@5": 0.4333,
+      "MRR": 0.5067
     },
     "keyword_tantivy_off": {
-      "P@5": 0.0,
-      "R@5": 0.0,
-      "MRR": 0.0
+      "P@5": 0.4267,
+      "R@5": 0.4267,
+      "MRR": 0.39
     },
     "hybrid_semantic": {
-      "P@5": 0.0,
-      "R@5": 0.0,
-      "MRR": 0.0
+      "P@5": 0.46,
+      "R@5": 0.46,
+      "MRR": 0.58
     }
   },
   "tantivy_contribution": {
-    "P@5_delta_pp": 63.3,
-    "R@5_delta_pp": 63.3,
-    "MRR_delta": 0.645,
-    "latency_speedup_x": 0.0
+    "P@5_delta_pp": 0.7,
+    "R@5_delta_pp": 0.7,
+    "MRR_delta": 0.117,
+    "latency_speedup_x": 7255.0
   },
   "notes": "Tantivy ON: normal c.search(semantic=False) with Tantivy BM25 sidecar at :9091. Tantivy OFF: same client with tantivy_url set to invalid endpoint, falling back to _keyword_fallback (client-side substring match). Hybrid: c.search(semantic=True) uses embedder + Tantivy + graph + temporal fusion."
 }
