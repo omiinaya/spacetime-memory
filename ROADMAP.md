@@ -164,7 +164,7 @@
 - [ ] Audit missing methods by category:
   - [x] `batchUpdateMemories` — done
   - [ ] `setMemoryScope` — missing
-  - [ ] `escalateMemories` — missing
+  - [x] `escalateMemories` — exists (reducer + Python SDK + TS SDK + CLI + tests)
   - [ ] `recommendMemories` — missing
   - [ ] `detectPatterns` — missing
   - [ ] `deltaSync` — missing
