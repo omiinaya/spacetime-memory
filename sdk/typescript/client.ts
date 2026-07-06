@@ -271,6 +271,8 @@ export interface ClientOptions {
   port?: number | string;
   database?: string;
   embedderUrl?: string;
+  /** Tantivy BM25 search sidecar URL (default: http://127.0.0.1:9091). */
+  tantivyUrl?: string;
   /** MCP server URL for cross-encoder reranking and other LLM tools (default: http://127.0.0.1:8099). */
   mcpUrl?: string;
 }
@@ -384,6 +386,7 @@ export class Client {
   private readonly port: string;
   private readonly database: string;
   private readonly embedderUrl: string;
+  private readonly tantivyUrl: string;
   private readonly mcpUrl: string;
   private readonly baseUrl: string;
 
@@ -396,6 +399,8 @@ export class Client {
       "spacetime-memory";
     this.embedderUrl =
       opts.embedderUrl ?? process.env.EMBEDDER_URL ?? "http://127.0.0.1:4000";
+    this.tantivyUrl =
+      opts.tantivyUrl ?? process.env.TANTIVY_URL ?? "http://127.0.0.1:9091";
     this.mcpUrl =
       opts.mcpUrl ?? process.env.MCP_URL ?? "http://127.0.0.1:8099";
     this.baseUrl = `http://${this.host}:${this.port}`;

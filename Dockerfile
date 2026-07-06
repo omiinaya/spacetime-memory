@@ -82,6 +82,9 @@ RUN pip install --no-cache-dir -e sdk/python
 COPY cli/ cli/
 RUN pip install --no-cache-dir -e cli
 
+# ---- Scripts (for reindex-tantivy.py and other utilities) ----
+COPY scripts/ scripts/
+
 # ---- Rust embedder binary ----
 COPY --from=embedder-builder /build/target/release/embedder /usr/local/bin/embedder
 
