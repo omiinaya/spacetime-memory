@@ -77,8 +77,8 @@ print(f"Workspace: {ws_id}")
 print()
 
 # Ensure we have data to search
-count_result = c._query("memory", workspace_id=ws_id, columns=["COUNT(*) as cnt"])
-mem_count = count_result[0]["cnt"] if count_result else 0
+existing = c._query("memory", workspace_id=ws_id, columns=["id"])
+mem_count = len(existing)
 print(f"Existing memories: {mem_count}")
 
 # Seed at least 50 memories if needed
@@ -138,8 +138,8 @@ run("search.semantic (top-10, w/ embedder)", lambda: c.search(ws_id, "test memor
 # 4. Graph query (unaffected but useful for comparison)
 run("graph.query", lambda: c.query_graph(ws_id, "memory"), n=N)
 
-# 5. Memory count
-run("memory.count (_query)", lambda: c._query("memory", workspace_id=ws_id, columns=["COUNT(*) as cnt"]), n=min(N, 5))
+# 5. Memory count (via len of ids)
+run("memory.count (_query)", lambda: len(c._query("memory", workspace_id=ws_id, columns=["id"])), n=min(N, 5))
 
 # 6. Ping (baseline round-trip)
 run("ping (round-trip)", lambda: c._whoami(), n=N)
