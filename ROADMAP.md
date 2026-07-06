@@ -178,7 +178,7 @@
   - [ ] `deltaSync` — missing
   - [ ] `searchWithFilters` — missing
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
-  - [ ] `updateMemoryTier` — missing
+  - [x] `updateMemoryTier` — missing
   - [ ] `setMemoryScope` — missing
   - [ ] `batchDeleteMemories` — exists
   - [ ] `batchTagMemories` / `batchUntagMemories` — missing
