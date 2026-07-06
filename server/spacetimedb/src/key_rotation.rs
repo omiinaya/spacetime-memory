@@ -25,6 +25,83 @@ fn pubkey_pem_to_jwk_coords(pem: &str) -> Result<(String, String), String> {
     ))
 }
 
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A valid SECP256R1 (P-256) public key in PEM format.
+    /// Generated with: openssl ecparam -name prime256v1 -genkey -noout | openssl ec -pubout
+    const VALID_P256_PEM: &str = "-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE3XQusdYQ0D81uJlj/vqgIVxsOQjC
+sQeKqTvXxj2Zs14bOyX02c9GuF7+AvgjVe6K389L/tU87XvKcq2KGJ0Q7g==
+-----END PUBLIC KEY-----";
+
+    // ── pubkey_pem_to_jwk_coords ────────────────────────────────────────────
+
+    #[test]
+    fn test_pubkey_pem_to_jwk_coords_valid() {
+        let (x, y) = pubkey_pem_to_jwk_coords(VALID_P256_PEM).unwrap();
+        // Both coordinates should be non-empty base64url strings.
+        assert!(!x.is_empty(), "x coordinate should not be empty");
+        assert!(!y.is_empty(), "y coordinate should not be empty");
+        // P-256 coordinates are 32 bytes -> 43 base64url chars (ceil(32*4/3) with no pad)
+        assert_eq!(x.len(), 43, "x should be 43 base64url chars (no padding)");
+        assert_eq!(y.len(), 43, "y should be 43 base64url chars (no padding)");
+        // Verify they're valid base64url
+        use base64::Engine;
+        let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        assert!(engine.decode(&x).is_ok(), "x should be valid base64url");
+        assert!(engine.decode(&y).is_ok(), "y should be valid base64url");
+        // They should be different
+        assert_ne!(x, y, "x and y coordinates should differ");
+    }
+
+    #[test]
+    fn test_pubkey_pem_to_jwk_coords_empty_string() {
+        let err = pubkey_pem_to_jwk_coords("").unwrap_err();
+        assert!(err.contains("Invalid EC P-256 public key PEM"));
+    }
+
+    #[test]
+    fn test_pubkey_pem_to_jwk_coords_not_a_pem() {
+        let err = pubkey_pem_to_jwk_coords("this is not a PEM key").unwrap_err();
+        assert!(err.contains("Invalid EC P-256 public key PEM"));
+    }
+
+    #[test]
+    fn test_pubkey_pem_to_jwk_coords_wrong_key_type() {
+        // RSA public key PEM -- parsing should fail because it's not EC P-256
+        let rsa_pem = "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5ZkE1qC3S6jQkYcQgKjK
+1iB6Kw2wHn0KJ0y8pX9f0L0y0p0X0L0y0p0X0L0y0p0X0L0y0p0X0L0y0p0QID
+AQAB
+-----END PUBLIC KEY-----";
+        let err = pubkey_pem_to_jwk_coords(rsa_pem).unwrap_err();
+        assert!(err.contains("Invalid EC P-256 public key PEM"));
+    }
+
+    #[test]
+    fn test_pubkey_pem_to_jwk_coords_truncated_pem() {
+        let truncated = "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcD";
+        let err = pubkey_pem_to_jwk_coords(truncated).unwrap_err();
+        assert!(err.contains("Invalid EC P-256 public key PEM"));
+    }
+
+    #[test]
+    fn test_pubkey_pem_to_jwk_coords_different_key_gives_different_coords() {
+        // A different P-256 public key
+        const OTHER_P256_PEM: &str = "-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEq+XvYCYzy5ztHUvqLA26x0Wj083r
+LLqQfRdL7sncdkLj9Z/pLW7v5MptpEbzuAMd6VHYfHOtqayCbD/EKEqAuA==
+-----END PUBLIC KEY-----";
+        let (x1, y1) = pubkey_pem_to_jwk_coords(VALID_P256_PEM).unwrap();
+        let (x2, y2) = pubkey_pem_to_jwk_coords(OTHER_P256_PEM).unwrap();
+        assert_ne!((x1, y1), (x2, y2), "different keys should produce different coordinates");
+    }
+}
+
 // ── Tables ────────────────────────────────────────────────────────────
 
 /// A registered JWT signing key.
