@@ -582,11 +582,9 @@ describe("Client", () => {
     });
 
     it("batchTagMemories skips call for empty array", async () => {
-      mockReducerOk();
-      const fetchSpy = jest.spyOn(globalThis, "fetch");
+      globalThis.fetch = vi.fn();
       await client.batchTagMemories("tag-1", []);
-      expect(fetchSpy).not.toHaveBeenCalled();
-      fetchSpy.mockRestore();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
 
     it("batchUntagMemories calls batch_untag_memories reducer", async () => {
@@ -598,11 +596,9 @@ describe("Client", () => {
     });
 
     it("batchUntagMemories skips call for empty array", async () => {
-      mockReducerOk();
-      const fetchSpy = jest.spyOn(globalThis, "fetch");
+      globalThis.fetch = vi.fn();
       await client.batchUntagMemories("tag-1", []);
-      expect(fetchSpy).not.toHaveBeenCalled();
-      fetchSpy.mockRestore();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
   });
 
