@@ -1609,13 +1609,14 @@ export class Client {
     workspaceId: string,
     title: string,
     content: string,
-    opts?: { embed?: boolean }
+    opts?: { note_date?: string; embed?: boolean }
   ): Promise<void> {
     await this._call("create_note", [
       workspaceId,
       title,
       content,
-      opts?.embed ?? true,
+      opts?.note_date ?? "",
+      opts?.embed === false ? "[]" : "",
     ]);
   }
 
