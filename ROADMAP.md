@@ -176,7 +176,7 @@
   - [ ] `recommendMemories` — missing
   - [ ] `detectPatterns` — missing
   - [ ] `deltaSync` — missing
-  - [ ] `searchWithFilters` — missing
+  - [x] `searchWithFilters` — server + Python SDK + TS SDK + MCP tool + tests
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
   - [x] `updateMemoryTier` — missing
   - [ ] `setMemoryScope` — missing
