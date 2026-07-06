@@ -1420,6 +1420,71 @@ def kg_stats(workspace_id: str) -> None:
         console.print("[yellow]No knowledge graph data — add some nodes first.[/yellow]")
 
 
+@kg.command(name="add-node-citation")
+@click.argument("workspace_id")
+@click.argument("node_id")
+@click.argument("memory_id")
+@click.option("--description", default="",
+              help="Description of the citation relationship")
+def kg_add_node_citation(workspace_id: str, node_id: str,
+                         memory_id: str, description: str) -> None:
+    """Add a citation linking a KG node to a source memory.
+
+    Citations provide provenance: they record which memory (raw source,
+    note, or observation) supports a particular knowledge-graph node.
+    """
+    with console.status("Adding node citation..."):
+        result = _sdk_client().add_node_citation(
+            workspace_id, node_id, memory_id, description,
+        )
+    _quiet_print("[green]Citation added to node.[/green]")
+    if result:
+        print_json(result)
+
+
+@kg.command(name="add-edge-citation")
+@click.argument("workspace_id")
+@click.argument("edge_id")
+@click.argument("memory_id")
+@click.option("--description", default="",
+              help="Description of the citation relationship")
+def kg_add_edge_citation(workspace_id: str, edge_id: str,
+                         memory_id: str, description: str) -> None:
+    """Add a citation linking a KG edge to a source memory.
+
+    Citations provide provenance for edges — useful for marking which
+    source memory supports a particular relationship between nodes.
+    """
+    with console.status("Adding edge citation..."):
+        result = _sdk_client().add_edge_citation(
+            workspace_id, edge_id, memory_id, description,
+        )
+    _quiet_print("[green]Citation added to edge.[/green]")
+    if result:
+        print_json(result)
+
+
+@kg.command(name="get-citations")
+@click.argument("workspace_id")
+@click.argument("entity_id")
+@click.option("--entity-type", default="node",
+              type=click.Choice(["node", "edge"]),
+              help="Entity type: 'node' (default) or 'edge'")
+def kg_get_citations(workspace_id: str, entity_id: str,
+                     entity_type: str) -> None:
+    """Get all citations for a KG entity (node or edge).
+
+    Citations link KG nodes/edges back to the source memories that
+    support them. Use this to trace provenance for any KG entity.
+    """
+    with console.status(f"Fetching citations for {entity_type} '{entity_id}'..."):
+        rows = _sdk_client().get_citations(workspace_id, entity_id, entity_type)
+    if rows:
+        print_table(rows, title=f"Citations for {entity_type} '{entity_id[:40]}'")
+    else:
+        console.print("[yellow]No citations found for this entity.[/yellow]")
+
+
 # ===================================================================
 # session commands
 # ===================================================================

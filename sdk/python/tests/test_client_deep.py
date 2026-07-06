@@ -413,8 +413,8 @@ class TestGraphDeep:
                 stdb_client.add_node_citation(
                     ws_id,
                     node_id,
-                    "Test citation for graph entity",
                     "test-mem-001",
+                    "Test citation for graph entity",
                 )
             except RuntimeError:
                 pass
@@ -578,8 +578,8 @@ class TestGraphDeep:
             result = stdb_client.add_node_citation(
                 ws_id,
                 node_id,
-                "Node citation description",
                 "src-mem-1",
+                "Node citation description",
             )
             assert result["status"] == "ok"
 
@@ -618,8 +618,8 @@ class TestGraphDeep:
                     result = stdb_client.add_edge_citation(
                         ws_id,
                         edge_id,
-                        "Edge citation",
                         "src-mem-2",
+                        "Edge citation",
                     )
                     assert result["status"] == "ok"
                 except RuntimeError as e:
