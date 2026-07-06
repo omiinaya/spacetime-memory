@@ -150,8 +150,8 @@
 
 ### 2.5 Fix Tantivy search query handling
 **Status:** Single-token queries work (e.g., "fox" → found). Multi-token queries return wrong/worse results because `TermQuery` bypasses Tantivy's query parser.
-- [ ] Switch from `TermQuery` to `QueryParser` in Tantivy sidecar for multi-word queries
-- [ ] This gives proper tokenization-based matching for queries like "quick brown fox"
+- [x] Switch from `TermQuery` to `QueryParser` in Tantivy sidecar for multi-word queries
+- [x] This gives proper tokenization-based matching for queries like "quick brown fox"
 
 ---
 
