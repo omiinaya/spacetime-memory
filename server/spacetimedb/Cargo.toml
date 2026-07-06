@@ -7,6 +7,13 @@ description = "Multi-layer memory infrastructure for AI agents on SpacetimeDB"
 [lib]
 crate-type = ["cdylib"]
 
+[profile.release]
+opt-level = 1
+codegen-units = 256
+lto = false
+strip = false
+debug = false
+
 [dependencies]
 spacetimedb = { version = "2.6" }
 serde = { version = "1", features = ["derive"] }
