@@ -36,11 +36,23 @@
 - **Graph operations** — edges are fast (1.2ms), nodes are slow (523ms) because `create_node` includes entity extraction.
 - **Ping** (1.2ms) — STDB HTTP round-trip.
 
-## Retrieval Quality (keyword-only, no semantic embeddings)
+## Retrieval Quality
+
+**Benchmarked:** 2026-07-06 via `scripts/hybrid_benchmark.py` (standalone, embedder API direct)
+**Dataset:** 50 eval memories, 25 queries from `data/`
+**Embedder:** bge-large-en-v1.5 at :9090 (1024-dim, ~350ms/embedding)
 
 | Config | P@5 | R@5 | MRR |
 |--------|-----|-----|-----|
-| keyword-only (no embeddings) | 40.0% | 40.0% | 0.400 |
+| keyword-only (term overlap) | 49.3% | 49.3% | 0.463 |
+| hybrid (bge-large-en-v1.5 semantic) | 74.0% | 74.0% | 0.853 |
+
+**Historical baseline (June 20, bge-m3 proxy):** P@5=81.3%, R@5=82.0%, MRR=0.960
+
+**Analysis:**
+- Hybrid embeddings provide a 24.7pp P@5 improvement over keyword-only regardless of embedder choice
+- bge-large-en-v1.5 trails bge-m3 by 7.3pp P@5 — acceptable trade-off for lower latency
+- A reranker pass is expected to push P@5 above 80%
 
 ## Recommendations
 
