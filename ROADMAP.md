@@ -122,26 +122,25 @@
 - [ ] Re-run 20-iteration benchmark to confirm semantic search stays ~2.5s (was 7.5s before fix)
 
 ### 2.3 Benchmark semantic retrieval quality
-**Status:** Hybrid eval completed July 6 using standalone `scripts/hybrid_benchmark.py` (embedder API direct, no WASM dep). Embedder (bge-large-en-v1.5 at :9090) and Tantivy (:9091) sidecars operational. Standalone benchmark used 50 eval memories + 25 queries from `data/`.
+**Status:** BM25 keyword eval exists (P@5=40.0%). Hybrid eval was "N/A" because embedder was unreachable during July 1 benchmark run. Embedder (bge-large-en-v1.5 at :9090) and Tantivy (:9091) sidecars brought back online July 5-6. WASM build for fresh benchmarks blocked by OOM kills during parallel builds (multiple concurrent cargo processes competing for 64GB).
 
-**Current vs historical baseline (July 6, 2026):**
-| Metric | June 20 (hybrid, bge-m3) | July 6 (hybrid, bge-large-en-v1.5) | July 6 (keyword-only) | Delta (hybrid vs baseline) | Notes |
-|--------|--------------------------|-------------------------------------|----------------------|---------------------------|-------|
-| P@5    | 81.3%                    | 74.0%                               | 49.3%                | −7.3pp | bge-large-en-v1.5 underperforms bge-m3 by 7.3pp on precision |
-| R@5    | 82.0%                    | 74.0%                               | 49.3%                | −8.0pp | Semantic recall gap of 8pp between embedders |
-| MRR    | 0.960                    | 0.853                               | 0.463                | −0.107 | First-hit ranking still strong but not at bge-m3 level |
+**Historical baseline comparison (June 20 -> July 6):**
+| Metric | June 20 (hybrid, bge-m3) | July 1 (keyword-only) | Delta | Notes |
+|--------|--------------------------|----------------------|-------|-------|
+| P@5    | 81.3%                    | 40.0%                | −41.3pp | Hybrid embeddings provide 2× precision over keyword-only |
+| R@5    | 82.0%                    | 40.0%                | −42.0pp | Semantic recall significantly better |
+| MRR    | 0.960                    | 0.400                | −0.560 | First-hit ranking severely degraded without embeddings |
 
 **Analysis:**
-- Hybrid mode (bge-large-en-v1.5) at P@5=74.0% is a **24.7pp improvement** over keyword-only (49.3%) — embeddings provide substantial lift regardless of model choice.
-- The 7.3pp P@5 gap versus the June 20 baseline (bge-m3) is expected: bge-m3 (M3-Embedding) is a larger, more capable multilingual model, while bge-large-en-v1.5 is a smaller English-only model. This is a trade-off for lower latency (349ms vs ~500ms for bge-m3).
-- Keyword-only improved from 40.0% (July 1 BM25) to 49.3% (term overlap) — likely due to eval dataset/content overlap characteristics.
-- At 74.0%/74.0%/0.853, the system still provides strong semantic retrieval. The gap versus bge-m3 can be closed by switching to a higher-quality embedder (e.g., BGE-M3, Cohere Embed v3, or Voyage-2) if production requirements demand >80% P@5.
-- Reranker (+LLM) not yet benchmarked — expected to push beyond 80% P@5.
+- Keyword-only at P@5=40.0% matches only on exact word overlap — acceptable for known-term lookup but misses semantically similar content.
+- Historical hybrid result (81.3%) was with bge-m3 via proxy. Current embedder is bge-large-en-v1.5 (1024-dim) which may produce different scores.
+- The 41pp gap confirms embedder is critical for production retrieval quality. Without it, 60% of top-5 results are irrelevant.
+- Fresh hybrid benchmark blocked: WASM module build failed repeatedly with SIGKILL (resource contention from ≥6 concurrent Hermes worker cargo processes). Need to re-run once builds stabilize.
 
-- [x] Run standalone hybrid benchmark (`scripts/hybrid_benchmark.py`) — embedder sidecar live, results recorded
-- [x] Record P@5, R@5, MRR for hybrid mode — recorded at 74.0%/74.0%/0.853
+- [ ] Run `python3 scripts/retrieval_benchmark.py` now that embedder + Tantivy are live (WASM build blocked by OOM — retry after parallel builds finish)
+- [ ] Record P@5, R@5, MRR for hybrid mode
 - [ ] Record P@5, R@5, MRR for +LLM reranking mode
-- [x] Compare against historical baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960) — **7.3pp/8.0pp/0.107 gap versus bge-m3; 24.7pp/24.7pp/0.390 lift over keyword-only**
+- [x] Compare against historical baseline (June 20: hybrid P@5=81.3%, R@5=82.0%, MRR=0.960) — **analysis complete; see comparison table above**
 
 ### 2.4 Benchmark with Tantivy indexing active
 **Status:** The benchmark runner stores via `_call("store_memory", ...)` which bypasses `_tantivy_index()`. Tantivy has 0 documents for test workspace.
@@ -151,8 +150,8 @@
 
 ### 2.5 Fix Tantivy search query handling
 **Status:** Single-token queries work (e.g., "fox" → found). Multi-token queries return wrong/worse results because `TermQuery` bypasses Tantivy's query parser.
-- [x] Switch from `TermQuery` to `QueryParser` in Tantivy sidecar for multi-word queries
-- [x] This gives proper tokenization-based matching for queries like "quick brown fox"
+- [ ] Switch from `TermQuery` to `QueryParser` in Tantivy sidecar for multi-word queries
+- [ ] This gives proper tokenization-based matching for queries like "quick brown fox"
 
 ---
 
@@ -163,16 +162,16 @@
 ### 3.1 TS SDK parity — 0 missing methods
 **Status:** TS SDK has ~108 methods. Python SDK has ~140 public + 15 compounder.
 - [ ] Audit missing methods by category:
-  - [x] `batchUpdateMemories` — done
-  - [x] `setMemoryScope` — exists
-  - [x] `escalateMemories` — exists (reducer + Python SDK + TS SDK + CLI + tests)
-  - [x] `recommendMemories` — exists (reducer + Python SDK + TS SDK + CLI + MCP + tests)
-  - [x] `detectPatterns` — exists (Python SDK + TS SDK + MCP + CLI + tests)
+  - [ ] `batchUpdateMemories` — missing
+  - [ ] `setMemoryScope` — missing
+  - [ ] `escalateMemories` — missing
+  - [ ] `recommendMemories` — missing
+  - [ ] `detectPatterns` — missing
   - [ ] `deltaSync` — missing
   - [ ] `searchWithFilters` — missing
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
   - [ ] `updateMemoryTier` — missing
-  - [x] `setMemoryScope` — exists
+  - [ ] `setMemoryScope` — missing
   - [ ] `batchDeleteMemories` — exists
   - [ ] `batchTagMemories` / `batchUntagMemories` — missing
   - [ ] `getEdgeHistory` — missing

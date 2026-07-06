@@ -99,8 +99,8 @@ def main():
     # Embed all memories
     t0 = time.time()
     memory_embeddings = {}
-    for mem in memories:
-        memory_embeddings[mem["id"]] = get_embedding(mem["content"])
+    for m in memories:
+        memory_embeddings[m["id"]] = get_embedding(m["content"])
     seed_time = time.time() - t0
     print(f"  Embedded {len(memories)} memories in {seed_time:.1f}s")
 
@@ -111,19 +111,20 @@ def main():
         t0 = time.time()
         q_emb = get_embedding(q["query"])
         scores = []
-        for mem in memories:
-            sim = cosine_similarity(q_emb, memory_embeddings[mem["id"]])
-            scores.append((sim, mem))
+        for m in memories:
+            sim = cosine_similarity(q_emb, memory_embeddings[m["id"]])
+            scores.append((sim, m))
         scores.sort(key=lambda x: -x[0])
         results[q["query"]] = [
-            {"content": mem["content"], "score": s}
-            for s, mem in scores[:5]
+            {"content": m["content"], "score": s}
+            for s, m in scores[:5]
         ]
         query_times.append(time.time() - t0)
 
     avg_query_time = sum(query_times) / len(query_times)
 
-    hybrid_metrics = compute_metrics(queries, results, memories_by_id)
+    m = compute_metrics(queries, results, memories_by_id)
+    hybrid_metrics = m  # avoid name collision with for-m loops below
     print(f"  [hybrid (bge-m3 semantic)]")
     print(f"    P@5={hybrid_metrics['P@5']:.1%}  R@5={hybrid_metrics['R@5']:.1%}  MRR={hybrid_metrics['MRR']:.3f}")
     print(f"    seed={seed_time:.1f}s  {avg_query_time*1000:.0f}ms/q")
@@ -142,13 +143,13 @@ def main():
     kw_results = {}
     for q in queries:
         scores = []
-        for mem in memories:
-            sim = term_overlap_score(q["query"], mem["content"])
-            scores.append((sim, mem))
+        for m in memories:
+            sim = term_overlap_score(q["query"], m["content"])
+            scores.append((sim, m))
         scores.sort(key=lambda x: -x[0])
         kw_results[q["query"]] = [
-            {"content": mem["content"], "score": s}
-            for s, mem in scores[:5]
+            {"content": m["content"], "score": s}
+            for s, m in scores[:5]
         ]
 
     kw = compute_metrics(queries, kw_results, memories_by_id)
