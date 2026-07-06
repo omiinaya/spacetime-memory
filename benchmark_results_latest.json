@@ -1,101 +1,66 @@
 {
-  "timestamp": "2026-07-06T03:19:00Z",
-  "host": "127.0.0.1",
-  "port": "3001",
-  "database": "c2003cfb7133e87cf8c4ec48debf6c7439ca3a05b6133056982896b873fba7da",
-  "workspace_id": "80de37ab8f764446a125dcce5e15e986",
-  "iterations": 15,
-  "tantivy_url": "http://127.0.0.1:9091",
-  "notes": "Tantivy contribution benchmark - keyword search uses Tantivy BM25 sidecar (~1ms) instead of WASM BM25 (~28ms). Bugfix: Tantivy indexing no longer gated behind embedder availability.",
+  "timestamp": "2026-07-06T07:25:53Z",
+  "host": "localhost",
+  "port": 3001,
+  "database": "c2003cfb7133e87cf8c4",
+  "workspace_id": "5245222a76704f93a5e7d9561974183c",
+  "iterations": 20,
+  "embedder_available": true,
   "latency": [
     {
-      "label": "Tantivy direct (no SDK overhead)",
-      "n": 10,
+      "label": "embed-only (bge-m3)",
+      "n": 5,
       "fails": 0,
-      "p50": 0.5,
-      "p90": 0.5,
-      "p99": 0.5,
-      "mean": 0.5,
-      "min": 0.5,
-      "max": 0.5
+      "p50": 537.4,
+      "p90": 543.8,
+      "p99": 546.2,
+      "mean": 531.2,
+      "min": 512.7,
+      "max": 546.5
     },
     {
-      "label": "search.keyword (Tantivy BM25, top-5)",
-      "n": 15,
+      "label": "search.keyword (top-5)",
+      "n": 20,
       "fails": 0,
-      "p50": 0.8,
-      "p90": 0.8,
-      "p99": 1.0,
-      "mean": 0.8,
-      "min": 0.8,
-      "max": 1.0
+      "p50": 42.6,
+      "p90": 49.5,
+      "p99": 51.9,
+      "mean": 43.6,
+      "min": 38.8,
+      "max": 52.2
     },
     {
-      "label": "search.keyword (multi-word, top-5)",
-      "n": 15,
+      "label": "search.semantic (top-10, w/ embedder)",
+      "n": 20,
       "fails": 0,
-      "p50": 0.8,
-      "p90": 0.8,
-      "p99": 0.9,
-      "mean": 0.8,
-      "min": 0.8,
-      "max": 1.0
+      "p50": 1344.0,
+      "p90": 1458.2,
+      "p99": 2043.2,
+      "mean": 1397.4,
+      "min": 1285.1,
+      "max": 2157.4
+    },
+    {
+      "label": "graph.query",
+      "n": 20,
+      "fails": 0,
+      "p50": 7.0,
+      "p90": 7.7,
+      "p99": 8.8,
+      "mean": 7.1,
+      "min": 6.4,
+      "max": 9.0
     },
     {
       "label": "ping (round-trip)",
-      "n": 15,
+      "n": 20,
       "fails": 0,
-      "p50": 0.8,
-      "p90": 0.9,
-      "p99": 0.9,
-      "mean": 0.8,
+      "p50": 0.9,
+      "p90": 1.1,
+      "p99": 1.4,
+      "mean": 0.9,
       "min": 0.8,
-      "max": 0.9
-    },
-    {
-      "label": "memory.store (single)",
-      "n": 15,
-      "fails": 0,
-      "p50": 45.3,
-      "p90": 53.0,
-      "p99": 55.8,
-      "mean": 46.2,
-      "min": 39.1,
-      "max": 56.1
-    },
-    {
-      "label": "graph.query (KG)",
-      "n": 10,
-      "fails": 0,
-      "p50": 4.8,
-      "p90": 5.4,
-      "p99": 5.6,
-      "mean": 4.9,
-      "min": 4.6,
-      "max": 5.7
-    },
-    {
-      "label": "get_neighbors (KG)",
-      "n": 10,
-      "fails": 0,
-      "p50": 9.2,
-      "p90": 9.7,
-      "p99": 10.1,
-      "mean": 9.3,
-      "min": 9.0,
-      "max": 10.2
+      "max": 1.4
     }
-  ],
-  "quality": {
-    "keyword-only (Tantivy BM25)": {
-      "P@5": 0.9,
-      "R@5": 0.9,
-      "MRR": 0.9
-    }
-  },
-  "comparison": {
-    "search_keyword_before_ms": 27.8,
-    "search_keyword_now_ms": 0.8,
-    "improvement_pct": 97.1
-  }
+  ]
 }
