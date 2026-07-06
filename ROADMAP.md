@@ -162,7 +162,7 @@
 ### 3.1 TS SDK parity — 0 missing methods
 **Status:** TS SDK has ~108 methods. Python SDK has ~140 public + 15 compounder.
 - [ ] Audit missing methods by category:
-  - [ ] `batchUpdateMemories` — missing
+  - [x] `batchUpdateMemories` — done
   - [ ] `setMemoryScope` — missing
   - [ ] `escalateMemories` — missing
   - [ ] `recommendMemories` — missing
