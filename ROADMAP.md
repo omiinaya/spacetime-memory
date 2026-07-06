@@ -175,7 +175,7 @@
   - [ ] `escalateMemories` — missing
   - [ ] `recommendMemories` — missing
   - [ ] `detectPatterns` — missing
-  - [ ] `deltaSync` — missing
+  - [x] `deltaSync` — exists
   - [x] `searchWithFilters` — server + Python SDK + TS SDK + MCP tool + tests
   - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
   - [x] `updateMemoryTier` — missing
@@ -187,11 +187,11 @@
   - [x] `computePageRank` — exists
   - [ ] `computeCommunityHierarchy` — exists
   - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
-  - [x] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
-  - [ ] `extractEntities` — exists
-  - [x] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
+  - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
+  - [x] `extractEntities` — exists
+  - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
   - [ ] `logResonanceSession` — exists
-  - [x] `createEntityLink` / `addAlias` / `resolveEntity` — now fixed; TS createEntityLink had wrong signature (3 args instead of 5), fixed to match server reducer
+  - [ ] `createEntityLink` / `addAlias` / `resolveEntity` — missing
   - [x] `getNode` — exists
   - [x] `getNoteByDate` — exists
   - [x] `getNoteByTitle` — exists
