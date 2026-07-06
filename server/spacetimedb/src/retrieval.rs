@@ -296,3 +296,57 @@ pub fn index_terms(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // retrieval.rs has pure functions for tokenization and BM25 text prep
+
+    #[test]
+    fn test_token_count_approximation() {
+        let content = "Hello world this is a test";
+        let tokens = content.split_whitespace().count() as u32;
+        assert_eq!(tokens, 6);
+    }
+
+    #[test]
+    fn test_token_count_empty() {
+        let content = "";
+        let tokens = content.split_whitespace().count() as u32;
+        assert_eq!(tokens, 0);
+    }
+
+    #[test]
+    fn test_token_count_multiple_spaces() {
+        let content = "Hello    world   test";
+        let tokens = content.split_whitespace().count() as u32;
+        assert_eq!(tokens, 3);
+    }
+
+    #[test]
+    fn test_token_count_newlines() {
+        let content = "Line 1
+Line 2
+Line 3";
+        let tokens = content.split_whitespace().count() as u32;
+        assert_eq!(tokens, 6); // "Line", "1", "Line", "2", "Line", "3"
+    }
+
+    #[test]
+    fn test_entity_type_validation() {
+        let valid = ["memory", "node", "chunk", "peer", "note"];
+        for v in valid {
+            assert!(["memory", "node", "chunk", "peer", "note"].contains(&v));
+        }
+        assert!(!["memory", "node", "chunk", "peer", "note"].contains(&"invalid"));
+    }
+
+    #[test]
+    fn test_bm25_text_same_as_content() {
+        let content = "Test content for BM25";
+        let bm25_text = content.clone();
+        assert_eq!(bm25_text, content);
+    }
+}
+

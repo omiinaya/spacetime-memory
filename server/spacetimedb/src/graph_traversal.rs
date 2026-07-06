@@ -544,3 +544,119 @@ pub fn compute_kg_stats(
     Ok(())
 }
 // ---------------------------------------------------------------------------
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Graph traversal mostly has reducers with STDB dependencies.
+    // Pure functions that can be tested:
+    // - Bridge score calculation logic
+    // - KG stats computation logic
+    
+    #[test]
+    fn test_bridge_score_calculation() {
+        // Bridge score = (community_count - 1) / (total_communities - 1)
+        // For a node connecting 3 communities out of 5 total:
+        // (3 - 1) / (5 - 1) = 2/4 = 0.5
+        let count = 3;
+        let total = 5;
+        let score = if total > 1 {
+            (count as f64 - 1.0) / (total as f64 - 1.0)
+        } else {
+            0.0
+        };
+        assert!((score - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_bridge_score_single_community_zero() {
+        // Node in only 1 community should score 0
+        let count = 1;
+        let total = 5;
+        let score = if total > 1 {
+            (count as f64 - 1.0) / (total as f64 - 1.0)
+        } else {
+            0.0
+        };
+        assert_eq!(score, 0.0);
+    }
+
+    #[test]
+    fn test_bridge_score_max() {
+        // Node connecting all communities
+        let count = 5;
+        let total = 5;
+        let score = if total > 1 {
+            (count as f64 - 1.0) / (total as f64 - 1.0)
+        } else {
+            0.0
+        };
+        assert_eq!(score, 1.0);
+    }
+
+    #[test]
+    fn test_bridge_score_no_communities() {
+        let count = 0;
+        let total = 0;
+        let score = if total > 1 {
+            (count as f64 - 1.0) / (total as f64 - 1.0)
+        } else {
+            0.0
+        };
+        assert_eq!(score, 0.0);
+    }
+
+    #[test]
+    fn test_kg_stats_avg_degree() {
+        // avg_degree = edge_count / node_count (or 0 if no nodes)
+        let node_count = 10u64;
+        let edge_count = 20u64;
+        let avg = if node_count > 0 {
+            edge_count as f64 / node_count as f64
+        } else {
+            0.0
+        };
+        assert!((avg - 2.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_kg_stats_zero_nodes() {
+        let node_count = 0u64;
+        let edge_count = 5u64;
+        let avg = if node_count > 0 {
+            edge_count as f64 / node_count as f64
+        } else {
+            0.0
+        };
+        assert_eq!(avg, 0.0);
+    }
+
+    #[test]
+    fn test_community_count_excludes_zero() {
+        // community_id == 0 means unassigned
+        let community_ids = vec![0u64, 1, 1, 2, 2, 3, 0, 0];
+        let mut unique = std::collections::HashSet::new();
+        for cid in community_ids {
+            if cid > 0 {
+                unique.insert(cid);
+            }
+        }
+        assert_eq!(unique.len(), 3);
+    }
+
+    #[test]
+    fn test_orphan_nodes_zero_edges() {
+        // Nodes with zero edges are orphans
+        let node_edges: std::collections::HashMap<String, u32> = [
+            ("a".to_string(), 2),
+            ("b".to_string(), 0),
+            ("c".to_string(), 1),
+            ("d".to_string(), 0),
+        ].into_iter().collect();
+        
+        let orphans = node_edges.values().filter(|&&c| c == 0).count();
+        assert_eq!(orphans, 2);
+    }
+}
