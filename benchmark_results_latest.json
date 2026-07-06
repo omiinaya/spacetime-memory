@@ -1,12 +1,12 @@
 {
-  "timestamp": "2026-07-06T07:19:51Z",
+  "timestamp": "2026-07-06T03:19:00Z",
   "host": "127.0.0.1",
   "port": "3001",
   "database": "c2003cfb7133e87cf8c4ec48debf6c7439ca3a05b6133056982896b873fba7da",
   "workspace_id": "80de37ab8f764446a125dcce5e15e986",
   "iterations": 15,
   "tantivy_url": "http://127.0.0.1:9091",
-  "notes": "Tantivy contribution benchmark \u2014 keyword search uses Tantivy BM25 sidecar (~1ms) instead of WASM BM25 (~28ms)",
+  "notes": "Tantivy contribution benchmark - keyword search uses Tantivy BM25 sidecar (~1ms) instead of WASM BM25 (~28ms). Bugfix: Tantivy indexing no longer gated behind embedder availability.",
   "latency": [
     {
       "label": "Tantivy direct (no SDK overhead)",
