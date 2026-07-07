@@ -1195,4 +1195,28 @@ describe("Client", () => {
       expect(result).toHaveProperty("status", "error");
     });
   });
+
+  describe("getPeerReputation", () => {
+    it("returns reputation for a known peer", async () => {
+      mockSqlResponse([{
+        id: "peer-1",
+        helpful_count: 10n,
+        unhelpful_count: 2n,
+        total_feedback: 12n,
+        reputation_score: 0.846,
+        last_feedback_at: 1712345678000000n,
+      }]);
+      const result = await client.getPeerReputation("peer-1");
+      expect(result).not.toBeNull();
+      expect(result).toHaveProperty("id", "peer-1");
+      expect(result).toHaveProperty("reputation_score", 0.846);
+      expect(result).toHaveProperty("helpful_count", 10n);
+    });
+
+    it("returns null for unknown peer", async () => {
+      mockSqlResponse([]);
+      const result = await client.getPeerReputation("unknown-peer");
+      expect(result).toBeNull();
+    });
+  });
 });

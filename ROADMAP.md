@@ -198,7 +198,7 @@
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
   - [x] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — added graphBfs, fixed shortestPath table name (bfs_result→shortest_path_result) + added maxHops param
   - [ ] `searchSessionsSemantic` — missing
-  - [ ] `getPeerReputation` — missing
+  - [x] `getPeerReputation` — exists
   - [ ] `registerConnector` / `updateConnector` / `deleteConnector` — missings
   - [ ] Compounder class (15 methods) — does not exist in TS
 - [x] `listTagsByMemory` — already added in prior session (uncommitted)

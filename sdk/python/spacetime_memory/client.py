@@ -2079,6 +2079,13 @@ class Client:
             after: Optional Unix timestamp — only return results with
                     ``created_at > after``.
         """
+        # -- Resolve temporal_filter into before/after --
+        if temporal_filter is not None:
+            if after is None and "from" in temporal_filter:
+                after = temporal_filter["from"]
+            if before is None and "to" in temporal_filter:
+                before = temporal_filter["to"]
+
         if semantic:
             # ── Query cache check ──
             cache_key: str | None = None
