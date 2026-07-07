@@ -358,4 +358,145 @@ mod tests {
         assert_eq!(tier_ord("unknown"), 3);
         assert_eq!(tier_ord(""), 3);
     }
+
+
+    // ── memory_to_entry ──────────────────────────────────────────────────────────
+
+    fn make_test_memory() -> Memory {
+        Memory {
+            id: "mem-1".to_string(),
+            workspace_id: "ws-1".to_string(),
+            peer_id: "peer-1".to_string(),
+            observer_id: "obs-1".to_string(),
+            memory_type: "experience".to_string(),
+            content: "Test memory content".to_string(),
+            summary: "Test summary".to_string(),
+            context: "test context".to_string(),
+            entities_json: "[]".to_string(),
+            confidence: 0.85,
+            source_session_id: "sess-1".to_string(),
+            source_message_id: "msg-1".to_string(),
+            is_active: true,
+            created_at: 1000000,
+            expires_at: 0,
+            updated_at: 2000000,
+            tier: "L1".to_string(),
+            access_count: 5,
+            strength: 0.75,
+            version: 2,
+            valid_from: 0,
+            valid_to: 0,
+            parent_directory_id: "".to_string(),
+            consolidated_to: "".to_string(),
+            trust_score: 0.9,
+            feedback_count: 3,
+            user_scope: "".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_memory_to_entry_basic() {
+        let mem = make_test_memory();
+        let entry = memory_to_entry(&mem);
+        assert_eq!(entry["id"], "mem-1");
+        assert_eq!(entry["content"], "Test memory content");
+        assert_eq!(entry["summary"], "Test summary");
+        assert_eq!(entry["memory_type"], "experience");
+        assert_eq!(entry["tier"], "L1");
+    }
+
+    #[test]
+    fn test_memory_to_entry_numeric_fields() {
+        let mem = make_test_memory();
+        let entry = memory_to_entry(&mem);
+        assert!((entry["confidence"].as_f64().unwrap() - 0.85).abs() < 1e-6);
+        assert!((entry["strength"].as_f64().unwrap() - 0.75).abs() < 1e-6);
+        assert_eq!(entry["access_count"], 5);
+        assert_eq!(entry["created_at"], 1000000);
+        assert_eq!(entry["updated_at"], 2000000);
+    }
+
+    #[test]
+    fn test_memory_to_entry_serializable() {
+        let mem = Memory {
+            id: "mem-2".to_string(),
+            workspace_id: "ws-2".to_string(),
+            peer_id: "peer-2".to_string(),
+            observer_id: "obs-2".to_string(),
+            memory_type: "world_fact".to_string(),
+            content: "Earth is round".to_string(),
+            summary: "".to_string(),
+            context: "".to_string(),
+            entities_json: "[]".to_string(),
+            confidence: 0.99,
+            source_session_id: "sess-2".to_string(),
+            source_message_id: "msg-2".to_string(),
+            is_active: true,
+            created_at: 3000000,
+            expires_at: 0,
+            updated_at: 4000000,
+            tier: "L0".to_string(),
+            access_count: 10,
+            strength: 0.95,
+            version: 1,
+            valid_from: 0,
+            valid_to: 0,
+            parent_directory_id: "".to_string(),
+            consolidated_to: "".to_string(),
+            trust_score: 0.8,
+            feedback_count: 5,
+            user_scope: "".to_string(),
+        };
+        let entry = memory_to_entry(&mem);
+        let json_str = serde_json::to_string(&entry).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(parsed["id"], "mem-2");
+        assert_eq!(parsed["content"], "Earth is round");
+        assert_eq!(parsed["confidence"], 0.99);
+    }
+
+    #[test]
+    fn test_memory_to_entry_tier_values() {
+        let mut mem = make_test_memory();
+        
+        mem.tier = "L0".to_string();
+        let entry = memory_to_entry(&mem);
+        assert_eq!(entry["tier"], "L0");
+        
+        mem.tier = "L2".to_string();
+        let entry = memory_to_entry(&mem);
+        assert_eq!(entry["tier"], "L2");
+        
+        mem.tier = "archival".to_string();
+        let entry = memory_to_entry(&mem);
+        assert_eq!(entry["tier"], "archival");
+    }
+
+    #[test]
+    fn test_memory_to_entry_empty_strings() {
+        let mut mem = make_test_memory();
+        mem.content = "".to_string();
+        mem.summary = "".to_string();
+        
+        let entry = memory_to_entry(&mem);
+        assert_eq!(entry["content"], "");
+        assert_eq!(entry["summary"], "");
+    }
+
+    #[test]
+    fn test_memory_to_entry_all_fields_present() {
+        let mem = make_test_memory();
+        let entry = memory_to_entry(&mem);
+        
+        assert!(entry.get("id").is_some());
+        assert!(entry.get("content").is_some());
+        assert!(entry.get("summary").is_some());
+        assert!(entry.get("memory_type").is_some());
+        assert!(entry.get("confidence").is_some());
+        assert!(entry.get("tier").is_some());
+        assert!(entry.get("strength").is_some());
+        assert!(entry.get("access_count").is_some());
+        assert!(entry.get("created_at").is_some());
+        assert!(entry.get("updated_at").is_some());
+    }
 }
