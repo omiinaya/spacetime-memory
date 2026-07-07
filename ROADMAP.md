@@ -281,7 +281,7 @@
 - [ ] Connector tests require live credentials — no mock mode
 - [ ] `connectors/base.py` is confusing — "connector" means "sync connector" (Discord, Notion, GitHub, Slack, RSS, Twitter, webhook, orgmode), NOT "parity adapter" (Mem0, Zep, etc.)
 - [ ] No Telegram connector (mentioned in the prompt template)
-- [~] Orgsync connector may have bugs (orgmode.py:70 FIXME resolved by _section_to_event())
+- [ ] Orgsync connector may have bugs (orgmode.py:70 "FIXME")
 
 ### 4.7 Monitoring & Observability
 - [ ] No alerting when embedder/Tantivy sidecar is down
