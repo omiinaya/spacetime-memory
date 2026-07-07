@@ -4389,7 +4389,7 @@ class Client:
         """
         self._call("list_api_keys", [workspace_id])
         return self._sql(
-            "SELECT api_key_id, name, permissions, is_active, created_at, last_used_at "
+            "SELECT api_key_id, name, permissions, scope, is_active, created_at, last_used_at "
             "FROM api_key_result WHERE "
             f"workspace_id = '{_esc(workspace_id)}' "
             "AND operation = 'list'"
