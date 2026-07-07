@@ -223,6 +223,18 @@ export interface SearchOptions {
    *  for discriminative relevance scoring. Falls back gracefully if MCP server is
    *  unavailable. */
   crossEncoder?: boolean;
+  /**
+   * Shorthand temporal range filter. Accepts `{from?: number, to?: number}`
+   * where values are Unix timestamps (microseconds). Results are filtered
+   * by `created_at > from` and `created_at < to`. Entries are used only when
+   * the corresponding explicit `before`/`after` param is not set.
+   * @example { from: 1700000000000, to: 1700086400000 }
+   */
+  temporalFilter?: { from?: number; to?: number };
+  /** Optional Unix timestamp (microseconds) — only return results with `created_at < before`. */
+  before?: number;
+  /** Optional Unix timestamp (microseconds) — only return results with `created_at > after`. */
+  after?: number;
 }
 
 /** Options for listMemories() method. */
@@ -264,6 +276,8 @@ export interface SearchResult {
   memory_content?: string;
   node_label?: string;
   context_json?: string;
+  /** Unix timestamp (microseconds) when the memory was created. */
+  created_at?: number;
 }
 
 export interface ClientOptions {
