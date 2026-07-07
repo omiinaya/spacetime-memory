@@ -304,7 +304,7 @@
 - [ ] **WebSocket subscriptions** — real-time memory updates via STDB subscriptions
 
 ### 5.2 Compounder enhancements
-- [ ] **TS Compounder class** — doesn't exist. ~15 methods to port.
+- [x] **TS Compounder class** — exposed with 14 methods and unit tests.
 - [ ] **Compounder E2E tests** — `test_compounder_integration.py` exists but likely stale.
 - [ ] **Ripple effect detection** — when a source is updated, which entities/nodes need re-summarization?
 
