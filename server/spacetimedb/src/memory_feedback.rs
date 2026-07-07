@@ -237,11 +237,11 @@ pub fn apply_decay_inner(
 
         let new_trust = if use_weibull {
             // Weibull: trust = initial * exp(-(t/λ)^k)
-            let initial = mem.trust_score.max(0.5); // use current trust as initial floor
+            let initial = mem.trust_score.max(0.5_f64); // use current trust as initial floor
             let t = days_since_last_access;
-            let k = weibull_shape.max(0.1).min(5.0);
-            let lambda = weibull_scale.max(1.0);
-            let exponent = -(t / lambda).powf(k);
+            let k = weibull_shape.max(0.1_f64).min(5.0_f64);
+            let lambda = weibull_scale.max(1.0_f64);
+            let exponent = -1.0 * (t / lambda).powf(k);
             initial * exponent.exp()
         } else {
             // Linear: new_trust = trust_score * (1.0 - decay_rate * days)
@@ -467,7 +467,7 @@ pub fn recommend_memories(
             "review"
         };
 
-        let urgency = ((1.0 - trust) * age_weight * feedback_penalty).min(1.0);
+        let urgency = ((1.0 - trust) * age_weight * feedback_penalty).min(1.0_f64);
 
         if urgency >= min_urgency {
             recommendations.push((
@@ -533,7 +533,7 @@ pub fn get_peer_reputation(ctx: &ReducerContext, peer_id: String) -> Result<(), 
         .peer_reputation_result()
         .iter()
         .take(crate::MAX_RESULTS)
-        .map(|r: &PeerReputationResult| r.id.clone())
+        .map(|r: PeerReputationResult| r.id.clone())
         .collect();
     for id in &stale {
         ctx.db.peer_reputation_result().id().delete(id);
@@ -596,11 +596,11 @@ mod tests {
         let lambda = 30.0; // scale
         let k = 0.6; // shape
         
-        let exponent = -(t / lambda).powf(k);
+        let exponent = -1.0 * (t / lambda).powf(k);
         let new_trust = initial * exponent.exp();
         
         // At t = λ, trust ≈ 37% of initial (1/e)
-        assert!((new_trust - 0.367879).abs() < 0.01);
+        assert!((new_trust - 0.367879).abs() < 0.01f64);
     }
 
     #[test]
@@ -610,11 +610,11 @@ mod tests {
         let k = 0.6;
         let t = 3.0 * lambda; // 90 days
         
-        let exponent = -(t / lambda).powf(k);
+        let exponent = -1.0 * (t / lambda).powf(k);
         let new_trust = initial * exponent.exp();
         
         // At t = 3λ, trust ≈ 5%
-        assert!((new_trust - 0.05).abs() < 0.02);
+        assert!((new_trust - 0.05).abs() < 0.02f64);
     }
 
     #[test]
@@ -625,7 +625,7 @@ mod tests {
         // Very large t
         let t = 1000.0;
         
-        let exponent = -(t / lambda).powf(k);
+        let exponent = -1.0 * (t / lambda).powf(k);
         let new_trust = initial * exponent.exp();
         
         // Should never reach exactly zero, just approach it
@@ -640,7 +640,7 @@ mod tests {
         let total = 10u64;
         let score = (helpful as f64 + 1.0) / (total as f64 + 2.0);
         // (5+1)/(10+2) = 6/12 = 0.5
-        assert!((score - 0.5).abs() < 1e-10);
+        assert!((score - 0.5).abs() < 1e-10f64);
     }
 
     #[test]
@@ -649,7 +649,7 @@ mod tests {
         let helpful = 0u64;
         let total = 0u64;
         let score = (helpful as f64 + 1.0) / (total as f64 + 2.0);
-        assert!((score - 0.5).abs() < 1e-10);
+        assert!((score - 0.5).abs() < 1e-10f64);
     }
 
     #[test]
@@ -658,7 +658,7 @@ mod tests {
         let total = 10u64;
         let score = (helpful as f64 + 1.0) / (total as f64 + 2.0);
         // (10+1)/(10+2) = 11/12 ≈ 0.9167
-        assert!((score - 11.0/12.0).abs() < 1e-10);
+        assert!((score - 11.0/12.0).abs() < 1e-10f64);
     }
 
     #[test]
@@ -667,7 +667,7 @@ mod tests {
         let total = 10u64;
         let score = (helpful as f64 + 1.0) / (total as f64 + 2.0);
         // (0+1)/(10+2) = 1/12 ≈ 0.0833
-        assert!((score - 1.0/12.0).abs() < 1e-10);
+        assert!((score - 1.0/12.0).abs() < 1e-10f64);
     }
 
     #[test]
@@ -676,7 +676,7 @@ mod tests {
         let scores = vec![5.0, 4.0, 5.0, 3.0];
         let avg = scores.iter().sum::<f64>() / scores.len() as f64; // 4.25
         let trust = (avg / 5.0).clamp(0.0, 1.0); // 0.85
-        assert!((trust - 0.85).abs() < 1e-10);
+        assert!((trust - 0.85).abs() < 1e-10f64);
     }
 
     #[test]
@@ -698,7 +698,7 @@ mod tests {
         let trust = 0.2;
         let age_weight = 1.5; // < 1 day
         let feedback_penalty = 1.0;
-        let urgency = ((1.0 - trust) * age_weight * feedback_penalty).min(1.0);
+        let urgency = ((1.0 - trust) * age_weight * feedback_penalty).min(1.0_f64);
         // (0.8 * 1.5 * 1.0) = 1.2 -> clamped to 1.0
         assert_eq!(urgency, 1.0);
     }
@@ -708,9 +708,9 @@ mod tests {
         let trust = 0.1;
         let age_weight = 0.8; // > 30 days
         let feedback_penalty = 1.0;
-        let urgency = ((1.0 - trust) * age_weight * feedback_penalty).min(1.0);
+        let urgency = ((1.0 - trust) * age_weight * feedback_penalty).min(1.0_f64);
         // (0.9 * 0.8) = 0.72
-        assert!((urgency - 0.72).abs() < 1e-10);
+        assert!((urgency - 0.72).abs() < 1e-10f64);
     }
 
     #[test]
