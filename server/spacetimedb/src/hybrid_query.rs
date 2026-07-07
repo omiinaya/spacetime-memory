@@ -1124,7 +1124,7 @@ pub fn search_by_tags(
         }
     }
     // Collect memory IDs that have ALL of the requested tags
-    let mut matched_memory_ids: Vec<String> = mem_tags
+    let matched_memory_ids: Vec<String> = mem_tags
         .into_iter()
         .filter(|(_, tags)| {
             tag_ids.iter().all(|tid| tags.contains(tid))

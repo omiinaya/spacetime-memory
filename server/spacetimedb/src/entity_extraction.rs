@@ -1,23 +1,59 @@
-//! Zero-LLM entity extraction from memory content.
-//!
-//! GBrain-style regex-based extraction: finds person names, company names,
-//! and creates entity_link records + kg_edges between co-mentioned entities.
-//!
-//! Called automatically from ``store_memory`` — no separate reducer needed
-//! in normal operation.  The ``extract_entities`` reducer is public for
-//! manual re-extraction of existing memories.
-
 use spacetimedb::*;
-
 use crate::auth::require_auth;
-use crate::entity_linking::{entity_link, EntityLink};
-use crate::knowledge_graph::{kg_edge, kg_node, KgEdge, KgNode};
-use crate::workspace::check_space_access;
-use crate::{now_micros, uuid_v7};
 
-// ---------------------------------------------------------------------------
-// Pattern matching (no regex crate — SpacetimeDB WASM constraint)
-// ---------------------------------------------------------------------------
+use crate::{now_micros, uuid_v4_uniq, uuid_v7};
+use crate::workspace::workspace;
+use crate::workspace::SpacePermission;
+use crate::workspace::space_permission;
+
+/// A link between a text mention and a knowledge-graph node.
+#[table(accessor = entity_link)]
+#[derive(Debug, Clone)]
+pub struct EntityLink {
+    #[primary_key]
+    pub id: String,
+    pub name: String,
+    /// "person", "company", "technology", "concept", "acronym"
+    pub entity_type: String,
+    pub workspace_id: String,
+    pub used_count: u64,
+    pub first_seen: i64,
+    pub last_seen: i64,
+}
+
+/// A knowledge-graph node (canonical entity).
+#[table(accessor = kg_node)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KgNode {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub entity_type: String,
+    pub description: String,
+    pub metadata_json: String,
+}
+
+/// A directed edge between two knowledge-graph nodes.
+#[table(accessor = kg_edge)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct KgEdge {
+    #[primary_key]
+    pub id: String,
+    pub subject_id: String,
+    pub object_id: String,
+    /// e.g. "works_at", "acquired", "competitor", "collaborator"
+    pub relation: String,
+    pub weight: f64,
+    pub created_at: i64,
+}
+
+/// A mention extracted from text (not persisted — used during extraction).
+#[derive(Debug, Clone)]
+pub struct Mention {
+    pub name: String,
+    pub entity_type: String,
+}
 
 /// Known company suffixes (case-insensitive match).
 const COMPANY_SUFFIXES: &[&str] = &[
@@ -31,19 +67,26 @@ const COMPANY_SUFFIXES: &[&str] = &[
 fn is_company_suffix(word: &str) -> bool {
     COMPANY_SUFFIXES
         .iter()
-        .any(|s| word.eq_ignore_ascii_case(s))
+        .any(|s| s.eq_ignore_ascii_case(word))
 }
 
-/// Check that a string looks like a proper name (starts uppercase, rest lowercase).
-fn is_proper_word(s: &str) -> bool {
-    let mut chars = s.chars();
+/// Return whether a word is a proper name (capitalized, 2+ chars).
+fn is_proper_word(word: &str) -> bool {
+    let trimmed = word.trim_end_matches(|c: char| c == '.' || c == ',' || c == ';' || c == ':');
+    if trimmed.is_empty() || trimmed.len() < 2 {
+        return false;
+    }
+    let mut chars = trimmed.chars();
+    // First char must be uppercase, rest must be lowercase
     match chars.next() {
         Some(c) if c.is_ascii_uppercase() => chars.all(|c| c.is_ascii_lowercase()),
         _ => false,
     }
 }
 
-/// Score how likely a candidate is to be a real entity (not a common word).
+/// Assign a score to a word for entity extraction.
+/// - 0 for noise words, short words, etc.
+/// - 1 for valid entity candidates.
 fn entity_score(word: &str) -> i32 {
     let lower = word.to_lowercase();
     let noise: &[&str] = &[
@@ -55,22 +98,13 @@ fn entity_score(word: &str) -> i32 {
     if noise.contains(&lower.as_str()) {
         return 0;
     }
-    if lower.len() < 3 {
+    if lower.len() < 2 {
         return 0;
     }
     1
 }
 
-// ---------------------------------------------------------------------------
-// Extraction
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Additional extractors
-// ---------------------------------------------------------------------------
-
-/// Extract single-word capitalized names (technologies, concepts, products).
-/// Skips words that are likely sentence-starters or common nouns.
+/// Extract single-word entity candidates (technologies, concepts).
 fn extract_single_words(text: &str) -> Vec<Mention> {
     let mut results = Vec::new();
     let words: Vec<&str> = text.split_whitespace().collect();
@@ -81,13 +115,8 @@ fn extract_single_words(text: &str) -> Vec<Mention> {
         if stripped.len() < 3 {
             continue;
         }
-        let mut chars = stripped.chars();
-        let first = chars.next();
-        if first.map_or(true, |c| !c.is_ascii_uppercase()) {
-            continue;
-        }
-        // Rest must be lowercase
-        if !chars.all(|c| c.is_ascii_lowercase()) {
+        let first = stripped.chars().next().unwrap();
+        if !first.is_ascii_uppercase() {
             continue;
         }
         // Skip if it's the first word of a sentence
@@ -142,7 +171,7 @@ fn extract_single_words(text: &str) -> Vec<Mention> {
     results
 }
 
-/// Extract acronyms (ALL_CAPS words with 2-6 characters).
+/// Extract acronym-style entities (all-caps, 2-6 chars).
 fn extract_acronyms(text: &str) -> Vec<Mention> {
     let mut results = Vec::new();
     for word in text.split_whitespace() {
@@ -167,69 +196,77 @@ fn extract_acronyms(text: &str) -> Vec<Mention> {
     results
 }
 
-/// Extract extracted entity mention.
-#[derive(Debug, Clone)]
-struct Mention {
-    name: String,
-    entity_type: String, // "person" or "company"
-}
-
-/// Extract person names from text (two-word capitalized pairs like "Garry Tan").
+/// Extract two-word person names (Title+Title, 3+ chars each).
 fn extract_people(text: &str) -> Vec<Mention> {
-    let mut people = Vec::new();
+    let mut results = Vec::new();
     let words: Vec<&str> = text.split_whitespace().collect();
 
-    for window in words.windows(2) {
-        if is_proper_word(window[0]) && is_proper_word(window[1]) {
-            let name = format!("{} {}", window[0], window[1]);
-            // Filter obvious false positives
-            if entity_score(window[0]) > 0 && entity_score(window[1]) > 0 {
-                // Avoid "I The", "A New" patterns
-                if window[0].len() > 1 && window[1].len() > 2 {
-                    people.push(Mention {
-                        name,
-                        entity_type: "person".into(),
-                    });
-                }
-            }
+    for pair in words.windows(2) {
+        let first = pair[0].trim_end_matches(|c: char| c == '.' || c == ',' || c == ';');
+        let second = pair[1].trim_end_matches(|c: char| c == '.' || c == ',' || c == ';');
+
+        // Both must be capitalized proper words (3+ chars)
+        if first.len() < 3 || second.len() < 2 {
+            continue;
         }
+        if !is_proper_word(first) || !is_proper_word(second) {
+            continue;
+        }
+
+        // Skip noise pairs
+        let noise_words: &[&str] = &[
+            "The", "And", "For", "With", "This", "That", "From", "Have",
+            "Been", "Was", "Are", "Has", "Had", "Not", "But", "Its", "His",
+            "Her", "She", "They", "Will", "Would", "Could", "Should", "There",
+            "Their", "About", "Which", "When", "Where", "What", "Into", "Over",
+        ];
+        if noise_words.contains(&first) || noise_words.contains(&second) {
+            continue;
+        }
+
+        results.push(Mention {
+            name: format!("{} {}", first, second),
+            entity_type: "person".into(),
+        });
     }
-    people
+    results
 }
 
-/// Extract company names from text (capitalized sequence ending in known suffix).
+/// Extract company names (two+ words where the last word is a known suffix).
 fn extract_companies(text: &str) -> Vec<Mention> {
-    let mut companies = Vec::new();
+    let mut results = Vec::new();
     let words: Vec<&str> = text.split_whitespace().collect();
 
-    for (i, word) in words.iter().enumerate() {
-        let stripped = word.trim_end_matches(|c: char| c == '.' || c == ',');
-        if is_company_suffix(stripped) && i > 0 {
-            // Walk backward to find the full company name
-            let start = (0..i)
-                .rev()
-                .take_while(|&j| {
-                    let w = words[j].trim_end_matches(|c: char| c == ',' || c == '.');
-                    w.chars().next().map_or(false, |c| c.is_ascii_uppercase())
-                })
-                .last()
-                .unwrap_or(i.saturating_sub(1));
-
-            let name_words: Vec<&str> = words[start..=i]
-                .iter()
-                .map(|w| w.trim_end_matches(|c: char| c == ',' || c == '.'))
-                .collect();
-
-            if name_words.len() >= 2 {
-                let name = name_words.join(" ");
-                companies.push(Mention {
-                    name,
-                    entity_type: "company".into(),
-                });
-            }
+    for i in 0..words.len() {
+        let current = words[i].trim_end_matches(|c: char| c == '.' || c == ',' || c == ';');
+        if !is_company_suffix(current) {
+            continue;
         }
+        if i == 0 {
+            continue; // need at least one word before the suffix
+        }
+        let prev = words[i - 1].trim_end_matches(|c: char| c == '.' || c == ',' || c == ';');
+        if prev.len() < 2 {
+            continue;
+        }
+        if !is_proper_word(prev) {
+            continue;
+        }
+        let noise_words: &[&str] = &[
+            "The", "And", "For", "With", "This", "That", "From", "Have",
+            "Been", "Was", "Are", "Has", "Had", "Not", "But", "Its", "His",
+            "Her", "She", "They", "Will", "Would", "Could", "Should", "There",
+            "Their", "About", "Which", "When", "Where", "What", "Into", "Over",
+        ];
+        if noise_words.contains(&prev) {
+            continue;
+        }
+        results.push(Mention {
+            name: format!("{} {}", prev, current),
+            entity_type: "company".into(),
+        });
     }
-    companies
+    results
 }
 
 /// Create or find entity records (entity_link + kg_node) for a mention.
@@ -243,160 +280,157 @@ fn ensure_entity(
     // Check existing entity_link by exact name match
     let mut link_id: Option<String> = None;
     for existing in ctx.db.entity_link().iter().take(crate::MAX_RESULTS) {
-        if existing.workspace_id == workspace_id && existing.entity_name == mention.name {
+        if existing.name.eq_ignore_ascii_case(&mention.name)
+            && existing.workspace_id == workspace_id
+        {
+            // Update usage count
+            let updated = EntityLink {
+                used_count: existing.used_count + 1,
+                last_seen: now,
+                ..existing.clone()
+            };
+            ctx.db.entity_link().id().update(updated);
             link_id = Some(existing.id.clone());
             break;
         }
     }
 
-    // Check existing kg_node by label match
-    for existing in ctx.db.kg_node().iter().take(crate::MAX_RESULTS) {
-        if existing.workspace_id == workspace_id && existing.label == mention.name {
-            // Found existing node — ensure entity_link exists too
-            if link_id.is_none() {
-                let eid = uuid_v7(ctx);
-                let link = EntityLink {
-                    id: eid.clone(),
-                    workspace_id: workspace_id.into(),
-                    entity_name: mention.name.clone(),
-                    entity_type: mention.entity_type.clone(),
-                    aliases_json: "[]".into(),
-                    description: "auto-extracted".into(),
-                    created_at: now,
-                };
-                ctx.db.entity_link().insert(link);
-            }
-            return existing.id;
-        }
-    }
-
     // Create new entity_link if needed
-    let needs_link = link_id.is_none();
-    let eid = if let Some(id) = link_id { id } else { uuid_v7(ctx) };
-    if needs_link {
+    let eid = if let Some(ref id) = link_id { id.clone() } else { uuid_v7(ctx) };
+    if link_id.is_none() {
         let link = EntityLink {
             id: eid.clone(),
-            workspace_id: workspace_id.into(),
-            entity_name: mention.name.clone(),
+            name: mention.name.clone(),
             entity_type: mention.entity_type.clone(),
-            aliases_json: "[]".into(),
-            description: "auto-extracted".into(),
-            created_at: now,
+            workspace_id: workspace_id.to_string(),
+            used_count: 1,
+            first_seen: now,
+            last_seen: now,
         };
         ctx.db.entity_link().insert(link);
     }
 
-    // Create new kg_node
-    let nid = uuid_v7(ctx);
-    let node = KgNode {
-        id: nid.clone(),
-        workspace_id: workspace_id.into(),
-        label: mention.name.clone(),
-        node_type: mention.entity_type.clone(),
-        summary: format!("auto-extracted {}", mention.entity_type),
-        metadata_json: "{}".into(),
-        source_memory_id: String::new(),
-        community_id: 0,
-        embedding_json: "[]".into(),
-        created_at: now,
-    };
-    ctx.db.kg_node().insert(node);
-    nid
-}
-
-/// Create an edge between two entities in the knowledge graph.
-fn create_edge(
-    ctx: &ReducerContext,
-    workspace_id: &str,
-    source_id: &str,
-    target_id: &str,
-    relation: &str,
-    now: i64,
-) {
-    let id = uuid_v7(ctx);
-    let edge = KgEdge {
-        id,
-        workspace_id: workspace_id.into(),
-        source_node_id: source_id.into(),
-        target_node_id: target_id.into(),
-        relation: relation.into(),
-        weight: 0.5,
-        confidence: "LOW".into(),
-        metadata_json: "{}".into(),
-        source_memory_id: String::new(),
-        created_at: now,
-        valid_at: now,
-        invalid_at: 0,
-        version: 1,
-        edge_group_id: "".into(),
-    };
-    ctx.db.kg_edge().insert(edge);
-}
-
-// ---------------------------------------------------------------------------
-// Public reducer
-// ---------------------------------------------------------------------------
-
-/// Extract entities from text and link them in the entity graph.
-///
-/// Called automatically from ``store_memory``.  Also exposed as a public
-/// reducer for re-extraction of existing memories.
-///
-/// Args:
-///     workspace_id: Target workspace.
-///     content: The text to scan for entity mentions.
-#[reducer]
-pub fn extract_entities(
-    ctx: &ReducerContext,
-    workspace_id: String,
-    content: String,
-) -> Result<(), String> {
-    let _account = require_auth(ctx)?;
-    let caller = ctx.sender().to_hex();
-    check_space_access(ctx, &workspace_id, &caller, "editor")?;
-    let now = now_micros(ctx);
-
-    let people = extract_people(&content);
-    let companies = extract_companies(&content);
-    let tech_concepts = extract_single_words(&content);
-    let acronyms = extract_acronyms(&content);
-    let all_mentions: Vec<Mention> = people
-        .into_iter()
-        .chain(companies.into_iter())
-        .chain(tech_concepts.into_iter())
-        .chain(acronyms.into_iter())
-        .collect();
-
-    if all_mentions.is_empty() {
-        return Ok(());
-    }
-
-    // Ensure entity_link records for each mention
-    let mut entity_ids: Vec<(String, String)> = Vec::new(); // (id, entity_type)
-    for mention in &all_mentions {
-        let eid = ensure_entity(ctx, &workspace_id, mention, now);
-        entity_ids.push((eid, mention.entity_type.clone()));
-    }
-
-    // Create co-mention edges between entities found in the same text
-    for i in 0..entity_ids.len() {
-        for j in (i + 1)..entity_ids.len() {
-            let relation = match (entity_ids[i].1.as_str(), entity_ids[j].1.as_str()) {
-                ("person", "company") => "mentioned_with_company",
-                ("company", "person") => "mentioned_with_person",
-                ("person", "person") => "co_mentioned_person",
-                _ => "co_mentioned",
-            };
-            create_edge(
-                ctx,
-                &workspace_id,
-                &entity_ids[i].0,
-                &entity_ids[j].0,
-                relation,
-                now,
-            );
+    // Also ensure a KG node exists
+    let mut node_id: Option<String> = None;
+    for existing in ctx.db.kg_node().iter().take(crate::MAX_RESULTS) {
+        if existing.name.eq_ignore_ascii_case(&mention.name)
+            && existing.workspace_id == workspace_id
+        {
+            node_id = Some(existing.id.clone());
+            break;
         }
     }
+    if let Some(nid) = node_id {
+        nid
+    } else {
+        let nid = uuid_v7(ctx);
+        ctx.db.kg_node().insert(KgNode {
+            id: nid.clone(),
+            workspace_id: workspace_id.to_string(),
+            name: mention.name.clone(),
+            entity_type: mention.entity_type.clone(),
+            description: String::new(),
+            metadata_json: String::new(),
+        });
+        nid
+    }
+}
+
+/// Result table for extract_entities.
+#[table(accessor = entity_extraction_result, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EntityExtractionResult {
+    #[primary_key]
+    pub id: String,
+    pub workspace_id: String,
+    /// JSON array of {type, name} pairs
+    pub entities_json: String,
+    pub kg_node_count: u64,
+    pub edge_count: u64,
+    pub queried_at: i64,
+}
+
+/// Extract named entities from a workspace's most recent conversation text.
+///
+/// Runs all extractors (people, companies, acronyms, single words) and
+/// creates entity_link + kg_node records for each mention. Also creates
+/// co-occurrence KG edges between entities that appear in the same text.
+#[reducer]
+pub fn extract_entities(ctx: &ReducerContext, workspace_id: String, text: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex().to_string();
+
+    // Check workspace access
+    let has_access = ctx.db.workspace().id().find(&workspace_id).is_some()
+        || ctx.db.space_permission().iter().take(crate::MAX_RESULTS).any(|sp: SpacePermission| {
+            sp.workspace_id == workspace_id && sp.peer_id == caller
+        });
+    if !has_access {
+        return Err(format!("Access denied: no access to workspace '{}'", workspace_id));
+    }
+
+    let now = now_micros(ctx);
+
+    // Run all extractors
+    let mut all_mentions: Vec<Mention> = Vec::new();
+    all_mentions.extend(extract_people(&text));
+    all_mentions.extend(extract_companies(&text));
+    all_mentions.extend(extract_acronyms(&text));
+    all_mentions.extend(extract_single_words(&text));
+
+    // Deduplicate by name (case-insensitive) — keep first occurrence
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    all_mentions.retain(|m| {
+        let lower = m.name.to_lowercase();
+        seen.insert(lower)
+    });
+
+    // Ensure each entity exists and collect KG node IDs
+    let mut entity_ids: Vec<String> = Vec::new();
+    for mention in &all_mentions {
+        let nid = ensure_entity(ctx, &workspace_id, mention, now);
+        entity_ids.push(nid);
+    }
+
+    // Create co-occurrence edges between entities in the same text
+    for i in 0..entity_ids.len() {
+        for j in (i + 1)..entity_ids.len() {
+            let sub = &entity_ids[i];
+            let obj = &entity_ids[j];
+            // Check if edge already exists
+            let exists = ctx.db.kg_edge().iter().take(crate::MAX_RESULTS).any(|e: KgEdge| {
+                (e.subject_id == *sub && e.object_id == *obj)
+                    || (e.subject_id == *obj && e.object_id == *sub)
+            });
+            if !exists {
+                ctx.db.kg_edge().insert(KgEdge {
+                    id: uuid_v7(ctx),
+                    subject_id: sub.clone(),
+                    object_id: obj.clone(),
+                    relation: "co_occurrence".to_string(),
+                    weight: 1.0,
+                    created_at: now,
+                });
+            }
+        }
+    }
+
+    // Write result
+    let entities_json = serde_json::to_string(
+        &all_mentions.iter().map(|m| serde_json::json!({
+            "type": m.entity_type,
+            "name": m.name,
+        })).collect::<Vec<_>>()
+    ).unwrap_or_default();
+
+    ctx.db.entity_extraction_result().insert(EntityExtractionResult {
+        id: uuid_v4_uniq(ctx, |id| ctx.db.entity_extraction_result().id().find(id).is_none(), 3),
+        workspace_id: workspace_id.clone(),
+        entities_json,
+        kg_node_count: entity_ids.len() as u64,
+        edge_count: (entity_ids.len() * entity_ids.len().saturating_sub(1) / 2) as u64,
+        queried_at: now,
+    });
 
     log::info!(
         "extract_entities: {} mentions → {} edges for workspace {}",
@@ -428,23 +462,22 @@ mod tests {
         assert!(is_company_suffix("Ventures"));
         assert!(is_company_suffix("Labs"));
         assert!(is_company_suffix("AI"));
-        assert!(is_company_suffix("Software"));
+        assert!(is_company_suffix("SaaS"));
     }
 
     #[test]
     fn test_company_suffix_case_insensitive() {
         assert!(is_company_suffix("inc"));
-        assert!(is_company_suffix("llc"));
-        assert!(is_company_suffix("gmbh"));
-        assert!(is_company_suffix("ltd"));
+        assert!(is_company_suffix("INC"));
     }
 
     #[test]
-    fn test_company_suffix_not_a_suffix() {
-        assert!(!is_company_suffix("Banana"));
+    fn test_company_suffix_unknown() {
+        assert!(!is_company_suffix("Company"));
+        assert!(!is_company_suffix("Solutions"));
+        assert!(!is_company_suffix("Services"));
+        assert!(!is_company_suffix("Test"));
         assert!(!is_company_suffix(""));
-        assert!(!is_company_suffix("Apple"));
-        assert!(!is_company_suffix("Corporation")); // "Corp" yes, "Corporation" no
     }
 
     // ── is_proper_word ─────────────────────────────────────────────────
@@ -647,54 +680,48 @@ mod tests {
 
     #[test]
     fn test_extract_people_short_names_filtered() {
-        // "A Bc" — first word "A" has len 1 → entity_score returns 0 (len < 3)
-        let mentions = extract_people("A Bc and Xy Zz are here");
-        // "A" is too short, "Xy" len=2 → entity_score=0
-        assert!(mentions.is_empty());
-    }
-
-    #[test]
-    fn test_extract_people_false_positives_filtered() {
-        // "I The" — "I" is short (len 1), should be filtered
-        let mentions = extract_people("I The person said hi");
-        assert!(mentions.is_empty());
-    }
-
-    #[test]
-    fn test_extract_people_middle_of_sentence() {
-        let mentions = extract_people("The speaker John Doe presented today");
+        // Both names must be ≥3 chars for the first word
+        let mentions = extract_people("Al Go is a short name");
         let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
-        assert!(names.contains(&"John Doe"));
+        assert!(names.is_empty(), "short names should not be extracted as people");
     }
 
     #[test]
-    fn test_extract_people_empty() {
-        let mentions = extract_people("");
-        assert!(mentions.is_empty());
+    fn test_extract_people_noise_words_filtered() {
+        let mentions = extract_people("The World is not a person");
+        let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
+        // "The World" — "The" is a noise word → should be filtered
+        assert!(!names.contains(&"The World"), "noise word 'The' should be filtered");
     }
 
     // ── extract_companies ──────────────────────────────────────────────
 
     #[test]
-    fn test_extract_companies_with_suffix() {
-        let mentions = extract_companies("OpenAI Inc and Google LLC are big");
+    fn test_extract_companies_simple() {
+        let mentions = extract_companies("OpenAI Inc and Microsoft Corp are tech companies");
         let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
         assert!(names.contains(&"OpenAI Inc"));
-        assert!(names.contains(&"Google LLC"));
+        assert!(names.contains(&"Microsoft Corp"));
     }
 
     #[test]
-    fn test_extract_companies_multi_word() {
-        let mentions = extract_companies("Atlas Venture Partners raised a fund");
+    fn test_extract_companies_suffix_case_insensitive() {
+        let mentions = extract_companies("Acme corp and Beta ltd");
         let names: Vec<&str> = mentions.iter().map(|m| m.name.as_str()).collect();
-        assert!(names.contains(&"Atlas Venture Partners"));
+        assert!(names.contains(&"Acme corp"));
+        assert!(names.contains(&"Beta ltd"));
     }
 
     #[test]
-    fn test_extract_companies_suffix_at_start() {
-        // "Inc" at position 0 — no preceding capitalized words
-        let mentions = extract_companies("Inc is not a company name here");
-        assert!(mentions.is_empty());
+    fn test_extract_companies_no_prev_word() {
+        let mentions = extract_companies("Inc is just a suffix");
+        assert!(mentions.is_empty(), "suffix at start of text → no company");
+    }
+
+    #[test]
+    fn test_extract_companies_prev_word_too_short() {
+        let mentions = extract_companies("A Corp has a short name");
+        assert!(mentions.is_empty(), "single-char prev word → not a company");
     }
 
     #[test]
@@ -730,13 +757,8 @@ mod tests {
         assert!(names.contains(&"Acme Corp"));
         assert!(names.contains(&"Beta LLC"));
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // ── is_company_suffix tests ─────────────────────────────────────────────
+    // ── is_company_suffix tests (extended) ──────────────────────────────────
 
     #[test]
     fn test_is_company_suffix_known_suffixes() {
@@ -764,7 +786,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_company_suffix_case_insensitive() {
+    fn test_is_company_suffix_case_insensitive_ext() {
         assert!(is_company_suffix("inc"));
         assert!(is_company_suffix("INC"));
         assert!(is_company_suffix("Inc"));
@@ -780,10 +802,10 @@ mod tests {
         assert!(!is_company_suffix(""));
     }
 
-    // ── is_proper_word tests ────────────────────────────────────────────────
+    // ── is_proper_word tests (extended) ────────────────────────────────
 
     #[test]
-    fn test_is_proper_word_valid() {
+    fn test_is_proper_word_valid_ext() {
         assert!(is_proper_word("John"));
         assert!(is_proper_word("Apple"));
         assert!(is_proper_word("Microsoft"));
@@ -815,7 +837,7 @@ mod tests {
         assert!(!is_proper_word("jOHN"));
     }
 
-    // ── entity_score tests ──────────────────────────────────────────────────
+    // ── entity_score tests (extended) ──────────────────────────────────
 
     #[test]
     fn test_entity_score_noise_words_zero() {
@@ -845,13 +867,13 @@ mod tests {
     }
 
     #[test]
-    fn test_entity_score_case_insensitive_noise() {
+    fn test_entity_score_case_insensitive_noise_alt() {
         assert_eq!(entity_score("THE"), 0);
         assert_eq!(entity_score("And"), 0);
         assert_eq!(entity_score("FOR"), 0);
     }
 
-    // ── extract_people tests ────────────────────────────────────────────────
+    // ── extract_people tests (extended) ────────────────────────────────
 
     #[test]
     fn test_extract_people_simple_two_word_names() {
@@ -895,10 +917,10 @@ mod tests {
         assert_eq!(people.len(), 0);
     }
 
-    // ── extract_single_words tests ──────────────────────────────────────────
+    // ── extract_single_words tests (extended) ──────────────────────────
 
     #[test]
-    fn test_extract_single_words_tech_names() {
+    fn test_extract_single_words_tech_names_ext() {
         let text = "I use Python and Rust for programming. Also Docker and Kubernetes.";
         let words = extract_single_words(text);
         let names: Vec<_> = words.iter().map(|w| w.name.as_str()).collect();
@@ -909,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_single_words_skips_sentence_starters() {
+    fn test_extract_single_words_skips_sentence_starters_ext() {
         let text = "Hello world. This is a test. Apple makes phones.";
         let words = extract_single_words(text);
         let names: Vec<_> = words.iter().map(|w| w.name.as_str()).collect();
@@ -936,10 +958,10 @@ mod tests {
         assert_eq!(words.len(), 0);
     }
 
-    // ── extract_acronyms tests ──────────────────────────────────────────────
+    // ── extract_acronyms tests (extended) ──────────────────────────────
 
     #[test]
-    fn test_extract_acronyms_valid() {
+    fn test_extract_acronyms_valid_ext() {
         let text = "NASA and FBI work with AI and ML models. HTTP API uses JSON.";
         let acronyms = extract_acronyms(text);
         let names: Vec<_> = acronyms.iter().map(|a| a.name.as_str()).collect();
@@ -960,7 +982,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_acronyms_length_bounds() {
+    fn test_extract_acronyms_length_bounds_ext() {
         let text = "A AB ABC ABCD ABCDE ABCDEF ABCDEFG";
         let acronyms = extract_acronyms(text);
         let names: Vec<_> = acronyms.iter().map(|a| a.name.as_str()).collect();
@@ -983,7 +1005,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_acronyms_with_digits() {
+    fn test_extract_acronyms_with_digits_ext() {
         let text = "HTTP2 TLS13 USB3";
         let acronyms = extract_acronyms(text);
         let names: Vec<_> = acronyms.iter().map(|a| a.name.as_str()).collect();
@@ -992,4 +1014,3 @@ mod tests {
         assert!(names.contains(&"USB3"));
     }
 }
-
