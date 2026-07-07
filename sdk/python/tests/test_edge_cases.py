@@ -32,6 +32,7 @@ class TestEmptySearch:
     @pytest.mark.unit
     def test_empty_query_keyword(self, mock_http_client):
         """Search with an empty string (semantic=False) returns empty list."""
+        mock_http_client._tantivy_search = Mock(return_value=[])
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([]),
@@ -68,6 +69,7 @@ class TestEmptySearch:
     @pytest.mark.unit
     def test_search_empty_workspace(self, mock_http_client):
         """Search in a workspace that has no data returns empty list."""
+        mock_http_client._tantivy_search = Mock(return_value=[])
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([]),
@@ -82,6 +84,7 @@ class TestEmptySearch:
     @pytest.mark.unit
     def test_search_single_character(self, mock_http_client):
         """Search with a single character returns valid results."""
+        mock_http_client._tantivy_search = Mock(return_value=[])
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([]),

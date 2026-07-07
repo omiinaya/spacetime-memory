@@ -20,7 +20,11 @@ function mockSqlResponse(rows: unknown[]): void {
           name: { some: name },
         })),
       },
-      rows: rows.map((r) => Object.values(r as Record<string, unknown>)),
+      rows: rows.map((r) =>
+        Object.values(r as Record<string, unknown>).map((v) =>
+          typeof v === "bigint" ? Number(v) : v,
+        ),
+      ),
     },
   ]);
   globalThis.fetch = vi.fn().mockResolvedValue({
@@ -1211,7 +1215,7 @@ describe("Client", () => {
       expect(result).not.toBeNull();
       expect(result).toHaveProperty("peer_id", "peer-1");
       expect(result).toHaveProperty("reputation_score", 0.846);
-      expect(result).toHaveProperty("helpful_count", 10n);
+      expect(result).toHaveProperty("helpful_count", 10);
     });
 
     it("returns null for unknown peer", async () => {
