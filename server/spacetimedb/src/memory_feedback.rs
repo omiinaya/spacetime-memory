@@ -2,7 +2,7 @@ use spacetimedb::*;
 use crate::auth::require_admin;
 use crate::auth::require_auth;
 
-use crate::{memory::memory, now_micros, uuid_v7};
+use crate::{memory::memory, now_micros, uuid_v4_uniq, uuid_v7};
 use crate::workspace::workspace;
 
 /// Records user feedback on a memory for trust scoring.
@@ -496,6 +496,59 @@ pub fn recommend_memories(
             action: action.clone(),
             urgency: *urgency,
             created_at: now,
+        });
+    }
+
+    Ok(())
+}
+
+// ── Peer Reputation Result Table ──────────────────────────────────
+
+/// Result table for `get_peer_reputation` queries.
+#[table(accessor = peer_reputation_result, public)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PeerReputationResult {
+    #[primary_key]
+    pub id: String,
+    pub peer_id: String,
+    pub helpful_count: u64,
+    pub unhelpful_count: u64,
+    pub total_feedback: u64,
+    pub reputation_score: f64,
+    pub last_feedback_at: i64,
+}
+
+/// Get reputation stats for a peer.
+///
+/// Looks up the peer in `peer_reputation` and stores the result in
+/// `peer_reputation_result` for client consumption. Returns a single
+/// record if found, or an empty table if the peer has no feedback history.
+#[reducer]
+pub fn get_peer_reputation(ctx: &ReducerContext, peer_id: String) -> Result<(), String> {
+    let _account = require_auth(ctx)?;
+
+    // Clear stale results
+    let stale: Vec<_> = ctx
+        .db
+        .peer_reputation_result()
+        .iter()
+        .take(crate::MAX_RESULTS)
+        .map(|r: &PeerReputationResult| r.id.clone())
+        .collect();
+    for id in &stale {
+        ctx.db.peer_reputation_result().id().delete(id);
+    }
+
+    // Look up the peer reputation and insert into result table
+    if let Some(rep) = ctx.db.peer_reputation().id().find(&peer_id) {
+        ctx.db.peer_reputation_result().insert(PeerReputationResult {
+            id: uuid_v4_uniq(ctx, |id| ctx.db.peer_reputation_result().id().find(id).is_none(), 3),
+            peer_id: rep.id.clone(),
+            helpful_count: rep.helpful_count,
+            unhelpful_count: rep.unhelpful_count,
+            total_feedback: rep.total_feedback,
+            reputation_score: rep.reputation_score,
+            last_feedback_at: rep.last_feedback_at,
         });
     }
 

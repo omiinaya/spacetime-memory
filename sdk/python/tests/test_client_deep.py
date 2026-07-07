@@ -5180,16 +5180,20 @@ class TestConfigAndReputation:
         from unittest.mock import Mock
 
         c = Client(host="localhost", port=3001)
-        c._query = Mock(return_value=[{"id": "peer1", "reputation": 0.85}])
+        c._call = Mock()
+        c._sql = Mock(return_value=[{"id": "uuid-1", "peer_id": "peer1", "reputation_score": 0.85}])
         result = c.get_peer_reputation("peer1")
-        assert result == {"id": "peer1", "reputation": 0.85}
+        c._call.assert_called_once_with("get_peer_reputation", ["peer1"])
+        assert result == {"id": "uuid-1", "peer_id": "peer1", "reputation_score": 0.85}
 
     def test_get_peer_reputation_not_found(self):
         from unittest.mock import Mock
 
         c = Client(host="localhost", port=3001)
-        c._query = Mock(return_value=[])
+        c._call = Mock()
+        c._sql = Mock(return_value=[])
         result = c.get_peer_reputation("peer1")
+        c._call.assert_called_once_with("get_peer_reputation", ["peer1"])
         assert result is None
 
 
