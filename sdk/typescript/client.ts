@@ -4206,3 +4206,6 @@ export class Client {
     }
   }
 }
+
+// Re-export Compounder class for convenience via main entry point
+export { Compounder, CompounderCrossLinkResult, SuggestConnectionResult, EntityPageResult, IngestSourceResult, StoreAnswerResultEx } from "./compounder";
