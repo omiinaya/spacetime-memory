@@ -4237,8 +4237,9 @@ class Client:
         workspace_id: str,
         name: str,
         permissions: str = '["read"]',
+        scope: str = "*",
     ) -> dict[str, Any]:
-        """Create a new API key.
+        """Create a new API key with optional scope limits.
 
         Generates a secure random key secret, hashes it, and stores the
         hash in the SpacetimeDB ``ApiKey`` table.  The unhashed secret is
@@ -4249,10 +4250,13 @@ class Client:
             name: A human-readable label for this key.
             permissions: JSON array of permission strings
                 (default: ``["read"]``).
+            scope: JSON scope defining workspace access limits.
+                ``"*"`` (default) = system-wide / admin-level access.
+                ``'["ws-1", "ws-2"]'`` = scoped to specific workspace IDs.
 
         Returns:
             Dict with ``status``, ``api_key`` (the secret), ``id`` (the
-            key's database ID), and a warning note.
+            key's database ID), ``scope``, and a warning note.
         """
         raw = secrets.token_bytes(32)
         api_key = "sk-" + raw.hex()
@@ -4267,12 +4271,13 @@ class Client:
                 permissions,
                 key_hash,
                 request_id,
+                scope,
             ],
         )
 
         # Fetch the just-created key from the public result table
         rows = self._sql(
-            "SELECT api_key_id, name, permissions FROM api_key_result WHERE "
+            "SELECT api_key_id, name, permissions, scope FROM api_key_result WHERE "
             f"request_id = '{_esc(request_id)}' "
             "AND operation = 'create'"
         )
@@ -4282,8 +4287,81 @@ class Client:
             "status": "ok",
             "api_key": api_key,
             "id": key_id,
+            "scope": scope,
             "note": "Save this key — it will not be shown again.",
         }
+
+    def verify_api_key(
+        self,
+        raw_key: str,
+    ) -> dict[str, Any]:
+        """Verify an API key by its raw secret (sk-...).
+
+        Hashes the key and looks it up against stored key hashes in the
+        ``ApiKey`` table.  Returns the key's scope, permissions, and
+        metadata if valid.
+
+        Args:
+            raw_key: The full ``sk-...`` API key secret.
+
+        Returns:
+            Dict with verification result including ``valid``, ``api_key_id``,
+            ``workspace_id``, ``scope``, ``permissions``, ``name``, and
+            ``verified_at``. If the key is invalid, ``valid`` is ``False``.
+        """
+        try:
+            self._call("verify_api_key", [raw_key])
+        except Exception as e:
+            return {"valid": False, "error": str(e)}
+
+        rows = self._sql(
+            "SELECT api_key_id, workspace_id, name, permissions, scope, "
+            "is_active, created_at, last_used_at, verified_at "
+            "FROM api_key_verification_result "
+            "ORDER BY verified_at DESC LIMIT 1"
+        )
+        if not rows:
+            return {"valid": False, "error": "Key not found or deactivated"}
+
+        row = rows[0]
+        return {
+            "valid": True,
+            "api_key_id": row["api_key_id"],
+            "workspace_id": row["workspace_id"],
+            "name": row["name"],
+            "permissions": row["permissions"],
+            "scope": row["scope"],
+            "is_active": row["is_active"],
+            "created_at": row["created_at"],
+            "last_used_at": row["last_used_at"],
+            "verified_at": row["verified_at"],
+        }
+
+    def update_api_key(
+        self,
+        key_id: str,
+        name: str = "",
+        permissions: str = "",
+        scope: str = "",
+        is_active: bool = True,
+    ) -> dict[str, Any]:
+        """Update an API key's name, permissions, scope, or active status.
+
+        Args:
+            key_id: The primary-key ``id`` of the ``ApiKey`` row.
+            name: New label (empty = leave unchanged).
+            permissions: New JSON permission array (empty = leave unchanged).
+            scope: New scope string (empty = leave unchanged).
+                ``"*"`` for all workspaces, or ``'["ws-1"]'`` for scoped access.
+            is_active: Active status (default: True).
+
+        Returns:
+            Reducer status dict.
+        """
+        return self._call(
+            "update_api_key",
+            [key_id, name, permissions, scope, is_active],
+        )
 
     def deactivate_api_key(self, key_id: str) -> dict[str, Any]:
         """Deactivate (revoke) an API key so it can no longer be used.
