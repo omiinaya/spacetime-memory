@@ -2043,12 +2043,18 @@ class Client:
         mmr_lambda: float = 0.0,
         fusion_weights: dict[str, float] | None = None,
         entity_types: list[str] | None = None,
+        temporal_filter: dict[str, Any] | None = None,
         before: float | int | None = None,
         after: float | int | None = None,
     ) -> list[dict[str, Any]]:
         """Search memories.  When *semantic* is True uses hybrid search.
 
         Args:
+            temporal_filter: Optional dict with ``"from"`` and/or ``"to"`` keys
+                    (Unix timestamps) to filter results by creation time.
+                    Shorthand for ``before``/``after`` — entries are used
+                    only when the corresponding explicit param is not set.
+                    Example: ``{"from": 1700000000, "to": 1700086400}``.
             rerank: If True, passes top results through an LLM reranker
                     (QMD-style) for relevance re-scoring.
             rerank_endpoint: OpenAI-compatible base URL for reranker
