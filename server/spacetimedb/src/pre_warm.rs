@@ -60,6 +60,7 @@ pub fn pre_warm_caches(ctx: &ReducerContext) {
     pre_warm_single(ctx, "agent_step", |ctx| ctx.db.agent_step().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "api_key", |ctx| ctx.db.api_key().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "api_key_result", |ctx| ctx.db.api_key_result().iter().take(0).for_each(drop));
+    pre_warm_single(ctx, "api_key_verification_result", |ctx| ctx.db.api_key_verification_result().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "backup_entry", |ctx| ctx.db.backup_entry().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "block_reference", |ctx| ctx.db.block_reference().iter().take(0).for_each(drop));
     pre_warm_single(ctx, "bridge_result", |ctx| ctx.db.bridge_result().iter().take(0).for_each(drop));

@@ -65,6 +65,88 @@ pub struct ApiKeyResult {
     pub request_id: String,
 }
 
+// ── Rate Limiting ─────────────────────────────────────────────────────
+
+/// Sliding-window rate limit configuration per endpoint.
+const RATE_LIMIT_WINDOW_MICROS: i64 = 60_000_000; // 60 seconds
+const REGISTER_MAX: usize = 3;    // max 3 registration attempts per 60s
+const LOGIN_MAX: usize = 10;      // max 10 login attempts per 60s
+
+/// Records a single request timestamp for rate limit tracking.
+/// Private table — only accessed through check_rate_limit.
+#[table(accessor = rate_limit_entry)]
+#[derive(Debug, Clone)]
+pub struct RateLimitEntry {
+    #[primary_key]
+    pub id: String,
+    /// Identity hex of the caller.
+    pub identity: String,
+    /// Endpoint name: "register" | "login".
+    pub endpoint: String,
+    /// Timestamp in microseconds (from now_micros).
+    pub timestamp: i64,
+}
+
+/// Check if the caller has exceeded the rate limit for an endpoint.
+/// Sweeps entries older than the window, then counts remaining entries.
+/// Inserts a new entry if under the limit, or returns an error.
+fn check_rate_limit(ctx: &ReducerContext, endpoint: &str, max_requests: usize) -> Result<(), String> {
+    let identity = ctx.sender().to_hex().to_string();
+    let now = crate::now_micros(ctx);
+    let window_start = now - RATE_LIMIT_WINDOW_MICROS;
+
+    // Sweep old entries for this identity+endpoint
+    let old: Vec<_> = ctx.db.rate_limit_entry().iter().take(crate::MAX_RESULTS)
+        .filter(|e: &RateLimitEntry| e.identity == identity && e.endpoint == endpoint && e.timestamp < window_start)
+        .collect();
+    for entry in old {
+        ctx.db.rate_limit_entry().id().delete(&entry.id);
+    }
+
+    // Count remaining entries within the window
+    let count = ctx.db.rate_limit_entry().iter().take(crate::MAX_RESULTS)
+        .filter(|e: &RateLimitEntry| e.identity == identity && e.endpoint == endpoint)
+        .count();
+
+    if count >= max_requests {
+        let retry_after_secs = RATE_LIMIT_WINDOW_MICROS / 1_000_000;
+        return Err(format!(
+            "Rate limit exceeded for '{}'. Maximum {} requests per {} seconds. Please wait and retry.",
+            endpoint, max_requests, retry_after_secs
+        ));
+    }
+
+    // Record this request
+    let id = crate::uuid_v4(ctx);
+    ctx.db.rate_limit_entry().insert(RateLimitEntry {
+        id,
+        identity,
+        endpoint: endpoint.to_string(),
+        timestamp: now,
+    });
+
+    Ok(())
+}
+
+/// Periodically clean up expired rate limit entries.
+/// Can be called via cron or scheduler.
+#[reducer]
+pub fn cleanup_rate_limits(ctx: &ReducerContext) -> Result<(), String> {
+    let now = crate::now_micros(ctx);
+    let window_start = now - RATE_LIMIT_WINDOW_MICROS;
+
+    let old: Vec<_> = ctx.db.rate_limit_entry().iter().take(crate::MAX_RESULTS)
+        .filter(|e: &RateLimitEntry| e.timestamp < window_start)
+        .collect();
+    let count = old.len();
+    for entry in old {
+        ctx.db.rate_limit_entry().id().delete(&entry.id);
+    }
+
+    log::info!("cleanup_rate_limits: removed {} expired entries", count);
+    Ok(())
+}
+
 // ── Reducers ──────────────────────────────────────────────────────────
 
 /// Register a new account. First user is admin.
@@ -304,6 +386,101 @@ pub fn create_api_key(
     })
 }
 
+/// Verify an API key by its raw secret (sk-...).
+///
+/// Hashes the raw key, finds the matching ApiKey row, checks it is active,
+/// and writes the verification result to the public `api_key_verification_result`
+/// table.  The SDK reads that table to obtain the key's scope and permissions
+/// without direct access to the private api_key table.
+///
+/// The caller identity is recorded so the SDK can filter for its own results.
+#[reducer]
+pub fn verify_api_key(ctx: &ReducerContext, raw_key: String) -> Result<(), String> {
+    trace_span!(ctx, "verify_api_key", TracingSpanKind::Read, "", {
+        let caller = ctx.sender().to_hex().to_string();
+        let now = now_micros(ctx);
+
+        let key_hash = hash_api_key(&raw_key);
+
+        let key = ctx.db.api_key().iter().take(crate::MAX_RESULTS)
+            .find(|k: &ApiKey| k.key_hash == key_hash && k.is_active)
+            .ok_or_else(|| "Invalid or deactivated API key".to_string())?;
+
+        // Update last_used_at
+        let mut upd = key.clone();
+        upd.last_used_at = now;
+        ctx.db.api_key().id().update(upd);
+
+        // Clear previous verification results for this caller
+        let old: Vec<_> = ctx.db.api_key_verification_result().iter().take(crate::MAX_RESULTS)
+            .filter(|r: &ApiKeyVerificationResult| r.caller_identity == caller)
+            .collect();
+        for r in old {
+            ctx.db.api_key_verification_result().id().delete(&r.id);
+        }
+
+        // Write fresh result
+        ctx.db.api_key_verification_result().insert(ApiKeyVerificationResult {
+            id: uuid_v4_uniq(ctx, |id| ctx.db.api_key_verification_result().id().find(id).is_none(), 3),
+            api_key_id: key.id.clone(),
+            workspace_id: key.workspace_id.clone(),
+            name: key.name.clone(),
+            permissions: key.permissions.clone(),
+            scope: key.scope.clone(),
+            is_active: true,
+            created_at: key.created_at,
+            last_used_at: now,
+            caller_identity: caller,
+            verified_at: now,
+        });
+
+        Ok(())
+    })
+}
+
+/// Update an API key's name, permissions, scope, or active status.
+///
+/// The caller must be authenticated.  Only admins or the key's workspace owner
+/// can update a key.
+#[reducer]
+pub fn update_api_key(
+    ctx: &ReducerContext,
+    id: String,
+    name: String,
+    permissions: String,
+    scope: String,
+    is_active: bool,
+) -> Result<(), String> {
+    trace_span!(ctx, "update_api_key", TracingSpanKind::Write, "", {
+        let _account = require_auth(ctx)?;
+
+        let mut key = ctx.db.api_key().id().find(&id)
+            .ok_or_else(|| "API key not found".to_string())?;
+
+        // Validate new permissions if provided
+        if !permissions.is_empty() {
+            if serde_json::from_str::<Vec<String>>(&permissions).is_err() {
+                return Err("permissions must be a valid JSON array of strings or empty to leave unchanged".to_string());
+            }
+            key.permissions = permissions;
+        }
+
+        // Validate new scope if provided
+        if !scope.is_empty() {
+            validate_scope(&scope)?;
+            key.scope = scope;
+        }
+
+        if !name.is_empty() {
+            key.name = name;
+        }
+        key.is_active = is_active;
+
+        ctx.db.api_key().id().update(key);
+        Ok(())
+    })
+}
+
 /// Deactivate an API key.
 #[reducer]
 pub fn deactivate_api_key(ctx: &ReducerContext, id: String) -> Result<(), String> {
@@ -353,6 +530,7 @@ pub fn list_api_keys(ctx: &ReducerContext, workspace_id: String) -> Result<(), S
                 workspace_id: workspace_id.clone(),
                 name: key.name.clone(),
                 permissions: key.permissions.clone(),
+                scope: key.scope.clone(),
                 is_active: key.is_active,
                 created_at: key.created_at,
                 last_used_at: key.last_used_at,
@@ -423,6 +601,13 @@ fn derive_salt(identity: &str, timestamp: i64) -> Vec<u8> {
     hasher.update(&timestamp.to_le_bytes());
     hasher.update(b"spacetime-memory-auth-salt");
     hasher.finalize().to_vec()
+}
+
+/// Hash a raw API key (sk-...) with SHA-256 for secure storage and lookup.
+fn hash_api_key(raw_key: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(raw_key.as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 // ── Admin Management ─────────────────────────────────────────────────
