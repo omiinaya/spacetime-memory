@@ -1,6 +1,6 @@
 use spacetimedb::*;
 
-use crate::auth::{account, admin_list_result, api_key, api_key_result};
+use crate::auth::{account, admin_list_result, api_key, api_key_result, api_key_verification_result};
 use crate::change_event::{change_event, change_event_result};
 use crate::connector::connector_config;
 use crate::consolidation::{backup_entry, consolidation_log, maintenance_schedule, merge_suggestion};

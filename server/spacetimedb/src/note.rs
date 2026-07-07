@@ -347,7 +347,7 @@ pub fn get_backlinks(ctx: &ReducerContext, note_id: String) -> Result<(), String
         .backlink_result()
         .iter()
         .take(crate::MAX_RESULTS * 2)
-        .map(|r: &BacklinkResult| r.id.clone())
+        .map(|r: BacklinkResult| r.id.clone())
         .collect();
     for id in &stale {
         ctx.db.backlink_result().id().delete(id);
@@ -392,7 +392,7 @@ pub fn get_outgoing_links(ctx: &ReducerContext, note_id: String) -> Result<(), S
         .backlink_result()
         .iter()
         .take(crate::MAX_RESULTS * 2)
-        .map(|r: &BacklinkResult| r.id.clone())
+        .map(|r: BacklinkResult| r.id.clone())
         .collect();
     for id in &stale {
         ctx.db.backlink_result().id().delete(id);
