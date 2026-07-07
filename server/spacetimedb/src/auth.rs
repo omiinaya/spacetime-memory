@@ -201,6 +201,7 @@ pub fn register(
     display_name: String,
     password: String,
 ) -> Result<(), String> {
+    check_rate_limit(ctx, "register", REGISTER_MAX)?;
     trace_span!(ctx, "register", TracingSpanKind::Write, "", {
         let identity = ctx.sender().to_hex().to_string();
 
@@ -250,6 +251,7 @@ pub fn register(
 /// Login with username + password. Links this WebSocket identity to the account.
 #[reducer]
 pub fn login(ctx: &ReducerContext, username: String, password: String) -> Result<(), String> {
+    check_rate_limit(ctx, "login", LOGIN_MAX)?;
     trace_span!(ctx, "login", TracingSpanKind::Write, "", {
         let identity = ctx.sender().to_hex().to_string();
 
