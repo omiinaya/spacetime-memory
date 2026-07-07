@@ -1355,6 +1355,100 @@ mod tests {
         assert!((sim - 1.0).abs() < 1e-6);
     }
 
+    // ── tokenize_query ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_tokenize_query_basic() {
+        let tokens = tokenize_query("Rust memory system");
+        assert!(tokens.contains(&"rust".to_string()));
+        assert!(tokens.contains(&"memory".to_string()));
+        assert!(tokens.contains(&"system".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_query_removes_stopwords() {
+        let tokens = tokenize_query("the and for with");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_query_short_words() {
+        let tokens = tokenize_query("a b c d");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_query_mixed() {
+        let tokens = tokenize_query("the quick brown fox jumps");
+        assert!(!tokens.contains(&"the".to_string()));
+        assert!(tokens.contains(&"quick".to_string()));
+        assert!(tokens.contains(&"brown".to_string()));
+        assert!(tokens.contains(&"fox".to_string()));
+        assert!(tokens.contains(&"jumps".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_query_punctuation() {
+        let tokens = tokenize_query("hello, world! how's it?");
+        assert!(tokens.contains(&"hello".to_string()));
+        assert!(tokens.contains(&"world".to_string()));
+        assert!(!tokens.contains(&"it".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_query_empty() {
+        let tokens = tokenize_query("");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_query_numbers() {
+        let tokens = tokenize_query("GPT4 and BERT score");
+        assert!(tokens.contains(&"gpt4".to_string()));
+        assert!(tokens.contains(&"bert".to_string()));
+        assert!(tokens.contains(&"score".to_string()));
+    }
+
+    // ── make_context_json ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_make_context_json_basic() {
+        let json = make_context_json("workspace ctx", "memory ctx");
+        assert!(json.contains("workspace_context"));
+        assert!(json.contains("workspace ctx"));
+        assert!(json.contains("memory_context"));
+        assert!(json.contains("memory ctx"));
+    }
+
+    #[test]
+    fn test_make_context_json_empty_strings() {
+        let json = make_context_json("", "");
+        // Should produce valid JSON: {"workspace_context":"","memory_context":""}
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(parsed.is_object());
+        assert_eq!(parsed["workspace_context"], "");
+        assert_eq!(parsed["memory_context"], "");
+    }
+
+    #[test]
+    fn test_make_context_json_special_chars() {
+        let json = make_context_json("hello \"world\"", "line\nbreak");
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["workspace_context"], "hello \"world\"");
+        assert_eq!(parsed["memory_context"], "line\nbreak");
+    }
+
+    #[test]
+    fn test_make_context_json_valid_json() {
+        let json = make_context_json("a", "b");
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(parsed.is_object());
+        assert_eq!(parsed["workspace_context"], "a");
+        assert_eq!(parsed["memory_context"], "b");
+    }
+
+    // ── MMR formula (pure calculation, no reducer context) ───────────────────────
+
     #[test]
     fn test_mmr_relevance_dominates_with_high_lambda() {
         // MMR with λ=1.0 should return results in pure relevance order
