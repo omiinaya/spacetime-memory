@@ -64,36 +64,38 @@ class OrgModeParser(Connector):
         sections = self._parse_sections(lines)
 
         for section in sections:
-            heading_text = section["heading"]
-            body_text = section["body"]
-            outline_level = section["level"]
-            todo_state = section["todo_state"]
-            tags = section["tags"]
-
-            content = heading_text
-            if body_text:
-                content = f"{heading_text}\n\n{body_text}"
-
-            metadata = {
-                "source": "org-mode",
-                "file": self.file_path,
-                "outline_level": outline_level,
-                "tags": tags,
-                "todo_state": todo_state,
-            }
-
-            events.append(
-                Event(
-                    content=content,
-                    workspace_id=self.workspace_id,
-                    summary=heading_text[:200],
-                    memory_type="experience",
-                    peer_id=self.peer_id,
-                    metadata=metadata,
-                )
-            )
+            events.append(self._section_to_event(section))
 
         return events
+
+    def _section_to_event(self, section: dict) -> Event:
+        """Convert a parsed section dict into an Event."""
+        heading_text = section["heading"]
+        body_text = section["body"]
+        outline_level = section["level"]
+        todo_state = section["todo_state"]
+        tags = section["tags"]
+
+        content = heading_text
+        if body_text:
+            content = f"{heading_text}\n\n{body_text}"
+
+        metadata = {
+            "source": "org-mode",
+            "file": self.file_path,
+            "outline_level": outline_level,
+            "tags": tags,
+            "todo_state": todo_state,
+        }
+
+        return Event(
+            content=content,
+            workspace_id=self.workspace_id,
+            summary=heading_text[:200],
+            memory_type="experience",
+            peer_id=self.peer_id,
+            metadata=metadata,
+        )
 
     def _parse_sections(
         self,
