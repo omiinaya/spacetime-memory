@@ -36,6 +36,7 @@ pub struct ApiKey {
     pub key_hash: String,
     pub name: String,
     pub permissions: String,
+    pub scope: String,
     pub is_active: bool,
     pub created_at: i64,
     pub last_used_at: i64,

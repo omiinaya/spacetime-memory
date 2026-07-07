@@ -525,7 +525,7 @@ pub fn get_memory_stats(ctx: &ReducerContext, workspace_id: String) -> Result<()
     }
 
     // Tag stats: count how many times each tag name is used across memory_tags
-    let mut tag_counts: Vec<(String, u64)> = Vec::new();
+    let tag_counts: Vec<(String, u64)>;
     {
         // Build a tag_id → tag_name map from the tag table
         let mut name_by_id: std::collections::HashMap<String, String> = std::collections::HashMap::new();
