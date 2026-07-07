@@ -386,6 +386,39 @@ describe("Client", () => {
       expect(notes).toHaveLength(1);
       expect(notes[0].title).toBe("My Note");
     });
+
+    it("getBacklinks calls reducer then queries backlink_result", async () => {
+      mockReducerOk();
+      const blRows = [
+        {
+          id: "bl-1",
+          source_note_id: "src-1",
+          source_note_title: "Source",
+          target_note_id: "n1",
+          target_note_title: "Target",
+          display_text: "[[wikilink]]",
+          created_at: 1712345678000000n,
+        },
+      ];
+      mockSqlResponse(blRows);
+      const result = await client.getBacklinks("n1");
+      expect(result).toHaveLength(1);
+      expect(result[0]).toHaveProperty("target_note_id", "n1");
+      expect(result[0]).toHaveProperty("source_note_title", "Source");
+    });
+
+    it("getOutgoingLinks queries note_backlink for a source note", async () => {
+      mockSqlResponse([
+        {
+          target_note_id: "tgt-1",
+          relation: "wikilink",
+          display_text: "[[linked]]",
+        },
+      ]);
+      const result = await client.getOutgoingLinks("src-1");
+      expect(result).toHaveLength(1);
+      expect(result[0]).toHaveProperty("target_note_id", "tgt-1");
+    });
   });
 
   describe("maintenance", () => {
