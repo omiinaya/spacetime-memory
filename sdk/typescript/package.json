@@ -1,5 +1,5 @@
 {
-  "name": "spacetime-memory",
+  "name": "@omiinaya/spacetime-memory",
   "version": "0.2.0",
   "description": "TypeScript SDK for spacetime-memory",
   "main": "dist/client.js",
