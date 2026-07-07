@@ -2982,7 +2982,7 @@ export class Client {
 
   /**
    * Run BFS traversal from a starting node in the knowledge graph.
-   * Calls the graph_bfs reducer then reads the bfs_result table.
+   * Calls the graph_bfs reducer then reads the graph_traversal_result table.
    * @param workspaceId - Workspace ID
    * @param startNodeId - Starting node ID
    * @param maxDepth - Maximum traversal depth (default: 5)

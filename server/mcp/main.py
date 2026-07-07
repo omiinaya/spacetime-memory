@@ -612,6 +612,42 @@ def delete_tag(tag_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 @require_api_key
+def batch_tag_memories(tag_id: str, memory_ids_json: str) -> dict[str, Any]:
+    """Batch-attach a tag to multiple memories in a single reducer call.
+
+    Eliminates O(n) network round-trips for bulk tagging. Already-tagged
+    memories are silently skipped (idempotent).
+
+    Args:
+        tag_id: The tag ID to attach.
+        memory_ids_json: JSON array of memory ID strings to tag.
+
+    Returns:
+        Status dict.
+    """
+    return get_client().batch_tag_memories(tag_id, json.loads(memory_ids_json))
+
+
+@mcp.tool()
+@require_api_key
+def batch_untag_memories(tag_id: str, memory_ids_json: str) -> dict[str, Any]:
+    """Batch-remove a tag from multiple memories in a single reducer call.
+
+    Eliminates O(n) network round-trips for bulk untagging. Missing
+    associations are silently skipped (idempotent).
+
+    Args:
+        tag_id: The tag ID to detach.
+        memory_ids_json: JSON array of memory ID strings to untag.
+
+    Returns:
+        Status dict.
+    """
+    return get_client().batch_untag_memories(tag_id, json.loads(memory_ids_json))
+
+
+@mcp.tool()
+@require_api_key
 def store_batch(
     items_json: str,
     workspace_id: str = "default",
