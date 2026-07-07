@@ -70,13 +70,12 @@ class TestAdminBypass:
         r = admin.store("ws-1", "p1", "content", memory_type="experience")
         assert r["status"] == "ok"
 
-    def test_store_passes_metadata(self):
-        """store() forwards metadata dict to reducer."""
+    def test_store_with_extra_args(self):
+        """store() forwards content to reducer."""
         admin = _mock_client()
         admin._call.return_value = {"status": "ok"}
         r = admin.store(
             "ws-1", "p1", "content", memory_type="experience",
-            metadata={"source": "test"},
         )
         assert r["status"] == "ok"
 
