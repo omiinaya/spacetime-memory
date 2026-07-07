@@ -53,6 +53,8 @@ pub struct ApiKeyResult {
     pub workspace_id: String,
     pub name: String,
     pub permissions: String,
+    /// Scope string — ``"*"`` for all workspaces or JSON array of workspace IDs.
+    pub scope: String,
     pub is_active: bool,
     pub created_at: i64,
     pub last_used_at: i64,
@@ -63,6 +65,48 @@ pub struct ApiKeyResult {
     /// Client-generated lookup key for "create" operations — SDK uses this
     /// to find the just-created key without querying the private api_key table.
     pub request_id: String,
+}
+
+/// Public result table for API key verification results.
+/// Populated by verify_api_key reducer so the SDK can read back
+/// the key's scope, permissions, and metadata without access to
+/// the private api_key table.
+#[table(accessor = api_key_verification_result, public)]
+#[derive(Debug, Clone)]
+pub struct ApiKeyVerificationResult {
+    #[primary_key]
+    pub id: String,
+    pub api_key_id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub permissions: String,
+    pub scope: String,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub last_used_at: i64,
+    pub caller_identity: String,
+    pub verified_at: i64,
+}
+
+/// Validate an API key scope string.
+///
+/// Accepts either ``"*"`` (wildcard — all workspaces) or a JSON array
+/// of workspace IDs like ``'["ws-1", "ws-2"]'``.
+pub fn validate_scope(scope: &str) -> Result<(), String> {
+    if scope == "*" {
+        return Ok(());
+    }
+    let ids: Vec<String> = serde_json::from_str(scope)
+        .map_err(|_| "Scope must be \"*\" or a JSON array of workspace IDs like '[\"ws-1\"]'".to_string())?;
+    if ids.is_empty() {
+        return Err("Scope array must not be empty — use \"*\" for unlimited access".to_string());
+    }
+    for id in &ids {
+        if id.trim().is_empty() {
+            return Err("Scope array elements must be non-empty workspace IDs".to_string());
+        }
+    }
+    Ok(())
 }
 
 // ── Rate Limiting ─────────────────────────────────────────────────────
@@ -345,6 +389,7 @@ pub fn create_api_key(
     permissions: String,
     key_hash: String,
     request_id: String,
+    scope: String,
 ) -> Result<(), String> {
     trace_span!(ctx, "create_api_key", TracingSpanKind::Write, &workspace_id, {
         let account = require_auth(ctx)?;
@@ -353,6 +398,9 @@ pub fn create_api_key(
         if serde_json::from_str::<Vec<String>>(&permissions).is_err() {
             return Err("permissions must be a valid JSON array of strings".to_string());
         }
+
+        // Validate scope
+        validate_scope(&scope)?;
 
         let id = uuid_v4_uniq(ctx, |id| ctx.db.api_key().id().find(id).is_none(), 3);
         let now = now_micros(ctx);
@@ -363,6 +411,7 @@ pub fn create_api_key(
             key_hash,
             name: name.clone(),
             permissions: permissions.clone(),
+            scope: scope.clone(),
             is_active: true,
             created_at: now,
             last_used_at: 0,
@@ -375,6 +424,7 @@ pub fn create_api_key(
             workspace_id: workspace_id.clone(),
             name,
             permissions,
+            scope,
             is_active: true,
             created_at: now,
             last_used_at: 0,
