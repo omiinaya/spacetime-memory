@@ -262,8 +262,8 @@
 - [ ] 20 TODOs/FIXMEs across the codebase
   - `note.rs:208` — "TODO: handle concurrent note block updates" ✓ (added expected_version param to update_note)
   - `lib.rs:15` — "TODO: organize module structure"
-  - `client.py:128` — "TODO: configure log level"
-  - `orgmode.py:70` — "FIXME: extract method"
+  - `client.py:128` — "TODO: configure log level" ✓ (added NullHandler + env var support)
+  - `orgmode.py:70` — "FIXME: extract method" ✓ DONE — extracted `_section_to_event()`
 - [ ] Unused imports in several Rust files (warnings on build)
 - [ ] `client.py` is ~5,200 lines — needs module split
 - [ ] Python `_request_with_retry` shares circuit breaker across STDB + Tantivy — Tantivy failures trip the breaker for STDB
