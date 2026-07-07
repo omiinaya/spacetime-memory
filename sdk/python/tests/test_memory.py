@@ -327,3 +327,116 @@ class TestMemoryCrud:
 
         result = mock_http_client.reinforce("mem-1")
         assert result["status"] == "ok"
+
+
+class TestSearchTemporalFilter:
+    """search() with temporal_filter / before / after parameters."""
+
+    def test_search_temporal_filter_from(self, mock_http_client):
+        """temporal_filter={'from': ts} filters out older results."""
+        mock_http_client._http.post.side_effect = _search_side_effect(
+            sql_rows=[
+                {"id": "1", "content": "old memory", "created_at": 100},
+                {"id": "2", "content": "new memory", "created_at": 200},
+            ],
+        )
+        result = mock_http_client.search(
+            workspace_id="ws1",
+            query="memory",
+            semantic=False,
+            temporal_filter={"from": 150},
+        )
+        assert len(result) == 1
+        assert result[0]["entity_id"] == "2"
+
+    def test_search_temporal_filter_to(self, mock_http_client):
+        """temporal_filter={'to': ts} filters out newer results."""
+        mock_http_client._http.post.side_effect = _search_side_effect(
+            sql_rows=[
+                {"id": "1", "content": "old memory", "created_at": 100},
+                {"id": "2", "content": "new memory", "created_at": 200},
+            ],
+        )
+        result = mock_http_client.search(
+            workspace_id="ws1",
+            query="memory",
+            semantic=False,
+            temporal_filter={"to": 150},
+        )
+        assert len(result) == 1
+        assert result[0]["entity_id"] == "1"
+
+    def test_search_temporal_filter_both(self, mock_http_client):
+        """temporal_filter with both from and to narrows the time window."""
+        mock_http_client._http.post.side_effect = _search_side_effect(
+            sql_rows=[
+                {"id": "1", "content": "too old", "created_at": 50},
+                {"id": "2", "content": "just right", "created_at": 120},
+                {"id": "3", "content": "too new", "created_at": 200},
+            ],
+        )
+        result = mock_http_client.search(
+            workspace_id="ws1",
+            query="memory",
+            semantic=False,
+            temporal_filter={"from": 100, "to": 150},
+        )
+        assert len(result) == 1
+        assert result[0]["entity_id"] == "2"
+
+    def test_search_explicit_before_overrides_temporal_filter(self, mock_http_client):
+        """Explicit before= overrides temporal_filter['to']."""
+        mock_http_client._http.post.side_effect = _search_side_effect(
+            sql_rows=[
+                {"id": "1", "content": "memory A", "created_at": 100},
+                {"id": "2", "content": "memory B", "created_at": 200},
+                {"id": "3", "content": "memory C", "created_at": 300},
+            ],
+        )
+        # temporal_filter says to=250, but explicit before=150 overrides
+        result = mock_http_client.search(
+            workspace_id="ws1",
+            query="memory",
+            semantic=False,
+            temporal_filter={"to": 250},
+            before=150,
+        )
+        assert len(result) == 1
+        assert result[0]["entity_id"] == "1"
+
+    def test_search_explicit_after_overrides_temporal_filter(self, mock_http_client):
+        """Explicit after= overrides temporal_filter['from']."""
+        mock_http_client._http.post.side_effect = _search_side_effect(
+            sql_rows=[
+                {"id": "1", "content": "memory A", "created_at": 100},
+                {"id": "2", "content": "memory B", "created_at": 200},
+                {"id": "3", "content": "memory C", "created_at": 300},
+            ],
+        )
+        # temporal_filter says from=50, but explicit after=250 overrides
+        result = mock_http_client.search(
+            workspace_id="ws1",
+            query="memory",
+            semantic=False,
+            temporal_filter={"from": 50},
+            after=250,
+        )
+        assert len(result) == 1
+        assert result[0]["entity_id"] == "3"
+
+    def test_search_no_created_at_filtered_out(self, mock_http_client):
+        """Results missing created_at are excluded when temporal_filter is active."""
+        mock_http_client._http.post.side_effect = _search_side_effect(
+            sql_rows=[
+                {"id": "1", "content": "no timestamp"},
+                {"id": "2", "content": "has timestamp", "created_at": 100},
+            ],
+        )
+        result = mock_http_client.search(
+            workspace_id="ws1",
+            query="memory",
+            semantic=False,
+            temporal_filter={"from": 50},
+        )
+        assert len(result) == 1
+        assert result[0]["entity_id"] == "2"

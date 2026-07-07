@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Client } from "../client";
+import { Client, Compounder } from "../client";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1289,6 +1289,45 @@ describe("Client", () => {
       mockSqlResponse([]);
       const result = await client.getPeerReputation("unknown-peer");
       expect(result).toBeNull();
+    });
+  });
+
+  describe("Compounder exports", () => {
+    it("should export Compounder class from main entry point", () => {
+      expect(Compounder).toBeDefined();
+      expect(typeof Compounder).toBe("function");
+    });
+
+    it("should construct Compounder with a Client", () => {
+      const cp = new Compounder(client);
+      expect(cp).toBeDefined();
+      expect(cp instanceof Compounder).toBe(true);
+    });
+
+    it("should have 14 public compounder methods", () => {
+      const publicMethods = Object.getOwnPropertyNames(Compounder.prototype)
+        .filter(k => k !== "constructor" && !k.startsWith("_"));
+      expect(publicMethods.length).toBeGreaterThanOrEqual(14);
+
+      const expected = [
+        "searchEntities",
+        "findNearDuplicates",
+        "storeAnswer",
+        "storeAnswers",
+        "crossLink",
+        "suggestConnections",
+        "lintWorkspace",
+        "ingestSource",
+        "createEntityPage",
+        "updateEntityPage",
+        "createConceptPage",
+        "createComparisonPage",
+        "exportWorkspace",
+        "generateOverviewPage",
+      ];
+      for (const method of expected) {
+        expect(publicMethods).toContain(method);
+      }
     });
   });
 });
