@@ -23,6 +23,7 @@ import logging
 import re
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())  # Standard library pattern: silent until consumer configures
 
 from .query_expansion import expand_query  # noqa: E402 — intentional late import
 from ._protocols import (  # noqa: E402 — intentional late import
@@ -129,7 +130,7 @@ class JSONFormatter(logging.Formatter):
 
 
 def configure_logging(
-    level: str = "INFO",
+    level: str | None = None,
     json_format: bool = True,
     log_file: str | None = None,
 ) -> None:
@@ -137,9 +138,11 @@ def configure_logging(
 
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR).
+               Falls back to SPACETIME_MEMORY_LOG_LEVEL env var, then "INFO".
         json_format: If True, output newline-delimited JSON. If False, plain text.
         log_file: Optional path to a log file. If None, logs to stderr.
     """
+    level = (level or os.environ.get("SPACETIME_MEMORY_LOG_LEVEL", "INFO")).upper()
     logger = logging.getLogger("spacetime_memory")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
 

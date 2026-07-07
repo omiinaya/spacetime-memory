@@ -1,38 +1,65 @@
-pub mod workspace;
+// ---------------------------------------------------------------------------
+// Domain models — core data entities
+// ---------------------------------------------------------------------------
+pub mod document;
+pub mod message;
+pub mod note;
 pub mod peer;
 pub mod session;
-pub mod message;
-pub mod memory;
-pub mod memory_feedback;
-pub mod knowledge_graph;
-pub mod document;
+pub mod tag;
+pub mod tour;
+pub mod user;
+pub mod workspace;
+
+// ---------------------------------------------------------------------------
+// User profiles
+// ---------------------------------------------------------------------------
 pub mod profile;
 pub mod profile_query;
-pub mod tag;
-pub mod entity_linking;
+
+// ---------------------------------------------------------------------------
+// Memory & Knowledge Graph
+// ---------------------------------------------------------------------------
+pub mod graph_traversal;
+pub mod knowledge_graph;
+pub mod memory;
+pub mod memory_feedback;
+
+// ---------------------------------------------------------------------------
+// Entity extraction & linking
+// ---------------------------------------------------------------------------
 pub mod entity_extraction;
+pub mod entity_linking;
 pub mod insight;
-pub mod retrieval;
-pub mod auth;
-pub mod connector;
-pub mod consolidation;
+
+// ---------------------------------------------------------------------------
+// Retrieval, query & context
+// ---------------------------------------------------------------------------
 pub mod context_compression;
 pub mod context_delta;
 pub mod context_directory;
 pub mod hybrid_query;
-pub mod note;
-pub mod graph_traversal;
-pub mod tour;
-pub mod replication;
 pub mod query;
-pub mod user;
-pub mod proxy_metrics;
-pub mod harmonic_belief;
-pub mod change_event;
-pub mod tracing;
+pub mod retrieval;
+
+// ---------------------------------------------------------------------------
+// Auth, crypto & key management
+// ---------------------------------------------------------------------------
+pub mod auth;
 pub mod crypto;
 pub mod key_rotation;
+
+// ---------------------------------------------------------------------------
+// Infrastructure — cross-cutting concerns
+// ---------------------------------------------------------------------------
+pub mod change_event;
+pub mod connector;
+pub mod consolidation;
+pub mod harmonic_belief;
 pub mod pre_warm;
+pub mod proxy_metrics;
+pub mod replication;
+pub mod tracing;
 
 /// Maximum number of rows any read reducer will return.
 /// This caps all `.iter()` scans to prevent OOM/timeout on large tables.
@@ -98,9 +125,6 @@ fn format_uuid_v4(high: u64, low: u64) -> String {
 /// same transaction batch may produce identical UUIDs. This function checks
 /// for existing rows via `is_unique` (a closure that returns `true` if the
 /// generated ID is available) and retries up to `max_attempts` times.
-///
-/// Use this for every table INSERT that uses a UUID primary key generated
-/// by `uuid_v4`, especially under concurrent load.
 pub fn uuid_v4_uniq(
     ctx: &spacetimedb::ReducerContext,
     is_unique: impl Fn(&String) -> bool,
