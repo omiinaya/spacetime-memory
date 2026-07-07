@@ -27,7 +27,7 @@ pub struct Workspace {
 /// - `"editor"`  — read and write
 /// - `"viewer"`  — read only
 #[table(accessor = space_permission)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SpacePermission {
     #[primary_key]
     pub id: String,
@@ -124,7 +124,7 @@ pub fn set_workspace_context(
 
 /// Result table for get_workspace_context queries.
 #[table(accessor = workspace_context_result, public)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorkspaceContextResult {
     #[primary_key]
     pub id: String,
