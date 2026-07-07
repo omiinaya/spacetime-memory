@@ -473,107 +473,88 @@ pub fn batch_delete_memories(ctx: &ReducerContext, ids_json: String) -> Result<(
     })
 }
 
-/// Auto-invalidate an old fact and replace it with a new one (temporal fact versioning).
+/// Auto-invalidate an old memory fact in favor of a new contradictory fact.
 ///
-/// Finds all active memories in the workspace whose content exactly matches
-/// `old_fact`, marks them as invalid (`valid_to = now`, `is_active = false`),
-/// and stores a new memory with `new_fact` as content (`valid_from = now`,
-/// `is_active = true`).
+/// When an agent recognizes that new information (identified by `new_fact`)
+/// supersedes an older stored fact (identified by `old_fact`), this reducer:
 ///
-/// This provides temporal fact versioning (Graphiti parity): when a stored
-/// belief about the world is superseded, the old fact gets temporally scoped
-/// and the new fact becomes the current truth.
+/// 1. Validates both memory IDs exist and are in the same workspace.
+/// 2. Checks that the caller has editor access to the workspace.
+/// 3. Deactivates the old fact (`is_active = false`, `valid_to = now`).
+/// 4. Sets `consolidated_to` on the old fact to reference the new fact ID.
+/// 5. Logs both changes as update events for audit trail.
+///
+/// This provides a targeted, ID-based invalidation path — complementary to
+/// the content-based dedup/consolidation pipeline. Use it when you know
+/// exactly which old memory is contradicted by which new memory.
 ///
 /// # Parameters
-/// - `workspace_id` — scope for the search and new memory
-/// - `old_fact` — exact content of the memory(ies) to invalidate
-/// - `new_fact` — content of the replacement memory
-/// - `peer_id` — who the memory is about
-/// - `observer_id` — who observed this memory
+/// - `old_fact` — ID of the existing memory to deactivate
+/// - `new_fact` — ID of the replacement memory that supersedes it
 #[reducer]
 pub fn auto_invalidate(
     ctx: &ReducerContext,
-    workspace_id: String,
     old_fact: String,
     new_fact: String,
-    peer_id: String,
-    observer_id: String,
 ) -> Result<(), String> {
-    let ws_id = workspace_id.clone();
-    trace_span!(ctx, "auto_invalidate", TracingSpanKind::Write, &ws_id, {
-        let _account = require_auth(ctx)?;
-        let caller = ctx.sender().to_hex();
-        check_space_access(ctx, &ws_id, &caller, "editor")?;
-        let now = now_micros(ctx);
+    let _account = require_auth(ctx)?;
+    let caller = ctx.sender().to_hex();
+    let now = now_micros(ctx);
 
-        // Find all active memories whose content exactly matches old_fact
-        let matches: Vec<Memory> = ctx
-            .db
-            .memory()
-            .iter()
-            .take(crate::MAX_RESULTS)
-            .filter(|m: &Memory| m.workspace_id == ws_id && m.content == old_fact && m.is_active)
-            .collect();
+    // Find and validate old fact
+    let mut old = ctx
+        .db
+        .memory()
+        .id()
+        .find(&old_fact)
+        .ok_or_else(|| format!("old_fact '{}' not found", old_fact))?;
 
-        // Invalidate each matching memory via temporal boundaries
-        for mut mem in matches {
-            // Save revision snapshot before modification
-            record_revision(ctx, &mem, &mem.content, &mem.summary, mem.confidence);
+    // Find and validate new fact
+    let newer = ctx
+        .db
+        .memory()
+        .id()
+        .find(&new_fact)
+        .ok_or_else(|| format!("new_fact '{}' not found", new_fact))?;
 
-            mem.is_active = false;
-            mem.valid_to = now;
-            mem.version += 1;
-            mem.updated_at = now;
+    // Both must be in the same workspace
+    if old.workspace_id != newer.workspace_id {
+        return Err(format!(
+            "old_fact and new_fact must be in the same workspace, got '{}' and '{}'",
+            old.workspace_id, newer.workspace_id
+        ));
+    }
 
-            let ws = mem.workspace_id.clone();
-            let mid = mem.id.clone();
-            let mem_json = change_event::record_to_json(&mem);
-            ctx.db.memory().id().update(mem);
-            change_event::log_change(ctx, &ws, "memory", "update", &mid, &mem_json);
-        }
+    let ws_id = old.workspace_id.clone();
+    check_space_access(ctx, &ws_id, &caller, "editor")?;
 
-        // Create a new memory with the new fact
-        let id = uuid_v4_uniq(ctx, |id| ctx.db.memory().id().find(id).is_none(), 3);
+    // Save revision snapshot before modification
+    record_revision(ctx, &old, &old.content, &old.summary, old.confidence);
 
-        let enc_content = encrypt_if_enabled(ctx, &ws_id, &new_fact)?;
-        let enc_summary = encrypt_if_enabled(ctx, &ws_id, &new_fact)?;
+    // Deactivate the old fact and link it to the new one
+    old.is_active = false;
+    old.valid_to = now;
+    old.consolidated_to = new_fact.clone();
+    old.version += 1;
+    old.updated_at = now;
 
-        let new_mem = Memory {
-            id: id.clone(),
-            workspace_id: ws_id.clone(),
-            peer_id,
-            observer_id,
-            memory_type: String::from("world_fact"),
-            content: enc_content,
-            summary: enc_summary,
-            context: String::new(),
-            entities_json: String::new(),
-            confidence: 0.9,
-            source_session_id: String::new(),
-            source_message_id: String::new(),
-            is_active: true,
-            created_at: now,
-            expires_at: 0,
-            updated_at: now,
-            tier: String::from("L1"),
-            access_count: 0,
-            strength: 0.5,
-            version: 1,
-            valid_from: now,
-            valid_to: 0,
-            parent_directory_id: String::new(),
-            consolidated_to: String::new(),
-            trust_score: 0.5,
-            feedback_count: 0,
-            user_scope: String::new(),
-        };
+    let old_id = old.id.clone();
+    let old_json = change_event::record_to_json(&old);
+    ctx.db.memory().id().update(old);
+    change_event::log_change(ctx, &ws_id, "memory", "auto_invalidate_old", &old_id, &old_json);
 
-        let mem_json = change_event::record_to_json(&new_mem);
-        ctx.db.memory().insert(new_mem);
-        change_event::log_change(ctx, &ws_id, "memory", "insert", &id, &mem_json);
+    // Also log on the new fact to create an audit trail
+    let new_json = change_event::record_to_json(&newer);
+    change_event::log_change(
+        ctx,
+        &ws_id,
+        "memory",
+        "auto_invalidate_new",
+        &new_fact,
+        &new_json,
+    );
 
-        Ok(())
-    })
+    Ok(())
 }
 
 /// Retrieve all memories scoped to a specific user within a workspace.
