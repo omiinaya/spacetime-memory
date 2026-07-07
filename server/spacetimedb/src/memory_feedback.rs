@@ -569,7 +569,7 @@ mod tests {
         let days = 10.0;
         let expected = trust_score * (1.0 - decay_rate * days); // 0.9
         let actual = trust_score * (1.0 - decay_rate * days);
-        assert!((actual - expected).abs() < 1e-10);
+        assert!((actual - expected).abs() < 1e-10f64);
     }
 
     #[test]
