@@ -215,7 +215,7 @@
 ### 3.3 Bi-temporal fact tracking (Graphiti parity)
 **Status:** Not started. Graphiti's main differentiator is temporal facts with valid_from/valid_to.
 - [ ] Add `valid_from: i64` and `valid_to: i64` to Memory struct
-- [ ] Add `auto_invalidate(old_fact, new_fact)` reducer
+- [x] Add `auto_invalidate(old_fact, new_fact)` reducer
 - [ ] Expose in Python SDK: `search(query, temporal_filter={from: ..., to: ...})`
 - [x] Expose in TS SDK
 
