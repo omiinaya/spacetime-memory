@@ -347,7 +347,7 @@ describe("Client", () => {
       await client.createNote("ws-1", "My Note", "Content here");
       const [url, req] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain("call/create_note");
-      expect(JSON.parse(req.body)).toEqual(["ws-1", "My Note", "Content here", true]);
+      expect(JSON.parse(req.body)).toEqual(["ws-1", "My Note", "Content here", "", ""]);
     });
 
     it("updateNote calls update_note reducer", async () => {
@@ -1199,7 +1199,8 @@ describe("Client", () => {
   describe("getPeerReputation", () => {
     it("returns reputation for a known peer", async () => {
       mockSqlResponse([{
-        id: "peer-1",
+        id: "uuid-1",
+        peer_id: "peer-1",
         helpful_count: 10n,
         unhelpful_count: 2n,
         total_feedback: 12n,
@@ -1208,7 +1209,7 @@ describe("Client", () => {
       }]);
       const result = await client.getPeerReputation("peer-1");
       expect(result).not.toBeNull();
-      expect(result).toHaveProperty("id", "peer-1");
+      expect(result).toHaveProperty("peer_id", "peer-1");
       expect(result).toHaveProperty("reputation_score", 0.846);
       expect(result).toHaveProperty("helpful_count", 10n);
     });

@@ -2445,8 +2445,9 @@ export class Client {
    * @returns Reputation record or null
    */
   async getPeerReputation(peerId: string): Promise<Record<string, unknown> | null> {
+    await this._call("get_peer_reputation", [peerId]);
     const rows = await this._sqlExec(
-      `SELECT * FROM peer_reputation WHERE id = :pid`,
+      `SELECT * FROM peer_reputation_result WHERE peer_id = :pid`,
       { pid: peerId },
     );
     return rows.length > 0 ? rows[0] : null;
@@ -3452,7 +3453,7 @@ export class Client {
     }
     const tagIdsJson = JSON.stringify(tagIds);
     await this._call("search_by_tags", [workspaceId, tagIdsJson, embJson, limit]);
-    const qhash = this._queryHash(`tagged:${tagIdsJson}`);
+    const qhash = queryHash(`tagged:${tagIdsJson}`);
     return this._sqlExec(
       `SELECT * FROM hybrid_result WHERE workspace_id = :ws AND query_hash = :qh ORDER BY score DESC`,
       { ws: workspaceId, qh: qhash },

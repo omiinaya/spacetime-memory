@@ -3180,9 +3180,15 @@ class Client:
     def get_peer_reputation(self, peer_id: str) -> dict[str, Any] | None:
         """Get reputation stats for a peer.
 
+        Calls the get_peer_reputation reducer and reads the result
+        from the peer_reputation_result table.
         Returns None if the peer has no feedback history.
         """
-        rows = self._query("peer_reputation", filter_dict={"id": peer_id})
+        self._call("get_peer_reputation", [peer_id])
+        rows = self._sql(
+            "SELECT * FROM peer_reputation_result WHERE "
+            f"peer_id = '{_esc(peer_id)}'"
+        )
         if rows:
             return rows[0]
         return None

@@ -1428,17 +1428,18 @@ def get_profile_context(peer_id: str) -> list[dict[str, Any]]:
 def get_peer_reputation(peer_id: str) -> dict[str, Any] | None:
     """Get reputation stats for a peer.
 
-    Returns trust score, feedback count, positive/negative breakdown,
-    and last-updated timestamp. Returns None if the peer has no
-    feedback history. Useful for monitoring peer trustworthiness
+    Calls the get_peer_reputation reducer and returns the result
+    from the peer_reputation_result table. Returns None if the peer
+    has no feedback history. Useful for monitoring peer trustworthiness
     in multi-agent systems.
 
     Args:
         peer_id: Peer identifier.
 
     Returns:
-        Reputation stats dict with id, trust_score, feedback_count,
-        positive_feedback, negative_feedback, last_updated; or None.
+        Reputation stats dict with id (UUID), peer_id, helpful_count,
+        unhelpful_count, total_feedback, reputation_score, last_feedback_at;
+        or None.
     """
     return get_client().get_peer_reputation(peer_id)
 
