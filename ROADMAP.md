@@ -177,7 +177,7 @@
   - [ ] `detectPatterns` — missing
   - [ ] `deltaSync` — missing
   - [ ] `searchWithFilters` — missing
-  - [ ] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — missing
+  - [x] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — implemented (server reducers + Python SDK + TS SDK + CLI + tests)
   - [x] `updateMemoryTier` — missing
   - [ ] `setMemoryScope` — missing
   - [ ] `batchDeleteMemories` — exists
