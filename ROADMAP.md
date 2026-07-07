@@ -217,7 +217,7 @@
 - [ ] Add `valid_from: i64` and `valid_to: i64` to Memory struct
 - [ ] Add `auto_invalidate(old_fact, new_fact)` reducer
 - [ ] Expose in Python SDK: `search(query, temporal_filter={from: ..., to: ...})`
-- [ ] Expose in TS SDK
+- [x] Expose in TS SDK
 
 **Estimate:** 1 week.
 
