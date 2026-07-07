@@ -108,6 +108,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - name: Configure npmrc for CI
+        run: |
+          # Copy project .npmrc to ensure CI-specific settings
+          # (registry, audit=false, prefer-offline, etc.)
+          cp ../../.npmrc ./.npmrc
+          # If NODE_AUTH_TOKEN is set (for private deps), setup-node's
+          # auto-generated .npmrc already handles it via registry-url
+          node -e "const fs=require('fs'); console.log('npmrc configured:', fs.readFileSync('.npmrc','utf8').split('\\n')[0])"
       - name: Install deps
         run: npm ci
       - name: Type check

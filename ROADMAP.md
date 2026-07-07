@@ -230,7 +230,7 @@
 ### 3.5 npm publish
 **Status:** Blocked by NPM_TOKEN
 - [ ] Add NPM_TOKEN to GitHub secrets (`NPM_TOKEN`)
-- [ ] Configure `.npmrc` in CI
+- [x] Configure `.npmrc` in CI
 - [ ] Run `npm publish` from `sdk/typescript/`
 - [ ] Also publish `sdk/python/` to PyPI? (requires PYPI_TOKEN)
 
