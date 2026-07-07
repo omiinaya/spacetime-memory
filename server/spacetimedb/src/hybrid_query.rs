@@ -581,7 +581,7 @@ pub fn hybrid_search(
     // Min-max normalization was done here but the Python SDK's fusion
     // pipeline (client.py search()) does its own per-strategy min-max
     // before weighted fusion. Double normalization flattened score
-    // distributions. The SDK handles it correctly. (Removed Jun 2026.)
+    // distributions. The SDK handles it correctly. (Removed.)
 
     // ── MMR (Maximal Marginal Relevance) Reranking ─────────────────
     // When mmr_lambda > 0.0, re-rank results to balance relevance

@@ -220,3 +220,135 @@ pub fn cleanup_change_events(
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    // ---- Test helper structs ----
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct SimpleMetric {
+        name: String,
+        value: f64,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct Empty {}
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct Nested {
+        label: String,
+        inner: Inner,
+    }
+
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct Inner {
+        x: u32,
+        y: u32,
+    }
+
+    // ---- record_to_json tests ----
+
+    #[test]
+    fn test_record_to_json_simple_struct() {
+        let m = SimpleMetric {
+            name: "cpu".into(),
+            value: 0.85,
+        };
+        let json = record_to_json(&m);
+        assert_eq!(json, r#"{"name":"cpu","value":0.85}"#);
+    }
+
+    #[test]
+    fn test_record_to_json_empty_struct() {
+        let e = Empty {};
+        let json = record_to_json(&e);
+        assert_eq!(json, r#"{}"#);
+    }
+
+    #[test]
+    fn test_record_to_json_nested_struct() {
+        let n = Nested {
+            label: "point".into(),
+            inner: Inner { x: 10, y: 20 },
+        };
+        let json = record_to_json(&n);
+        assert_eq!(json, r#"{"label":"point","inner":{"x":10,"y":20}}"#);
+    }
+
+    #[test]
+    fn test_record_to_json_roundtrip() {
+        let original = SimpleMetric {
+            name: "memory".into(),
+            value: 0.42,
+        };
+        let json = record_to_json(&original);
+        let parsed: SimpleMetric = serde_json::from_str(&json).expect("valid JSON");
+        assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn test_record_to_json_valid_json() {
+        let m = SimpleMetric {
+            name: "disk".into(),
+            value: 0.5,
+        };
+        let json = record_to_json(&m);
+        // Should parse as valid JSON
+        let v: serde_json::Value = serde_json::from_str(&json).expect("should be valid JSON");
+        assert_eq!(v["name"], "disk");
+        assert_eq!(v["value"], 0.5);
+    }
+
+    // ---- ChangeEvent serialisation tests ----
+
+    #[test]
+    fn test_change_event_serialization() {
+        let event = ChangeEvent {
+            id: "evt-001".into(),
+            workspace_id: "ws-1".into(),
+            table_name: "memory".into(),
+            operation: "insert".into(),
+            record_id: "rec-001".into(),
+            data_json: r#"{"key":"value"}"#.into(),
+            created_at: 1_000_000,
+        };
+        let json = record_to_json(&event);
+        let v: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+
+        assert_eq!(v["id"], "evt-001");
+        assert_eq!(v["workspace_id"], "ws-1");
+        assert_eq!(v["table_name"], "memory");
+        assert_eq!(v["operation"], "insert");
+        assert_eq!(v["record_id"], "rec-001");
+        assert_eq!(v["data_json"], r#"{"key":"value"}"#);
+        assert_eq!(v["created_at"], 1_000_000);
+    }
+
+    // ---- ChangeEventResult serialisation tests ----
+
+    #[test]
+    fn test_change_event_result_serialization() {
+        let result = ChangeEventResult {
+            id: "res-001".into(),
+            since_cursor: 500,
+            events_json: r#"[{"id":"evt-001"}]"#.into(),
+            next_cursor: 1000,
+            created_at: 2_000_000,
+        };
+        let json = record_to_json(&result);
+        let v: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+
+        assert_eq!(v["id"], "res-001");
+        assert_eq!(v["since_cursor"], 500);
+        assert_eq!(v["events_json"], r#"[{"id":"evt-001"}]"#);
+        assert_eq!(v["next_cursor"], 1000);
+        assert_eq!(v["created_at"], 2_000_000);
+    }
+}
