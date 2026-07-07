@@ -271,6 +271,8 @@ export interface ClientOptions {
   port?: number | string;
   database?: string;
   embedderUrl?: string;
+  /** Tantivy BM25 search sidecar URL (default: http://127.0.0.1:9091). */
+  tantivyUrl?: string;
   /** MCP server URL for cross-encoder reranking and other LLM tools (default: http://127.0.0.1:8099). */
   mcpUrl?: string;
 }
@@ -384,6 +386,7 @@ export class Client {
   private readonly port: string;
   private readonly database: string;
   private readonly embedderUrl: string;
+  private readonly tantivyUrl: string;
   private readonly mcpUrl: string;
   private readonly baseUrl: string;
 
@@ -396,6 +399,8 @@ export class Client {
       "spacetime-memory";
     this.embedderUrl =
       opts.embedderUrl ?? process.env.EMBEDDER_URL ?? "http://127.0.0.1:4000";
+    this.tantivyUrl =
+      opts.tantivyUrl ?? process.env.TANTIVY_URL ?? "http://127.0.0.1:9091";
     this.mcpUrl =
       opts.mcpUrl ?? process.env.MCP_URL ?? "http://127.0.0.1:8099";
     this.baseUrl = `http://${this.host}:${this.port}`;
@@ -2298,6 +2303,26 @@ export class Client {
   }
 
   /**
+   * BFS traversal from a start node up to max_depth.
+   * Calls the graph_bfs reducer then reads the graph_traversal_result table.
+   * @param workspaceId - Workspace ID
+   * @param startNodeId - Start node ID
+   * @param maxDepth - Maximum traversal depth (1-6, default 3)
+   * @returns Array of graph traversal result records
+   */
+  async graphBfs(
+    workspaceId: string,
+    startNodeId: string,
+    maxDepth: number = 3
+  ): Promise<Record<string, unknown>[]> {
+    await this._call("graph_bfs", [workspaceId, startNodeId, maxDepth]);
+    return await this._sqlExec(
+      `SELECT * FROM graph_traversal_result WHERE workspace_id = :ws`,
+      { ws: workspaceId },
+    );
+  }
+
+  /**
    * List sessions a peer has participated in.
    * @param peerId - Peer identity
    * @returns Array of session records with role and joined_at
@@ -2957,7 +2982,7 @@ export class Client {
 
   /**
    * Run BFS traversal from a starting node in the knowledge graph.
-   * Calls the graph_bfs reducer then reads the bfs_result table.
+   * Calls the graph_bfs reducer then reads the graph_traversal_result table.
    * @param workspaceId - Workspace ID
    * @param startNodeId - Starting node ID
    * @param maxDepth - Maximum traversal depth (default: 5)
@@ -2981,24 +3006,27 @@ export class Client {
 
   /**
    * Find the shortest path between two nodes in the knowledge graph.
-   * Calls the shortest_path reducer then reads the bfs_result table.
+   * Calls the shortest_path reducer then reads the shortest_path_result table.
    * @param workspaceId - Workspace ID
    * @param sourceId - Source node ID
    * @param targetId - Target node ID
+   * @param maxHops - Maximum hop limit (1-12, default 6)
    * @returns Array of path result records
    */
   async shortestPath(
     workspaceId: string,
     sourceId: string,
-    targetId: string
+    targetId: string,
+    maxHops: number = 6
   ): Promise<Record<string, unknown>[]> {
     await this._call("shortest_path", [
       workspaceId,
       sourceId,
       targetId,
+      maxHops,
     ]);
     return await this._sqlExec(
-      `SELECT * FROM bfs_result WHERE workspace_id = :ws`,
+      `SELECT * FROM shortest_path_result WHERE workspace_id = :ws ORDER BY step_order ASC`,
       { ws: workspaceId },
     );
   }
