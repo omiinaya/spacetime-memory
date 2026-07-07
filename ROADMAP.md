@@ -181,7 +181,7 @@
   - [x] `updateMemoryTier` — missing
   - [ ] `setMemoryScope` — missing
   - [ ] `batchDeleteMemories` — exists
-  - [ ] `batchTagMemories` / `batchUntagMemories` — missing
+  - [x] `batchTagMemories` / `batchUntagMemories` — CLI commands added (stmem tag batch-tag / batch-untag)
   - [x] `getEdgeHistory` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
   - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
   - [ ] `computePageRank` — exists
