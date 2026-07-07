@@ -4394,6 +4394,36 @@ def tag_delete_cmd(tag_id: str, yes: bool) -> None:
     _quiet_print(f"[green]Tag '{tag_id}' deleted.[/green]")
 
 
+@tag.command(name="batch-tag")
+@click.argument("tag_id")
+@click.argument("memory_ids")
+def tag_batch_tag_cmd(tag_id: str, memory_ids: str) -> None:
+    """Batch-attach a tag to multiple memories. MEMORY_IDS is comma-separated."""
+    client = _sdk_client()
+    ids = [m.strip() for m in memory_ids.split(",") if m.strip()]
+    if not ids:
+        console.print("[yellow]No memory IDs provided.[/yellow]")
+        return
+    with console.status(f"Tagging {len(ids)} memories with '{tag_id}'..."):
+        result = client.batch_tag_memories(tag_id, ids)
+    _quiet_print(f"[green]Tagged {len(ids)} memories with '{tag_id}'.[/green]")
+
+
+@tag.command(name="batch-untag")
+@click.argument("tag_id")
+@click.argument("memory_ids")
+def tag_batch_untag_cmd(tag_id: str, memory_ids: str) -> None:
+    """Batch-remove a tag from multiple memories. MEMORY_IDS is comma-separated."""
+    client = _sdk_client()
+    ids = [m.strip() for m in memory_ids.split(",") if m.strip()]
+    if not ids:
+        console.print("[yellow]No memory IDs provided.[/yellow]")
+        return
+    with console.status(f"Untagging {len(ids)} memories from '{tag_id}'..."):
+        result = client.batch_untag_memories(tag_id, ids)
+    _quiet_print(f"[green]Untagged {len(ids)} memories from '{tag_id}'.[/green]")
+
+
 @cli.group()
 def aaak() -> None:
     """AAAK compression — lossless LLM context shorthand.

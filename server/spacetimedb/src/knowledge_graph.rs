@@ -1141,12 +1141,16 @@ pub fn get_citations(
     let _account = require_auth(ctx)?;
     let caller = ctx.sender().to_hex();
     check_space_access(ctx, &workspace_id, &caller, "viewer")?;
-    let qid = uuid_v7(ctx);
+
+    // Clear stale results before inserting new ones
+    for existing in ctx.db.citation_result().iter().take(crate::MAX_RESULTS) {
+        ctx.db.citation_result().id().delete(&existing.id);
+    }
 
     for c in ctx.db.citation().iter().take(crate::MAX_RESULTS) {
         if c.entity_id == entity_id && c.entity_type == entity_type && c.workspace_id == workspace_id {
             ctx.db.citation_result().insert(CitationResult {
-                id: qid.clone(),
+                id: uuid_v7(ctx),
                 entity_id: c.entity_id.clone(),
                 entity_type: c.entity_type.clone(),
                 source_memory_id: c.source_memory_id.clone(),
