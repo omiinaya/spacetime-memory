@@ -21,6 +21,13 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Configure npmrc for CI
+        run: |
+          # Copy project .npmrc to ensure CI-specific settings
+          # (registry, audit=false, prefer-offline, etc.)
+          cp ../../.npmrc ./.npmrc
+          node -e "const fs=require('fs'); console.log('npmrc configured:', fs.readFileSync('.npmrc','utf8').split('\\n')[0])"
+
       - name: Install deps
         run: npm ci
 
