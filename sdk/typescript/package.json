@@ -4,6 +4,16 @@
   "description": "TypeScript SDK for spacetime-memory",
   "main": "dist/client.js",
   "types": "dist/client.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./compounder": {
+      "types": "./dist/compounder.d.ts",
+      "default": "./dist/compounder.js"
+    }
+  },
   "files": [
     "dist/"
   ],

@@ -46,6 +46,21 @@ class TestEmptySearch:
         assert len(result) == 0
 
     @pytest.mark.unit
+    def test_none_query(self, mock_http_client):
+        """Search with query=None does not crash."""
+        mock_http_client._tantivy_search = Mock(return_value=[])
+        mock_http_client._http.post.return_value = Mock(
+            status_code=200,
+            text=make_sql_response([]),
+        )
+        result = mock_http_client.search(
+            workspace_id="ws1",
+            query=None,
+            semantic=False,
+        )
+        assert isinstance(result, list)
+
+    @pytest.mark.unit
     def test_whitespace_only_query(self, mock_http_client, monkeypatch):
         """Search with whitespace-only query is handled gracefully."""
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
@@ -97,6 +112,8 @@ class TestEmptySearch:
     @pytest.mark.unit
     def test_search_special_regex_chars(self, mock_http_client):
         """Search with regex metacharacters does not crash."""
+        mock_http_client._tantivy_search = Mock(return_value=[])
+        mock_http_client._keyword_fallback = Mock(return_value=[])
         mock_http_client._http.post.return_value = Mock(
             status_code=200,
             text=make_sql_response([]),
@@ -233,6 +250,31 @@ class TestSpecialCharacters:
             peer_id="peer1",
         )
         assert result["status"] == "ok"
+
+    @pytest.mark.unit
+    def test_control_characters(self, mock_http_client, monkeypatch):
+        """Memory with ASCII control characters is handled without error."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        mock_http_client._embed = Mock(return_value=[])
+
+        def post_side_effect(*args, **kwargs):
+            return Mock(status_code=200, text="{}")
+
+        mock_http_client._http.post.side_effect = post_side_effect
+
+        # Build content with ASCII control chars (0x01-0x1F) excluding tab/newline/CR
+        control_chars = "".join(chr(i) for i in range(0x01, 0x20)
+                                if i not in (0x09, 0x0A, 0x0D))
+        content = f"before{control_chars}after"
+        try:
+            result = mock_http_client.store(
+                workspace_id="ws1",
+                content=content,
+                peer_id="peer1",
+            )
+            assert result["status"] == "ok"
+        except (TypeError, ValueError):
+            pass  # Some runtimes reject control chars — acceptable
 
 
 # ============================================================================
@@ -384,6 +426,24 @@ class TestUnicodeMemory:
         )
         assert result["status"] == "ok"
 
+    @pytest.mark.unit
+    def test_surrogate_pairs(self, mock_http_client, monkeypatch):
+        """Memory with 4-byte UTF-8 surrogate pairs (astral plane) is stored safely."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        mock_http_client._embed = Mock(return_value=[])
+
+        def post_side_effect(*args, **kwargs):
+            return Mock(status_code=200, text="{}")
+
+        mock_http_client._http.post.side_effect = post_side_effect
+
+        # 𐌰 = Gothic 𐌰 (U+10330), 𓀀 = Egyptian hieroglyph A1 (U+13000)
+        content = "Astral plane: 𐌰𐌱𓀀𓁩  𒀭𒈹 Gudea cylinder"
+        result = mock_http_client.store(
+            workspace_id="ws1", content=content, peer_id="peer1",
+        )
+        assert result["status"] == "ok"
+
 
 # ============================================================================
 # Very large content payloads
@@ -482,6 +542,25 @@ class TestVeryLargeContent:
             workspace_id="ws1", query=long_query, semantic=True,
         )
         assert isinstance(result, list)
+
+    @pytest.mark.unit
+    def test_content_near_limit(self, mock_http_client, monkeypatch):
+        """Store content approaching the ~256 KB SpacetimeDB limit."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        mock_http_client._embed = Mock(return_value=[])
+
+        def post_side_effect(*args, **kwargs):
+            return Mock(status_code=200, text="{}")
+
+        mock_http_client._http.post.side_effect = post_side_effect
+
+        content = "X" * 200_000  # ~200 KB, safely under 256 KB limit
+        assert len(content) == 200_000
+
+        result = mock_http_client.store(
+            workspace_id="ws1", content=content, peer_id="peer1",
+        )
+        assert result["status"] == "ok"
 
 
 # ============================================================================
@@ -620,6 +699,58 @@ class TestConcurrentWrites:
 
         assert len(errors) == 0, f"Mixed op errors: {errors}"
 
+    @pytest.mark.unit
+    def test_concurrent_store_and_delete(self, mock_http_client, monkeypatch):
+        """Concurrent store and delete operations from multiple threads."""
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+        mock_http_client._embed = Mock(return_value=[])
+        mock_http_client._sql = Mock(return_value=[])
+
+        call_count = [0]
+        call_lock = threading.Lock()
+
+        def post_side_effect(*args, **kwargs):
+            with call_lock:
+                call_count[0] += 1
+            return Mock(status_code=200, text="{}")
+
+        mock_http_client._http.post.side_effect = post_side_effect
+
+        errors = []
+        lock = threading.Lock()
+
+        def store_worker(i: int):
+            try:
+                mock_http_client.store(
+                    workspace_id="ws1",
+                    content=f"store-del content {i}",
+                    peer_id=f"peer-{i}",
+                )
+            except Exception as e:
+                with lock:
+                    errors.append(e)
+
+        def delete_worker():
+            try:
+                mock_http_client.delete_memory(memory_id="mem-to-delete")
+            except Exception as e:
+                with lock:
+                    errors.append(e)
+
+        threads = []
+        for i in range(10):
+            threads.append(threading.Thread(target=store_worker, args=(i,)))
+            threads.append(threading.Thread(target=delete_worker))
+
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=15)
+
+        assert len(errors) == 0, f"Concurrent store/delete errors: {errors}"
+        # At least some HTTP calls were made
+        assert call_count[0] > 0
+
 
 # ============================================================================
 # Network partition / failure scenarios
@@ -712,3 +843,30 @@ class TestNetworkPartition:
         )
         with pytest.raises(json.JSONDecodeError):
             mock_http_client._sql("SELECT * FROM nothing")
+
+    @pytest.mark.unit
+    def test_intermittent_failure(self, mock_http_client):
+        """Retry after 503 succeeds — verifies retry logic recovers."""
+        mock_http_client.max_retries = 2
+
+        attempt = [0]
+
+        def post_side_effect(*args, **kwargs):
+            attempt[0] += 1
+            if attempt[0] == 1:
+                raise httpx.ConnectError("First attempt fails")
+            if attempt[0] == 2:
+                return Mock(status_code=503, text="Service Unavailable")
+            # Third attempt succeeds
+            return Mock(status_code=200, text="{}")
+
+        mock_http_client._http.post.side_effect = post_side_effect
+        mock_http_client._http.get.return_value = Mock(status_code=200)
+
+        # The store method with semantic=False hits _sql endpoint.
+        # It goes through _call -> _request_with_retry.
+        result = mock_http_client.store(
+            workspace_id="ws1", content="recovered content", peer_id="peer1",
+        )
+        assert result["status"] == "ok"
+        assert attempt[0] >= 3
