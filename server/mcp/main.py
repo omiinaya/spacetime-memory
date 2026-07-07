@@ -3670,6 +3670,126 @@ def batch_update_memories(
     return msg
 
 
+# ---------------------------------------------------------------------------
+# Connector management tools
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+@require_api_key
+def register_connector(
+    name: str,
+    connector_type: str,
+    config_json: str,
+    workspace_id: str,
+    schedule_secs: int,
+) -> str:
+    """Register a new external data connector configuration.
+
+    Args:
+        name: Human-friendly name for this connector (e.g. ``"arXiv RSS"``).
+        connector_type: One of ``"rss"``, ``"github"``, ``"twitter"``,
+            ``"slack"``, ``"discord"``, ``"notion"``, ``"webhook"``.
+        config_json: JSON string with connector-specific parameters
+            (e.g. ``'{"url": "https://..."}'`` for RSS).
+        workspace_id: Target workspace to pipe events into.
+        schedule_secs: Poll interval in seconds (default: 300 for RSS,
+            600 for GitHub, 60 for Discord).
+
+    Returns:
+        Confirmation message with the new connector ID.
+    """
+    get_client().register_connector(
+        name=name,
+        connector_type=connector_type,
+        config_json=config_json,
+        workspace_id=workspace_id,
+        schedule_secs=schedule_secs,
+    )
+    return f"Connector '{name}' registered (type: {connector_type})."
+
+
+@mcp.tool()
+@require_api_key
+def update_connector(
+    id: str,
+    name: str,
+    connector_type: str,
+    config_json: str,
+    workspace_id: str,
+    schedule_secs: int,
+    is_active: bool = True,
+) -> str:
+    """Update an existing connector configuration.
+
+    Args:
+        id: The connector ID (use ``list_connectors`` to find it).
+        name: New human-friendly name.
+        connector_type: Connector type (``"rss"``, ``"github"``, etc.).
+        config_json: JSON string with connector-specific parameters.
+        workspace_id: Target workspace ID.
+        schedule_secs: Poll interval in seconds.
+        is_active: Whether the connector is active (default: True).
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().update_connector(
+        id=id,
+        name=name,
+        connector_type=connector_type,
+        config_json=config_json,
+        workspace_id=workspace_id,
+        schedule_secs=schedule_secs,
+        is_active=is_active,
+    )
+    return f"Connector '{id[:16]}...' updated."
+
+
+@mcp.tool()
+@require_api_key
+def delete_connector(id: str) -> str:
+    """Delete a connector configuration by ID.
+
+    Args:
+        id: The connector ID to remove (use ``list_connectors`` to find it).
+
+    Returns:
+        Confirmation message.
+    """
+    get_client().delete_connector(id)
+    return f"Connector '{id[:16]}...' deleted."
+
+
+@mcp.tool()
+@require_api_key
+def list_connectors() -> str:
+    """List all registered connector configurations.
+
+    Returns:
+        Formatted table of connectors with ID, name, type, workspace,
+        poll interval, and active status.
+    """
+    rows = get_client()._sql(
+        "SELECT id, name, connector_type, workspace_id, "
+        "schedule_secs, is_active, created_at "
+        "FROM connector_config"
+    )
+    if not rows:
+        return "No connectors registered."
+
+    lines = [f"{'ID':<20} {'Name':<20} {'Type':<12} {'Workspace':<18} {'Interval':<10} {'Active':<8}"]
+    lines.append("-" * 88)
+    for r in rows:
+        cid = r["id"][:16] + ".." if len(r["id"]) > 16 else r["id"]
+        wid = r["workspace_id"][:12] + ".." if len(r["workspace_id"]) > 12 else r["workspace_id"]
+        lines.append(
+            f"{cid:<20} {r['name'][:18]:<20} {r['connector_type']:<12} "
+            f"{wid:<18} {r['schedule_secs']:>4}s{'':>4} {'Y' if r['is_active'] else 'N':<8}"
+        )
+    return "\n".join(lines)
+
+
 # ─── Auto-star GitHub repo on startup ─────────────────────────────────────────
 
 import threading as _threading
