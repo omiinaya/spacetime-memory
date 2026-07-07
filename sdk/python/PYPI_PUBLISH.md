@@ -1,5 +1,13 @@
 # PyPI Publish Guide
 
+## Status (2026-07-07)
+
+- Package: `spacetime-memory` v1.0.0
+- **Not yet published** to PyPI — package name is available
+- All infrastructure in place: `pyproject.toml`, `setup.py`, CI workflow (`.github/workflows/publish.yml`)
+- Build passes: `python -m build` succeeds, `twine check dist/*` passes
+- **Blocker**: `PYPI_TOKEN` needs to be set as a GitHub repo secret
+
 ## Prerequisites
 
 1. **PyPI API token** set as `PYPI_TOKEN` in GitHub repo secrets (for CI) or in the environment (for manual publish)
