@@ -347,7 +347,7 @@ describe("Client", () => {
       await client.createNote("ws-1", "My Note", "Content here");
       const [url, req] = (globalThis.fetch as any).mock.calls[0];
       expect(url).toContain("call/create_note");
-      expect(JSON.parse(req.body)).toEqual(["ws-1", "My Note", "Content here", true]);
+      expect(JSON.parse(req.body)).toEqual(["ws-1", "My Note", "Content here", "", ""]);
     });
 
     it("updateNote calls update_note reducer", async () => {
