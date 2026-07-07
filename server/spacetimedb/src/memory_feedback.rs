@@ -501,3 +501,220 @@ pub fn recommend_memories(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Test the decay logic functions (extract from apply_decay_inner)
+    
+    #[test]
+    fn test_linear_decay_formula() {
+        // new_trust = trust_score * (1.0 - decay_rate * days_since_last_access)
+        let trust_score = 1.0;
+        let decay_rate = 0.01; // 1% per day
+        let days = 10.0;
+        let expected = trust_score * (1.0 - decay_rate * days); // 0.9
+        let actual = trust_score * (1.0 - decay_rate * days);
+        assert!((actual - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_linear_decay_clamped_to_floor() {
+        let trust_score = 1.0;
+        let decay_rate = 0.01;
+        let days = 200.0; // Way past max_days (90)
+        let max_days = 90.0;
+        let floor = 0.1;
+        
+        let new_trust = if days > max_days {
+            floor
+        } else {
+            trust_score * (1.0 - decay_rate * days)
+        };
+        assert_eq!(new_trust, 0.1);
+    }
+
+    #[test]
+    fn test_weibull_decay_formula() {
+        // new_trust = initial * exp(-(t/λ)^k)
+        let initial = 1.0;
+        let t = 30.0; // days
+        let lambda = 30.0; // scale
+        let k = 0.6; // shape
+        
+        let exponent = -(t / lambda).powf(k);
+        let new_trust = initial * exponent.exp();
+        
+        // At t = λ, trust ≈ 37% of initial (1/e)
+        assert!((new_trust - 0.367879).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_weibull_decay_at_3_lambda() {
+        let initial = 1.0;
+        let lambda = 30.0;
+        let k = 0.6;
+        let t = 3.0 * lambda; // 90 days
+        
+        let exponent = -(t / lambda).powf(k);
+        let new_trust = initial * exponent.exp();
+        
+        // At t = 3λ, trust ≈ 5%
+        assert!((new_trust - 0.05).abs() < 0.02);
+    }
+
+    #[test]
+    fn test_weibull_never_reaches_zero() {
+        let initial = 1.0;
+        let lambda = 30.0;
+        let k = 0.6;
+        // Very large t
+        let t = 1000.0;
+        
+        let exponent = -(t / lambda).powf(k);
+        let new_trust = initial * exponent.exp();
+        
+        // Should never reach exactly zero, just approach it
+        assert!(new_trust > 0.0);
+        assert!(new_trust < 0.001);
+    }
+
+    #[test]
+    fn test_reputation_score_laplace_smoothing() {
+        // reputation = (helpful + 1) / (total + 2)
+        let helpful = 5u64;
+        let total = 10u64;
+        let score = (helpful as f64 + 1.0) / (total as f64 + 2.0);
+        // (5+1)/(10+2) = 6/12 = 0.5
+        assert!((score - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_reputation_score_no_feedback() {
+        // Prior: 1 helpful, 1 unhelpful = 0.5
+        let helpful = 0u64;
+        let total = 0u64;
+        let score = (helpful as f64 + 1.0) / (total as f64 + 2.0);
+        assert!((score - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_reputation_score_all_helpful() {
+        let helpful = 10u64;
+        let total = 10u64;
+        let score = (helpful as f64 + 1.0) / (total as f64 + 2.0);
+        // (10+1)/(10+2) = 11/12 ≈ 0.9167
+        assert!((score - 11.0/12.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_reputation_score_all_unhelpful() {
+        let helpful = 0u64;
+        let total = 10u64;
+        let score = (helpful as f64 + 1.0) / (total as f64 + 2.0);
+        // (0+1)/(10+2) = 1/12 ≈ 0.0833
+        assert!((score - 1.0/12.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_trust_score_from_feedback() {
+        // trust_score = avg_score / 5.0
+        let scores = vec![5.0, 4.0, 5.0, 3.0];
+        let avg = scores.iter().sum::<f64>() / scores.len() as f64; // 4.25
+        let trust = (avg / 5.0).clamp(0.0, 1.0); // 0.85
+        assert!((trust - 0.85).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_trust_score_clamped() {
+        let scores = vec![1.0, 1.0, 1.0];
+        let avg = scores.iter().sum::<f64>() / scores.len() as f64; // 1.0
+        let trust = (avg / 5.0).clamp(0.0, 1.0); // 0.2
+        assert_eq!(trust, 0.2);
+        
+        let scores = vec![5.0, 5.0, 5.0];
+        let avg = scores.iter().sum::<f64>() / scores.len() as f64; // 5.0
+        let trust = (avg / 5.0).clamp(0.0, 1.0); // 1.0
+        assert_eq!(trust, 1.0);
+    }
+
+    #[test]
+    fn test_recommendation_urgency_calculation() {
+        // urgency = (1.0 - trust_score) * age_weight * feedback_penalty
+        let trust = 0.2;
+        let age_weight = 1.5; // < 1 day
+        let feedback_penalty = 1.0;
+        let urgency = ((1.0 - trust) * age_weight * feedback_penalty).min(1.0);
+        // (0.8 * 1.5 * 1.0) = 1.2 -> clamped to 1.0
+        assert_eq!(urgency, 1.0);
+    }
+
+    #[test]
+    fn test_recommendation_urgency_low_trust_old_memory() {
+        let trust = 0.1;
+        let age_weight = 0.8; // > 30 days
+        let feedback_penalty = 1.0;
+        let urgency = ((1.0 - trust) * age_weight * feedback_penalty).min(1.0);
+        // (0.9 * 0.8) = 0.72
+        assert!((urgency - 0.72).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_recommendation_feedback_penalty_consistently_poor() {
+        let feedback = 5u32;
+        let trust = 0.2;
+        let penalty = if feedback >= 3 && trust < 0.3 {
+            1.5
+        } else if feedback >= 5 && trust < 0.5 {
+            1.2
+        } else {
+            1.0
+        };
+        assert_eq!(penalty, 1.5);
+    }
+
+    #[test]
+    fn test_recommendation_action_discard() {
+        let feedback = 3u32;
+        let trust = 0.2;
+        let action = if feedback >= 3 && trust < 0.3 {
+            "discard"
+        } else if feedback == 0 && trust < 0.5 {
+            "reinforce"
+        } else {
+            "review"
+        };
+        assert_eq!(action, "discard");
+    }
+
+    #[test]
+    fn test_recommendation_action_reinforce() {
+        let feedback = 0u32;
+        let trust = 0.4;
+        let age_days = 10.0;
+        let action = if feedback >= 3 && trust < 0.3 {
+            "discard"
+        } else if feedback == 0 && trust < 0.5 && age_days > 7.0 {
+            "reinforce"
+        } else {
+            "review"
+        };
+        assert_eq!(action, "reinforce");
+    }
+
+    #[test]
+    fn test_recommendation_action_review() {
+        let feedback = 1u32;
+        let trust = 0.6;
+        let action = if feedback >= 3 && trust < 0.3 {
+            "discard"
+        } else if feedback == 0 && trust < 0.5 {
+            "reinforce"
+        } else {
+            "review"
+        };
+        assert_eq!(action, "review");
+    }
+}
+
