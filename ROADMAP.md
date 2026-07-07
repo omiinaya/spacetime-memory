@@ -197,7 +197,7 @@
   - [x] `getNoteByTitle` — exists
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
   - [x] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — added graphBfs, fixed shortestPath table name (bfs_result→shortest_path_result) + added maxHops param
-  - [ ] `searchSessionsSemantic` — missing
+  - [x] `searchSessionsSemantic` — CLI command added (`stmem session search`)
   - [x] `getPeerReputation` — exists
   - [x] `registerConnector` / `updateConnector` / `deleteConnector` — added MCP tools at server/mcp/main.py
   - [ ] Compounder class (15 methods) — does not exist in TS

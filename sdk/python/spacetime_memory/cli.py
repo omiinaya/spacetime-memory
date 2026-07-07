@@ -1518,6 +1518,26 @@ def session_messages(session_id: str) -> None:
     print_table(rows, title=f"Messages (session: {session_id})")
 
 
+@session.command(name="search")
+@click.argument("query")
+@click.option("--limit", "-n", default=10, type=int, help="Max results")
+def session_search(query: str, limit: int) -> None:
+    """Semantically search across all sessions/workspaces.
+
+    Embeds the query and returns sessions sorted by relevance score.
+    Requires an embedder service to be configured.
+    """
+    with console.status(f"Searching sessions for '{query}'..."):
+        rows = _sdk_client().search_sessions_semantic(query=query, limit=limit)
+    if not rows:
+        console.print("[yellow]No matching sessions found.[/yellow]")
+        return
+    print_table(
+        rows,
+        title=f"Session Search: '{query}'",
+    )
+
+
 # ===================================================================
 # ingest — codebase, file, and text source ingestion
 # ===================================================================
