@@ -441,6 +441,40 @@ describe("Client", () => {
     });
   });
 
+  describe("merge", () => {
+    it("suggestMerges calls suggest_merges reducer with default threshold", async () => {
+      mockReducerOk();
+      await client.suggestMerges("ws-1");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/suggest_merges");
+      expect(JSON.parse(req.body)).toEqual(["ws-1", 0.8]);
+    });
+
+    it("suggestMerges passes custom threshold", async () => {
+      mockReducerOk();
+      await client.suggestMerges("ws-1", 0.92);
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/suggest_merges");
+      expect(JSON.parse(req.body)).toEqual(["ws-1", 0.92]);
+    });
+
+    it("approveMerge calls approve_merge reducer", async () => {
+      mockReducerOk();
+      await client.approveMerge("sug-1");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/approve_merge");
+      expect(JSON.parse(req.body)).toEqual(["sug-1"]);
+    });
+
+    it("rejectMerge calls reject_merge reducer", async () => {
+      mockReducerOk();
+      await client.rejectMerge("sug-1");
+      const [url, req] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("call/reject_merge");
+      expect(JSON.parse(req.body)).toEqual(["sug-1"]);
+    });
+  });
+
   describe("profiles / facts", () => {
     it("addFact calls add_fact reducer", async () => {
       mockReducerOk();
