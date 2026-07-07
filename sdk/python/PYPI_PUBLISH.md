@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-1. **PyPI API token** set as `PYPI_TOKEN` in GitHub repo secrets
+1. **PyPI API token** set as `PYPI_TOKEN` in GitHub repo secrets (for CI) or in the environment (for manual publish)
 2. Package built and verified (see below)
 
 ## Version Bumping
@@ -18,14 +18,14 @@ Version is defined in two places that must match:
 
 ## Publish Workflow
 
-The CI workflow `.github/workflows/publish.yml` triggers automatically on tag push:
+The CI workflow `.github/workflows/publish.yml` triggers automatically on `py-v*.*.*` tag push:
 
 ```bash
 # 1. Update version in both files
 # 2. Commit and tag
 git add sdk/python/pyproject.toml sdk/python/spacetime_memory/__init__.py
 git commit -m "chore: bump version to X.Y.Z"
-git tag vX.Y.Z
+git tag py-vX.Y.Z
 git push origin main --tags
 ```
 
