@@ -261,7 +261,7 @@
 ### 4.4 Code quality
 - [ ] 20 TODOs/FIXMEs across the codebase
   - `note.rs:208` — "TODO: handle concurrent note block updates" ✓ (added expected_version param to update_note)
-  - `lib.rs:15` — "TODO: organize module structure"
+  - `lib.rs:15` — "TODO: organize module structure" ✓ (organized into 7 logical groups: domain models, user profiles, memory/KG, entity extraction/linking, retrieval/query/context, auth/crypto, infrastructure)
   - `client.py:128` — "TODO: configure log level" ✓ (added NullHandler + env var support)
   - `orgmode.py:70` — "FIXME: extract method" ✓ DONE — extracted `_section_to_event()`
 - [ ] Unused imports in several Rust files (warnings on build)
@@ -281,7 +281,7 @@
 - [ ] Connector tests require live credentials — no mock mode
 - [ ] `connectors/base.py` is confusing — "connector" means "sync connector" (Discord, Notion, GitHub, Slack, RSS, Twitter, webhook, orgmode), NOT "parity adapter" (Mem0, Zep, etc.)
 - [ ] No Telegram connector (mentioned in the prompt template)
-- [ ] Orgsync connector may have bugs (orgmode.py:70 "FIXME")
+|284|- [~] Orgsync connector may have bugs (orgmode.py:70 FIXME resolved by _section_to_event())|
 
 ### 4.7 Monitoring & Observability
 - [ ] No alerting when embedder/Tantivy sidecar is down
