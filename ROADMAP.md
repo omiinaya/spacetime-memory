@@ -186,7 +186,7 @@
   - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
   - [ ] `computePageRank` — exists
   - [x] `computeCommunityHierarchy` — exists (server reducer + MCP tool + Python SDK + TS SDK + tests)
-  - [ ] `suggestMerges` / `approveMerge` / `rejectMerge` — missing
+  - [x] `suggestMerges` / `approveMerge` / `rejectMerge` — implemented (server reducer + MCP tool + Python SDK + TS SDK + CLI + web UI + tests)
   - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
   - [ ] `extractEntities` — exists
   - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
@@ -196,7 +196,7 @@
   - [x] `getNoteByDate` — exists
   - [x] `getNoteByTitle` — exists
   - [ ] `getBacklinks` / `getOutgoingLinks` — missing
-  - [ ] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — missing
+  - [x] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — added graphBfs, fixed shortestPath table name (bfs_result→shortest_path_result) + added maxHops param
   - [ ] `searchSessionsSemantic` — missing
   - [ ] `getPeerReputation` — missing
   - [ ] `registerConnector` / `updateConnector` / `deleteConnector` — missings
