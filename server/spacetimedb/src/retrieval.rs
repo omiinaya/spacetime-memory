@@ -348,5 +348,163 @@ Line 3";
         let bm25_text = content.clone();
         assert_eq!(bm25_text, content);
     }
+
+
+    // ── tokenize ─────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_tokenize_basic() {
+        let tokens = tokenize("Rust memory system");
+        assert!(tokens.contains(&"rust".to_string()));
+        assert!(tokens.contains(&"memory".to_string()));
+        assert!(tokens.contains(&"system".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_removes_stopwords() {
+        let tokens = tokenize("the and for with");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_short_words() {
+        let tokens = tokenize("a b c d");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_mixed() {
+        let tokens = tokenize("the quick brown fox jumps");
+        assert!(!tokens.contains(&"the".to_string()));
+        assert!(tokens.contains(&"quick".to_string()));
+        assert!(tokens.contains(&"brown".to_string()));
+        assert!(tokens.contains(&"fox".to_string()));
+        assert!(tokens.contains(&"jumps".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_punctuation() {
+        let tokens = tokenize("hello, world! how's it?");
+        assert!(tokens.contains(&"hello".to_string()));
+        assert!(tokens.contains(&"world".to_string()));
+        assert!(!tokens.contains(&"it".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_empty() {
+        let tokens = tokenize("");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_numbers() {
+        let tokens = tokenize("GPT4 and BERT score");
+        assert!(tokens.contains(&"gpt4".to_string()));
+        assert!(tokens.contains(&"bert".to_string()));
+        assert!(tokens.contains(&"score".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_case_insensitive() {
+        let tokens = tokenize("Hello WORLD");
+        assert!(tokens.contains(&"hello".to_string()));
+        assert!(tokens.contains(&"world".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_unicode() {
+        let tokens = tokenize("café résumé");
+        assert!(tokens.contains(&"café".to_string()));
+        assert!(tokens.contains(&"résumé".to_string()));
+    }
+
+    // ── bm25_idf ─────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_bm25_idf_common_term() {
+        let idf = bm25_idf(90, 100);
+        assert!(idf > 0.0);
+        assert!(idf < 1.0);
+    }
+
+    #[test]
+    fn test_bm25_idf_rare_term() {
+        let idf = bm25_idf(2, 100);
+        assert!(idf > 0.0);
+    }
+
+    #[test]
+    fn test_bm25_idf_all_docs() {
+        let idf = bm25_idf(100, 100);
+        assert!(idf > 0.0);
+        assert!(idf < 1.0);
+    }
+
+    #[test]
+    fn test_bm25_idf_zero_doc_freq() {
+        let idf = bm25_idf(0, 100);
+        assert_eq!(idf, 0.0);
+    }
+
+    #[test]
+    fn test_bm25_idf_zero_total() {
+        let idf = bm25_idf(5, 0);
+        assert_eq!(idf, 0.0);
+    }
+
+    #[test]
+    fn test_bm25_idf_single_doc() {
+        let idf = bm25_idf(1, 1);
+        assert!(idf > 0.0);
+    }
+
+    // ── bm25_score ───────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_bm25_score_higher_tf_higher_score() {
+        let score_1 = bm25_score(5, 100, 50.0);
+        let score_2 = bm25_score(10, 100, 50.0);
+        assert!(score_2 > score_1);
+    }
+
+    #[test]
+    fn test_bm25_score_shorter_doc_higher_score_same_tf() {
+        let score_short = bm25_score(3, 10, 50.0);
+        let score_long = bm25_score(3, 100, 50.0);
+        assert!(score_short > score_long);
+    }
+
+    #[test]
+    fn test_bm25_score_zero_tf() {
+        let score = bm25_score(0, 100, 50.0);
+        assert_eq!(score, 0.0);
+    }
+
+    #[test]
+    fn test_bm25_score_positive() {
+        let score = bm25_score(3, 30, 25.0);
+        assert!(score > 0.0);
+        assert!(score < 1.0);
+    }
+
+    #[test]
+    fn test_bm25_score_saturating() {
+        let score = bm25_score(1000, 100, 50.0);
+        assert!(score > 0.0);
+        // BM25 with k1=1.2 asymptotes at k1+1 = 2.2
+        assert!(score <= 2.2);
+    }
+
+    #[test]
+    fn test_bm25_score_doc_len_zero() {
+        let score = bm25_score(3, 0, 25.0);
+        assert!(score > 0.0);
+    }
+
+    #[test]
+    fn test_bm25_score_avg_doc_len_zero() {
+        let score = bm25_score(3, 30, 0.0);
+        assert!(score > 0.0);
+    }
 }
 
