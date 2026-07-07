@@ -110,24 +110,6 @@ pub struct BacklinkResult {
     pub created_at: i64,
 }
 
-/// Stores the result of a get_backlinks / get_outgoing_links query (public for SQL reads).
-/// Transient — contents are replaced on each query call.
-#[table(accessor = backlink_result, public)]
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BacklinkResult {
-    #[primary_key]
-    pub id: String,
-    /// Source note ID (the note containing the [[wikilink]])
-    pub source_note_id: String,
-    pub source_note_title: String,
-    /// Target note ID (the note being linked to)
-    pub target_note_id: String,
-    pub target_note_title: String,
-    /// Display text used in the wikilink
-    pub display_text: String,
-    pub created_at: i64,
-}
-
 /// A block — individual paragraph/heading/list-item within a note.
 /// Blocks are parsed from markdown content and given stable IDs.
 #[table(accessor = note_block)]
