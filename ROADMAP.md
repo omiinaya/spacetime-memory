@@ -168,43 +168,42 @@
 ## ═══════════════════════════════════════════════
 
 ### 3.1 TS SDK parity — 0 missing methods
-**Status:** TS SDK has ~108 methods. Python SDK has ~140 public + 15 compounder.
-- [ ] Audit missing methods by category:
-  - [ ] `batchUpdateMemories` — missing
-  - [ ] `setMemoryScope` — missing
-  - [ ] `escalateMemories` — missing
-  - [ ] `recommendMemories` — missing
-  - [ ] `detectPatterns` — missing
-  - [ ] `deltaSync` — missing
-  - [ ] `searchWithFilters` — missing
+**Status:** TS SDK has ~195 async methods + 14 compounder methods. Python SDK has ~140 public + 15 compounder.
+- [x] Audit missing methods by category (see below):
+  - [x] `batchUpdateMemories` — exists
+  - [x] `setMemoryScope` — exists
+  - [x] `escalateMemories` — exists
+  - [x] `recommendMemories` — exists
+  - [x] `detectPatterns` — exists
+  - [ ] `deltaSync` — missing (still needs porting from Python SDK)
+  - [x] `searchWithFilters` — exists
   - [x] `listDirectory` / `traverseDirectory` / `getDirectory` / `createDirectory` / `linkMemoryToDirectory` / `unlinkMemoryFromDirectory` — implemented (server reducers + Python SDK + TS SDK + CLI + tests)
-  - [x] `updateMemoryTier` — missing
-  - [ ] `setMemoryScope` — missing
-  - [ ] `batchDeleteMemories` — exists
+  - [x] `updateMemoryTier` — exists
+  - [x] `batchDeleteMemories` — exists
   - [x] `batchTagMemories` / `batchUntagMemories` — CLI commands added (stmem tag batch-tag / batch-untag)
   - [x] `getEdgeHistory` — implemented (server reducer + MCP tool + Python SDK + TS SDK + tests)
-  - [ ] `addNodeCitation` / `addEdgeCitation` / `getCitations` — missing
-  - [ ] `computePageRank` — exists
+  - [x] `addNodeCitation` / `addEdgeCitation` / `getCitations` — exist
+  - [x] `computePageRank` — exists
   - [x] `computeCommunityHierarchy` — exists (server reducer + MCP tool + Python SDK + TS SDK + tests)
   - [x] `suggestMerges` / `approveMerge` / `rejectMerge` — implemented (server reducer + MCP tool + Python SDK + TS SDK + CLI + web UI + tests)
-  - [ ] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
-  - [ ] `extractEntities` — exists
-  - [ ] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
-  - [ ] `logResonanceSession` — exists
+  - [x] `addProfileFact` / `addDynamicContext` / `getProfile` / `listProfiles` / `searchProfiles` / `upsertProfile` — exist
+  - [x] `extractEntities` — exists
+  - [x] `storeHarmonicBeliefs` / `clearHarmonicBeliefs` — exist
+  - [x] `logResonanceSession` — exists
   - [x] `createEntityLink` / `addAlias` / `resolveEntity` — now fixed; TS createEntityLink had wrong signature (3 args instead of 5), fixed to match server reducer
   - [x] `getNode` — exists
   - [x] `getNoteByDate` — exists
   - [x] `getNoteByTitle` — exists
-  - [ ] `getBacklinks` / `getOutgoingLinks` — missing
+  - [x] `getBacklinks` / `getOutgoingLinks` — implemented + TS SDK tests
   - [x] `getNeighborsViaReducer` / `graphBfs` / `shortestPath` — added graphBfs, fixed shortestPath table name (bfs_result→shortest_path_result) + added maxHops param
-  - [x] `searchSessionsSemantic` — CLI command added (`stmem session search`)
-  - [x] `getPeerReputation` — implemented (server reducer + Python SDK + TS SDK + MCP + tests)
-  - [x] `registerConnector` / `updateConnector` / `deleteConnector` — added MCP tools at server/mcp/main.py
-  - [ ] Compounder class (15 methods) — does not exist in TS
+  - [x] `searchSessionsSemantic` — exists
+  - [x] `getPeerReputation` — exists
+  - [x] `registerConnector` / `updateConnector` / `deleteConnector` — exist
+  - [x] Compounder class (14 methods) — exposed in TS SDK with tests
 - [x] `listTagsByMemory` — already added in prior session (uncommitted)
 - [x] `updateTag` — already added in prior session (uncommitted)
 
-**Estimate:** ~40 missing methods. Each is 5-15 lines. ~4-8 hours.
+**Estimate:** 1 method remaining (deltaSync). ~15-30 min.
 
 ### 3.2 Python SDK `store_batch` — verify batch semantics
 **Status:** `store_batch()` now uses a single batch Tantivy call. Added ``/index/batch`` endpoint to the Tantivy sidecar (``index_batch`` handler) that groups items by workspace, batch-deletes old docs, batch-adds new ones, and commits once per workspace. Updated `store_batch()` to call ``_tantivy_index_batch()`` after the STDB reducers.
@@ -213,10 +212,10 @@
 - [x] Update `store_batch()` to use single batch Tantivy call
 
 ### 3.3 Bi-temporal fact tracking (Graphiti parity)
-**Status:** Not started. Graphiti's main differentiator is temporal facts with valid_from/valid_to.
-- [ ] Add `valid_from: i64` and `valid_to: i64` to Memory struct
+**Status:** Partial — Python SDK search() has temporal_filter, but bi-temporal filtering uses `created_at` not `valid_from`/`valid_to`. See commit logs for full status.
+- [x] Add `valid_from: i64` and `valid_to: i64` to Memory struct
 - [x] Add `auto_invalidate(old_fact, new_fact)` reducer
-- [ ] Expose in Python SDK: `search(query, temporal_filter={from: ..., to: ...})`
+- [x] Expose in Python SDK: `search(query, temporal_filter={from: ..., to: ...})`
 - [x] Expose in TS SDK
 
 **Estimate:** 1 week.
