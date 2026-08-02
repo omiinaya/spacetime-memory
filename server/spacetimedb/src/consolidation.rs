@@ -429,9 +429,9 @@ pub fn manual_maintenance(ctx: &ReducerContext) -> Result<(), String> {
 /// Automatically deduplicate near-duplicate memories in a workspace.
 ///
 /// Scans active memories and deactivates any pair that is BOTH cosine
-/// >= 0.85 (embedding similarity) AND edit distance <= 30 % (character
-/// similarity), keeping the older memory as the survivor. Writes a
-/// ``consolidation_log`` row of type ``"dedup"``.
+/// similarity at least 0.85 AND edit distance at most 30 percent,
+/// keeping the older memory as the survivor. Writes a
+/// `consolidation_log` row of type `"dedup"`.
 ///
 /// This is the reducer the SDK's `dedup_memories()` wraps.
 #[reducer]
