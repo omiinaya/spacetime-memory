@@ -134,7 +134,6 @@ export default function MemfsPage() {
   // -----------------------------------------------------------------------
 
   const loadEntries = useCallback(async () => {
-    clearMessages();
     setLoading(true);
     try {
       await callReducer('get_memfs_entries', ['', '']);

@@ -82,7 +82,7 @@ export default function ObservationsPage() {
   };
 
   const loadObservations = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       await callReducer('list_observations', ['']);

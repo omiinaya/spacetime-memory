@@ -77,7 +77,7 @@ export default function WebhooksPage() {
   };
 
   const loadWebhooks = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       await callReducer('list_webhooks', ['']);

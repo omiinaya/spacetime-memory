@@ -122,7 +122,6 @@ export default function TaskQueuePage() {
   }, []);
 
   const loadTasks = useCallback(async () => {
-    clearMessages();
     setLoading(true);
     try {
       const res = await executeSql(

@@ -99,7 +99,7 @@ export default function ReasoningTiersPage() {
   // -----------------------------------------------------------------------
 
   const loadTiers = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       await callReducer('get_reasoning_tiers', ['']);

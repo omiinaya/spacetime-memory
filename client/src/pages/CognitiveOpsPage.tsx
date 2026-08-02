@@ -99,7 +99,6 @@ export default function CognitiveOpsPage() {
   // -----------------------------------------------------------------------
 
   const loadOps = useCallback(async () => {
-    clearMessages();
     setLoading(true);
     try {
       await callReducer('get_cognitive_ops', ['', typeFilter]);

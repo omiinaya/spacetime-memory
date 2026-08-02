@@ -124,7 +124,7 @@ export default function PipelinePage() {
   };
 
   const loadPipelines = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       const res = await executeSql(

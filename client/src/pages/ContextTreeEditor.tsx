@@ -60,7 +60,7 @@ export default function ContextTreeEditor() {
   };
 
   const loadEntries = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       await callReducer('list_contexts', ['']);

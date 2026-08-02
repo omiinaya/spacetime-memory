@@ -154,7 +154,7 @@ export default function OntologyPage() {
   // -----------------------------------------------------------------------
 
   const loadEntityTypes = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       const res = await executeSql(
@@ -170,7 +170,7 @@ export default function OntologyPage() {
   }, []);
 
   const loadRelationTypes = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       const res = await executeSql(
@@ -186,7 +186,7 @@ export default function OntologyPage() {
   }, []);
 
   const loadRecipes = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       const res = await executeSql(

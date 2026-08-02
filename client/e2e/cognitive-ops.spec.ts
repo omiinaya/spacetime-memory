@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockPage, expectAnyVisible, gotoPage } from './helpers';
+import { mockPage, expectAnyVisible, gotoPage, mockSqlCalls } from './helpers';
 
 /**
  * E2E tests for the Cognitive Operations page.
@@ -46,5 +46,44 @@ test.describe('Cognitive Ops Page', () => {
     await page.locator('textarea').first().fill('not json');
     await page.getByRole('button', { name: 'Register', exact: true }).click();
     await expect(page.getByText('config_json is not valid JSON')).toBeVisible({ timeout: 8000 });
+  });
+
+  test('register op succeeds with valid name and config', async ({ page }) => {
+    await page.getByRole('button', { name: 'Register Op', exact: true }).click();
+    await expect(page.getByText('Register Cognitive Operation', { exact: true })).toBeVisible({ timeout: 8000 });
+    await page.getByPlaceholder('e.g. entity_extract, semantic_search').fill('my_op');
+    await page.getByPlaceholder('What this operation does').fill('Test op');
+    // config textarea stays '{}' (valid) → submit
+    await page.getByRole('button', { name: 'Register', exact: true }).click();
+    await expect(page.getByText('Cognitive op registered', { exact: true })).toBeVisible({ timeout: 8000 });
+  });
+});
+
+test.describe('Cognitive Ops — Seeded', () => {
+  test.beforeEach(async ({ page }) => {
+    // The page reads cognitive_op_result first (empty) then falls back to
+    // cognitive_op; seed the fallback table so the op list renders.
+    await mockPage(page, [
+      {
+        schema: {
+          elements: [
+            { name: { some: 'id' } }, { name: { some: 'name' } },
+            { name: { some: 'op_type' } }, { name: { some: 'description' } },
+            { name: { some: 'config_json' } }, { name: { some: 'is_active' } },
+            { name: { some: 'created_at' } }, { name: { some: 'updated_at' } },
+          ],
+        },
+        rows: [
+          ['op-1', 'entity_extract', 'observe', 'Extracts entities', '{}', true, '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z'],
+        ],
+      },
+    ]);
+    await gotoPage(page, '/cognitive-ops');
+  });
+
+  test('lists seeded op and opens its detail view', async ({ page }) => {
+    await expect(page.getByText('entity_extract', { exact: false }).first()).toBeVisible({ timeout: 8000 });
+    await page.getByText('entity_extract', { exact: false }).first().click();
+    await expect(page.getByText('Extracts entities', { exact: false }).first()).toBeVisible({ timeout: 8000 });
   });
 });

@@ -141,7 +141,6 @@ export default function ReflectionLoopPage() {
   // -----------------------------------------------------------------------
 
   const loadSessions = useCallback(async () => {
-    clearMessages();
     setLoading(true);
     try {
       await callReducer('get_reflection_sessions', ['']);

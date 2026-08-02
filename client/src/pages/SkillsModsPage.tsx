@@ -192,7 +192,7 @@ export default function SkillsModsPage() {
   };
 
   const loadSkills = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       const res = await executeSql(
@@ -208,7 +208,7 @@ export default function SkillsModsPage() {
   }, []);
 
   const loadMods = useCallback(async () => {
-    clearMessages();
+
     setLoading(true);
     try {
       const res = await executeSql(
