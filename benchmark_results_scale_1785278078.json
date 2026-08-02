@@ -1,0 +1,110 @@
+{
+  "10": {
+    "n_memories": 10,
+    "n_queries": 5,
+    "n_iterations": 2,
+    "seed_time_secs": 1.1,
+    "memories_stored": 10,
+    "search": {
+      "keyword_search": {
+        "p50_ms": 0.94,
+        "p90_ms": 846.93,
+        "p99_ms": 846.93,
+        "mean_ms": 86.26,
+        "min_ms": 0.88,
+        "max_ms": 846.93,
+        "samples": 10
+      },
+      "hybrid_search": {
+        "p50_ms": 45.13,
+        "p90_ms": 51.74,
+        "p99_ms": 51.74,
+        "mean_ms": 41.21,
+        "min_ms": 29.07,
+        "max_ms": 51.74,
+        "samples": 10
+      },
+      "graph_query": {
+        "p50_ms": 3.14,
+        "p90_ms": 3.35,
+        "p99_ms": 3.35,
+        "mean_ms": 3.15,
+        "min_ms": 3.06,
+        "max_ms": 3.35,
+        "samples": 10
+      }
+    }
+  },
+  "100": {
+    "n_memories": 100,
+    "n_queries": 5,
+    "n_iterations": 2,
+    "seed_time_secs": 13.0,
+    "memories_stored": 100,
+    "search": {
+      "keyword_search": {
+        "p50_ms": 0.93,
+        "p90_ms": 1.77,
+        "p99_ms": 1.77,
+        "mean_ms": 1.08,
+        "min_ms": 0.86,
+        "max_ms": 1.77,
+        "samples": 10
+      },
+      "hybrid_search": {
+        "p50_ms": 46.87,
+        "p90_ms": 1174.33,
+        "p99_ms": 1174.33,
+        "mean_ms": 159.39,
+        "min_ms": 36.68,
+        "max_ms": 1174.33,
+        "samples": 10
+      },
+      "graph_query": {
+        "p50_ms": 5.31,
+        "p90_ms": 5.77,
+        "p99_ms": 5.77,
+        "mean_ms": 5.26,
+        "min_ms": 4.7,
+        "max_ms": 5.77,
+        "samples": 10
+      }
+    }
+  },
+  "1000": {
+    "n_memories": 1000,
+    "n_queries": 5,
+    "n_iterations": 2,
+    "seed_time_secs": 108.8,
+    "memories_stored": 1000,
+    "search": {
+      "keyword_search": {
+        "p50_ms": 0.88,
+        "p90_ms": 2.0,
+        "p99_ms": 2.0,
+        "mean_ms": 1.02,
+        "min_ms": 0.85,
+        "max_ms": 2.0,
+        "samples": 10
+      },
+      "hybrid_search": {
+        "p50_ms": 68.37,
+        "p90_ms": 78.95,
+        "p99_ms": 78.95,
+        "mean_ms": 68.15,
+        "min_ms": 59.81,
+        "max_ms": 78.95,
+        "samples": 10
+      },
+      "graph_query": {
+        "p50_ms": 21.65,
+        "p90_ms": 24.24,
+        "p99_ms": 24.24,
+        "mean_ms": 21.7,
+        "min_ms": 20.13,
+        "max_ms": 24.24,
+        "samples": 10
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "workspace_id": "db74f8ff294b4e16873ea49d6fe1b8ea",
+  "nodes": [
+    {
+      "community_id": 0,
+      "created_at": 1783489470962,
+      "embedding_json": "[]",
+      "id": "e23f0e22-c203-454d-a9c4-c3482fc78fd0",
+      "label": "Artificial Intelligence",
+      "metadata_json": "{}",
+      "node_type": "concept",
+      "source_memory_id": "",
+      "summary": "AI is a broad field of computer science focused on creating intelligent systems.",
+      "workspace_id": "db74f8ff294b4e16873ea49d6fe1b8ea"
+    },
+    {
+      "community_id": 0,
+      "created_at": 1783489470965,
+      "embedding_json": "[]",
+      "id": "52e9dd05-79b1-414a-9fda-4139e812d266",
+      "label": "Machine Learning",
+      "metadata_json": "{}",
+      "node_type": "concept",
+      "source_memory_id": "",
+      "summary": "ML enables systems to learn from experience without explicit programming.",
+      "workspace_id": "db74f8ff294b4e16873ea49d6fe1b8ea"
+    },
+    {
+      "community_id": 0,
+      "created_at": 1783489470968,
+      "embedding_json": "[]",
+      "id": "441ee26a-10ae-4f60-817e-4ce50e5f62cb",
+      "label": "Deep Learning",
+      "metadata_json": "{}",
+      "node_type": "concept",
+      "source_memory_id": "",
+      "summary": "DL uses multi-layer neural networks for hierarchical feature extraction.",
+      "workspace_id": "db74f8ff294b4e16873ea49d6fe1b8ea"
+    },
+    {
+      "community_id": 0,
+      "created_at": 1783489470971,
+      "embedding_json": "[]",
+      "id": "400a32c5-404a-4036-8950-902154e53058",
+      "label": "Alice Chen",
+      "metadata_json": "{}",
+      "node_type": "entity",
+      "source_memory_id": "",
+      "summary": "CEO and co-founder of Acme AI, Stanford CS graduate.",
+      "workspace_id": "db74f8ff294b4e16873ea49d6fe1b8ea"
+    },
+    {
+      "community_id": 0,
+      "created_at": 1783489470974,
+      "embedding_json": "[]",
+      "id": "90c10ecf-cacf-44ef-90b5-ddf42968ea06",
+      "label": "Bob Kumar",
+      "metadata_json": "{}",
+      "node_type": "entity",
+      "source_memory_id": "",
+      "summary": "CTO of Acme AI, former Google Brain, PhD MIT.",
+      "workspace_id": "db74f8ff294b4e16873ea49d6fe1b8ea"
+    },
+    {
+      "community_id": 0,
+      "created_at": 1783489470977,
+      "embedding_json": "[]",
+      "id": "7cd92580-eb5c-4683-b110-c484d6e2f055",
+      "label": "Acme AI",
+      "metadata_json": "{}",
+      "node_type": "entity",
+      "source_memory_id": "",
+      "summary": "LLM observability platform, processing 500M inference requests/day.",
+      "workspace_id": "db74f8ff294b4e16873ea49d6fe1b8ea"
+    }
+  ],
+  "edges": []
+}

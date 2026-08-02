@@ -1,0 +1,152 @@
+{
+  "benchmark": "LoCoMo v5",
+  "timestamp": 1785306479.2308593,
+  "model": "deepseek/deepseek-chat",
+  "report": {
+    "single-hop": {
+      "total": 3,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "temporal": {
+      "total": 6,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "multi-hop": {
+      "total": 1,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "__primary__": {
+      "categories": [
+        "single-hop",
+        "temporal",
+        "multi-hop",
+        "open-domain"
+      ],
+      "total": 10,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "__overall__": {
+      "total": 10,
+      "correct": 0,
+      "accuracy": 0.0
+    }
+  },
+  "results": [
+    {
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected_answer": "7 May 2023",
+      "actual_answer": "Caroline went to the LGBTQ support group on **8 May, 2023**, as mentioned in **Session 1, Turn 3**.",
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "The system's answer (8 May 2023) is not semantically correct as it does not match the expected answer (7 May 2023). The difference in dates makes the answer incorrect, even when considering leniency for paraphrases or different date formats.",
+      "evidence": [
+        "D1:3"
+      ]
+    },
+    {
+      "question": "When did Melanie paint a sunrise?",
+      "expected_answer": 2022,
+      "actual_answer": "The timeline does not provide any information about Melanie painting a sunrise. Therefore, the answer is: **I don't know.**",
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "The system's answer claims there is no information about Melanie painting a sunrise, which contradicts the expected answer of '2022'. Therefore, the system's answer is not semantically correct.",
+      "evidence": [
+        "D1:12"
+      ]
+    },
+    {
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected_answer": "Psychology, counseling certification",
+      "actual_answer": "Here\u2019s the step-by-step reasoning:\n\n1. **Relevant Facts**:\n   - In **Session 1 (Turn 11)**, Caroline expresses interest in \"counseling or working in mental health\" to support others with similar issues (LGBTQ+ and transgender experiences).\n   - In **Session 4 (Turn 69-73)**, she reiterates her passion for counseling, specifically mentioning a focus on transgender individuals and mental health support, inspired by her own journey and workshops she attended.\n   - In **Session 6 (Turn 95)**, she again mentions exploring counseling or mental health work as a career path.\n   - In **Session 7 (Turn 113-115)**, she emphasizes her goal of counseling to provide support and safe spaces for others, linking it to her advocacy work.\n\n2. **Connections**:\n   - Caroline consistently ties her educational/career goals to her personal experiences (transition, mental health struggles, LGBTQ+ support groups) and her desire to help others in similar situations.\n   - Her focus is specifically on mental health counseling, with a recurring emphasis on transgender and LGBTQ+ populations.\n\n3. **Answer**:\n   Caroline is likely to pursue education in **mental health counseling**, particularly with a focus on **LGBTQ+ and transgender support**. \n\n(No other fields are mentioned in the timeline; her interests are consistently centered on counseling and advocacy in this context.)",
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "The system's answer accurately captures Caroline's consistent interest in mental health counseling, particularly with a focus on LGBTQ+ and transgender support, as evidenced by multiple sessions. The answer is semantically correct, even though it paraphrases the expected answer ('Psychology, counseling certification') as 'mental health counseling'.",
+      "evidence": [
+        "D1:9",
+        "D1:11"
+      ]
+    },
+    {
+      "question": "What did Caroline research?",
+      "expected_answer": "Adoption agencies",
+      "actual_answer": "Caroline researched adoption agencies and career options in counseling or mental health, particularly focusing on working with the LGBTQ+ community. She also looked into LGBTQ+ counseling workshops and attended an LGBTQ+ conference.",
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "The system's answer includes the expected information about Caroline researching adoption agencies, along with additional details. Since partial matches and paraphrases are accepted, the answer is semantically correct.",
+      "evidence": [
+        "D2:8"
+      ]
+    },
+    {
+      "question": "What is Caroline's identity?",
+      "expected_answer": "Transgender woman",
+      "actual_answer": "Caroline is a transgender woman who is passionate about LGBTQ+ advocacy, mental health, and supporting the transgender community. She has been transitioning for three years and is involved in various activities like mentoring LGBTQ+ youth, attending pride events, and creating art that reflects her identity and experiences.",
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "The system's answer includes the expected answer 'Transgender woman' and provides additional context that aligns with the expected identity, thus semantically correct.",
+      "evidence": [
+        "D1:5"
+      ]
+    },
+    {
+      "question": "When did Melanie run a charity race?",
+      "expected_answer": "The sunday before 25 May 2023",
+      "actual_answer": "The information about Melanie running a charity race is found in **Session 2 (1:14 pm on 25 May, 2023), Turn 19**. \n\nAnswer: Melanie ran the charity race on **last Saturday before 25 May 2023** (mentioned in Session 2). The exact date isn't specified, but it was the Saturday prior to that session.",
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "The system's answer states the race was on 'last Saturday before 25 May 2023', which is a different day than the expected answer 'The sunday before 25 May 2023'. The days do not match, even with leniency for paraphrases or partial matches.",
+      "evidence": [
+        "D2:1"
+      ]
+    },
+    {
+      "question": "When is Melanie planning on going camping?",
+      "expected_answer": "June 2023",
+      "actual_answer": "The relevant information about camping is mentioned in Session 2 (1:14 pm on 25 May, 2023), Turn 25, where Caroline says: \"We're thinking about going camping next month.\" \n\nHowever, this refers to Caroline's plans, not Melanie's. The timeline does not contain any information about Melanie planning to go camping. \n\nAnswer: I don't know.",
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "The system correctly identifies that the information provided refers to Caroline's plans, not Melanie's, and acknowledges the absence of any information about Melanie planning to go camping. Therefore, the answer 'I don't know' is semantically correct.",
+      "evidence": [
+        "D2:7"
+      ]
+    },
+    {
+      "question": "What is Caroline's relationship status?",
+      "expected_answer": "Single",
+      "actual_answer": "Caroline is single and planning to adopt as a single parent (mentioned in Turn 32).",
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "The system's answer correctly states that Caroline is single, which matches the expected answer. The additional information about planning to adopt as a single parent does not contradict the relationship status but rather provides context, making the semantically correct.",
+      "evidence": [
+        "D3:13",
+        "D2:14"
+      ]
+    },
+    {
+      "question": "When did Caroline give a speech at a school?",
+      "expected_answer": "The week before 9 June 2023",
+      "actual_answer": "Caroline gave a speech at a school event in **Session 3 (7:55 pm on 9 June, 2023)**. This is mentioned in [Turn 36], where she talks about her school event and sharing her transgender journey.",
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "The system's answer specifies a time on 9 June 2023, which is the exact date mentioned in the expected answer as the reference point ('the week before 9 June 2023'). Since the system's answer does not indicate that the speech occurred before 9 June 2023, it does not semantically match the expected answer.",
+      "evidence": [
+        "D3:1"
+      ]
+    },
+    {
+      "question": "When did Caroline meet up with her friends, family, and mentors?",
+      "expected_answer": "The week before 9 June 2023",
+      "actual_answer": "The relevant information is found in **Session 3, Turn 46**, where Caroline mentions meeting up with her friends, family, and mentors last week. The session took place on **7:55 pm on 9 June, 2023**.\n\nAnswer: Caroline met up with her friends, family, and mentors in the week before **9 June, 2023**.",
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "The system's answer correctly identifies the time frame as the week before 9 June 2023, which matches the expected answer. The mention of 'last week' in the context of the session date (9 June 2023) semantically aligns with 'the week before 9 June 2023'.",
+      "evidence": [
+        "D3:11"
+      ]
+    }
+  ]
+}

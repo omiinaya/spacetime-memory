@@ -1,0 +1,70 @@
+{
+  "report_name": "Spacetime Memory — Competitive Benchmark Report",
+  "timestamp": "2026-07-29T14:00:00.000000",
+  "version": "4.0.0",
+  "caveat": "SCORES ACROSS SYSTEMS ARE NOT DIRECTLY COMPARABLE without standardized evaluation methodology",
+  "benchmarks": {
+    "locomo": {
+      "description": "LoCoMo (Long-Context Memory) — 199 sampled questions, 5 categories",
+      "methodology_notes": "Our scores use a 199-Q sample with hybrid substring/keyword/DeepSeek LLM judge. Competitors use full 1,540-Q set with different judge models (gpt-5). NOT directly comparable.",
+      "results": {
+        "v9": {"accuracy_primary": 85.53, "notes": "STDB pipeline, keyword+graph+temporal search, 199-Q sample"},
+        "v91": {"accuracy_primary": 85.53, "notes": "Entity extraction during storage, 199-Q sample"},
+        "v10_oracle": {"accuracy_primary": 94.08, "notes": "3-shot self-consistency (upper bound, not pipeline), 199-Q sample"},
+        "v11_multi_query_fusion": {"accuracy_primary": 89.47, "notes": "Multi-query fusion, 3 variants, 199-Q sample"},
+        "stdb_pipeline_full_set": {"accuracy_primary": "TBD", "notes": "Pending: standardized run on full 1,540-Q set with structured LLM judge"}
+      }
+    },
+    "longmemeval": {
+      "description": "LongMemEval — 50 questions, in-process BM25 (NOT real STDB pipeline)",
+      "methodology_notes": "Our score uses in-process BM25 on 50 Q. NOT comparable to real pipeline results.",
+      "results": {
+        "bm25_multi_query_fusion": {"accuracy": 100.0, "correct": 50, "total": 50, "notes": "In-process BM25 — not real pipeline performance"}
+      }
+    },
+    "beam": {
+      "description": "BEAM (Belief-based Evaluation for Artificial Memory) — 82 scenarios",
+      "methodology_notes": "Our real STDB pipeline scores 63-76%. BM25 scores (83-90%) are in-process baselines and NOT comparable to competitors' real pipeline results.",
+      "results": {
+        "standalone_bm25": {"accuracy": 82.9, "passed": 68, "total": 82, "notes": "In-process BM25 — NOT real pipeline"},
+        "sdk_pipeline": {"accuracy": 63.4, "passed": 52, "total": 82, "notes": "STDB SDK store + keyword search — THIS is real pipeline"},
+        "sdk_multi_query_fusion": {"accuracy": 75.6, "passed": 62, "total": 82, "notes": "SDK pipeline + 3-query fusion — real pipeline"},
+        "bm25_multi_query_fusion": {"accuracy": 86.6, "passed": 71, "total": 82, "notes": "In-process BM25 + fusion — NOT real pipeline"},
+        "temporal_aware": {"accuracy": 90.2, "passed": 74, "total": 82, "notes": "In-process BM25 + temporal — NOT real pipeline"}
+      },
+      "per_ability": {
+        "ABS": {"passed": 6, "total": 6, "accuracy": 100.0, "name": "Abstention"},
+        "ALL": {"passed": 6, "total": 8, "accuracy": 75.0, "name": "End-to-end Narrative"},
+        "CR":  {"passed": 3, "total": 5, "accuracy": 60.0, "name": "Counterfactual Reasoning"},
+        "EO":  {"passed": 6, "total": 6, "accuracy": 100.0, "name": "Entity Ordering"},
+        "IE":  {"passed": 9, "total": 9, "accuracy": 100.0, "name": "Information Extraction"},
+        "IF":  {"passed": 4, "total": 6, "accuracy": 66.7, "name": "Inference"},
+        "KU":  {"passed": 8, "total": 8, "accuracy": 100.0, "name": "Knowledge Updating"},
+        "MR":  {"passed": 9, "total": 9, "accuracy": 100.0, "name": "Memory Retrieval"},
+        "PF":  {"passed": 11, "total": 11, "accuracy": 100.0, "name": "Property Following"},
+        "SUM": {"passed": 5, "total": 5, "accuracy": 100.0, "name": "Summarization"},
+        "TR":  {"passed": 7, "total": 9, "accuracy": 77.8, "name": "Temporal Reasoning"}
+      }
+    }
+  },
+  "competitive_position": {
+    "honest_note": "We cannot claim to beat any competitor without standardized evaluation. Our raw pipeline scores are competitive but not directly comparable to any competitor's published numbers.",
+    "locomo": "v11 = 89.5% (199-Q sample, hybrid judge) vs Mem0 = 91.6% (1,540-Q, gpt-5 judge). Standardized run pending.",
+    "longmemeval": "BM25 = 100% (50 Q) vs Mem0 = 94.4% (500 Q, real pipeline). Not comparable.",
+    "beam": "Real pipeline = 63-76% vs Mem0 = 67% (real pipeline). BM25 = 83-90% (not comparable)."
+  },
+  "test_results": {
+    "total": 107,
+    "passed": 53,
+    "skipped": 54,
+    "failures": 0,
+    "errors": 0
+  },
+  "feature_coverage": {
+    "sdk_modules": 161,
+    "sdk_compatibility_layers": ["mem0", "zep", "honcho", "graphiti", "hindsight", "langchain"],
+    "connectors": 9,
+    "cli_commands": "35+",
+    "ui_pages": ["ProxyMetrics", "EmbedderMetrics", "MemoryManager", "BenchmarkDashboard", "KGVisualizer", "ConnectionWizard"]
+  }
+}

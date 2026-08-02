@@ -1,0 +1,9 @@
+# Force getrandom's "custom" backend for wasm builds: the wasi backend imports
+# `wasi_snapshot_preview1::random_get`, which the SpacetimeDB host does not
+# provide (pre-publish check rejects the module). The getrandom code paths in
+# the dependency tree (uuid, rand via spacetimedb-sats) are never invoked at
+# runtime — ctx.rng() is seeded from the reducer timestamp (StdbRng::seed_from_ts),
+# and Uuid::new_v4 is not called by the SDK. getrandom 0.2 is handled via the
+# "custom" cargo feature in Cargo.toml; 0.3/0.4 honor this cfg flag.
+[build]
+rustflags = ["--cfg", 'getrandom_backend="custom"']

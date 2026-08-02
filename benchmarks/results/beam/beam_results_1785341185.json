@@ -1,0 +1,76 @@
+{
+  "metadata": {
+    "benchmark": "beam",
+    "pipeline": "bm25",
+    "judge_model": "deepseek/deepseek-chat",
+    "total_questions": 5,
+    "timestamp": "2026-07-29T12:06:25.703311"
+  },
+  "metrics": {
+    "overall": {
+      "total": 5,
+      "correct": 5,
+      "accuracy": 100.0
+    },
+    "by_ability": {
+      "IE": {
+        "name": "Information Extraction",
+        "total": 5,
+        "correct": 5,
+        "accuracy": 100.0
+      }
+    }
+  },
+  "results": [
+    {
+      "scenario_id": "beam_ie_01",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "What is Dr. Elena Vasquez's position at NeuroLink Labs?",
+      "expected": "Chief Scientific Officer",
+      "answer": "Chief Scientific Officer",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer exactly matches the gold answer.\",\n  \"label\": \"CORREC"
+    },
+    {
+      "scenario_id": "beam_ie_01",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "Who is the CSO of NeuroLink Labs?",
+      "expected": "Elena Vasquez",
+      "answer": "Dr. Elena Vasquez is the CSO of NeuroLink Labs.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies Elena Vasquez as the CSO of Neur"
+    },
+    {
+      "scenario_id": "beam_ie_02",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "Who owns Project Chimera?",
+      "expected": "Phoenix Dynamics; Horizon Energy",
+      "answer": "Project Chimera is owned by Phoenix Dynamics (51% stake) and Horizon Energy (49% stake).",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies both Phoenix Dynamics and Horizo"
+    },
+    {
+      "scenario_id": "beam_ie_02",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "What percentage stake does Phoenix Dynamics hold in Project Chimera?",
+      "expected": "51%",
+      "answer": "51%",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly.\",\n  \"label\": \"CORREC"
+    },
+    {
+      "scenario_id": "beam_ie_02",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "Where is Project Chimera headquartered?",
+      "expected": "Geneva; Switzerland",
+      "answer": "Geneva, Switzerland",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of location "
+    }
+  ]
+}

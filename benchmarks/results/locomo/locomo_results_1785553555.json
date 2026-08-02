@@ -1,0 +1,67 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "stdb",
+    "judge_model": "deepseek-v4-flash-free",
+    "answer_model": "deepseek-v4-flash-free",
+    "total_questions": 3,
+    "primary_count": 3,
+    "timestamp": "2026-07-31T23:05:55.716053"
+  },
+  "metrics": {
+    "primary": {
+      "total": 3,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 1,
+        "correct": 0,
+        "accuracy": 0.0
+      },
+      "temporal": {
+        "total": 2,
+        "correct": 0,
+        "accuracy": 0.0
+      }
+    },
+    "overall": {
+      "total": 3,
+      "correct": 0,
+      "accuracy": 0.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "The generated answer does not provide the date requested and instead states it has insufficient information, missing the gold answer's fact (7 May 2023)."
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "The generated answer does not provide the date 2022 and instead states it lacks information, so it does not capture the gold answer's factual knowledge."
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "The generated answer does not provide any of the specified fields (Psychology, counseling certification) and instead states it has no information."
+    }
+  ]
+}

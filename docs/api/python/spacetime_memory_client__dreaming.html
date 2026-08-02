@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._dreaming API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._dreaming</h1>
+<pre>Help on module spacetime_memory.client._dreaming in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._dreaming - Dreaming / Synthetic Memory module — Letta parity.
+
+DESCRIPTION
+    Dreaming generates synthetic memories from patterns in existing memories,
+    creating connections, filling gaps, and generating insights without external
+    input.  All computation is client-side using existing memories — no new
+    SpacetimeDB reducers are needed.
+    
+    Reference: https://memgpt.readthedocs.io/en/latest/dreaming
+
+CLASSES
+    builtins.object
+        DreamMixin
+    
+    class DreamMixin(builtins.object)
+     |  Spacetime-Memory dreaming / synthetic memory mixin.
+     |  
+     |  Provides Client methods for generating synthetic memories, forgetting-curve
+     |  analysis, memory health assessment, and scheduled dreaming cycles.
+     |  
+     |  Mnemosyne parity: forgetting-curve and decay modeling functions match the
+     |  Mnemosyne spaced-repetition algorithm's approach to memory strength over
+     |  time.
+     |  
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  calculate_memory_health(self, workspace_id: 'str') -> 'dict[str, Any]'
+     |      Compute memory health metrics for a workspace.
+     |      
+     |      Analyses memory freshness (age distribution), decay (strength
+     |      distribution), and coverage (topic diversity) to produce a
+     |      comprehensive health report.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          Dict with keys:
+     |          - ``total_memories``: count of all memories.
+     |          - ``active_memories``: count of active memories.
+     |          - ``synthetic_memories``: count of synthetic memories.
+     |          - ``avg_age_days``: average memory age in days.
+     |          - ``avg_strength``: average memory strength.
+     |          - ``strength_distribution``: counts of weak/medium/strong memories.
+     |          - ``decay_rate``: average decay rate across memories.
+     |          - ``freshness_score``: composite freshness 0.0–1.0.
+     |          - ``coverage_estimate``: estimated topic coverage score 0.0–1.0.
+     |          - ``health_score``: overall health composite 0.0–1.0.
+     |          - ``recommendations``: list of suggested actions.
+     |  
+     |  forgetting_curve_predict(self, workspace_id: 'str', memory: 'dict[str, Any]', days_from_now: 'float' = 30.0) -> 'dict[str, Any]'
+     |      Predict memory strength at a future point in time.
+     |      
+     |      Unlike :meth:`get_forgetting_curve` which returns a full curve
+     |      for multiple memories, this method takes a single memory dict
+     |      (e.g. from a query result) and returns a simplified forecast
+     |      at a specific future date.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          memory: A memory dict (must have ``created_at`` and optionally
+     |              ``confidence``).  Can be a raw memory row or a dict with
+     |              those keys.
+     |          days_from_now: How many days into the future to predict.
+     |      
+     |      Returns:
+     |          Dict with keys: ``memory_id``, ``current_strength``,
+     |          ``predicted_strength``, ``days_from_now``, ``age_at_prediction``,
+     |          ``model``, ``strength_delta``.
+     |  
+     |  get_dream_log(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get the history of dream/synthesis sessions for a workspace.
+     |      
+     |      Dream log entries are stored as memories with
+     |      ``memory_type="dream_log"``.  Returns them ordered by creation
+     |      time (newest first).
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          List of dream-log entry dicts, each with keys: ``id``,
+     |          ``strategy``, ``generated_id``, ``source_ids``, ``summary``,
+     |          ``created_at``.
+     |  
+     |  get_forgetting_curve(self, workspace_id: 'str', memory_id: 'str | None' = None) -> 'list[dict[str, Any]]'
+     |      Compute forgetting curves for memories in a workspace.
+     |      
+     |      Mnemosyne parity: models memory strength over time using Weibull or
+     |      linear decay, projected over a 90-day horizon at daily intervals.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          memory_id: Optional specific memory ID.  If ``None``, returns
+     |              curves for all active memories (aggregated).
+     |      
+     |      Returns:
+     |          List of dicts, each with keys: ``memory_id``, ``age_days``,
+     |          ``current_strength``, ``curve`` (list of
+     |          ``{"day": int, "strength": float}``), and ``model``.
+     |  
+     |  run_dream_cycle(self, workspace_id: 'str', strategies: 'list[str] | None' = None, max_new: 'int' = 5) -> 'dict[str, Any]'
+     |      Run a full dream cycle with multiple strategies.
+     |      
+     |      This orchestrates multiple synthesis strategies in one session,
+     |      returning a consolidated report of all generated memories.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          strategies: List of strategies to run.  Defaults to
+     |              ``["connect", "generalize"]``.
+     |          max_new: Maximum total new synthetic memories to generate.
+     |      
+     |      Returns:
+     |          Dict with keys:
+     |          - ``results``: list of all generated memories.
+     |          - ``total_generated``: count of generated memories.
+     |          - ``strategies_run``: list of strategies that were executed.
+     |          - ``timestamp``: unix seconds of the cycle.
+     |  
+     |  schedule_dreaming(self, workspace_id: 'str', interval_hours: 'int' = 24, strategies: 'list[str] | None' = None) -> 'dict[str, Any]'
+     |      Schedule recurring dreaming for a workspace.
+     |      
+     |      Stores the schedule configuration in the ``workspace_config`` table
+     |      (or as a dream_log memory if config table is unavailable).  The
+     |      actual scheduling execution is expected to be handled externally
+     |      (cron, task queue, etc.).
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          interval_hours: Hours between dream cycles (default 24).
+     |          strategies: List of strategies for each cycle.  Defaults to
+     |              ``["connect"]``.
+     |      
+     |      Returns:
+     |          The stored schedule config dict.
+     |  
+     |  simulate_cramming(self, workspace_id: 'str', memory_ids: 'list[str]', review_times: 'list[float]') -> 'list[dict[str, Any]]'
+     |      Simulate the effect of spaced-repetition review on memory strength.
+     |      
+     |      Uses a simplified SM-2-inspired model: each review boosts strength
+     |      and resets the decay clock partially, simulating the spacing effect.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          memory_ids: List of memory IDs to simulate.
+     |          review_times: List of review time points in days from now
+     |              (e.g., ``[1, 7, 30]`` for reviews at 1, 7, and 30 days).
+     |      
+     |      Returns:
+     |          List of dicts, one per memory, each with keys: ``memory_id``,
+     |          ``content``, ``baseline_curve`` (strength without review),
+     |          ``simulated_curve`` (strength with review), and
+     |          ``boost`` (improvement at day 90).
+     |  
+     |  synthesize_memories(self, workspace_id: 'str', source_ids: 'list[str] | None' = None, strategy: 'str' = 'connect', max_new: 'int' = 5) -> 'list[dict[str, Any]]'
+     |      Generate new synthetic memories from existing ones.
+     |      
+     |      This is purely client-side: reads existing memories, computes
+     |      relationships, and writes new synthetic memories via the existing
+     |      ``store`` method.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          source_ids: Optional list of specific memory IDs to use as
+     |              source material.  If ``None``, all active memories in the
+     |              workspace are used.
+     |          strategy: One of ``"connect"``, ``"generalize"``, ``"fill_gaps"``,
+     |              ``"contrast"``, or ``"all"`` (runs all applicable strategies).
+     |          max_new: Maximum number of synthetic memories to generate.
+     |      
+     |      Returns:
+     |          List of generated synthetic memory dicts, each with at least
+     |          ``id``, ``content``, ``summary``, ``strategy``, and
+     |          ``source_memory_ids``.
+     |      
+     |      Raises:
+     |          ValueError: If *strategy* is not recognised.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    DREAM_LOG_MEMORY_TYPE = 'dream_log'
+    SYNTHETIC_MEMORY_TYPE = 'synthetic'
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_dreaming.py
+
+
+</pre>
+</body></html>

@@ -1,0 +1,2858 @@
+{
+  "benchmark": "LoCoMo v9",
+  "timestamp": 1785319132.2522602,
+  "report": {
+    "single-hop": {
+      "total": 32,
+      "correct": 22,
+      "accuracy": 68.75
+    },
+    "temporal": {
+      "total": 37,
+      "correct": 32,
+      "accuracy": 86.49
+    },
+    "multi-hop": {
+      "total": 13,
+      "correct": 11,
+      "accuracy": 84.62
+    },
+    "open-domain": {
+      "total": 70,
+      "correct": 65,
+      "accuracy": 92.86
+    },
+    "adversarial": {
+      "total": 47,
+      "correct": 18,
+      "accuracy": 38.3
+    },
+    "__primary__": {
+      "categories": [
+        "single-hop",
+        "temporal",
+        "multi-hop",
+        "open-domain"
+      ],
+      "total": 152,
+      "correct": 130,
+      "accuracy": 85.53
+    },
+    "__overall__": {
+      "total": 199,
+      "correct": 148,
+      "accuracy": 74.37
+    }
+  },
+  "results": [
+    {
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected_answer": "7 May 2023",
+      "actual_answer": "8 May, 2023",
+      "matched_sessions": [
+        1,
+        10,
+        13
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie paint a sunrise?",
+      "expected_answer": 2022,
+      "actual_answer": "Melanie painted the sunrise last year relative to Session 1 (8 May 2023). \n\nThe exact date is not specified, so the answer is: I don't know.",
+      "matched_sessions": [
+        1,
+        13,
+        14
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "yes. the system ackn",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected_answer": "Psychology, counseling certification",
+      "actual_answer": "Based on the context, Caroline has expressed a strong interest in counseling and mental health careers (Session 7) due to her personal experiences and desire to support others. She is also actively involved in LGBTQ activism and community support (Sessions 7, 10), which aligns with advocacy or social work. Additionally, her passion for art and self-expression (Session 13) could lead her to pursue creative fields like art therapy.  \n\n**Concise answer:** Counseling, mental health, social work, or art therapy.",
+      "matched_sessions": [
+        7,
+        13,
+        10
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "yes. the system answ",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Caroline research?",
+      "expected_answer": "Adoption agencies",
+      "actual_answer": "Caroline researched counseling, career options, adoption agencies, lawyers, documents for adoption (references, financial info, medical checks), and emotional preparation for adoption.",
+      "matched_sessions": [
+        1,
+        17,
+        8
+      ],
+      "is_correct": true,
+      "category": 1,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What is Caroline's identity?",
+      "expected_answer": "Transgender woman",
+      "actual_answer": "Caroline is a trans woman.",
+      "matched_sessions": [
+        16,
+        13,
+        3
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie run a charity race?",
+      "expected_answer": "The sunday before 25 May 2023",
+      "actual_answer": "Melanie ran the charity race on **20 May 2023** (the Saturday before Session 2 on 25 May 2023). \n\nAnswer: 20 May 2023.",
+      "matched_sessions": [
+        2,
+        13,
+        18
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When is Melanie planning on going camping?",
+      "expected_answer": "June 2023",
+      "actual_answer": "From **Session 9 (17 July 2023)**, Melanie mentions:  \n*\"I had a quiet weekend after we went camping with my fam two weekends ago.\"*  \n\n- **Session 9 date**: 17 July 2023 (Monday)  \n- \"Two weekends ago\" = 2 weekends before 17 July.  \n  - The prior weekend was **8\u20139 July 2023**.  \n  - The weekend before that was **1\u20132 July 2023**.  \n\nThus, Melanie went camping on **1\u20132 July 2023**.  \n\nAnswer: 1 July 2023 (and likely 2 July 2023).",
+      "matched_sessions": [
+        14,
+        18,
+        9
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What is Caroline's relationship status?",
+      "expected_answer": "Single",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        16
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline give a speech at a school?",
+      "expected_answer": "The week before 9 June 2023",
+      "actual_answer": "Caroline gave a speech at a school on **2 June, 2023**.",
+      "matched_sessions": [
+        3,
+        18,
+        13
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "yes. \n\nthe system an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline meet up with her friends, family, and mentors?",
+      "expected_answer": "The week before 9 June 2023",
+      "actual_answer": "Here are the computed dates based on the context:\n\n1. **LGBTQ conference**: Two days before Session 7 (12 July 2023) \u2192 **10 July 2023**  \n2. **Pride parade**: \"Last weekend\" before Session 10 (20 July 2023). Assuming \"last weekend\" refers to the closest prior weekend (15-16 July 2023) \u2192 **15-16 July 2023**  \n3. **Charity race**: \"Last Saturday\" before Session 2 (25 May 2023) \u2192 **20 May 2023**  \n4. **Adoption agency interviews**: \"Last Friday\" before Session 19 (22 October 2023) \u2192 **20 October 2023**  \n5. **Roadtrip**: \"This past weekend\" before Session 18 (20 October 2023). Assuming the weekend prior (14-15 October 2023) \u2192 **14-15 October 202",
+      "matched_sessions": [
+        7,
+        10,
+        2
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How long has Caroline had her current group of friends for?",
+      "expected_answer": "4 years",
+      "actual_answer": "To determine how long Caroline has had her current group of friends, let's analyze the relevant sessions:\n\n1. In **Session 1 (8 May 2023)**, Caroline mentions attending an LGBTQ support group for the first time (\"I went to a LGBTQ support group yesterday\"). This implies her involvement with this group (and likely the friends from it) began around **7 May 2023**.\n\n2. In **Session 10 (20 July 2023)**, she refers to joining a new LGBTQ activist group \"last Tues.\" Assuming this is the same or a related group, \"last Tues\" relative to 20 July 2023 would be **11 July 2023**.\n\nHowever, the question asks about her \"current group of friends,\" which likely includes the support network mentioned in **Session 6 (6 July 2023)**, where she says her friends and family have been helping with her transition. Since her transition support network (friends) is already established",
+      "matched_sessions": [
+        10,
+        1,
+        6
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "yes. the system's an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Where did Caroline move from 4 years ago?",
+      "expected_answer": "Sweden",
+      "actual_answer": "Caroline moved from her home country 4 years ago.",
+      "matched_sessions": [
+        3,
+        8,
+        15
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How long ago was Caroline's 18th birthday?",
+      "expected_answer": "10 years ago",
+      "actual_answer": "To determine how long ago Caroline's 18th birthday was, we need to find a reference to her age or birthday in the sessions. \n\nFrom **Session 16 (13 September 2023)**, Caroline mentions:  \n*\"Since I was 17 or so. I find it so empowering and cathartic.\"*  \n\nThis implies that she started creating art around age 17. However, there is no explicit mention of her current age or when she turned 18.  \n\nSince we cannot compute the exact date of her 18th birthday from the given context, the answer is:  \n\n**I don't know.**",
+      "matched_sessions": [
+        15,
+        16,
+        7
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "yes. the system's re",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What career path has Caroline decided to persue?",
+      "expected_answer": "counseling or mental health for Transgender people",
+      "actual_answer": "Caroline has decided to pursue a career in counseling or mental health, specifically working with trans people to help them accept themselves and support their mental health.",
+      "matched_sessions": [
+        7,
+        4,
+        1
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Caroline still want to pursue counseling as a career if she hadn't received support growing up?",
+      "expected_answer": "Likely no",
+      "actual_answer": "Reasoning: Caroline's motivation to pursue counseling is strongly tied to her positive experiences at the LGBTQ+ pride parade (Session 5) and her mentorship work with LGBTQ+ youth (Session 9), which stem from her own supportive community experiences. However, the context does not provide enough information about how she would have reacted to a lack of support or whether her career goals would persist in that scenario.  \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        5,
+        9,
+        14
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "yes. the system's an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What activities does Melanie partake in?",
+      "expected_answer": "pottery, camping, painting, swimming",
+      "actual_answer": "pottery, playing clarinet",
+      "matched_sessions": [
+        13,
+        5,
+        15
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no. the system's ans",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie sign up for a pottery class?",
+      "expected_answer": "2 July 2023",
+      "actual_answer": "Melanie signed up for a pottery class on 2 July, 2023. \n\n(Computed from Session 5 on 3 July, 2023, where she says, \"I just signed up for a pottery class yesterday.\")",
+      "matched_sessions": [
+        5,
+        16,
+        14
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When is Caroline going to the transgender conference?",
+      "expected_answer": "July 2023",
+      "actual_answer": "July 2023 (exact date not specified in the context).",
+      "matched_sessions": [
+        5,
+        9,
+        14
+      ],
+      "is_correct": true,
+      "category": 2,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Where has Melanie camped?",
+      "expected_answer": "beach, mountains, forest",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        5,
+        7,
+        14
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What do Melanie's kids like?",
+      "expected_answer": "dinosaurs, nature",
+      "actual_answer": "Melanie's kids like dinosaurs, animals, and nature.",
+      "matched_sessions": [
+        19,
+        6,
+        4
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie go to the museum?",
+      "expected_answer": "5 July 2023",
+      "actual_answer": "The museum visit was mentioned in **Session 6 (6 July 2023)** as happening \"yesterday.\"  \n\n**Computed date: 5 July 2023**",
+      "matched_sessions": [
+        6,
+        13,
+        1
+      ],
+      "is_correct": true,
+      "category": 2,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline have a picnic?",
+      "expected_answer": "The week before 6 July 2023",
+      "actual_answer": "The picnic occurred \"last week\" relative to Session 6 (6 July 2023). \n\nComputed date: **29 June 2023**.",
+      "matched_sessions": [
+        6,
+        13,
+        18
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Caroline likely have Dr. Seuss books on her bookshelf?",
+      "expected_answer": "Yes, since she collects classic children's books",
+      "actual_answer": "Caroline mentions creating a library for when she has kids, including \"classics, stories from different cultures, and educational books\" (Session 6). Dr. Seuss books are considered classics and are often included in children's libraries. Based on this, it is likely that Caroline would have Dr. Seuss books on her bookshelf.\n\n**Answer:** Yes, Caroline would likely have Dr. Seuss books on her bookshelf.",
+      "matched_sessions": [
+        7,
+        6,
+        18
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What books has Melanie read?",
+      "expected_answer": "\"Nothing is Impossible\", \"Charlotte's Web\"",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        7,
+        6,
+        5
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What does Melanie do to destress?",
+      "expected_answer": "Running, pottery",
+      "actual_answer": "running",
+      "matched_sessions": [
+        13,
+        7,
+        11
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline go to the LGBTQ conference?",
+      "expected_answer": "10 July 2023",
+      "actual_answer": "12 July, 2023.",
+      "matched_sessions": [
+        5,
+        13,
+        7
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie read the book \"nothing is impossible\"?",
+      "expected_answer": 2022,
+      "actual_answer": "The context does not provide any information about Melanie reading a book titled \"nothing is impossible.\" \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        7,
+        6,
+        17
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Caroline pursue writing as a career option?",
+      "expected_answer": "LIkely no; though she likes reading, she wants to be a counselor",
+      "actual_answer": "Based on the context, Caroline expresses a deep appreciation for books and reading, mentioning how they guide and motivate her (Session 7). She also highlights the importance of self-expression through sentimental objects like her hand-painted bowl (Session 4). However, there is no explicit mention of her interest in writing as a career or any active pursuit of it. Her focus is primarily on counseling and mental health (Sessions 4 and 7).  \n\nConcise answer: I don't know.",
+      "matched_sessions": [
+        4,
+        7,
+        18
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline go to the adoption meeting?",
+      "expected_answer": "The friday before 15 July 2023",
+      "actual_answer": "The adoption meeting was mentioned in Session 8 (15 July, 2023) as happening \"last Friday.\" \n\nCalculating from the session date (15 July 2023, a Saturday), \"last Friday\" would be **14 July 2023**. \n\nAnswer: 14 July 2023.",
+      "matched_sessions": [
+        13,
+        8,
+        10
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie go to the pottery workshop?",
+      "expected_answer": "The Friday before 15 July 2023",
+      "actual_answer": "The pottery workshop was mentioned in **Session 8 (15 July, 2023)**, where Melanie says:  \n*\"Last Fri I finally took my kids to a pottery workshop.\"*  \n\nSince \"Last Friday\" relative to **15 July 2023 (a Saturday)** would be **14 July 2023**, the exact date is:  \n\n**14 July 2023**",
+      "matched_sessions": [
+        8,
+        4,
+        5
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Melanie be considered a member of the LGBTQ community?",
+      "expected_answer": "Likely no, she does not refer to herself as part of it",
+      "actual_answer": "There is no direct evidence in the provided context that explicitly states Melanie is a member of the LGBTQ community. While Caroline discusses her involvement in LGBTQ+ events and her transgender identity, Melanie's own identity or orientation is not mentioned. Therefore, based on the information given, **I don't know**.",
+      "matched_sessions": [
+        18,
+        5,
+        14
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie go camping in June?",
+      "expected_answer": "The week before 27 June 2023",
+      "actual_answer": "I don't know. The context does not provide information about Melanie going camping in June.",
+      "matched_sessions": [
+        10,
+        13,
+        18
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What LGBTQ+ events has Caroline participated in?",
+      "expected_answer": "Pride parade, school speech, support group",
+      "actual_answer": "LGBTQ conference (two days before 12 July 2023), LGBTQ+ pride parade (last week before 3 July 2023), Connected LGBTQ Activists group (joined last Tuesday before 20 July 2023)",
+      "matched_sessions": [
+        7,
+        10,
+        5
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline go to a pride parade during the summer?",
+      "expected_answer": "The week before 3 July 2023",
+      "actual_answer": "Caroline went to a pride parade on **24 June, 2023**.",
+      "matched_sessions": [
+        10,
+        8,
+        5
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What events has Caroline participated in to help children?",
+      "expected_answer": "Mentoring program, school speech",
+      "actual_answer": "- LGBTQ conference, pride parade, council meeting for adoption",
+      "matched_sessions": [
+        7,
+        10,
+        8
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie go camping in July?",
+      "expected_answer": "two weekends before 17 July 2023",
+      "actual_answer": "From the context, Melanie mentions their family camping trip in **Session 10 (20 July 2023)** as a summer tradition (\"We always look forward to our family camping trip... It's the highlight of our summer!\"). However, no exact date for the July camping trip is provided in the retrieved sessions. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        10,
+        13,
+        18
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline join a mentorship program?",
+      "expected_answer": "The weekend before 17 July 2023",
+      "actual_answer": "To determine when Caroline joined the mentorship program, we look at **Session 9 (17 July 2023)**, where she mentions:  \n*\"Last weekend I joined a mentorship program for LGBTQ youth.\"*  \n\nAssuming \"last weekend\" refers to the weekend immediately before the session date (17 July 2023), the most recent weekend prior was **15\u201316 July 2023**.  \n\n**Answer:** 15 July 2023.",
+      "matched_sessions": [
+        9,
+        14,
+        3
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Melanie paint recently?",
+      "expected_answer": "sunset",
+      "actual_answer": "Melanie painted a landscape inspired by autumn, a sunset, and an abstract painting with blue streaks showing tranquility.",
+      "matched_sessions": [
+        13,
+        17,
+        14
+      ],
+      "is_correct": true,
+      "category": 1,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What activities has Melanie done with her family?",
+      "expected_answer": "Pottery, painting, camping, museum, swimming, hiking",
+      "actual_answer": "- Took the kids to the museum (dinosaur exhibit), went camping at the beach, saw the Perseid meteor shower, went to the beach, family camping trip (roasting marshmallows, telling stories around the campfire)",
+      "matched_sessions": [
+        7,
+        6,
+        10
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "the system answer li",
+      "_reason": "substring match"
+    },
+    {
+      "question": "In what ways is Caroline participating in the LGBTQ community?",
+      "expected_answer": "Joining activist group, going to pride parades, participating in an art show, mentoring program",
+      "actual_answer": "Joined a new LGBTQ activist group, attended an LGBTQ+ pride parade, going to a transgender conference, organizing an LGBTQ art show",
+      "matched_sessions": [
+        10,
+        5,
+        14
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How many times has Melanie gone to the beach in 2023?",
+      "expected_answer": 2,
+      "actual_answer": "Once or twice",
+      "matched_sessions": [
+        10,
+        7,
+        6
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline join a new activist group?",
+      "expected_answer": "The Tuesday before 20 July 2023",
+      "actual_answer": "To determine when Caroline joined the new activist group, we look at **Session 10 (8:56 pm on 20 July, 2023)**, where she mentions:  \n*\"I just joined a new LGBTQ activist group last Tues.\"*  \n\nSince the session date is **20 July 2023 (Friday)**, \"last Tuesday\" would be **18 July 2023**.  \n\n**Answer:** 18 July 2023.",
+      "matched_sessions": [
+        10,
+        1,
+        13
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Melanie be more interested in going to a national park or a theme park?",
+      "expected_answer": "National park; she likes the outdoors",
+      "actual_answer": "Based on the context, Melanie seems more interested in nature and outdoor activities. In Session 16, she mentions camping with her kids, exploring the forest, and hiking, which suggests she enjoys national parks. There is no mention of her interest in theme parks. Therefore, Melanie would likely be more interested in going to a national park. \n\n**Answer:** National park.",
+      "matched_sessions": [
+        15,
+        16,
+        11
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What kind of art does Caroline make?",
+      "expected_answer": "abstract art",
+      "actual_answer": "Caroline makes self-portraits, horse paintings, abstract art, and art about her trans experience and LGBTQ+ advocacy.",
+      "matched_sessions": [
+        13,
+        11,
+        17
+      ],
+      "is_correct": true,
+      "category": 1,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When is Melanie's daughter's birthday?",
+      "expected_answer": "13 August",
+      "actual_answer": "Melanie's daughter's birthday is on **13 August, 2023**. \n\n(Computed from Session 11, where Caroline mentions celebrating her daughter's birthday \"last night\" on 14 August, 2023.)",
+      "matched_sessions": [
+        4,
+        11,
+        12
+      ],
+      "is_correct": true,
+      "category": 2,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline attend a pride parade in August?",
+      "expected_answer": "The Friday before 14 August 2023",
+      "actual_answer": "The pride parade Caroline attended in August was on **Friday, 11 August 2023** (as mentioned in Session 11 on 14 August 2023, where she says \"I went to a pride parade last Friday\"). \n\nAnswer: 11 August 2023.",
+      "matched_sessions": [
+        5,
+        10,
+        11
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Melanie be considered an ally to the transgender community?",
+      "expected_answer": "Yes, she is supportive",
+      "actual_answer": "Based on the context, Melanie shows consistent support and positive engagement with Caroline's transgender identity and the LGBTQ+ community. Examples include:\n1. Celebrating Caroline's participation in Pride (Session 5) and her transgender conference.\n2. Expressing admiration for Caroline's courage as a trans person (Session 14).\n3. Encouraging Caroline's LGBTQ+ art show (Session 14), calling it a needed platform.\n\nConcise answer: **Yes**, Melanie would be considered an ally to the transgender community.",
+      "matched_sessions": [
+        18,
+        5,
+        14
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Who supports Caroline when she has a negative experience?",
+      "expected_answer": "Her mentors, family, and friends",
+      "actual_answer": "Caroline's friends, family, and mentors support her when she has a negative experience. She has known these friends for 4 years since moving from her home country.",
+      "matched_sessions": [
+        4,
+        3,
+        10
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What types of pottery have Melanie and her kids made?",
+      "expected_answer": "bowls, cup",
+      "actual_answer": "bowls with black and white designs, pottery creations with cool designs",
+      "matched_sessions": [
+        10,
+        16,
+        5
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline and Melanie go to a pride fesetival together?",
+      "expected_answer": 2022,
+      "actual_answer": "From the context, Caroline mentions attending a pride parade \"a few weeks ago\" in **Session 8 (15 July 2023)**. Assuming \"a few weeks\" means roughly 2-3 weeks prior, the pride festival likely occurred around **late June to early July 2023**. However, the exact date isn't specified, so the answer is:  \n\n**I don't know.**  \n\n(Note: While the parade was mentioned, it doesn't confirm Melanie attended with Caroline.)",
+      "matched_sessions": [
+        10,
+        8,
+        13
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What would Caroline's political leaning likely be?",
+      "expected_answer": "Liberal",
+      "actual_answer": "Based on the context, Caroline is actively involved in the LGBTQ+ community, creates art that celebrates diversity and acceptance, and organizes an LGBTQ+ art show to spread understanding. These actions suggest a strong alignment with progressive values, such as inclusivity, social justice, and support for marginalized communities.  \n\n**Concise answer:** Caroline's political leaning is likely progressive/left-leaning.",
+      "matched_sessions": [
+        14
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What has Melanie painted?",
+      "expected_answer": "Horse, sunset, sunrise",
+      "actual_answer": "A lake sunrise, landscapes, still life, and a painting with her kids.",
+      "matched_sessions": [
+        1,
+        14,
+        9
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What are Melanie's pets' names?",
+      "expected_answer": "Oliver, Luna, Bailey",
+      "actual_answer": "Luna, Oliver",
+      "matched_sessions": [
+        7,
+        10,
+        14
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline apply to adoption agencies?",
+      "expected_answer": "The week of 23 August 2023",
+      "actual_answer": "23 August, 2023",
+      "matched_sessions": [
+        2,
+        13,
+        17
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline draw a self-portrait?",
+      "expected_answer": "The week before 23 August 2023",
+      "actual_answer": "The self-portrait was drawn \"last week\" relative to Session 13, which occurred on 23 August 2023. \n\nSubtracting one week from 23 August 2023 gives the date: **16 August 2023**. \n\nAnswer: 16 August 2023.",
+      "matched_sessions": [
+        13,
+        18,
+        14
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What subject have Caroline and Melanie both painted?",
+      "expected_answer": "Sunsets",
+      "actual_answer": "lake sunrise, LGBTQ center (unity and strength)",
+      "matched_sessions": [
+        9,
+        1,
+        4
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What symbols are important to Caroline?",
+      "expected_answer": "Rainbow flag, transgender symbol",
+      "actual_answer": "The symbols important to Caroline are:  \n- LGBTQ+ community (pride parade, trans rights, inclusivity),  \n- books (especially \"Becoming Nicole\" by Amy Ellis Nutt),  \n- pets (Luna the dog and Oliver the cat),  \n- running (for mental health),  \n- art (self-expression, trans experience, \"Embracing Identity\" painting).",
+      "matched_sessions": [
+        7,
+        2,
+        11
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "yes. the system's an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline encounter people on a hike and have a negative experience?",
+      "expected_answer": "The week before 25 August 2023",
+      "actual_answer": "17 August 2023",
+      "matched_sessions": [
+        12,
+        4,
+        18
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie make a plate in pottery class?",
+      "expected_answer": "24 August 2023",
+      "actual_answer": "The plate was made in pottery class on 24 August, 2023 (the day before Session 14 on 25 August, 2023, as mentioned: \"I made it in pottery class yesterday\").",
+      "matched_sessions": [
+        14,
+        5,
+        12
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Caroline be considered religious?",
+      "expected_answer": "Somewhat, but not extremely religious",
+      "actual_answer": "Based on the provided context, there is no direct evidence to suggest that Caroline is religious. In Session 12, Caroline mentions encountering a group of religious conservatives during a hike and expresses frustration about their comments regarding LGBTQ rights. This interaction highlights her support for LGBTQ rights and her focus on acceptance and inclusivity, but it does not provide information about her own religious beliefs. \n\n**Answer:** I don't know.",
+      "matched_sessions": [
+        18,
+        12,
+        19
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What instruments does Melanie play?",
+      "expected_answer": "clarinet and violin",
+      "actual_answer": "clarinet",
+      "matched_sessions": [
+        15,
+        13,
+        11
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What musical artists/bands has Melanie seen?",
+      "expected_answer": "Summer Sounds, Matt Patterson",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        6,
+        7,
+        5
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie go to the park?",
+      "expected_answer": "27 August 2023",
+      "actual_answer": "The park visit was mentioned in **Session 15 (28 August 2023)**, where Melanie says:  \n*\"Since we last spoke, I took my kids to a park yesterday.\"*  \n\nThe last session before this was **Session 13 (23 August 2023)**, so \"yesterday\" refers to **27 August 2023**.  \n\nAnswer: 27 August 2023.",
+      "matched_sessions": [
+        15,
+        13,
+        16
+      ],
+      "is_correct": true,
+      "category": 2,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When is Caroline's youth center putting on a talent show?",
+      "expected_answer": "September 2023",
+      "actual_answer": "I don't know. The context does not provide any information about Caroline's youth center or a talent show.",
+      "matched_sessions": [
+        8,
+        10,
+        6
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Melanie likely enjoy the song \"The Four Seasons\" by Vivaldi?",
+      "expected_answer": "Yes; it's classical music",
+      "actual_answer": "Melanie enjoys classical music like Bach and Mozart (mentioned in Session 15) and finds playing the clarinet a way to express herself and relax. Since \"The Four Seasons\" by Vivaldi is a well-known classical piece, it aligns with her musical tastes.  \n\nAnswer: Yes.",
+      "matched_sessions": [
+        15,
+        18,
+        8
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What are some changes Caroline has faced during her transition journey?",
+      "expected_answer": "Changes to her body, losing unsupportive friends",
+      "actual_answer": "Some close friends kept supporting her, but a few weren't able to handle it, relationships now feel more genuine.",
+      "matched_sessions": [
+        16,
+        10,
+        7
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What does Melanie do with her family on hikes?",
+      "expected_answer": "Roast marshmallows, tell stories",
+      "actual_answer": "Melanie roasts marshmallows, tells stories around the campfire, and enjoys each other's company with her family on hikes.",
+      "matched_sessions": [
+        10,
+        13,
+        17
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline go biking with friends?",
+      "expected_answer": "The weekend before 13 September 2023",
+      "actual_answer": "The biking trip occurred \"last weekend\" relative to Session 16 (13 September 2023). \n\nComputed date: **9-10 September 2023**.",
+      "matched_sessions": [
+        16,
+        13,
+        8
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "date match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How long has Melanie been practicing art?",
+      "expected_answer": "Since 2016",
+      "actual_answer": "7 years (since approximately 2016). \n\n(Computed from Session 16 on 13 September 2023, where Melanie says: \"Seven years now, and I've finally found my real muses: painting and pottery.\")",
+      "matched_sessions": [
+        16,
+        6,
+        15
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What personality traits might Melanie say Caroline has?",
+      "expected_answer": "Thoughtful, authentic, driven",
+      "actual_answer": "Based on the context, Melanie might describe Caroline as **compassionate, dedicated, and expressive**. Caroline is deeply involved in volunteering for the LGBTQ+ community, showing her compassion and dedication to making a difference. She also shares her personal story and emotions openly, indicating her expressive nature. Additionally, her passion for music and art further highlights her creativity and emotional depth. \n\n**Answer:** Compassionate, dedicated, expressive.",
+      "matched_sessions": [
+        15,
+        16,
+        10
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What transgender-specific events has Caroline attended?",
+      "expected_answer": "Poetry reading, conference",
+      "actual_answer": "LGBTQ conference, pride parade",
+      "matched_sessions": [
+        7,
+        13,
+        10
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "yes. the system's an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What book did Melanie read from Caroline's suggestion?",
+      "expected_answer": "\"Becoming Nicole\"",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        16,
+        14,
+        18
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "yes, the system's an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie's friend adopt a child?",
+      "expected_answer": 2022,
+      "actual_answer": "Melanie's friend adopted a child in **September 2022**. This is inferred from Session 17 (13 October 2023), where Melanie mentions her friend adopted \"last year.\"",
+      "matched_sessions": [
+        2,
+        8,
+        17
+      ],
+      "is_correct": true,
+      "category": 2,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie get hurt?",
+      "expected_answer": "September 2023",
+      "actual_answer": "August 2023",
+      "matched_sessions": [
+        17,
+        18,
+        14
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie's family go on a roadtrip?",
+      "expected_answer": "The weekend before 20 October 2023",
+      "actual_answer": "The roadtrip occurred on the weekend before 20 October 2023. Since \"this past weekend\" refers to the weekend immediately preceding the session date (20 October 2023), the roadtrip likely took place on **14-15 October 2023**. \n\nFinal answer: **14-15 October 2023**.",
+      "matched_sessions": [
+        17,
+        18,
+        14
+      ],
+      "is_correct": true,
+      "category": 2,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How many children does Melanie have?",
+      "expected_answer": 3,
+      "actual_answer": "I don't know",
+      "matched_sessions": [
+        8,
+        10,
+        13
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie go on a hike after the roadtrip?",
+      "expected_answer": "19 October 2023",
+      "actual_answer": "I don't know. (The context does not specify when Melanie went on a hike after the roadtrip.)",
+      "matched_sessions": [
+        18,
+        4,
+        12
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Melanie go on another roadtrip soon?",
+      "expected_answer": "Likely no; since this one went badly",
+      "actual_answer": "Melanie recently went on a road trip that ended with a scary accident involving her son, though thankfully he was okay. She expressed gratitude for her family and the importance of cherishing them, but there is no explicit mention of her plans for another road trip soon. Given the recent experience, it\u2019s unclear whether she would embark on another one immediately.\n\nAnswer: **I don\u2019t know.**",
+      "matched_sessions": [
+        18,
+        1,
+        13
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What items has Melanie bought?",
+      "expected_answer": "Figurines, shoes",
+      "actual_answer": "figurines",
+      "matched_sessions": [
+        19,
+        4,
+        6
+      ],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Caroline pass the adoption interview?",
+      "expected_answer": "The Friday before 22 October 2023",
+      "actual_answer": "19 October 2023",
+      "matched_sessions": [
+        19,
+        13,
+        2
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "When did Melanie buy the figurines?",
+      "expected_answer": "21 October 2023",
+      "actual_answer": "The figurines were bought on 21 October, 2023 (the day before Session 19 on 22 October, as mentioned \"yesterday\"). \n\nAnswer: 21 October, 2023.",
+      "matched_sessions": [
+        19,
+        13,
+        18
+      ],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Would Caroline want to move back to her home country soon?",
+      "expected_answer": "No; she's in the process of adopting children.",
+      "actual_answer": "Based on the context, there is no indication that Caroline wants to move back to her home country (Sweden) soon. While she values her roots and the sentimental items from her family (like the necklace from her grandma), her current focus is on building her own family through adoption (Session 19) and pursuing a career in counseling to support the LGBTQ+ community (Session 4). There is no mention of plans to relocate. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        19,
+        4,
+        18
+      ],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did the charity race raise awareness for?",
+      "expected_answer": "mental health",
+      "actual_answer": "The charity race raised awareness for mental health.",
+      "matched_sessions": [
+        2,
+        7,
+        3
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Melanie realize after the charity race?",
+      "expected_answer": "self-care is important",
+      "actual_answer": "Melanie realized that self-care is really important and that taking care of herself helps her better look after her family.",
+      "matched_sessions": [
+        2,
+        7,
+        18
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How does Melanie prioritize self-care?",
+      "expected_answer": "by carving out some me-time each day for activities like running, reading, or playing the violin",
+      "actual_answer": "Melanie prioritizes self-care by carving out me-time each day for activities like running, reading, or playing the violin, which helps her stay refreshed and present for her family.",
+      "matched_sessions": [
+        13,
+        2,
+        11
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What are Caroline's plans for the summer?",
+      "expected_answer": "researching adoption agencies",
+      "actual_answer": "Caroline plans to go on a family camping trip, roast marshmallows, tell stories around the campfire, and enjoy each other's company, as mentioned in Session 10.",
+      "matched_sessions": [
+        16,
+        10,
+        15
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "no. the system's ans",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What type of individuals does the adoption agency Caroline is considering support?",
+      "expected_answer": "LGBTQ+ individuals",
+      "actual_answer": "The adoption agency Caroline is considering supports LGBTQ+ individuals.",
+      "matched_sessions": [
+        17,
+        13,
+        2
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Why did Caroline choose the adoption agency?",
+      "expected_answer": "because of their inclusivity and support for LGBTQ+ individuals",
+      "actual_answer": "Caroline chose the adoption agency because they help LGBTQ+ folks with adoption, and their inclusivity and support really spoke to her.",
+      "matched_sessions": [
+        19,
+        2,
+        17
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What is Caroline excited about in the adoption process?",
+      "expected_answer": "creating a family for kids who need one",
+      "actual_answer": "Caroline is excited about making a family for kids who need one and creating a safe and loving home for them. She is thrilled to give kids a loving home and show love and acceptance.",
+      "matched_sessions": [
+        2,
+        19,
+        17
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What does Melanie think about Caroline's decision to adopt?",
+      "expected_answer": "she thinks Caroline is doing something amazing and will be an awesome mom",
+      "actual_answer": "I don't know. The context provided does not mention Melanie's thoughts on Caroline's decision to adopt.",
+      "matched_sessions": [
+        7,
+        10,
+        9
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes. the system's an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How long have Mel and her husband been married?",
+      "expected_answer": "Mel and her husband have been married for 5 years.",
+      "actual_answer": "Mel and her husband have been married for 5 years.",
+      "matched_sessions": [
+        3,
+        10,
+        7
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What does Caroline's necklace symbolize?",
+      "expected_answer": "love, faith, and strength",
+      "actual_answer": "Caroline's necklace symbolizes love, faith, and strength. It was a gift from her grandma in Sweden and serves as a reminder of her roots and the love and support from her family.",
+      "matched_sessions": [
+        14,
+        4
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What country is Caroline's grandma from?",
+      "expected_answer": "Sweden",
+      "actual_answer": "Caroline's grandma is from Sweden.",
+      "matched_sessions": [
+        3,
+        4
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What was grandma's gift to Caroline?",
+      "expected_answer": "necklace",
+      "actual_answer": "Grandma's gift to Caroline was a necklace from Sweden, symbolizing love, faith, and strength.",
+      "matched_sessions": [
+        16,
+        9,
+        4
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What is Melanie's hand-painted bowl a reminder of?",
+      "expected_answer": "art and self-expression",
+      "actual_answer": "Melanie's hand-painted bowl is a reminder of art and self-expression.",
+      "matched_sessions": [
+        18,
+        4,
+        5
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Melanie and her family do while camping?",
+      "expected_answer": "explored nature, roasted marshmallows, and went on a hike",
+      "actual_answer": "While camping, Melanie and her family roasted marshmallows, told stories around the campfire, and enjoyed each other's company. They also watched the Perseid meteor shower during one trip, which was a memorable experience.",
+      "matched_sessions": [
+        10,
+        8,
+        17
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What kind of counseling and mental health services is Caroline interested in pursuing?",
+      "expected_answer": "working with trans people, helping them accept themselves and supporting their mental health",
+      "actual_answer": "Caroline is interested in pursuing counseling and mental health services for trans people, focusing on helping them accept themselves and supporting their mental health. She attended an LGBTQ+ counseling workshop and is passionate about creating a safe, inviting space for this community.",
+      "matched_sessions": [
+        4,
+        7,
+        6
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What workshop did Caroline attend recently?",
+      "expected_answer": "LGBTQ+ counseling workshop",
+      "actual_answer": "Caroline recently attended an LGBTQ+ counseling workshop.",
+      "matched_sessions": [
+        8,
+        4,
+        17
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What was discussed in the LGBTQ+ counseling workshop?",
+      "expected_answer": "therapeutic methods and how to best work with trans people",
+      "actual_answer": "In the LGBTQ+ counseling workshop, they discussed different therapeutic methods and how to best work with trans people, emphasizing creating a safe and supportive environment for them.",
+      "matched_sessions": [
+        4,
+        7,
+        1
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What motivated Caroline to pursue counseling?",
+      "expected_answer": "her own journey and the support she received, and how counseling improved her life",
+      "actual_answer": "Caroline was motivated to pursue counseling by her own journey and the support she received, which made her want to help others going through similar experiences. She saw how counseling and support groups improved her life and became passionate about creating a safe space for others.",
+      "matched_sessions": [
+        4,
+        7,
+        5
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What kind of place does Caroline want to create for people?",
+      "expected_answer": "a safe and inviting place for people to grow",
+      "actual_answer": "Caroline wants to create a safe, inviting, and supportive place for people, particularly for trans individuals, where they can grow, accept themselves, and receive mental health support.",
+      "matched_sessions": [
+        4,
+        17,
+        13
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Did Melanie make the black and white bowl in the photo?",
+      "expected_answer": "Yes",
+      "actual_answer": "Yes, Melanie made the black and white bowl in the photo.",
+      "matched_sessions": [
+        5,
+        12,
+        8
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What kind of books does Caroline have in her library?",
+      "expected_answer": "kids' books - classics, stories from different cultures, educational books",
+      "actual_answer": "Caroline has lots of kids' books in her library, including classics, stories from different cultures, and educational books.",
+      "matched_sessions": [
+        6,
+        7,
+        10
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What was Melanie's favorite book from her childhood?",
+      "expected_answer": "\"Charlotte's Web\"",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        17,
+        12,
+        7
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes. the system's an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What book did Caroline recommend to Melanie?",
+      "expected_answer": "\"Becoming Nicole\"",
+      "actual_answer": "Caroline recommended \"Becoming Nicole\" by Amy Ellis Nutt.",
+      "matched_sessions": [
+        7,
+        17,
+        6
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Caroline take away from the book \"Becoming Nicole\"?",
+      "expected_answer": "Lessons on self-acceptance and finding support",
+      "actual_answer": "Caroline took away lessons of self-acceptance, finding support, and the idea that tough times don't last\u2014hope and love exist. She also mentioned that pets bring joy. \n\n(Source: Session 7)",
+      "matched_sessions": [
+        7,
+        17,
+        6
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What are the new shoes that Melanie got used for?",
+      "expected_answer": "Running",
+      "actual_answer": "The new shoes that Melanie got are used for running.",
+      "matched_sessions": [
+        7,
+        13,
+        6
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What is Melanie's reason for getting into running?",
+      "expected_answer": "To de-stress and clear her mind",
+      "actual_answer": "I don't know. The context does not provide information about Melanie's reason for getting into running.",
+      "matched_sessions": [
+        6,
+        12,
+        18
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What does Melanie say running has been great for?",
+      "expected_answer": "Her mental health",
+      "actual_answer": "Melanie says running has been great for her mental health and destressing.",
+      "matched_sessions": [
+        7,
+        13,
+        10
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Mel and her kids make during the pottery workshop?",
+      "expected_answer": "pots",
+      "actual_answer": "Mel and her kids made their own pots during the pottery workshop.",
+      "matched_sessions": [
+        8,
+        16,
+        10
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What kind of pot did Mel and her kids make with clay?",
+      "expected_answer": "a cup with a dog face on it",
+      "actual_answer": "Mel and her kids made a cup with clay.",
+      "matched_sessions": [
+        5,
+        10,
+        8
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What creative project do Mel and her kids do together besides pottery?",
+      "expected_answer": "painting",
+      "actual_answer": "Mel and her kids also do painting together, especially nature-inspired ones.",
+      "matched_sessions": [
+        12,
+        8,
+        10
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Mel and her kids paint in their latest project in July 2023?",
+      "expected_answer": "a sunset with a palm tree",
+      "actual_answer": "Mel and her kids painted a nature-inspired artwork in their latest project in July 2023.",
+      "matched_sessions": [
+        8,
+        10,
+        12
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Caroline see at the council meeting for adoption?",
+      "expected_answer": "many people wanting to create loving homes for children in need",
+      "actual_answer": "At the council meeting for adoption, Caroline saw many people who wanted to create loving homes for children in need, which she found inspiring and emotional.",
+      "matched_sessions": [
+        8,
+        10,
+        13
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What do sunflowers represent according to Caroline?",
+      "expected_answer": "warmth and happiness",
+      "actual_answer": "According to Caroline, sunflowers represent warmth and happiness.",
+      "matched_sessions": [
+        8,
+        12,
+        13
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Why are flowers important to Melanie?",
+      "expected_answer": "They remind her to appreciate the small moments and were a part of her wedding decor",
+      "actual_answer": "Flowers are important to Melanie because they represent growth, beauty, and remind her to appreciate small moments. They were also a significant part of her wedding decor, always reminding her of that special day.",
+      "matched_sessions": [
+        14,
+        8,
+        6
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What inspired Caroline's painting for the art show?",
+      "expected_answer": "visiting an LGBTQ center and wanting to capture unity and strength",
+      "actual_answer": "Caroline's painting for the art show was inspired by her path as a trans woman, with the red and blue representing the binary gender system and the mix of colors symbolizing breaking free from rigid gender norms. It was a reminder to love her authentic self.",
+      "matched_sessions": [
+        16,
+        13,
+        1
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How often does Melanie go to the beach with her kids?",
+      "expected_answer": "once or twice a year",
+      "actual_answer": "Melanie goes to the beach with her kids once or twice a year.",
+      "matched_sessions": [
+        10,
+        13,
+        6
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Melanie and her family see during their camping trip last year?",
+      "expected_answer": "Perseid meteor shower",
+      "actual_answer": "Melanie and her family saw the Perseid meteor shower during their camping trip last year.",
+      "matched_sessions": [
+        10,
+        18,
+        8
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How did Melanie feel while watching the meteor shower?",
+      "expected_answer": "in awe of the universe",
+      "actual_answer": "Melanie felt tiny and in awe of the universe while watching the meteor shower. It was a breathtaking moment that reminded her how awesome life is.",
+      "matched_sessions": [
+        10,
+        13,
+        17
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Whose birthday did Melanie celebrate recently?",
+      "expected_answer": "Melanie's daughter",
+      "actual_answer": "Melanie celebrated her daughter's birthday recently.",
+      "matched_sessions": [
+        17,
+        14,
+        11
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Who performed at the concert at Melanie's daughter's birthday?",
+      "expected_answer": "Matt Patterson",
+      "actual_answer": "Matt Patterson performed at the concert at Melanie's daughter's birthday.",
+      "matched_sessions": [
+        11,
+        4,
+        16
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Why did Melanie choose to use colors and patterns in her pottery project?",
+      "expected_answer": "She wanted to catch the eye and make people smile.",
+      "actual_answer": "Melanie chose to use colors and patterns in her pottery project because she is obsessed with them and wanted to create something eye-catching that would make people smile. Additionally, painting helps her express her feelings and be creative, with each stroke carrying a part of her.",
+      "matched_sessions": [
+        12,
+        14,
+        19
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What pet does Caroline have?",
+      "expected_answer": "guinea pig",
+      "actual_answer": "Caroline has a guinea pig named Oscar.",
+      "matched_sessions": [
+        13,
+        7,
+        11
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What pets does Melanie have?",
+      "expected_answer": "Two cats and a dog",
+      "actual_answer": "Melanie has a dog named Luna and a cat named Oliver.",
+      "matched_sessions": [
+        13,
+        7,
+        11
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Where did Oliver hide his bone once?",
+      "expected_answer": "In Melanie's slipper",
+      "actual_answer": "Oliver hid his bone in Caroline's slipper once.",
+      "matched_sessions": [
+        13,
+        10,
+        7
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What activity did Caroline used to do with her dad?",
+      "expected_answer": "Horseback riding",
+      "actual_answer": "Caroline used to go horseback riding with her dad when she was a kid.",
+      "matched_sessions": [
+        13,
+        10,
+        7
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Caroline make for a local church?",
+      "expected_answer": "a stained glass window",
+      "actual_answer": "Caroline made a stained glass window for a local church.",
+      "matched_sessions": [
+        14,
+        8,
+        15
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Caroline find in her neighborhood during her walk?",
+      "expected_answer": "a rainbow sidewalk",
+      "actual_answer": "Caroline found a cool rainbow sidewalk for Pride Month during her walk in her neighborhood.",
+      "matched_sessions": [
+        10,
+        7,
+        14
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Which song motivates Caroline to be courageous?",
+      "expected_answer": "Brave by Sara Bareilles",
+      "actual_answer": "The song that motivates Caroline to be courageous is \"Brave\" by Sara Bareilles.",
+      "matched_sessions": [
+        15,
+        3,
+        7
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Which  classical musicians does Melanie enjoy listening to?",
+      "expected_answer": "Bach and Mozart",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        17,
+        13,
+        8
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Who is Melanie a fan of in terms of modern music?",
+      "expected_answer": "Ed Sheeran",
+      "actual_answer": "Ed Sheeran.",
+      "matched_sessions": [
+        15,
+        11,
+        5
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How long has Melanie been creating art?",
+      "expected_answer": "7 years",
+      "actual_answer": "Melanie has been creating art for seven years.",
+      "matched_sessions": [
+        16,
+        6,
+        15
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What precautionary sign did Melanie see at the caf\u00e9?",
+      "expected_answer": "A sign stating that someone is not being able to leave",
+      "actual_answer": "The precautionary sign Melanie saw at the caf\u00e9 was not specified in the context. The exact content or nature of the sign is not mentioned. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        16,
+        15,
+        5
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes. the system's an",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What advice does Caroline give for getting started with adoption?",
+      "expected_answer": "Do research, find an adoption agency or lawyer, gather necessary documents, and prepare emotionally.",
+      "actual_answer": "Caroline advises to do research and find an adoption agency or lawyer, gather necessary documents like references, financial info, and medical checks, and prepare emotionally for the process.",
+      "matched_sessions": [
+        13,
+        17,
+        3
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What setback did Melanie face in October 2023?",
+      "expected_answer": "She got hurt and had to take a break from pottery.",
+      "actual_answer": "Melanie faced a setback in October 2023 when she got hurt and had to take a break from pottery, which she uses for self-expression and peace.",
+      "matched_sessions": [
+        17,
+        15,
+        9
+      ],
+      "is_correct": true,
+      "category": 4,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What does Melanie do to keep herself busy during her pottery break?",
+      "expected_answer": "Read a book and paint.",
+      "actual_answer": "During her pottery break, Melanie keeps herself busy by reading a book recommended by Caroline and painting.",
+      "matched_sessions": [
+        17,
+        8,
+        16
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes. the system answ",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What painting did Melanie show to Caroline on October 13, 2023?",
+      "expected_answer": "A painting inspired by sunsets with a pink sky.",
+      "actual_answer": "Melanie showed Caroline a painting inspired by sunsets, with calming colors, and also an abstract painting with peaceful blue streaks to show tranquility.",
+      "matched_sessions": [
+        14,
+        13,
+        17
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What kind of painting did Caroline share with Melanie on October 13, 2023?",
+      "expected_answer": "An abstract painting with blue streaks on a wall.",
+      "actual_answer": "Caroline shared an abstract painting with Melanie on October 13, 2023. The painting featured blue streaks to portray tranquility and had vibrant colors.",
+      "matched_sessions": [
+        8,
+        17,
+        14
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What was the poetry reading that Caroline attended about?",
+      "expected_answer": "It was a transgender poetry reading where transgender people shared their stories.",
+      "actual_answer": "The poetry reading Caroline attended was about transgender individuals sharing their stories through poetry, creating a safe space for self-expression and celebrating their identities.",
+      "matched_sessions": [
+        17,
+        13,
+        6
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did the posters at the poetry reading say?",
+      "expected_answer": "\"Trans Lives Matter\"",
+      "actual_answer": "The posters at the poetry reading were described as \"amazing, so much pride and strength,\" but the specific text or messages on them are not mentioned in the context. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        17,
+        10,
+        6
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What does Caroline's drawing symbolize for her?",
+      "expected_answer": "Freedom and being true to herself.",
+      "actual_answer": "Caroline's drawing symbolizes liberation, empowerment, and exploring her identity\u2014being true to herself. It is also therapeutic for her.",
+      "matched_sessions": [
+        13,
+        15,
+        10
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How do Melanie and Caroline describe their journey through life together?",
+      "expected_answer": "An ongoing adventure of learning and growing.",
+      "actual_answer": "Melanie and Caroline describe their journey through life together as supportive and inspiring. They share their personal experiences, motivate each other, and celebrate their growth and achievements. Caroline emphasizes the importance of community and acceptance, while Melanie highlights the value of family and creativity. Together, they encourage each other to spread love, understanding, and hope.",
+      "matched_sessions": [
+        3,
+        8,
+        4
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes. the system answ",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What happened to Melanie's son on their road trip?",
+      "expected_answer": "He got into an accident",
+      "actual_answer": "The context provided does not mention anything about Melanie's son or what happened to him on their road trip. Therefore, I don't know.",
+      "matched_sessions": [
+        19,
+        1,
+        7
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "no",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How did Melanie's son handle the accident?",
+      "expected_answer": "He was scared but reassured by his family",
+      "actual_answer": "The context does not mention Melanie's son or any accident involving him. Therefore, the answer is: I don't know.",
+      "matched_sessions": [
+        8,
+        16,
+        7
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes. the system's re",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How did Melanie feel about her family after the accident?",
+      "expected_answer": "They are important and mean the world to her",
+      "actual_answer": "After the accident, Melanie felt that her family was extremely important to her. She mentioned that they mean the world to her, and the experience reminded her to cherish them. She also said they are her biggest motivation and support, and having them around makes hard times easier.",
+      "matched_sessions": [
+        18,
+        10,
+        7
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How did Melanie's children handle the accident?",
+      "expected_answer": "They were scared but resilient",
+      "actual_answer": "Melanie's children were scared but were reassured and explained that their brother would be okay. They handled the situation with resilience.",
+      "matched_sessions": [
+        8,
+        16,
+        18
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How did Melanie feel after the accident?",
+      "expected_answer": "Grateful and thankful for her family",
+      "actual_answer": "Melanie felt scared during the accident but was thankful her son was okay. The experience made her reflect on the importance of family and cherish them more. She also found comfort in nature and quality time with her family afterward.",
+      "matched_sessions": [
+        18,
+        1,
+        14
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What was Melanie's reaction to her children enjoying the Grand Canyon?",
+      "expected_answer": "She was happy and thankful",
+      "actual_answer": "Melanie was thankful that her children enjoyed the Grand Canyon, as mentioned in the context: \"They mean the world to me and I'm so thankful to have them. Thankfully, they enjoyed the Grand Canyon a lot!\"",
+      "matched_sessions": [
+        18,
+        3,
+        4
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "keyword match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What do Melanie's family give her?",
+      "expected_answer": "Strength and motivation",
+      "actual_answer": "Melanie's family gives her support and encouragement, which helped her become who she is.",
+      "matched_sessions": [
+        15,
+        7,
+        19
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "How did Melanie feel about her family supporting her?",
+      "expected_answer": "She appreciated them a lot",
+      "actual_answer": "Melanie felt lucky and appreciative of her family, stating they bring her joy and love, and she values the special moments they share together.",
+      "matched_sessions": [
+        10,
+        7,
+        15
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Melanie do after the road trip to relax?",
+      "expected_answer": "Went on a nature walk or hike",
+      "actual_answer": "Melanie went camping with her family to relax after the road trip.",
+      "matched_sessions": [
+        18,
+        8,
+        1
+      ],
+      "is_correct": false,
+      "category": 4,
+      "reasoning": "yes",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What did Caroline realize after her charity race?",
+      "expected_answer": "",
+      "actual_answer": "After her charity race, Caroline realized that self-care is really important. She mentioned that taking care of herself allows her to better look after her family.",
+      "matched_sessions": [
+        2,
+        7,
+        10
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What are Melanie's plans for the summer with respect to adoption?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not provide any information about Melanie's plans for the summer regarding adoption.",
+      "matched_sessions": [
+        15,
+        17,
+        19
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What type of individuals does the adoption agency Melanie is considering support?",
+      "expected_answer": "",
+      "actual_answer": "The adoption agency Melanie is considering supports LGBTQ+ individuals. \n\n(Note: This is based on Caroline's mention in Session 2 about the agency she chose because they help LGBTQ+ folks with adoption. There is no direct mention of Melanie considering an agency in the provided sessions.)",
+      "matched_sessions": [
+        17,
+        13,
+        2
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "Why did Melanie choose the adoption agency?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not provide information about Melanie choosing an adoption agency; it only discusses Caroline's choice of an agency.",
+      "matched_sessions": [
+        19,
+        2,
+        17
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What is Melanie excited about in her adoption process?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention Melanie being in the adoption process; it only discusses Caroline's adoption journey. Melanie is the one supporting Caroline, not adopting herself.",
+      "matched_sessions": [
+        2,
+        19,
+        17
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What does Melanie's necklace symbolize?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention Melanie's necklace or its symbolism.",
+      "matched_sessions": [
+        4,
+        14
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What country is Melanie's grandma from?",
+      "expected_answer": "",
+      "actual_answer": "The context does not provide information about Melanie's grandma's country. The only mention of a grandma is Caroline's, who is from Sweden. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        3,
+        4
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What was grandma's gift to Melanie?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention anything about a grandma's gift to Melanie.",
+      "matched_sessions": [
+        8,
+        3,
+        16
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What was grandpa's gift to Caroline?",
+      "expected_answer": "",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        10,
+        14,
+        17
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What is Caroline's hand-painted bowl a reminder of?",
+      "expected_answer": "",
+      "actual_answer": "Caroline's hand-painted bowl is a reminder of her path as a trans woman, symbolizing the breaking of the binary gender system (represented by red and blue) and embracing her authentic self. \n\nAnswer: It reminds her to love her authentic self and represents her journey as a trans woman.",
+      "matched_sessions": [
+        16,
+        12,
+        5
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What did Caroline and her family do while camping?",
+      "expected_answer": "",
+      "actual_answer": "While camping, Caroline and her family roasted marshmallows, told stories around the campfire, and enjoyed each other's company. This was mentioned in Session 10.",
+      "matched_sessions": [
+        10,
+        8,
+        17
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What kind of counseling and mental health services is Melanie interested in pursuing?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not specify what kind of counseling and mental health services Melanie is interested in pursuing. The discussions focus on Caroline's interests and experiences.",
+      "matched_sessions": [
+        4,
+        7,
+        6
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What kind of counseling workshop did Melanie attend recently?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention Melanie attending any counseling workshop recently. It only mentions Caroline attending an LGBTQ+ counseling workshop.",
+      "matched_sessions": [
+        4,
+        5,
+        14
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What motivated Melanie to pursue counseling?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not provide information about Melanie's motivation to pursue counseling; it only discusses Caroline's motivations.",
+      "matched_sessions": [
+        4,
+        7,
+        5
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What kind of place does Melanie want to create for people?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not provide information about what kind of place Melanie wants to create for people. The focus is primarily on Caroline's aspirations and experiences.",
+      "matched_sessions": [
+        4,
+        17,
+        13
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "Did Caroline make the black and white bowl in the photo?",
+      "expected_answer": "No",
+      "actual_answer": "No, Melanie made the black and white bowl in the photo.",
+      "matched_sessions": [
+        5,
+        12,
+        8
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "What are the new shoes that Caroline got used for?",
+      "expected_answer": "",
+      "actual_answer": "The new shoes that Caroline got are for running. \n\n(From Session 7: \"Thanks, Caroline! These are for running. Been running longer since our last chat - a great way to destress and clear my mind.\")",
+      "matched_sessions": [
+        7,
+        13,
+        6
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What is Caroline's reason for getting into running?",
+      "expected_answer": "",
+      "actual_answer": "Caroline's reason for getting into running is not explicitly mentioned in the provided sessions. The context only mentions Melanie running a charity race for mental health (Session 2). \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        2,
+        13,
+        9
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What does Caroline say running has been great for?",
+      "expected_answer": "",
+      "actual_answer": "Caroline says running has been great for destressing and clearing her mind.",
+      "matched_sessions": [
+        7,
+        13,
+        10
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What did Melanie see at the council meeting for adoption?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention Melanie attending a council meeting for adoption; it only mentions Caroline attending one.",
+      "matched_sessions": [
+        8,
+        10,
+        13
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What inspired Melanie's painting for the art show?",
+      "expected_answer": "",
+      "actual_answer": "Melanie's painting for the art show was inspired by autumn. \n\n(Found in Session 14: \"I'm feeling inspired by autumn so I'm planning a few [paintings].\")",
+      "matched_sessions": [
+        6,
+        14,
+        10
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What inspired Caroline's sculpture for the art show?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention Caroline creating a sculpture for an art show or what inspired it.",
+      "matched_sessions": [
+        7,
+        5,
+        3
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "How often does Caroline go to the beach with her kids?",
+      "expected_answer": "",
+      "actual_answer": "Caroline goes to the beach with her kids \"usually only once or twice a year.\"",
+      "matched_sessions": [
+        10,
+        13,
+        6
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What did Caroline and her family see during their camping trip last year?",
+      "expected_answer": "",
+      "actual_answer": "During their camping trip last year, Caroline and her family saw the Perseid meteor shower. \n\n(Note: The answer is based on Session 10, where Melanie describes her own family's camping trip and the meteor shower. The context does not provide information about Caroline's family seeing anything during a camping trip. If the question is strictly about Caroline's family, the answer would be \"I don't know.\")",
+      "matched_sessions": [
+        10,
+        18,
+        8
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "How did Caroline feel while watching the meteor shower?",
+      "expected_answer": "",
+      "actual_answer": "The context does not mention Caroline watching the meteor shower. It was Melanie who described the experience. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        10,
+        13,
+        17
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "Why did Caroline choose to use colors and patterns in her pottery project?",
+      "expected_answer": "",
+      "actual_answer": "Caroline chose to use colors and patterns in her pottery project because she is \"obsessed with those\" and wanted to create something eye-catching that would make people smile. Additionally, painting helps her express her feelings and be creative, with each stroke carrying a part of herself. \n\n(Source: Session 12, Caroline's response: \"I'm obsessed with those, so I made something to catch the eye and make people smile. Plus, painting helps me express my feelings and be creative. Each stroke carries a part of me.\")",
+      "matched_sessions": [
+        12,
+        14,
+        19
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "Is Oscar Melanie's pet?",
+      "expected_answer": "No",
+      "actual_answer": "No, Oscar is Caroline's pet, not Melanie's.",
+      "matched_sessions": [
+        13,
+        7
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "substring match",
+      "_reason": "substring match"
+    },
+    {
+      "question": "Where did Oscar hide his bone once?",
+      "expected_answer": "",
+      "actual_answer": "Oscar is Caroline's guinea pig, and the context does not mention Oscar hiding a bone. The mention of hiding a bone refers to Melanie's cat, Oliver, who hid his bone in her slipper. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        13,
+        10,
+        11
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What activity did Melanie used to do with her dad?",
+      "expected_answer": "",
+      "actual_answer": "Melanie used to go horseback riding with her dad when she was a kid. \n\n(Found in Session 13: \"I used to go horseback riding with my dad when I was a kid, we'd go through the fields, feeling the wind. It was so special.\")",
+      "matched_sessions": [
+        13,
+        10,
+        7
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What did Melanie make for a local church?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention Melanie making anything for a local church. Caroline is the one who made a stained glass window for a local church.",
+      "matched_sessions": [
+        14,
+        8,
+        15
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What did Melanie find in her neighborhood during her walk?",
+      "expected_answer": "",
+      "actual_answer": "Melanie did not mention finding anything in her neighborhood during a walk in the provided sessions. The context only describes Caroline finding a rainbow sidewalk during Pride Month. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        10,
+        7,
+        14
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "Which song motivates Melanie to be courageous?",
+      "expected_answer": "",
+      "actual_answer": "The exact answer is not found in the provided sessions. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        15,
+        3,
+        7
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What type of instrument does Caroline play?",
+      "expected_answer": "",
+      "actual_answer": "Caroline plays the acoustic guitar.",
+      "matched_sessions": [
+        15,
+        13,
+        11
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "Which classical musicians does Caroline enjoy listening to?",
+      "expected_answer": "",
+      "actual_answer": "I don't know.",
+      "matched_sessions": [
+        17,
+        8,
+        13
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "Who is Caroline a fan of in terms of modern music?",
+      "expected_answer": "",
+      "actual_answer": "Caroline is a fan of Ed Sheeran's \"Perfect\" in terms of modern music. \n\n(Found in Session 15: Caroline mentions this when discussing her favorite tunes with Melanie.)",
+      "matched_sessions": [
+        15,
+        11,
+        5
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What precautionary sign did Caroline see at the caf\u00e9?",
+      "expected_answer": "",
+      "actual_answer": "The precautionary sign Caroline saw at the caf\u00e9 is not described in the provided sessions. \n\nAnswer: I don't know.",
+      "matched_sessions": [
+        16,
+        15,
+        5
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What setback did Caroline face recently?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention any setback faced by Caroline recently.",
+      "matched_sessions": [
+        17,
+        15,
+        9
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What does Caroline do to keep herself busy during her pottery break?",
+      "expected_answer": "",
+      "actual_answer": "During her pottery break, Caroline keeps herself busy by trying out abstract art and putting her feelings on the canvas without too much of a plan. She also mentions attending a transgender poetry reading and being inspired to create art from that experience. \n\nAnswer: Caroline does abstract art and attends poetry readings.",
+      "matched_sessions": [
+        17,
+        8,
+        16
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What was the poetry reading that Melanie attended about?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention Melanie attending a poetry reading; it was Caroline who attended a transgender poetry reading.",
+      "matched_sessions": [
+        17,
+        13,
+        6
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What happened to Caroline's son on their road trip?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The context does not mention anything about Caroline's son on their road trip.",
+      "matched_sessions": [
+        10,
+        11,
+        19
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "How did Caroline's son handle the accident?",
+      "expected_answer": "",
+      "actual_answer": "Caroline's son was scared but okay after the accident. The exact handling isn't detailed, but it's mentioned that he was unharmed (\"Thankfully, my son's ok\"). \n\nAnswer: I don't know.  \n\n(Note: The context refers to *Melanie's* son being in the accident, not Caroline's. The question inaccurately attributes the accident to Caroline's son, so the answer is \"I don't know.\")",
+      "matched_sessions": [
+        11,
+        18,
+        14
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "How did Caroline feel about her family after the accident?",
+      "expected_answer": "",
+      "actual_answer": "After the accident, Caroline felt that her family was super important to her. She mentioned that they mean the world to her and that she is thankful to have them, especially after the scary experience. She also expressed how much she cherishes her family and appreciates their support.",
+      "matched_sessions": [
+        18,
+        10,
+        7
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "How did Caroline's children handle the accident?",
+      "expected_answer": "",
+      "actual_answer": "In Session 18, Melanie (not Caroline) mentions that her children were scared after the accident but were reassured and explained that their brother would be okay. She also notes that they are tough kids. \n\nThe question asks about Caroline's children, but the accident involved Melanie's son. Therefore, the answer is:  \n\n**I don't know.** (The context does not mention Caroline's children in relation to the accident.)",
+      "matched_sessions": [
+        16,
+        8,
+        18
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "How did Caroline feel after the accident?",
+      "expected_answer": "",
+      "actual_answer": "Caroline felt scared and traumatized after the accident, but she was also thankful that her son was okay. She mentioned that it was a reminder to cherish family. \n\n(Note: The answer is based on Session 18, where Caroline is the one discussing the accident involving her son. Melanie is the other person in the conversation.)",
+      "matched_sessions": [
+        18,
+        1,
+        14
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What was Caroline's reaction to her children enjoying the Grand Canyon?",
+      "expected_answer": "",
+      "actual_answer": "I don't know. The provided sessions do not mention Caroline's reaction to her children enjoying the Grand Canyon.",
+      "matched_sessions": [
+        17,
+        7,
+        9
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What did Caroline do after the road trip to relax?",
+      "expected_answer": "",
+      "actual_answer": "After the road trip, Caroline went camping with her family to relax. \n\n(From Session 18: \"Thanks, Caroline! Yup, we just did it yesterday! The kids loved it and it was a nice way to relax after the road trip.\") \n\nNote: The speaker here is Melanie, not Caroline. The context does not explicitly state what Caroline did to relax after the road trip, so the correct answer is:  \n\n**I don't know.**  \n\n(Clarification: The retrieved sessions only mention Melanie's activities post-road trip, not Caroline's.)",
+      "matched_sessions": [
+        18,
+        8,
+        1
+      ],
+      "is_correct": true,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    },
+    {
+      "question": "What does Caroline love most about camping with her family?",
+      "expected_answer": "",
+      "actual_answer": "Caroline loves that camping with her family is a chance to be present and together, bonding over stories, campfires, and nature. She finds it peaceful and refreshing to wake up to the sound of birds and the smell of fresh air. \n\n(Note: This answer is based on Session 18, where Caroline is the one responding to Melanie's questions about camping. The context confirms that Caroline is the speaker describing her love for camping with her family.)",
+      "matched_sessions": [
+        10,
+        18,
+        13
+      ],
+      "is_correct": false,
+      "category": 5,
+      "reasoning": "no expected answer",
+      "_reason": "adversarial don't know check"
+    }
+  ],
+  "report_corrected": {
+    "temporal": {
+      "total": 37,
+      "correct": 6
+    },
+    "multi-hop": {
+      "total": 13,
+      "correct": 0
+    },
+    "single-hop": {
+      "total": 32,
+      "correct": 3
+    },
+    "open-domain": {
+      "total": 70,
+      "correct": 25
+    },
+    "adversarial": {
+      "total": 47,
+      "correct": 31
+    },
+    "__primary__": {
+      "correct": 34,
+      "total": 152,
+      "accuracy": 22.37
+    },
+    "__overall__": {
+      "correct": 65,
+      "total": 199,
+      "accuracy": 32.66
+    }
+  }
+}

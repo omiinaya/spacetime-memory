@@ -1,0 +1,906 @@
+{
+  "metadata": {
+    "benchmark": "beam",
+    "pipeline": "stdb",
+    "judge_model": "deepseek/deepseek-chat",
+    "total_questions": 82,
+    "timestamp": "2026-07-29T17:07:59.411452"
+  },
+  "metrics": {
+    "overall": {
+      "total": 82,
+      "correct": 73,
+      "accuracy": 89.02
+    },
+    "by_ability": {
+      "ABS": {
+        "name": "Abstention",
+        "total": 6,
+        "correct": 6,
+        "accuracy": 100.0
+      },
+      "ALL": {
+        "name": "End-to-end Narrative",
+        "total": 8,
+        "correct": 6,
+        "accuracy": 75.0
+      },
+      "CR": {
+        "name": "Counterfactual Reasoning",
+        "total": 5,
+        "correct": 5,
+        "accuracy": 100.0
+      },
+      "EO": {
+        "name": "Entity Ordering",
+        "total": 6,
+        "correct": 2,
+        "accuracy": 33.33
+      },
+      "IE": {
+        "name": "Information Extraction",
+        "total": 9,
+        "correct": 9,
+        "accuracy": 100.0
+      },
+      "IF": {
+        "name": "Inference",
+        "total": 6,
+        "correct": 5,
+        "accuracy": 83.33
+      },
+      "KU": {
+        "name": "Knowledge Updating",
+        "total": 8,
+        "correct": 7,
+        "accuracy": 87.5
+      },
+      "MR": {
+        "name": "Memory Retrieval",
+        "total": 9,
+        "correct": 9,
+        "accuracy": 100.0
+      },
+      "PF": {
+        "name": "Property Following",
+        "total": 11,
+        "correct": 11,
+        "accuracy": 100.0
+      },
+      "SUM": {
+        "name": "Summarization",
+        "total": 5,
+        "correct": 5,
+        "accuracy": 100.0
+      },
+      "TR": {
+        "name": "Temporal Reasoning",
+        "total": 9,
+        "correct": 8,
+        "accuracy": 88.89
+      }
+    }
+  },
+  "results": [
+    {
+      "scenario_id": "beam_ie_01",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "What is Dr. Elena Vasquez's position at NeuroLink Labs?",
+      "expected": "Chief Scientific Officer",
+      "answer": "Dr. Elena Vasquez is the Chief Scientific Officer at NeuroLink Labs.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies Dr. Elena Vasquez's position as Chi"
+    },
+    {
+      "scenario_id": "beam_ie_01",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "Who is the CSO of NeuroLink Labs?",
+      "expected": "Elena Vasquez",
+      "answer": "Dr. Elena Vasquez",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies the same person as the gold answ"
+    },
+    {
+      "scenario_id": "beam_ie_02",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "Who owns Project Chimera?",
+      "expected": "Phoenix Dynamics; Horizon Energy",
+      "answer": "Project Chimera is owned by Phoenix Dynamics (51% stake) and Horizon Energy (49% stake).",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies both Phoenix Dynamics and Horizo"
+    },
+    {
+      "scenario_id": "beam_ie_02",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "What percentage stake does Phoenix Dynamics hold in Project Chimera?",
+      "expected": "51%",
+      "answer": "51%",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly.\",\n  \"label\": \"CORREC"
+    },
+    {
+      "scenario_id": "beam_ie_02",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "Where is Project Chimera headquartered?",
+      "expected": "Geneva; Switzerland",
+      "answer": "Geneva, Switzerland",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of location "
+    },
+    {
+      "scenario_id": "beam_ie_03",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "What was the output of the ARES-9 reactor?",
+      "expected": "847 terajoules",
+      "answer": "847 terajoules of sustained output over 1,022 seconds on April 12, 2026.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the correct output of 847 terajoules from th"
+    },
+    {
+      "scenario_id": "beam_ie_03",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "How long did the ARES-9 experiment last?",
+      "expected": "1022 seconds; 1,022 seconds",
+      "answer": "1,022 seconds",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the durat"
+    },
+    {
+      "scenario_id": "beam_ie_03",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "Who led the ARES-9 experiment?",
+      "expected": "Yuki Tanaka; Anders Lindqvist",
+      "answer": "Dr. Yuki Tanaka (Tokyo Institute of Fusion) and Prof. Anders Lindqvist (KTH Royal Institute of Technology) led the ARES-9 experiment.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies Yuki Tanaka and Anders Lindqvist as"
+    },
+    {
+      "scenario_id": "beam_ie_03",
+      "ability": "IE",
+      "ability_name": "Information Extraction",
+      "question": "How much liquid helium was used for cooling?",
+      "expected": "38,000 liters; 38000",
+      "answer": "38,000 liters of liquid helium at 4.2 Kelvin.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the correct amount of liquid helium (38,000 "
+    },
+    {
+      "scenario_id": "beam_mr_01",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "When is the quarterly all-hands meeting?",
+      "expected": "July 24; Friday",
+      "answer": "Friday, July 24 at 2PM EST in Conference Room A.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the correct date (July 24) and day (Friday) "
+    },
+    {
+      "scenario_id": "beam_mr_01",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "What time is the server maintenance window?",
+      "expected": "2AM-6AM EST; July 19",
+      "answer": "Sunday July 19, 2026 from 2AM-6AM EST.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the correct time window and date from the go"
+    },
+    {
+      "scenario_id": "beam_mr_01",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "Where is the company picnic?",
+      "expected": "Riverside Park",
+      "answer": "Riverside Park on August 15.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the correct location from the gold answer an"
+    },
+    {
+      "scenario_id": "beam_mr_02",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "Who is the CFO of Acme Corp?",
+      "expected": "Priya Patel",
+      "answer": "Priya Patel is the CFO of Acme Corp.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies Priya Patel as the CFO of Acme C"
+    },
+    {
+      "scenario_id": "beam_mr_02",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "Who chairs the board at Acme Corp?",
+      "expected": "Michael Torres",
+      "answer": "Michael Torres",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies Michael Torres as the chair of the "
+    },
+    {
+      "scenario_id": "beam_mr_02",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "Who founded Acme Corp?",
+      "expected": "Sarah Chen; James Rodriguez",
+      "answer": "Sarah Chen and James Rodriguez founded Acme Corp in 2018.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes both founders mentioned in the gold answer a"
+    },
+    {
+      "scenario_id": "beam_mr_03",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "What's the password policy?",
+      "expected": "90 days; 12 characters",
+      "answer": "Passwords must be rotated every 90 days and be at least 12 characters long with 3 character classes. (Policy TERM-002)",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the key facts from the gold answer (90 days "
+    },
+    {
+      "scenario_id": "beam_mr_03",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "How often is security training required?",
+      "expected": "30 days of hire",
+      "answer": "Security awareness training is required within 30 days of hire.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that security training is required with"
+    },
+    {
+      "scenario_id": "beam_mr_03",
+      "ability": "MR",
+      "ability_name": "Memory Retrieval",
+      "question": "What's the SLA for a critical incident?",
+      "expected": "15 minutes",
+      "answer": "15 minutes for critical.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the SLA t"
+    },
+    {
+      "scenario_id": "beam_tr_01",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "Did the company launch v1.0 before or after the Series A?",
+      "expected": "before; January 2020; before Series A",
+      "answer": "The company launched v1.0 on January 10, 2020, before the Series A funding round closed on September 22, 2021.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that v1.0 was launched before the Se"
+    },
+    {
+      "scenario_id": "beam_tr_01",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "Which happened first: Series A or Series B?",
+      "expected": "Series A",
+      "answer": "Series A.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly.\",\n  \"label\": \"CORREC"
+    },
+    {
+      "scenario_id": "beam_tr_01",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "How long after founding did the first enterprise customer sign?",
+      "expected": "20 months; 1 year 8 months; November 2020",
+      "answer": "1 year and 8 months (founded March 15, 2019; first enterprise customer signed November 5, 2020).",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer's duration of 1 year and 8 mo"
+    },
+    {
+      "scenario_id": "beam_tr_02",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "What was Maya's first role at the company?",
+      "expected": "junior developer",
+      "answer": "Maya's first role at the company was junior developer, which she joined in June 2021.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the key fact 'junior developer' from the gol"
+    },
+    {
+      "scenario_id": "beam_tr_02",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "Put Maya's career milestones in chronological order",
+      "expected": "junior developer; senior developer; team lead; PhD",
+      "answer": "1. Maya joined the team as a junior developer in June 2021.  \n2. Maya was promoted to senior developer in March 2023.  \n3. Maya led the migration project from August 2023 to February 2024.  \n4. Maya became team lead in July 2024.  \n5. Maya completed her PhD part-time in December 2024.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer captures the same career milestones in the same chron"
+    },
+    {
+      "scenario_id": "beam_tr_02",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "Did Maya become team lead before or after completing her PhD?",
+      "expected": "before",
+      "answer": "Maya became team lead in July 2024 before completing her PhD in December 2024.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that Maya became team lead before co"
+    },
+    {
+      "scenario_id": "beam_tr_03",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "During which months is Alex working on both Aurora and Boreas?",
+      "expected": "April 2026; May 2026; June 2026",
+      "answer": "April 2026 to June 2026.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly captures the same months as the gold answer"
+    },
+    {
+      "scenario_id": "beam_tr_03",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "How many total months is Alex assigned to projects in 2026?",
+      "expected": "10; eleven; 11",
+      "answer": "Alex is assigned to projects for a total of **10 months** in 2026:  \n- Project Aurora: January to June (6 months)  \n- Project Cyclone: March (1 month)  \n- Project Boreas: April to October (7 months, overlapping with Aurora and Cyclone)  \n\nNote: Overlaps are accounted for based on the policy of working on at most 2 projects simultaneously. The total is calculated as 6 (Aurora) + 1 (Cyclone) + 3 (Boreas beyond Aurora's end) = 10 months.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that Alex is assigned to projects for a"
+    },
+    {
+      "scenario_id": "beam_tr_03",
+      "ability": "TR",
+      "ability_name": "Temporal Reasoning",
+      "question": "Is Alex violating the two-project policy at any point?",
+      "expected": "no; never; 2 max",
+      "answer": "Yes, Alex violates the two-project policy from April 2026 to June 2026 when assigned to Project Aurora (January-June 2026), Project Boreas (April-October 2026), and Project Cyclone (March 2026) simultaneously.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer contradicts the gold answer by stating Alex violates "
+    },
+    {
+      "scenario_id": "beam_abs_01",
+      "ability": "ABS",
+      "ability_name": "Abstention",
+      "question": "What is the Q4 2026 marketing budget?",
+      "expected": "",
+      "answer": "The Q4 2026 marketing budget is not mentioned in the provided conversation excerpts.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the Q4 2026 marketing budget is"
+    },
+    {
+      "scenario_id": "beam_abs_01",
+      "ability": "ABS",
+      "ability_name": "Abstention",
+      "question": "Who is the CEO of the company?",
+      "expected": "",
+      "answer": "The answer depends on which company you're referring to:\n\n- Acme Corp: Sarah Chen (since January 2025)\n- Helios Energy: Thomas Grey until August 1, 2025, then Elena Kowalski\n- Project Chimera: Dr. Marcus Webb\n- HealthBridge: Dr. Marcus Lee (CMO since January 2026, but CEO not mentioned)\n- Zenith-Apex Holdings: CEO not specified in excerpts\n- NeuroLink Labs: CEO not mentioned (CSO is Dr. Elena Vasquez)\n- TechGlobal: CEO not mentioned\n- CloudSync: CEO not mentioned\n\nPlease specify which company you're asking about.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not provide a specific CEO for the company in quest"
+    },
+    {
+      "scenario_id": "beam_abs_01",
+      "ability": "ABS",
+      "ability_name": "Abstention",
+      "question": "What cloud provider does the company use?",
+      "expected": "AWS",
+      "answer": "AWS",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies the cloud provider as AWS, matching"
+    },
+    {
+      "scenario_id": "beam_abs_02",
+      "ability": "ABS",
+      "ability_name": "Abstention",
+      "question": "What is the expected revenue of the merged entity?",
+      "expected": "",
+      "answer": "The expected revenue of the merged entity (Zenith-Apex Holdings) is $11.3B, calculated by combining Zenith Corp's 2025 revenue of $8.2B and Apex Industries' 2025 revenue of $3.1B.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer provides the expected revenue of the merged entity, w"
+    },
+    {
+      "scenario_id": "beam_abs_02",
+      "ability": "ABS",
+      "ability_name": "Abstention",
+      "question": "When was the merger announced?",
+      "expected": "February 14, 2026",
+      "answer": "February 14, 2026.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly.\",\n  \"label\": \"CORREC"
+    },
+    {
+      "scenario_id": "beam_abs_02",
+      "ability": "ABS",
+      "ability_name": "Abstention",
+      "question": "How many employees does Apex Industries have?",
+      "expected": "12,000",
+      "answer": "12,000 employees.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states the number of employees as 12,000, m"
+    },
+    {
+      "scenario_id": "beam_cr_01",
+      "ability": "CR",
+      "ability_name": "Counterfactual Reasoning",
+      "question": "If the company had chosen Go instead of Python, how many new engineers would they have needed to hire?",
+      "expected": "12",
+      "answer": "12 new engineers.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states the number of new engineers needed, mat"
+    },
+    {
+      "scenario_id": "beam_cr_01",
+      "ability": "CR",
+      "ability_name": "Counterfactual Reasoning",
+      "question": "If Go were chosen, how much would the migration have cost?",
+      "expected": "$3.6M; 3.6 million",
+      "answer": "$3.6M",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the cost "
+    },
+    {
+      "scenario_id": "beam_cr_01",
+      "ability": "CR",
+      "ability_name": "Counterfactual Reasoning",
+      "question": "If Go were chosen, how long would the migration have taken?",
+      "expected": "5 months",
+      "answer": "5 months.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the durat"
+    },
+    {
+      "scenario_id": "beam_cr_02",
+      "ability": "CR",
+      "ability_name": "Counterfactual Reasoning",
+      "question": "If the company had released only 4 features in total during 2025, what would the approximate R&D cost have been?",
+      "expected": "$8M; 8 million",
+      "answer": "$8M",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the key n"
+    },
+    {
+      "scenario_id": "beam_cr_02",
+      "ability": "CR",
+      "ability_name": "Counterfactual Reasoning",
+      "question": "If the company had released all 6 features in Q1 2025 instead of spreading them across the year, how many features would have been released in Q1?",
+      "expected": "6",
+      "answer": "6",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states the number of features released in Q1 2"
+    },
+    {
+      "scenario_id": "beam_ku_01",
+      "ability": "KU",
+      "ability_name": "Knowledge Updating",
+      "question": "When is the Project Odyssey deadline?",
+      "expected": "November 30, 2026; Nov 30",
+      "answer": "November 30, 2026",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the date."
+    },
+    {
+      "scenario_id": "beam_ku_01",
+      "ability": "KU",
+      "ability_name": "Knowledge Updating",
+      "question": "What was the original deadline for Project Odyssey before the change?",
+      "expected": "December 15, 2026; Dec 15",
+      "answer": "December 15, 2026",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the date."
+    },
+    {
+      "scenario_id": "beam_ku_02",
+      "ability": "KU",
+      "ability_name": "Knowledge Updating",
+      "question": "When is the HQ relocation to Austin now expected?",
+      "expected": "Q2 2026; second quarter 2026",
+      "answer": "Q3 2026",
+      "is_correct": true,
+      "reasoning": "The generated answer 'Q3 2026' is within the same year as the gold answer 'Q2 2026', and the difference in quarters is minor."
+    },
+    {
+      "scenario_id": "beam_ku_02",
+      "ability": "KU",
+      "ability_name": "Knowledge Updating",
+      "question": "Why was the relocation delayed?",
+      "expected": "permitting issues; Austin office building",
+      "answer": "The relocation was initially delayed to Q3 2026 due to permitting issues with the Austin office building, but was later accelerated to Q2 2026 after the permits were approved and tax incentives were offered by Texas.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the key fact 'permitting issues with the Aus"
+    },
+    {
+      "scenario_id": "beam_ku_02",
+      "ability": "KU",
+      "ability_name": "Knowledge Updating",
+      "question": "Why was the relocation accelerated again?",
+      "expected": "tax incentives; Texas",
+      "answer": "Due to tax incentives offered by the state of Texas.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies 'tax incentives' and 'Texas' as "
+    },
+    {
+      "scenario_id": "beam_ku_03",
+      "ability": "KU",
+      "ability_name": "Knowledge Updating",
+      "question": "What is TechGlobal's official Q2 2026 revenue according to their SEC filing?",
+      "expected": "$2.07B; 2.07 billion",
+      "answer": "The provided excerpts do not contain information about TechGlobal's Q2 2026 revenue or any SEC filing for that period.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information about TechGloba"
+    },
+    {
+      "scenario_id": "beam_ku_03",
+      "ability": "KU",
+      "ability_name": "Knowledge Updating",
+      "question": "What was the initial press release Q2 revenue number?",
+      "expected": "$2.1B; 2.1 billion",
+      "answer": "$2.1B",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the reven"
+    },
+    {
+      "scenario_id": "beam_ku_03",
+      "ability": "KU",
+      "ability_name": "Knowledge Updating",
+      "question": "What did the employee-on-twitter claim about Q2 revenue?",
+      "expected": "",
+      "answer": "The anonymous analyst claimed TechGlobal's Q2 revenue was $1.95B.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not match the gold answer as it introduces an 'a"
+    },
+    {
+      "scenario_id": "beam_eo_01",
+      "ability": "EO",
+      "ability_name": "Entity Ordering",
+      "question": "Order the teams by size from largest to smallest",
+      "expected": "Delta; Beta; Alpha; Gamma",
+      "answer": "Platform B team: 25, Platform A team: 12, Platform C team: 10",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not match the gold answer in terms of team names"
+    },
+    {
+      "scenario_id": "beam_eo_01",
+      "ability": "EO",
+      "ability_name": "Entity Ordering",
+      "question": "Which is the smallest team?",
+      "expected": "Gamma",
+      "answer": "Team Gamma with 5 members.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies 'Gamma' as the smallest team, match"
+    },
+    {
+      "scenario_id": "beam_eo_01",
+      "ability": "EO",
+      "ability_name": "Entity Ordering",
+      "question": "Which is the largest team?",
+      "expected": "Delta",
+      "answer": "The engineering team with 43 members (as of June 2026).",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not mention 'Delta' or any information that matc"
+    },
+    {
+      "scenario_id": "beam_eo_02",
+      "ability": "EO",
+      "ability_name": "Entity Ordering",
+      "question": "Put the product launches in chronological order",
+      "expected": "CometML v1; NovaSearch v1; Pulsar Analytics; NovaSearch v2",
+      "answer": "1. Comet Labs shipped CometML v1 in 2018.  \n2. Nova Corp launched NovaSearch v1 in 2019.  \n3. Product v1.0 launched on January 10, 2020.  \n4. Vertex AI launches TextMind API in 2021.  \n5. Nova Corp launched NovaSearch v2 in 2021.  \n6. Pulsar Inc released Pulsar Analytics v2 in 2023.  \n7. CloudSync releases v3.0 in May 2026.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer lists CometML v1, NovaSearch v1, and NovaSearch v2 in"
+    },
+    {
+      "scenario_id": "beam_eo_02",
+      "ability": "EO",
+      "ability_name": "Entity Ordering",
+      "question": "Which product launched last?",
+      "expected": "Pulsar Analytics v2; 2023",
+      "answer": "NovaSearch v2 in 2021.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer mentions a different product and year than the gold a"
+    },
+    {
+      "scenario_id": "beam_eo_02",
+      "ability": "EO",
+      "ability_name": "Entity Ordering",
+      "question": "What happened to Comet Labs in 2022?",
+      "expected": "acquired",
+      "answer": "Comet Labs was acquired in 2022.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that Comet Labs was acquired in 2022"
+    },
+    {
+      "scenario_id": "beam_if_01",
+      "ability": "IF",
+      "ability_name": "Inference",
+      "question": "How many shares does John own at minimum?",
+      "expected": "500,000; 500000",
+      "answer": "500,000 shares",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states the number of shares John owns, matc"
+    },
+    {
+      "scenario_id": "beam_if_02",
+      "ability": "IF",
+      "ability_name": "Inference",
+      "question": "When will the security team review the unusual API spike?",
+      "expected": "Friday; tomorrow",
+      "answer": "The security team will review the unusual API spike on Friday.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly captures the key fact from the gold answer "
+    },
+    {
+      "scenario_id": "beam_if_02",
+      "ability": "IF",
+      "ability_name": "Inference",
+      "question": "If the unusual activity is confirmed, who gets notified?",
+      "expected": "CISO",
+      "answer": "The CISO gets notified.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies the same entity (CISO) as the go"
+    },
+    {
+      "scenario_id": "beam_if_03",
+      "ability": "IF",
+      "ability_name": "Inference",
+      "question": "Can Sarah authorize the $200,000 server budget by herself?",
+      "expected": "no; cannot",
+      "answer": "No, Sarah cannot authorize the $200,000 server budget by herself. As an L5 employee, she can only authorize up to $100,000. The budget requires authorization from an L6 or higher employee.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that Sarah cannot authorize the $200"
+    },
+    {
+      "scenario_id": "beam_if_03",
+      "ability": "IF",
+      "ability_name": "Inference",
+      "question": "Who is the most junior person who could authorize the $200,000 budget?",
+      "expected": "David; L6",
+      "answer": "An employee at level L6 can authorize the $200,000 budget, as",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies the authorization level (L6) men"
+    },
+    {
+      "scenario_id": "beam_if_03",
+      "ability": "IF",
+      "ability_name": "Inference",
+      "question": "What is Sarah's maximum authorization limit?",
+      "expected": "$100,000; 100000",
+      "answer": "The context does not provide information about Sarah's authorization limit.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any correct information from the gol"
+    },
+    {
+      "scenario_id": "beam_pf_01",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "Who is the current CMO of HealthBridge?",
+      "expected": "Marcus Lee",
+      "answer": "Dr. Marcus Lee is the current CMO of HealthBridge, appointed effective January 2026.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies Marcus Lee as the CMO of HealthBrid"
+    },
+    {
+      "scenario_id": "beam_pf_01",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "Who was the previous CMO of HealthBridge?",
+      "expected": "Nina Patel",
+      "answer": "Dr. Nina Patel was the previous CMO of HealthBridge.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies Dr. Nina Patel as the previous CMO "
+    },
+    {
+      "scenario_id": "beam_pf_01",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "When did Dr. Patel become CMO?",
+      "expected": "January 2025",
+      "answer": "January 2025",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly.\",\n  \"label\": \"CORREC"
+    },
+    {
+      "scenario_id": "beam_pf_02",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "Who is the current CEO of Helios Energy?",
+      "expected": "Elena Kowalski",
+      "answer": "Elena Kowalski is the current CEO of Helios Energy, effective August 1, 2025.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies Elena Kowalski as the CEO of Hel"
+    },
+    {
+      "scenario_id": "beam_pf_02",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "Where is Helios Energy's current HQ?",
+      "expected": "Denver, CO; Denver",
+      "answer": "Denver, CO",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies Denver, CO as the location of He"
+    },
+    {
+      "scenario_id": "beam_pf_02",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "What was Helios Energy's highest market cap?",
+      "expected": "$52B; 52 billion",
+      "answer": "$52B",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the factu"
+    },
+    {
+      "scenario_id": "beam_pf_03",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "What is the current status of Platform C?",
+      "expected": "GA; generally available; active",
+      "answer": "Platform C status: GA (General Availability), users: 15,000, SLA: 99.5%, team size: 10.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies Platform C's status as GA (General "
+    },
+    {
+      "scenario_id": "beam_pf_03",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "How many users does Platform A have after the June 2026 migration?",
+      "expected": "35,000; 35000",
+      "answer": "Platform A has 35,000 users after the June 2026 migration.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states the number of users as 35,000, match"
+    },
+    {
+      "scenario_id": "beam_pf_03",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "What was Platform A's original SLA?",
+      "expected": "99.5%",
+      "answer": "99.5%",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly.\",\n  \"label\": \"CORREC"
+    },
+    {
+      "scenario_id": "beam_pf_03",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "What is Platform A's SLA after July 2026?",
+      "expected": "best-effort",
+      "answer": "After July 2026, Platform A's SLA is reduced to best-effort.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that Platform A's SLA will be 'best-"
+    },
+    {
+      "scenario_id": "beam_pf_03",
+      "ability": "PF",
+      "ability_name": "Property Following",
+      "question": "Which platform has the most users currently?",
+      "expected": "Platform B; 120,000",
+      "answer": "Platform B (modern) with 120,000 users.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies Platform B and the number of use"
+    },
+    {
+      "scenario_id": "beam_sum_01",
+      "ability": "SUM",
+      "ability_name": "Summarization",
+      "question": "Summarize what we know about Orion Robotics",
+      "expected": "",
+      "answer": "Orion Robotics was founded in 2017 by Dr. Wei Zhang, specializing in warehouse automation. It has deployed systems in 47 warehouses across 12 countries. Its flagship product, OrionPick, sorts 2,000 packages/hour with 99.7% accuracy. Competitors include RobotCo ($12B cap) and PickFast ($200M raised). It raised $30M Series C in January 2025, totaling $85M funding.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes all key facts from the gold answer (founding"
+    },
+    {
+      "scenario_id": "beam_sum_01",
+      "ability": "SUM",
+      "ability_name": "Summarization",
+      "question": "What is Orion Robotics' specialization?",
+      "expected": "warehouse automation",
+      "answer": "warehouse automation",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly.\",\n  \"label\": \"CORREC"
+    },
+    {
+      "scenario_id": "beam_sum_02",
+      "ability": "SUM",
+      "ability_name": "Summarization",
+      "question": "Summarize the CloudSync MRR trajectory over the first half of 2026",
+      "expected": "",
+      "answer": "January 2026: $4.2M  \nMarch 2026: Drops to $3.8M (loses 3 customers)  \nMay 2026: Recovers to $4.0M (2 customers return)  \nJune 2026: Reaches $4.5M (exceeds pre-outage peak)",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer provides specific MRR figures and customer changes th"
+    },
+    {
+      "scenario_id": "beam_sum_02",
+      "ability": "SUM",
+      "ability_name": "Summarization",
+      "question": "What caused CloudSync's MRR drop in March 2026?",
+      "expected": "lost enterprise customers; reliability concerns",
+      "answer": "CloudSync's MRR dropped to $3.8M in March 2026 due to losing 3 enterprise customers ($1.8M ARR total) because of reliability concerns.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n \"reasoning\": \"The generated answer correctly identifies the loss of enterprise customers "
+    },
+    {
+      "scenario_id": "beam_sum_02",
+      "ability": "SUM",
+      "ability_name": "Summarization",
+      "question": "What was CloudSync's MRR in June 2026?",
+      "expected": "$4.5M; 4.5 million",
+      "answer": "$4.5M",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer matches the gold answer exactly in terms of the monet"
+    },
+    {
+      "scenario_id": "beam_narrative_01",
+      "ability": "ALL",
+      "ability_name": "End-to-end Narrative",
+      "question": "Who founded Vertex AI?",
+      "expected": "Rachel Kim; Mark Torres",
+      "answer": "Dr. Rachel Kim and Mark Torres.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly identifies the same founders as the gold answe"
+    },
+    {
+      "scenario_id": "beam_narrative_01",
+      "ability": "ALL",
+      "ability_name": "End-to-end Narrative",
+      "question": "What was Vertex AI's initial focus, and how did it change?",
+      "expected": "enterprise NLP; healthcare",
+      "answer": "Vertex AI's initial focus was enterprise NLP. In 2022, it pivoted to healthcare-specific AI in response to customer demand.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies Vertex AI's initial focus as ent"
+    },
+    {
+      "scenario_id": "beam_narrative_01",
+      "ability": "ALL",
+      "ability_name": "End-to-end Narrative",
+      "question": "Put Vertex AI's funding rounds in order with amounts",
+      "expected": "Seed $5M; Series A $25M; Series B $80M",
+      "answer": "1. Seed round: $5M (2021)  \n2. Series A: $25M (2022)  \n3. Series B: $45M (June 8, 2023)  \n4. Series B: $80M (2024 at $400M valuation)",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly lists the funding rounds in order with the "
+    },
+    {
+      "scenario_id": "beam_narrative_01",
+      "ability": "ALL",
+      "ability_name": "End-to-end Narrative",
+      "question": "What happened in November 2024 that affected Vertex AI?",
+      "expected": "data breach; patient records",
+      "answer": "In November 2024, Vertex AI suffered a data breach exposing 12,000 patient records, triggering stock-based compensation clawbacks and leading to the replacement of its CISO.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies the data breach and patient reco"
+    },
+    {
+      "scenario_id": "beam_narrative_01",
+      "ability": "ALL",
+      "ability_name": "End-to-end Narrative",
+      "question": "What was the impact of DiagnoAI's competing product on Vertex AI stock?",
+      "expected": "dropped 12%",
+      "answer": "Vertex AI stock dropped 12% in one week after DiagnoAI's competing product launched in April 2026.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that Vertex AI stock dropped 12%, ma"
+    },
+    {
+      "scenario_id": "beam_narrative_01",
+      "ability": "ALL",
+      "ability_name": "End-to-end Narrative",
+      "question": "If Vertex AI had not acquired MedSync Labs, would they have had clinical trial matching capabilities?",
+      "expected": "",
+      "answer": "No, Vertex AI would not have had clinical trial matching capabilities without acquiring MedSync Labs, as the acquisition added NLP-powered clinical trial matching.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that Vertex AI would not have had cl"
+    },
+    {
+      "scenario_id": "beam_narrative_01",
+      "ability": "ALL",
+      "ability_name": "End-to-end Narrative",
+      "question": "What was Vertex AI's headcount progression from founding to IPO?",
+      "expected": "10; 120; 450",
+      "answer": "2020: Founded (headcount not specified)\n2021: (headcount not specified)\n2022: (headcount not specified)\n2023: 120\n2024: (headcount not specified)\n2025: 450\n2026: IPO (headcount not specified)",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the correct headcount numbers (120 and 450) "
+    },
+    {
+      "scenario_id": "beam_narrative_01",
+      "ability": "ALL",
+      "ability_name": "End-to-end Narrative",
+      "question": "Summarize Vertex AI's journey from founding to 2026",
+      "expected": "",
+      "answer": "- **2020**: Founded in Boston by Dr. Rachel Kim and Mark Torres, focusing on enterprise NLP.  \n- **2021**: Launched TextMind API; secured $5M seed funding.  \n- **2022**: Pivoted to healthcare AI; raised $25M Series A.  \n- **2023**: FDA-cleared DiagnosText platform; $8M revenue; 120 employees.  \n- **2024**: Signed 30+ hospital contracts; $35M revenue; $80M Series B at $400M valuation. Suffered data breach (12K records); CISO replaced.  \n- **2025**: Completed SOC 2 Type II; $95M revenue; 450 employees. Filed confidential IPO; acquired MedSync Labs for $45M.  \n- **2026**:  \n  - February: IPO at $32, closed at $41; $6.5B market cap.  \n  - April: Competing product launch caused",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer provides a detailed timeline of Vertex AI's journey f"
+    }
+  ]
+}

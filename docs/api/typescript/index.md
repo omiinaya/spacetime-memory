@@ -1,0 +1,28 @@
+# TypeScript SDK API Reference
+
+## Modules
+
+- [admin](admin.md)
+- [auth](auth.md)
+- [batchOps](batchOps.md)
+- [cognitiveOps](cognitiveOps.md)
+- [directive](directive.md)
+- [documents](documents.md)
+- [factTriple](factTriple.md)
+- [helpers](helpers.md)
+- [insights](insights.md)
+- [kg](kg.md)
+- [memfs](memfs.md)
+- [memories](memories.md)
+- [newFeatures](newFeatures.md)
+- [notes](notes.md)
+- [patternDetection](patternDetection.md)
+- [peers](peers.md)
+- [profile](profile.md)
+- [reasoningTiers](reasoningTiers.md)
+- [reflectionLoop](reflectionLoop.md)
+- [sessions](sessions.md)
+- [tags](tags.md)
+- [types](types.md)
+- [users](users.md)
+- [workspaces](workspaces.md)

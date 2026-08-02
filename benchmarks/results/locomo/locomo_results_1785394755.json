@@ -1,0 +1,1047 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "stdb",
+    "judge_model": "deepseek/deepseek-chat",
+    "answer_model": "deepseek/deepseek-chat",
+    "total_questions": 100,
+    "primary_count": 100,
+    "timestamp": "2026-07-30T02:59:15.176369"
+  },
+  "metrics": {
+    "primary": {
+      "total": 100,
+      "correct": 63,
+      "accuracy": 63.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 13,
+        "correct": 9,
+        "accuracy": 69.23
+      },
+      "open-domain": {
+        "total": 18,
+        "correct": 9,
+        "accuracy": 50.0
+      },
+      "single-hop": {
+        "total": 32,
+        "correct": 15,
+        "accuracy": 46.88
+      },
+      "temporal": {
+        "total": 37,
+        "correct": 30,
+        "accuracy": 81.08
+      }
+    },
+    "overall": {
+      "total": 100,
+      "correct": 63,
+      "accuracy": 63.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "The provided excerpts do not contain any information about Caroline or when she went to an LGBTQ support group.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states there is no information about Caroline's visit"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "The conversation excerpts provided do not contain any information about when Melanie painted a sunrise.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about w"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her educational pursuits. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What did Caroline research?",
+      "expected": "Adoption agencies",
+      "answer": "The context provided does not contain any information about what Caroline researched.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information about Caroline's "
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What is Caroline's identity?",
+      "expected": "Transgender woman",
+      "answer": "The provided excerpts do not contain any information about Caroline's identity.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information about Caroline's "
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie run a charity race?",
+      "expected": "The sunday before 25 May 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie running a charity race. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about M"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When is Melanie planning on going camping?",
+      "expected": "June 2023",
+      "answer": "The conversation excerpts provided do not contain any information about Melanie's camping plans. Therefore, the specific date or time of her camping trip cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information about Melanie's"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What is Caroline's relationship status?",
+      "expected": "Single",
+      "answer": "The conversation excerpts provided do not contain any information about Caroline's relationship status.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline give a speech at a school?",
+      "expected": "The week before 9 June 2023",
+      "answer": "The conversation excerpts provided do not contain any information about Caroline giving a speech at a school. Therefore, the specific date or time cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that the information is not available i"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline meet up with her friends, family, and mentors?",
+      "expected": "The week before 9 June 2023",
+      "answer": "The conversation excerpts provided do not contain any information about when Caroline met up with her friends, family, and mentors. Therefore, the specific date or time cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information is not availabl"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "How long has Caroline had her current group of friends for?",
+      "expected": "4 years",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or the duration of her friendships. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "Where did Caroline move from 4 years ago?",
+      "expected": "Sweden",
+      "answer": "The conversation excerpts provided do not contain any information about where Caroline moved from 4 years ago.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "How long ago was Caroline's 18th birthday?",
+      "expected": "10 years ago",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline's 18th birthday. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information about Caroline'"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What career path has Caroline decided to persue?",
+      "expected": "counseling or mental health for Transgender people",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline's career path.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not contain any information about Caroline's career"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Caroline still want to pursue counseling as a career if she hadn't received support growing up?",
+      "expected": "Likely no",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her career aspirations regarding counseling. Therefore, the question cannot be answered based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What activities does Melanie partake in?",
+      "expected": "pottery, camping, painting, swimming",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or her activities.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states there is no information about Melanie's activi"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie sign up for a pottery class?",
+      "expected": "2 July 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie signing up for a pottery class. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about M"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When is Caroline going to the transgender conference?",
+      "expected": "July 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or a transgender conference. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "Where has Melanie camped?",
+      "expected": "beach, mountains, forest",
+      "answer": "The provided conversation excerpts do not contain any information about where Melanie has camped.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about w"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What do Melanie's kids like?",
+      "expected": "dinosaurs, nature",
+      "answer": "The conversation excerpts do not provide any information about Melanie's kids or their preferences.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not capture any of the factual knowledge from the g"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie go to the museum?",
+      "expected": "5 July 2023",
+      "answer": "The provided excerpts do not contain any information about when Melanie went to the museum.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about w"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline have a picnic?",
+      "expected": "The week before 6 July 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline having a picnic.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Caroline likely have Dr. Seuss books on her bookshelf?",
+      "expected": "Yes, since she collects classic children's books",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her bookshelf preferences, including whether she would have Dr. Seuss books. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not address the gold answer's assertion that Caroli"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What books has Melanie read?",
+      "expected": "\"Nothing is Impossible\", \"Charlotte's Web\"",
+      "answer": "The provided conversation excerpts do not contain any information about books Melanie has read.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about b"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What does Melanie do to destress?",
+      "expected": "Running, pottery",
+      "answer": "The conversation excerpts provided do not contain any information about what Melanie does to destress. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not capture any of the factual knowledge from the g"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ conference?",
+      "expected": "10 July 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline attending an LGBTQ conference. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie read the book \"nothing is impossible\"?",
+      "expected": 2022,
+      "answer": "The provided excerpts do not contain information about when Melanie read the book \"nothing is impossible\".",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that the information about when Melanie"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Caroline pursue writing as a career option?",
+      "expected": "LIkely no; though she likes reading, she wants to be a counselor",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her career options. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the adoption meeting?",
+      "expected": "The friday before 15 July 2023",
+      "answer": "The provided excerpts do not contain any information about Caroline going to an adoption meeting.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states there is no information about Caroline going t"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie go to the pottery workshop?",
+      "expected": "The Friday before 15 July 2023",
+      "answer": "The provided conversation excerpts do not contain any information about when Melanie went to the pottery workshop.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that the provided conversation excerpts"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Melanie be considered a member of the LGBTQ community?",
+      "expected": "Likely no, she does not refer to herself as part of it",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or her identity, so it is not possible to determine if she is a member of the LGBTQ community based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about M"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie go camping in June?",
+      "expected": "The week before 27 June 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie going camping in June. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about M"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What LGBTQ+ events has Caroline participated in?",
+      "expected": "Pride parade, school speech, support group",
+      "answer": "The provided conversation excerpts do not contain any information about LGBTQ+ events Caroline has participated in.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any of the correct items from the go"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to a pride parade during the summer?",
+      "expected": "The week before 3 July 2023",
+      "answer": "The conversation excerpts provided do not contain any information about Caroline going to a pride parade during the summer. Therefore, the specific date or time cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What events has Caroline participated in to help children?",
+      "expected": "Mentoring program, school speech",
+      "answer": "The provided conversation excerpts do not contain any information about events Caroline has participated in to help children.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie go camping in July?",
+      "expected": "two weekends before 17 July 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie going camping in July. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not provide any information about Melanie's camping"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline join a mentorship program?",
+      "expected": "The weekend before 17 July 2023",
+      "answer": "The provided excerpts do not contain any information about Caroline joining a mentorship program. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that there is no information about Caro"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What did Melanie paint recently?",
+      "expected": "sunset",
+      "answer": "The provided conversation excerpts do not contain any information about what Melanie painted recently.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not mention 'sunset' or any other painting by Melan"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What activities has Melanie done with her family?",
+      "expected": "Pottery, painting, camping, museum, swimming, hiking",
+      "answer": "The provided excerpts do not contain any information about Melanie's activities with her family.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not mention any of the activities listed in the gol"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "In what ways is Caroline participating in the LGBTQ community?",
+      "expected": "Joining activist group, going to pride parades, participating in an art show, mentoring program",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline's participation in the LGBTQ community.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states there is no information about Caroline's parti"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "How many times has Melanie gone to the beach in 2023?",
+      "expected": 2,
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or her beach visits in 2023. Therefore, the answer cannot be determined from the given data.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that the information about Melanie's be"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline join a new activist group?",
+      "expected": "The Tuesday before 20 July 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline joining a new activist group. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that there is no information available "
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Melanie be more interested in going to a national park or a theme park?",
+      "expected": "National park; she likes the outdoors",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie's preferences for national parks or theme parks. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not capture the factual knowledge from the gold ans"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What kind of art does Caroline make?",
+      "expected": "abstract art",
+      "answer": "The conversation excerpts provided do not contain any information about the kind of art Caroline makes.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information about Caroline's "
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When is Melanie's daughter's birthday?",
+      "expected": "13 August",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie's daughter's birthday.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the conversation excerpts do no"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline attend a pride parade in August?",
+      "expected": "The Friday before 14 August 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline attending a pride parade in August. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Melanie be considered an ally to the transgender community?",
+      "expected": "Yes, she is supportive",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or her stance on the transgender community. Therefore, based on the given context, it is not possible to determine whether Melanie would be considered an ally to the transgender community.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information provide"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "Who supports Caroline when she has a negative experience?",
+      "expected": "Her mentors, family, and friends",
+      "answer": "The conversation excerpts provided do not contain any information about Caroline or who supports her during a negative experience. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that the information is not available i"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What types of pottery have Melanie and her kids made?",
+      "expected": "bowls, cup",
+      "answer": "The provided conversation excerpts do not contain any information about the types of pottery Melanie and her kids have made.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states there is no information about the types of pot"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline and Melanie go to a pride fesetival together?",
+      "expected": 2022,
+      "answer": "The provided conversation excerpts do not contain any information about Caroline and Melanie attending a pride festival together. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What would Caroline's political leaning likely be?",
+      "expected": "Liberal",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline's political leaning.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What has Melanie painted?",
+      "expected": "Horse, sunset, sunrise",
+      "answer": "The provided conversation excerpts do not contain any information about what Melanie has painted.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states there is no information about what Melanie has"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What are Melanie's pets' names?",
+      "expected": "Oliver, Luna, Bailey",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie's pets' names. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that the provided context does not cont"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline apply to adoption agencies?",
+      "expected": "The week of 23 August 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline applying to adoption agencies. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline draw a self-portrait?",
+      "expected": "The week before 23 August 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline drawing a self-portrait. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that there is no information about Caro"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What subject have Caroline and Melanie both painted?",
+      "expected": "Sunsets",
+      "answer": "The conversation excerpts provided do not contain any information about Caroline and Melanie or the subject they have painted.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information about Caroline an"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What symbols are important to Caroline?",
+      "expected": "Rainbow flag, transgender symbol",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or symbols important to her.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that there is no information about Caro"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline encounter people on a hike and have a negative experience?",
+      "expected": "The week before 25 August 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline encountering people on a hike or having a negative experience. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie make a plate in pottery class?",
+      "expected": "24 August 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie making a plate in pottery class or a specific date for such an event. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Caroline be considered religious?",
+      "expected": "Somewhat, but not extremely religious",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline's religious beliefs or practices. Therefore, it is not possible to determine whether Caroline would be considered religious based on the given data.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What instruments does Melanie play?",
+      "expected": "clarinet and violin",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or the instruments she plays. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any information from the gold answer"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What musical artists/bands has Melanie seen?",
+      "expected": "Summer Sounds, Matt Patterson",
+      "answer": "The provided conversation excerpts do not contain any information about musical artists or bands that Melanie has seen.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies that the conversation excerpts d"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie go to the park?",
+      "expected": "27 August 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie going to the park. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information about Melanie g"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When is Caroline's youth center putting on a talent show?",
+      "expected": "September 2023",
+      "answer": "The conversation excerpts provided do not contain any information about Caroline's youth center or a talent show. Therefore, the specific date or details about the event cannot be determined from the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Melanie likely enjoy the song \"The Four Seasons\" by Vivaldi?",
+      "expected": "Yes; it's classical music",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie's musical preferences or opinions on \"The Four Seasons\" by Vivaldi, so the answer cannot be determined from the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What are some changes Caroline has faced during her transition journey?",
+      "expected": "Changes to her body, losing unsupportive friends",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her transition journey. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What does Melanie do with her family on hikes?",
+      "expected": "Roast marshmallows, tell stories",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or her activities with her family on hikes. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information available about M"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go biking with friends?",
+      "expected": "The weekend before 13 September 2023",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline going biking with friends. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information about Caroline "
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "How long has Melanie been practicing art?",
+      "expected": "Since 2016",
+      "answer": "The conversation excerpts provided do not contain any information about how long Melanie has been practicing art. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information about how long "
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What personality traits might Melanie say Caroline has?",
+      "expected": "Thoughtful, authentic, driven",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie's opinion of Caroline's personality traits. Therefore, I cannot provide an answer based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information in the "
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What transgender-specific events has Caroline attended?",
+      "expected": "Poetry reading, conference",
+      "answer": "The provided conversation excerpts do not contain any information about transgender-specific events Caroline has attended.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that there is no information about tran"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What book did Melanie read from Caroline's suggestion?",
+      "expected": "\"Becoming Nicole\"",
+      "answer": "The provided conversation excerpts do not contain any information about a book Melanie read from Caroline's suggestion.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about t"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie's friend adopt a child?",
+      "expected": 2022,
+      "answer": "The conversation excerpts provided do not contain any information about when Melanie's friend adopted a child. Therefore, the specific date or time cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information is not availabl"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie get hurt?",
+      "expected": "September 2023",
+      "answer": "The conversation excerpts provided do not contain any information about when Melanie got hurt.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information about when Melani"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie's family go on a roadtrip?",
+      "expected": "The weekend before 20 October 2023",
+      "answer": "The conversation excerpts provided do not contain any information about when Melanie's family went on a road trip. Therefore, the specific date or time cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information about Melanie's"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "How many children does Melanie have?",
+      "expected": 3,
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or her children. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "When did Melanie go on a hike after the roadtrip?",
+      "expected": "19 October 2023",
+      "answer": "The conversation excerpts provided do not contain any information about Melanie going on a hike after a roadtrip. Therefore, the specific date or time cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that the information about Melanie's hi"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Melanie go on another roadtrip soon?",
+      "expected": "Likely no; since this one went badly",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or her plans for a roadtrip. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What items has Melanie bought?",
+      "expected": "Figurines, shoes",
+      "answer": "The provided conversation excerpts do not contain any information about items Melanie has bought.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states there is no information about items Melanie ha"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline pass the adoption interview?",
+      "expected": "The Friday before 22 October 2023",
+      "answer": "The provided excerpts do not contain any information about Caroline or an adoption interview. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie buy the figurines?",
+      "expected": "21 October 2023",
+      "answer": "The provided conversation excerpts do not contain any information about when Melanie bought the figurines.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about w"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "Would Caroline want to move back to her home country soon?",
+      "expected": "No; she's in the process of adopting children.",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her intentions to move back to her home country. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not address the gold answer's factual content about"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What did the charity race raise awareness for?",
+      "expected": "mental health",
+      "answer": "The provided conversation excerpts do not contain any information about what the charity race raised awareness for.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information about the charity"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What did Melanie realize after the charity race?",
+      "expected": "self-care is important",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or a charity race. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "How does Melanie prioritize self-care?",
+      "expected": "by carving out some me-time each day for activities like running, reading, or playing the violin",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie or her approach to self-care. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states there is no information available about Melani"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What are Caroline's plans for the summer?",
+      "expected": "researching adoption agencies",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline's plans for the summer.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer correctly states that there is no information about Caro"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What type of individuals does the adoption agency Caroline is considering support?",
+      "expected": "LGBTQ+ individuals",
+      "answer": "The provided conversation excerpts do not contain any information about an adoption agency or individuals it supports. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information in the "
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "Why did Caroline choose the adoption agency?",
+      "expected": "because of their inclusivity and support for LGBTQ+ individuals",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her reasons for choosing an adoption agency. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information availab"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What is Caroline excited about in the adoption process?",
+      "expected": "creating a family for kids who need one",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her excitement regarding the adoption process. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any information from the gold answer"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What does Melanie think about Caroline's decision to adopt?",
+      "expected": "she thinks Caroline is doing something amazing and will be an awesome mom",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie's thoughts on Caroline's decision to adopt.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information about Melanie's t"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "How long have Mel and her husband been married?",
+      "expected": "Mel and her husband have been married for 5 years.",
+      "answer": "The provided conversation excerpts do not contain any information about Mel or her husband's marriage duration. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information is not availabl"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What does Caroline's necklace symbolize?",
+      "expected": "love, faith, and strength",
+      "answer": "The conversation excerpts provided do not contain any information about Caroline's necklace or its symbolism.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What country is Caroline's grandma from?",
+      "expected": "Sweden",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline's grandma or her country of origin. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What was grandma's gift to Caroline?",
+      "expected": "necklace",
+      "answer": "The provided conversation excerpts do not contain any information about grandma's gift to Caroline.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any information about grandma's gift"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What is Melanie's hand-painted bowl a reminder of?",
+      "expected": "art and self-expression",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie's hand-painted bowl or what it is a reminder of. Therefore, the answer cannot be determined from the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that the information about Melanie's"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What did Melanie and her family do while camping?",
+      "expected": "explored nature, roasted marshmallows, and went on a hike",
+      "answer": "The provided conversation excerpts do not contain any information about Melanie and her family's activities while camping. Therefore, I cannot answer the question based on the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not contain any of the activities mentioned in the "
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What kind of counseling and mental health services is Caroline interested in pursuing?",
+      "expected": "working with trans people, helping them accept themselves and supporting their mental health",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline's interests in counseling and mental health services. Therefore, the specific information requested cannot be determined from the given context.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any information from the gold answer"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What workshop did Caroline attend recently?",
+      "expected": "LGBTQ+ counseling workshop",
+      "answer": "The provided excerpts do not contain any information about Caroline attending a workshop.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer states that there is no information about Caroline at"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What was discussed in the LGBTQ+ counseling workshop?",
+      "expected": "therapeutic methods and how to best work with trans people",
+      "answer": "The provided conversation excerpts do not contain any information about the content discussed in the LGBTQ+ counseling workshop.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any information from the gold answer"
+    },
+    {
+      "conv": 0,
+      "category": 4,
+      "category_name": "open-domain",
+      "question": "What motivated Caroline to pursue counseling?",
+      "expected": "her own journey and the support she received, and how counseling improved her life",
+      "answer": "The provided conversation excerpts do not contain any information about Caroline or her motivations for pursuing counseling. Therefore, the question cannot be answered based on the given context.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly states that there is no information about C"
+    }
+  ]
+}

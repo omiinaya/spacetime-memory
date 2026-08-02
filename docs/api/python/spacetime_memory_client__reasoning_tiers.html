@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._reasoning_tiers API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._reasoning_tiers</h1>
+<pre>Help on module spacetime_memory.client._reasoning_tiers in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._reasoning_tiers - Reasoning tiers mixin — Honcho parity.
+
+DESCRIPTION
+    A formal tier system that constrains agent reasoning depth.
+    Supports four default tiers: quick, balanced, deep, research.
+    
+    All data is stored via the ``reasoning_tier`` table using
+    ``create_reasoning_tier``, ``update_reasoning_tier`` reducers etc.
+    Results are read from ``reasoning_tier_result`` via the generic
+    ``query_table`` reducer.
+
+CLASSES
+    builtins.object
+        ReasoningTierMixin
+    
+    class ReasoningTierMixin(builtins.object)
+     |  Mixin for reasoning tier management — Honcho parity.
+     |  
+     |  Provides a formal tier system that constrains agent reasoning depth.
+     |  
+     |  Methods defined here:
+     |  
+     |  apply_reasoning_tier_to_memory(self, workspace_id: 'str', memory_id: 'str', tier_id: 'str') -> 'dict[str, Any]'
+     |      Tag a memory with a reasoning tier.
+     |      
+     |      Args:
+     |          workspace_id: Workspace containing the tier and memory.
+     |          memory_id: ID of the memory to tag.
+     |          tier_id: ID of the tier to apply.
+     |      
+     |      Returns:
+     |          The reducer result.
+     |  
+     |  create_reasoning_tier(self, workspace_id: 'str', name: 'str', description: 'str' = '', max_tokens: 'int' = 1024, temperature: 'float' = 0.7, top_p: 'float' = 0.9, max_context_memories: 'int' = 15, min_confidence: 'float' = 0.5, requires_reflection: 'bool' = False, requires_graph_traversal: 'bool' = False, priority: 'int' = 20, is_default: 'bool' = False) -> 'dict[str, Any]'
+     |      Create a new reasoning tier.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to create the tier in.
+     |          name: Tier name (e.g. "quick", "balanced", "deep", "research").
+     |          description: Human-readable description.
+     |          max_tokens: Maximum tokens for this tier.
+     |          temperature: LLM temperature (0.0–2.0).
+     |          top_p: Nucleus sampling parameter (0.0–1.0).
+     |          max_context_memories: How many memories to retrieve.
+     |          min_confidence: Minimum confidence for included memories (0.0–1.0).
+     |          requires_reflection: Whether reflection is required.
+     |          requires_graph_traversal: Whether knowledge graph traversal is used.
+     |          priority: Priority (lower = more important).
+     |          is_default: Whether this is the default tier.
+     |      
+     |      Returns:
+     |          The reducer result.
+     |  
+     |  delete_reasoning_tier(self, workspace_id: 'str', tier_id: 'str') -> 'dict[str, Any]'
+     |      Delete a reasoning tier.
+     |      
+     |      Args:
+     |          workspace_id: Workspace containing the tier.
+     |          tier_id: ID of the tier to delete.
+     |      
+     |      Returns:
+     |          The reducer result.
+     |  
+     |  get_default_reasoning_tier(self, workspace_id: 'str') -> 'dict[str, Any] | None'
+     |      Get the default reasoning tier for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to get the default tier for.
+     |      
+     |      Returns:
+     |          The default tier dict, or None if none is set.
+     |  
+     |  get_reasoning_tier_config(self, workspace_id: 'str') -> 'dict[str, Any]'
+     |      Get all reasoning tiers as a config dict keyed by tier name.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to get config for.
+     |      
+     |      Returns:
+     |          Dict mapping tier name -> tier config.
+     |  
+     |  get_reasoning_tiers(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get all reasoning tiers for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to get tiers for.
+     |      
+     |      Returns:
+     |          List of reasoning tier dicts, sorted by priority.
+     |  
+     |  select_tier_for_query(self, workspace_id: 'str', query_complexity: 'str' = 'balanced') -> 'dict[str, Any] | None'
+     |      Automatically select a tier based on query complexity.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to select from.
+     |          query_complexity: One of "quick", "balanced", "deep", "research".
+     |      
+     |      Returns:
+     |          The selected tier dict, or the default tier if not found.
+     |  
+     |  set_default_tier(self, workspace_id: 'str', tier_id: 'str') -> 'dict[str, Any]'
+     |      Set which tier is the default for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Workspace containing the tier.
+     |          tier_id: ID of the tier to set as default.
+     |      
+     |      Returns:
+     |          The reducer result.
+     |  
+     |  update_reasoning_tier(self, workspace_id: 'str', tier_id: 'str', **kwargs: 'Any') -> 'dict[str, Any]'
+     |      Update fields of an existing reasoning tier.
+     |      
+     |      Args:
+     |          workspace_id: Workspace containing the tier.
+     |          tier_id: ID of the tier to update.
+     |          **kwargs: Fields to update. Valid keys: name, description,
+     |              max_tokens, temperature, top_p, max_context_memories,
+     |              min_confidence, requires_reflection, requires_graph_traversal,
+     |              priority, is_default.
+     |      
+     |      Returns:
+     |          The reducer result.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    DEFAULT_REASONING_TIERS = {'balanced': {'description': 'Default balanc...
+    __annotations__ = {'DEFAULT_REASONING_TIERS': 'dict[str, dict[str, Any...
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_reasoning_tiers.py
+
+
+</pre>
+</body></html>

@@ -1,0 +1,394 @@
+Loading LoCoMo dataset...
+  1986 total questions (1540 primary, 446 adversarial)
+
+=== STDB Pipeline === (judge: deepseek/deepseek-chat)
+Workspace: b1725a70d78f4e70a6bb82742a3e307e (name: locomo_benchmark_1785342865)
+
+Storing conversation 0...
+  Stored batch 1/5 (4 sessions)
+  Stored batch 2/5 (4 sessions)
+  Stored batch 3/5 (4 sessions)
+  Stored batch 4/5 (4 sessions)
+  Stored batch 5/5 (3 sessions)
+  Total: 19 sessions stored
+
+Storing conversation 1...
+  Stored batch 1/5 (4 sessions)
+  Stored batch 2/5 (4 sessions)
+  Stored batch 3/5 (4 sessions)
+  Stored batch 4/5 (4 sessions)
+  Stored batch 5/5 (3 sessions)
+  Total: 19 sessions stored
+
+Storing conversation 2...
+  Stored batch 1/8 (4 sessions)
+  Stored batch 2/8 (4 sessions)
+  Stored batch 3/8 (4 sessions)
+  Stored batch 4/8 (4 sessions)
+  Stored batch 5/8 (4 sessions)
+  Stored batch 6/8 (4 sessions)
+  Stored batch 7/8 (4 sessions)
+  Stored batch 8/8 (4 sessions)
+  Total: 32 sessions stored
+
+Storing conversation 3...
+  Stored batch 1/8 (4 sessions)
+  Stored batch 2/8 (4 sessions)
+  Stored batch 3/8 (4 sessions)
+  Stored batch 4/8 (4 sessions)
+  Stored batch 5/8 (4 sessions)
+  Stored batch 6/8 (4 sessions)
+  Stored batch 7/8 (4 sessions)
+  Stored batch 8/8 (1 sessions)
+  Total: 29 sessions stored
+
+Storing conversation 4...
+  Stored batch 1/8 (4 sessions)
+  Stored batch 2/8 (4 sessions)
+  Stored batch 3/8 (4 sessions)
+  Stored batch 4/8 (4 sessions)
+  Stored batch 5/8 (4 sessions)
+  Stored batch 6/8 (4 sessions)
+  Stored batch 7/8 (4 sessions)
+  Stored batch 8/8 (1 sessions)
+  Total: 29 sessions stored
+
+Storing conversation 5...
+  Stored batch 1/7 (4 sessions)
+  Stored batch 2/7 (4 sessions)
+  Stored batch 3/7 (4 sessions)
+  Stored batch 4/7 (4 sessions)
+  Stored batch 5/7 (4 sessions)
+  Stored batch 6/7 (4 sessions)
+  Stored batch 7/7 (4 sessions)
+  Total: 28 sessions stored
+
+Storing conversation 6...
+  Stored batch 1/8 (4 sessions)
+  Stored batch 2/8 (4 sessions)
+  Stored batch 3/8 (4 sessions)
+  Stored batch 4/8 (4 sessions)
+  Stored batch 5/8 (4 sessions)
+  Stored batch 6/8 (4 sessions)
+  Stored batch 7/8 (4 sessions)
+  Stored batch 8/8 (3 sessions)
+  Total: 31 sessions stored
+
+Storing conversation 7...
+  Stored batch 1/8 (4 sessions)
+  Stored batch 2/8 (4 sessions)
+  Stored batch 3/8 (4 sessions)
+  Stored batch 4/8 (4 sessions)
+  Stored batch 5/8 (4 sessions)
+  Stored batch 6/8 (4 sessions)
+  Stored batch 7/8 (4 sessions)
+  Stored batch 8/8 (2 sessions)
+  Total: 30 sessions stored
+
+Storing conversation 8...
+  Stored batch 1/7 (4 sessions)
+  Stored batch 2/7 (4 sessions)
+  Stored batch 3/7 (4 sessions)
+  Stored batch 4/7 (4 sessions)
+  Stored batch 5/7 (4 sessions)
+  Stored batch 6/7 (4 sessions)
+  Stored batch 7/7 (1 sessions)
+  Total: 25 sessions stored
+
+Storing conversation 9...
+  Stored batch 1/8 (4 sessions)
+  Stored batch 2/8 (4 sessions)
+  Stored batch 3/8 (4 sessions)
+  Stored batch 4/8 (4 sessions)
+  Stored batch 5/8 (4 sessions)
+  Stored batch 6/8 (4 sessions)
+  Stored batch 7/8 (4 sessions)
+  Stored batch 8/8 (2 sessions)
+  Total: 30 sessions stored
+
+[1/1986] Q: When did Caroline go to the LGBTQ support group?...
+  ✓ Expected: 7 May 2023
+  ✓ Got: Caroline went to the LGBTQ support group yesterday (as menti
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer provides a relative date ('yester
+
+[2/1986] Q: When did Melanie paint a sunrise?...
+  ✓ Expected: 2022
+  ✓ Got: Melanie painted a lake sunrise last year, as mentioned in co
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer correctly identifies the year as 
+
+[3/1986] Q: What fields would Caroline be likely to pursue in her educaton?...
+  ✓ Expected: Psychology, counseling certification
+  ✓ Got: Caroline would likely pursue counseling and mental health wo
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer includes 'counseling' which match
+
+[4/1986] Q: What did Caroline research?...
+  ✓ Expected: Adoption agencies
+  ✓ Got: Caroline researched adoption agencies and career options in 
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer includes the key fact from the go
+
+[5/1986] Q: What is Caroline's identity?...
+  ✓ Expected: Transgender woman
+  ✓ Got: Caroline is a transgender woman.
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer matches the gold answer exactly i
+
+[6/1986] Q: When did Melanie run a charity race?...
+  ✓ Expected: The sunday before 25 May 2023
+  ✓ Got: Melanie ran a charity race last Saturday.
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer's date ('last Saturday') is withi
+
+[7/1986] Q: When is Melanie planning on going camping?...
+  ✓ Expected: June 2023
+  ✓ Got: Melanie is planning on going camping next month with her kid
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer mentions 'next month' which is co
+
+[8/1986] Q: What is Caroline's relationship status?...
+  ✓ Expected: Single
+  ✓ Got: Caroline is single and considering adoption as a single pare
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer includes the key fact from the go
+
+[9/1986] Q: When did Caroline give a speech at a school?...
+  ✓ Expected: The week before 9 June 2023
+  ✓ Got: Caroline gave a speech at a school last week.
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer 'last week' is within the accepta
+
+[10/1986] Q: When did Caroline meet up with her friends, family, and mentors?...
+  ✓ Expected: The week before 9 June 2023
+  ✓ Got: Caroline met up with her friends, family, and mentors last w
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer mentions 'last week', which is wi
+
+[11/1986] Q: How long has Caroline had her current group of friends for?...
+  ✓ Expected: 4 years
+  ✓ Got: 4 years.
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer matches the gold answer exactly i
+
+[12/1986] Q: Where did Caroline move from 4 years ago?...
+  ✓ Expected: Sweden
+  ✓ Got: Sweden
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer matches the gold answer exactly."
+
+[13/1986] Q: How long ago was Caroline's 18th birthday?...
+  ✓ Expected: 10 years ago
+  ✓ Got: 10 years ago.
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer matches the gold answer exactly i
+
+[14/1986] Q: What career path has Caroline decided to persue?...
+  ✓ Expected: counseling or mental health for Transgender people
+  ✓ Got: Caroline has decided to pursue a career in counseling or men
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer captures the same core idea of pu
+
+[15/1986] Q: Would Caroline still want to pursue counseling as a career if she hadn't receive...
+  ✓ Expected: Likely no
+  ✓ Got: Based on the conversations, Caroline's desire to pursue coun
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer supports the gold answer by expla
+
+[16/1986] Q: What activities does Melanie partake in?...
+  ✓ Expected: pottery, camping, painting, swimming
+  ✓ Got: Melanie partakes in the following activities:
+1. Playing cla
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer includes 'pottery' and 'camping' 
+
+[17/1986] Q: When did Melanie sign up for a pottery class?...
+  ✓ Expected: 2 July 2023
+  ✓ Got: Melanie signed up for a pottery class yesterday.
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer provides a relative date ('yester
+
+[18/1986] Q: When is Caroline going to the transgender conference?...
+  ✓ Expected: July 2023
+  ✓ Got: Caroline is going to the transgender conference this month. 
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer indicates the conference is happe
+
+[19/1986] Q: Where has Melanie camped?...
+  ✓ Expected: beach, mountains, forest
+  ✓ Got: Melanie has camped in the mountains and at the beach.
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer includes two of the three locatio
+
+[20/1986] Q: What do Melanie's kids like?...
+  ✓ Expected: dinosaurs, nature
+  ✓ Got: Melanie's kids enjoy:
+- Pottery workshops (making their own 
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer includes 'dinosaur exhibits' and 
+
+[21/1986] Q: When did Melanie go to the museum?...
+  ✓ Expected: 5 July 2023
+  ✓ Got: Melanie went to the museum yesterday (from the time of the c
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer provides a relative date ('yester
+
+[22/1986] Q: When did Caroline have a picnic?...
+  ✓ Expected: The week before 6 July 2023
+  ✓ Got: Caroline had a picnic last week.
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer indicates a recent time frame ('l
+
+[23/1986] Q: Would Caroline likely have Dr. Seuss books on her bookshelf?...
+  ✓ Expected: Yes, since she collects classic children's books
+  ✓ Got: Yes, Caroline would likely have Dr. Seuss books on her books
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer correctly identifies that Carolin
+
+[24/1986] Q: What books has Melanie read?...
+  ✓ Expected: "Nothing is Impossible", "Charlotte's Web"
+  ✓ Got: Melanie has read "Charlotte's Web" as a child and a book rec
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer includes 'Charlotte's Web' which 
+
+[25/1986] Q: What does Melanie do to destress?...
+  ✓ Expected: Running, pottery
+  ✓ Got: Melanie destresses by engaging in pottery, painting landscap
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer includes 'pottery' from the gold 
+
+[26/1986] Q: When did Caroline go to the LGBTQ conference?...
+  ✓ Expected: 10 July 2023
+  ✓ Got: Caroline went to the LGBTQ conference two days ago from the 
+  ✓ Judge: ```json
+{
+  "reasoning": "The generated answer provides a relative date ('two da
+
+[27/1986] Q: When did Melanie read the book "nothing is impossible"?...
+  ✗ Expected: 2022
+  ✗ Got: The conversation excerpts do not mention Melanie reading the
+  ✗ Judge: ```json
+{
+  "reasoning": "The generated answer correctly states that there is no
+
+[28/1986] Q: Would Caroline pursue writing as a career option?...
+Traceback (most recent call last):
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_sync/connection.py", line 103, in handle_request
+    return self._connection.handle_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_sync/http11.py", line 136, in handle_request
+    raise exc
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_sync/http11.py", line 106, in handle_request
+    ) = self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_sync/http11.py", line 177, in _receive_response_headers
+    event = self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_sync/http11.py", line 217, in _receive_event
+    data = self._network_stream.read(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_backends/sync.py", line 126, in read
+    with map_exceptions(exc_map):
+  File "/usr/lib/python3.11/contextlib.py", line 155, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ReadTimeout: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "$HOME/spacetime-memory/sdk/python/spacetime_memory/client/_base.py", line 463, in _request_with_retry
+    resp = self._http.post(url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_client.py", line 1144, in post
+    return self.request(
+           ^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_transports/default.py", line 249, in handle_request
+    with map_httpcore_exceptions():
+  File "/usr/lib/python3.11/contextlib.py", line 155, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/usr/local/lib/hermes-agent/venv/lib/python3.11/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadTimeout: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "$HOME/spacetime-memory/scripts/benchmarks/run_locomo.py", line 752, in <module>
+    main()
+  File "$HOME/spacetime-memory/scripts/benchmarks/run_locomo.py", line 706, in main
+    results = run_locomo_stdb(data, args.conv, args.limit, args.skip_ingest)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$HOME/spacetime-memory/scripts/benchmarks/run_locomo.py", line 529, in run_locomo_stdb
+    results_batch = search_stdb(client, workspace_id, qv, top_k=100)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$HOME/spacetime-memory/scripts/benchmarks/run_locomo.py", line 275, in search_stdb
+    results = client.search(workspace_id, question, limit=top_k)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$HOME/spacetime-memory/sdk/python/spacetime_memory/client/_memories_search.py", line 672, in search
+    rows = self._query(
+           ^^^^^^^^^^^^
+  File "$HOME/spacetime-memory/sdk/python/spacetime_memory/client/_base.py", line 602, in _query
+    self._call(
+  File "$HOME/spacetime-memory/sdk/python/spacetime_memory/client/_base.py", line 659, in _call
+    resp = _do_call()
+           ^^^^^^^^^^
+  File "$HOME/spacetime-memory/sdk/python/spacetime_memory/client/_base.py", line 649, in _do_call
+    return self._request_with_retry(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "$HOME/spacetime-memory/sdk/python/spacetime_memory/client/_base.py", line 518, in _request_with_retry
+    raise RuntimeError(
+RuntimeError: Request failed after 4 attempts: timed out
+  → Is SpacetimeDB running? Check: stmem doctor

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._notes API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._notes</h1>
+<pre>Help on module spacetime_memory.client._notes in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._notes - Note CRUD and backlink management mixin.
+
+CLASSES
+    builtins.object
+        NotesMixin
+    
+    class NotesMixin(builtins.object)
+     |  Spacetime-Memory notes mixin.
+     |  
+     |  Provides Client methods related to note management, backlinks,
+     |  and wiki-style cross-referencing.
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  create_note(self, workspace_id: 'str' = 'default', title: 'str' = '', content: 'str' = '', note_date: 'str' = '', embed: 'bool' = True) -> 'dict[str, Any]'
+     |      Create a note. If *embed* is True, auto-embeds via the sidecar.
+     |  
+     |  delete_note(self, note_id: 'str') -> 'dict[str, Any]'
+     |      Delete a note and its backlinks, and remove from search index.
+     |  
+     |  get_backlinks(self, note_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get all notes that link *to* the given note.
+     |  
+     |  get_note(self, note_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get a note by ID.
+     |  
+     |  get_note_by_date(self, note_date: 'str') -> 'list[dict[str, Any]]'
+     |      Get a note by its date string (YYYY-MM-DD).
+     |  
+     |  get_note_by_title(self, title: 'str', workspace_id: 'str' = '') -> 'list[dict[str, Any]]'
+     |      Find a note by exact title.
+     |      
+     |      Args:
+     |          title: The exact title to search for.
+     |          workspace_id: Optional workspace to scope the search to.
+     |              Pass an empty string (default) to search without workspace
+     |              scoping.
+     |  
+     |  get_outgoing_links(self, note_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get all notes that the given note links *to*.
+     |  
+     |  list_notes(self, workspace_id: 'str' = 'default', include_inactive: 'bool' = False) -> 'list[dict[str, Any]]'
+     |      List notes in a workspace.
+     |  
+     |  parse_note_blocks(self, note_id: 'str') -> 'dict[str, Any]'
+     |      Parse a note into blocks.
+     |      
+     |      Args:
+     |          note_id: The note ID to parse.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  update_note(self, note_id: 'str', title: 'str' = '', content: 'str' = '', embed: 'bool' = True, expected_version: 'int' = 0) -> 'dict[str, Any]'
+     |      Update a note. Re-embeds if content changes and *embed* is True.
+     |      
+     |      Pass *expected_version* to enable optimistic concurrency control.
+     |      If the note has been modified since you last read it, the reducer
+     |      returns an error and you should re-read, re-apply, and retry.
+     |  
+     |  update_note_block(self, block_id: 'str', content: 'str' = '', block_type: 'str' = '') -> 'dict[str, Any]'
+     |      Update a single note block.
+     |      
+     |      Args:
+     |          block_id: The block ID to update.
+     |          content: New content for the block.
+     |          block_type: New block type.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_notes.py
+
+
+</pre>
+</body></html>

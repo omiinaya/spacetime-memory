@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.weibull API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.weibull</h1>
+<pre>Help on module spacetime_memory.weibull in spacetime_memory:
+
+NAME
+    spacetime_memory.weibull - Weibull Temporal Boost — recency-weighted scoring via Weibull distribution.
+
+DESCRIPTION
+    Unlike linear decay, the Weibull distribution models natural memory decay:
+    fast initial drop-off followed by a long tail. This matches how human memory
+    works — recent items fade quickly, but older items persist at low weight.
+    
+    Shape parameter k controls the decay curve:
+      - k < 1: rapid initial decay, long tail (default — natural memory)
+      - k = 1: exponential decay
+      - k > 1: S-shaped (increasing hazard rate)
+    
+    Scale parameter λ controls the time scale (default: 7 days = 604800s).
+    
+    Integrated into Client.search() scoring pipeline.
+
+FUNCTIONS
+    apply_temporal_boost(results: list[dict[str, typing.Any]], *, score_field: str = 'score', timestamp_field: str = 'created_at', k: float = 0.5, lam: float = 604800.0, boost_strength: float = 0.15) -> list[dict[str, typing.Any]]
+        Apply Weibull temporal boost to search results in-place.
+        
+        Each result's score is multiplied by (1 + strength * weight),
+        where weight is the Weibull survival value for the item's age.
+        
+        Args:
+            results: Search results with score and timestamp fields.
+            score_field: Dict key for the relevance score.
+            timestamp_field: Dict key for the creation timestamp (unix seconds or microseconds).
+            k: Weibull shape parameter.
+            lam: Weibull scale parameter in seconds.
+            boost_strength: Multiplier for the boost (0.0 = no boost, 0.15 = mild).
+        
+        Returns:
+            Same list (mutated in-place, sorted by new score descending).
+    
+    weibull_weight(age_seconds: float, k: float = 0.5, lam: float = 604800.0, floor: float = 0.05) -> float
+        Compute Weibull survival weight for a given age.
+        
+        Args:
+            age_seconds: Age of the item in seconds (now - created_at).
+            k: Shape parameter (default 0.5 = fast decay, long tail).
+            lam: Scale parameter in seconds (default 7 days).
+            floor: Minimum weight cap (default 0.05).
+        
+        Returns:
+            Weight in [floor, 1.0] where 1.0 = brand new.
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/weibull.py
+
+
+</pre>
+</body></html>

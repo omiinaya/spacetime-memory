@@ -1,0 +1,92 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "stdb",
+    "judge_model": "deepseek/deepseek-chat",
+    "answer_model": "deepseek/deepseek-chat",
+    "total_questions": 5,
+    "primary_count": 5,
+    "timestamp": "2026-07-29T11:52:31.580694"
+  },
+  "metrics": {
+    "primary": {
+      "total": 5,
+      "correct": 5,
+      "accuracy": 100.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 1,
+        "correct": 1,
+        "accuracy": 100.0
+      },
+      "single-hop": {
+        "total": 2,
+        "correct": 2,
+        "accuracy": 100.0
+      },
+      "temporal": {
+        "total": 2,
+        "correct": 2,
+        "accuracy": 100.0
+      }
+    },
+    "overall": {
+      "total": 5,
+      "correct": 5,
+      "accuracy": 100.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "Caroline went to the LGBTQ support group yesterday (from the first conversation excerpt).",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer provides a relative date ('yesterday') which could fa"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "Melanie painted a lake sunrise last year, as mentioned in Conversation Excerpt [1].",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies the year as 'last year' which al"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "Caroline would likely pursue fields in counseling and mental health, specifically focusing on working with transgender individuals to help them accept themselves and support their mental health. She has expressed interest in these areas and has attended LGBTQ+ counseling workshops to gain insight into therapeutic methods and creating safe spaces for trans people.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the core fields of counseling and mental hea"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What did Caroline research?",
+      "expected": "Adoption agencies",
+      "answer": "Caroline researched counseling and mental health career options, specifically focusing on working with transgender individuals to help them accept themselves and support their mental health. She also looked into LGBTQ+ counseling workshops and adoption agencies, particularly those that assist LGBTQ+ individuals with adoption.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes 'adoption agencies' which matches the gold a"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What is Caroline's identity?",
+      "expected": "Transgender woman",
+      "answer": "Caroline is a transgender woman.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies Caroline as a transgender woman,"
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._skills API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._skills</h1>
+<pre>Help on module spacetime_memory.client._skills in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._skills - Skills/Mods system — Letta-parity reusable agent capabilities.
+
+DESCRIPTION
+    Skills are reusable capabilities that agents can learn and execute.
+    Mods extend agent behavior at runtime.
+    
+    Both skills and mods are stored via the existing memory infrastructure:
+    - Skills use ``memory_type="skill"``
+    - Mods use ``memory_type="mod"``
+    
+    A built-in catalog provides pre-defined skills (search, summarize, classify,
+    extract, translate, etc.) that agents can use immediately.
+
+CLASSES
+    builtins.object
+        SkillsModsMixin
+    
+    class SkillsModsMixin(builtins.object)
+     |  Spacetime-Memory Skills/Mods mixin.
+     |  
+     |  Provides Letta-parity reusable skill management, built-in skill catalog,
+     |  and behavior mods — all backed by the existing memory store.
+     |  
+     |  Skills are ``memory_type="skill"`` entries whose ``content`` is a JSON
+     |  blob holding ``name``, ``description``, ``code``, ``inputs``, ``outputs``,
+     |  ``category``, and ``created_at``.
+     |  
+     |  Mods are ``memory_type="mod"`` entries whose ``content`` is a JSON blob
+     |  holding ``mod_name``, ``version``, ``config``, and ``installed_at``.
+     |  
+     |  Inherits from ``ClientBase`` for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  create_skill(self, workspace_id: 'str', name: 'str', description: 'str', code: 'str', inputs: 'dict[str, str] | None' = None, outputs: 'dict[str, str] | None' = None, category: 'str' = '') -> 'dict[str, Any]'
+     |      Define a new skill in the given workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          name: Short unique name for the skill (e.g. ``"summarize"``).
+     |          description: Human-readable description of what the skill does.
+     |          code: Executable code/instructions (e.g. a Python function body).
+     |          inputs: Optional dict mapping parameter names to type strings.
+     |          outputs: Optional dict mapping return field names to type strings.
+     |          category: Optional category label (``"memory"``, ``"llm"``,
+     |              ``"graph"``, ``"workspace"``, etc.).
+     |      
+     |      Returns:
+     |          Reducer status dict with ``skill_id`` in entities_json.
+     |  
+     |  delete_skill(self, skill_id: 'str') -> 'dict[str, Any]'
+     |      Remove a skill by its memory ID.
+     |      
+     |      Args:
+     |          skill_id: The skill's memory ID.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |      
+     |      Raises:
+     |          NotFoundError: If the skill does not exist.
+     |  
+     |  execute_skill(self, workspace_id: 'str', skill_id: 'str', inputs: 'dict[str, Any] | None' = None) -> 'dict[str, Any]'
+     |      Execute a skill by ID (client-side execution).
+     |      
+     |      Retrieves the skill definition, then runs its ``code`` as a Python
+     |      function with the provided inputs.
+     |      
+     |      The skill's code must define a ``run`` function that accepts
+     |      ``(client, workspace_id, **inputs)``.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          skill_id: The skill's memory ID.
+     |          inputs: Dict of input parameters matching the skill's ``inputs``
+     |              schema.
+     |      
+     |      Returns:
+     |          Dict with ``status``, ``skill_name``, and ``result`` keys.
+     |          On failure, includes ``error`` with details.
+     |      
+     |      Raises:
+     |          NotFoundError: If the skill is not found.
+     |          ValueError: If the skill code has no ``run`` function.
+     |  
+     |  get_mod(self, mod_name: 'str', workspace_id: 'str | None' = None) -> 'dict[str, Any] | None'
+     |      Get details of a mod by name.
+     |      
+     |      Args:
+     |          mod_name: Name of the mod to find.
+     |          workspace_id: Optional workspace to search in. If provided,
+     |              only searches that workspace. If ``None``, searches all
+     |              workspaces.
+     |      
+     |      Returns:
+     |          A mod dict, or ``None`` if not found.
+     |  
+     |  get_skill(self, skill_id: 'str') -> 'dict[str, Any] | None'
+     |      Retrieve a skill definition by its memory ID.
+     |      
+     |      Args:
+     |          skill_id: The skill's memory ID.
+     |      
+     |      Returns:
+     |          A skill dict with keys ``skill_id``, ``name``, ``description``,
+     |          ``code``, ``inputs``, ``outputs``, ``category``, ``created_at``,
+     |          ``workspace_id`` — or ``None`` if not found.
+     |  
+     |  get_skills_catalog(self) -> 'list[dict[str, Any]]'
+     |      Return the built-in skill catalog with pre-defined skills.
+     |      
+     |      The catalog includes skills for:
+     |      - ``search_memories`` — semantic/keyword memory search
+     |      - ``summarize`` — text summarization via LLM
+     |      - ``classify`` — text classification via LLM
+     |      - ``extract_entities`` — named entity extraction
+     |      - ``translate`` — text translation via LLM
+     |      - ``create_note`` — wiki-style note creation
+     |      - ``list_memories`` — listing memories by type
+     |      - ``graph_query`` — knowledge graph queries
+     |      - ``create_entity`` — KG entity creation
+     |      - ``semantic_search`` — threshold-filtered semantic search
+     |      
+     |      Returns:
+     |          A list of skill definition dicts, each with keys ``name``,
+     |          ``description``, ``code``, ``inputs``, ``outputs``, ``category``.
+     |  
+     |  install_mod(self, workspace_id: 'str', mod_name: 'str', version: 'str', config: 'dict[str, Any] | None' = None) -> 'dict[str, Any]'
+     |      Install a behavior mod in a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          mod_name: Name of the mod (e.g. ``"auto_summarize"``).
+     |          version: Version string (e.g. ``"1.0.0"``).
+     |          config: Optional configuration dict.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  learn_from_interaction(self, workspace_id: 'str', interaction_data: 'dict[str, Any]') -> 'dict[str, Any]'
+     |      Extract a skill from an interaction pattern.
+     |      
+     |      Analyzes interaction data (queries, actions, responses) and
+     |      creates a skill that captures the observed pattern.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          interaction_data: Dict containing interaction pattern details.
+     |              Expected keys:
+     |              - ``name`` (str): Suggested skill name.
+     |              - ``description`` (str): What the skill does.
+     |              - ``code`` (str): Inferred implementation code.
+     |              - ``inputs`` (dict, optional): Input parameter schema.
+     |              - ``outputs`` (dict, optional): Output schema.
+     |      
+     |      Returns:
+     |          The result of :meth:`create_skill`.
+     |  
+     |  list_mods(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      List installed mods in a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          A list of mod dicts, each with keys ``mod_id``, ``mod_name``,
+     |          ``version``, ``config``, ``installed_at``, ``workspace_id``.
+     |          Sorted by ``installed_at`` descending.
+     |  
+     |  list_skills(self, workspace_id: 'str', category: 'str | None' = None) -> 'list[dict[str, Any]]'
+     |      List available skills in a workspace, optionally filtered by category.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          category: If provided, only return skills matching this category
+     |              (e.g. ``"memory"``, ``"llm"``, ``"graph"``, ``"workspace"``).
+     |      
+     |      Returns:
+     |          A list of skill dicts sorted by ``created_at`` descending.
+     |  
+     |  uninstall_mod(self, workspace_id: 'str', mod_name: 'str') -> 'dict[str, Any]'
+     |      Uninstall a behavior mod by name.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          mod_name: Name of the mod to remove.
+     |      
+     |      Returns:
+     |          Dict with ``status``, ``removed`` count.
+     |      
+     |      Raises:
+     |          NotFoundError: If no mod with that name is installed.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    BUILTIN_SKILL_CATALOG = [{'category': 'memory', 'code': 'def run(clien...
+    BUILTIN_SKILL_MAP = {'classify': {'category': 'llm', 'code': 'def run(...
+    MOD_MEMORY_TYPE = 'mod'
+    SKILL_MEMORY_TYPE = 'skill'
+    __annotations__ = {'BUILTIN_SKILL_CATALOG': 'list[dict[str, Any]]', 'B...
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_skills.py
+
+
+</pre>
+</body></html>

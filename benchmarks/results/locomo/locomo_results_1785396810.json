@@ -1,0 +1,67 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "stdb",
+    "judge_model": "deepseek/deepseek-chat",
+    "answer_model": "deepseek/deepseek-chat",
+    "total_questions": 3,
+    "primary_count": 3,
+    "timestamp": "2026-07-30T03:33:30.762905"
+  },
+  "metrics": {
+    "primary": {
+      "total": 3,
+      "correct": 3,
+      "accuracy": 100.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 1,
+        "correct": 1,
+        "accuracy": 100.0
+      },
+      "temporal": {
+        "total": 2,
+        "correct": 2,
+        "accuracy": 100.0
+      }
+    },
+    "overall": {
+      "total": 3,
+      "correct": 3,
+      "accuracy": 100.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "Caroline went to the LGBTQ support group yesterday, as mentioned in the first conversation excerpt.",
+      "is_correct": true,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer refers to the same event as the gold answer and provides"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "Melanie painted a lake sunrise last year, as mentioned in conversation excerpt [1].",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer correctly identifies the year as 'last year' relative"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "Caroline would likely pursue fields related to counseling, mental health, and LGBTQ+ advocacy. She has expressed interest in helping others through counseling and mental health careers, as well as supporting the LGBTQ+ community through advocacy and awareness.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer includes the key fields of counseling and mental heal"
+    }
+  ]
+}

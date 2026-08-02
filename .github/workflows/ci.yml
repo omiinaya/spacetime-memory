@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+    branches: [main, master, dev]
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: Run cargo-deny check (spacetimedb)
+        run: cargo deny check
+        working-directory: server/spacetimedb
+      - name: Run cargo-deny check (embedder)
+        run: cargo deny check
+        working-directory: server/embedder
+      - name: Run cargo-deny check (tantivy-sidecar)
+        run: cargo deny check
+        working-directory: server/tantivy-sidecar
+
+  rust-check:
+    name: Rust Check + Clippy
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          components: clippy
+      - name: cargo check (spacetimedb)
+        run: cargo check
+        working-directory: server/spacetimedb
+      - name: cargo clippy
+        run: cargo clippy -- -D warnings
+        working-directory: server/spacetimedb
+      - name: cargo check (embedder)
+        run: cargo check
+        working-directory: server/embedder
+      - name: cargo check (tantivy-sidecar)
+        run: cargo check
+        working-directory: server/tantivy-sidecar
+
+  rust-test:
+    name: Rust Tests
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Run tests
+        run: cargo test
+        working-directory: server/spacetimedb
+
+  rust-wasm-build:
+    name: WASM Build
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+      - name: WASM release build
+        run: cargo build --release --target wasm32-unknown-unknown
+        working-directory: server/spacetimedb
+
+  webhook-sidecar:
+    name: Webhook Sidecar
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: cargo check
+        run: cargo check
+        working-directory: server/webhook-sidecar
+
+  typescript-sdk:
+    name: TypeScript SDK
+    runs-on: [self-hosted, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: sdk/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: npm ci
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+      - name: Run tests
+        run: npx vitest run
+        env:
+          NODE_OPTIONS: "--experimental-websocket"
+
+  typescript-client:
+    name: TypeScript Client Build + Tests
+    runs-on: [self-hosted, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install deps
+        run: npm ci
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+      - name: Run tests
+        run: npx vitest run
+      - name: Build
+        run: npx vite build
+
+  python-sdk:
+    name: Python SDK (unit tests)
+    runs-on: [self-hosted, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: |
+          pip install -e ".[dev,cli]"
+          pip install websockets feedparser
+      - name: Run unit tests
+        run: python -m pytest tests/ -m "unit" -q --tb=short --timeout=120 -x
+
+  python-mcp:
+    name: Python MCP Server (unit tests)
+    runs-on: [self-hosted, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: server/mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: |
+          pip install -e ".[dev]"
+      - name: Run MCP tests
+        run: python -m pytest tools/tests/ -q --tb=short --timeout=120 -x
+
+  lint:
+    name: Lint
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff
+      - name: Run ruff check
+        run: ruff check sdk/python/ cli/

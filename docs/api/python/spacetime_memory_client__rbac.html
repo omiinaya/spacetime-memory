@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._rbac API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._rbac</h1>
+<pre>Help on module spacetime_memory.client._rbac in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._rbac - Enhanced RBAC mixin — Cognee-parity role-based access control.
+
+DESCRIPTION
+    Provides workspace-level roles (admin, editor, viewer, custom) and
+    resource-level permissions (read, write, delete, share, admin) via
+    the existing SpacetimeDB ACL infrastructure.
+    
+    Builds on the ``grant_space_access`` / ``revoke_space_access`` /
+    ``promote_admin`` / ``demote_admin`` reducers and adds client-side
+    role templates, permission inheritance, and high-level assignment
+    and revocation methods.
+    
+    Usage::
+    
+        client.assign_role(workspace_id="ws-1", user_id="...", role="editor")
+        client.revoke_role(workspace_id="ws-1", user_id="...")
+        client.check_permission(workspace_id="ws-1", user_id="...", permission="write")
+        client.create_custom_role(workspace_id="ws-1", role_name="moderator",
+                                  permissions=["read", "write", "delete"])
+
+CLASSES
+    builtins.object
+        RBACMixin
+        RoleAssignment
+        RoleTemplate
+    spacetime_memory.client._base.SpacetimeDBError(builtins.RuntimeError)
+        RBACError
+            InvalidPermissionError
+            InvalidRoleError
+            UserNotFoundError
+    
+    class InvalidPermissionError(RBACError)
+     |  Raised when an unknown or invalid permission is supplied.
+     |  
+     |  Method resolution order:
+     |      InvalidPermissionError
+     |      RBACError
+     |      spacetime_memory.client._base.SpacetimeDBError
+     |      builtins.RuntimeError
+     |      builtins.Exception
+     |      builtins.BaseException
+     |      builtins.object
+     |  
+     |  Data descriptors inherited from spacetime_memory.client._base.SpacetimeDBError:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.RuntimeError:
+     |  
+     |  __init__(self, /, *args, **kwargs)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Static methods inherited from builtins.RuntimeError:
+     |  
+     |  __new__(*args, **kwargs) from builtins.type
+     |      Create and return a new object.  See help(type) for accurate signature.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.BaseException:
+     |  
+     |  __delattr__(self, name, /)
+     |      Implement delattr(self, name).
+     |  
+     |  __getattribute__(self, name, /)
+     |      Return getattr(self, name).
+     |  
+     |  __reduce__(...)
+     |      Helper for pickle.
+     |  
+     |  __repr__(self, /)
+     |      Return repr(self).
+     |  
+     |  __setattr__(self, name, value, /)
+     |      Implement setattr(self, name, value).
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(self, /)
+     |      Return str(self).
+     |  
+     |  add_note(...)
+     |      Exception.add_note(note) --
+     |      add a note to the exception
+     |  
+     |  with_traceback(...)
+     |      Exception.with_traceback(tb) --
+     |      set self.__traceback__ to tb and return self.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from builtins.BaseException:
+     |  
+     |  __cause__
+     |      exception cause
+     |  
+     |  __context__
+     |      exception context
+     |  
+     |  __dict__
+     |  
+     |  __suppress_context__
+     |  
+     |  __traceback__
+     |  
+     |  args
+    
+    class InvalidRoleError(RBACError)
+     |  Raised when an unknown or invalid role name is supplied.
+     |  
+     |  Method resolution order:
+     |      InvalidRoleError
+     |      RBACError
+     |      spacetime_memory.client._base.SpacetimeDBError
+     |      builtins.RuntimeError
+     |      builtins.Exception
+     |      builtins.BaseException
+     |      builtins.object
+     |  
+     |  Data descriptors inherited from spacetime_memory.client._base.SpacetimeDBError:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.RuntimeError:
+     |  
+     |  __init__(self, /, *args, **kwargs)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Static methods inherited from builtins.RuntimeError:
+     |  
+     |  __new__(*args, **kwargs) from builtins.type
+     |      Create and return a new object.  See help(type) for accurate signature.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.BaseException:
+     |  
+     |  __delattr__(self, name, /)
+     |      Implement delattr(self, name).
+     |  
+     |  __getattribute__(self, name, /)
+     |      Return getattr(self, name).
+     |  
+     |  __reduce__(...)
+     |      Helper for pickle.
+     |  
+     |  __repr__(self, /)
+     |      Return repr(self).
+     |  
+     |  __setattr__(self, name, value, /)
+     |      Implement setattr(self, name, value).
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(self, /)
+     |      Return str(self).
+     |  
+     |  add_note(...)
+     |      Exception.add_note(note) --
+     |      add a note to the exception
+     |  
+     |  with_traceback(...)
+     |      Exception.with_traceback(tb) --
+     |      set self.__traceback__ to tb and return self.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from builtins.BaseException:
+     |  
+     |  __cause__
+     |      exception cause
+     |  
+     |  __context__
+     |      exception context
+     |  
+     |  __dict__
+     |  
+     |  __suppress_context__
+     |  
+     |  __traceback__
+     |  
+     |  args
+    
+    class RBACError(spacetime_memory.client._base.SpacetimeDBError)
+     |  Raised on RBAC operation failures (invalid role, permission denied, etc.).
+     |  
+     |  Method resolution order:
+     |      RBACError
+     |      spacetime_memory.client._base.SpacetimeDBError
+     |      builtins.RuntimeError
+     |      builtins.Exception
+     |      builtins.BaseException
+     |      builtins.object
+     |  
+     |  Data descriptors inherited from spacetime_memory.client._base.SpacetimeDBError:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.RuntimeError:
+     |  
+     |  __init__(self, /, *args, **kwargs)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Static methods inherited from builtins.RuntimeError:
+     |  
+     |  __new__(*args, **kwargs) from builtins.type
+     |      Create and return a new object.  See help(type) for accurate signature.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.BaseException:
+     |  
+     |  __delattr__(self, name, /)
+     |      Implement delattr(self, name).
+     |  
+     |  __getattribute__(self, name, /)
+     |      Return getattr(self, name).
+     |  
+     |  __reduce__(...)
+     |      Helper for pickle.
+     |  
+     |  __repr__(self, /)
+     |      Return repr(self).
+     |  
+     |  __setattr__(self, name, value, /)
+     |      Implement setattr(self, name, value).
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(self, /)
+     |      Return str(self).
+     |  
+     |  add_note(...)
+     |      Exception.add_note(note) --
+     |      add a note to the exception
+     |  
+     |  with_traceback(...)
+     |      Exception.with_traceback(tb) --
+     |      set self.__traceback__ to tb and return self.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from builtins.BaseException:
+     |  
+     |  __cause__
+     |      exception cause
+     |  
+     |  __context__
+     |      exception context
+     |  
+     |  __dict__
+     |  
+     |  __suppress_context__
+     |  
+     |  __traceback__
+     |  
+     |  args
+    
+    class RBACMixin(builtins.object)
+     |  Spacetime-Memory RBAC mixin.
+     |  
+     |  Provides workspace-level and resource-level access control methods
+     |  that wrap the existing reducer infrastructure with role abstractions,
+     |  permission checking, role templates, and bulk operations.
+     |  
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  assign_role(self, workspace_id: 'str', user_id: 'str', role: 'str', permissions: 'list[str] | None' = None) -> 'dict[str, Any]'
+     |      Assign a role to a user for a workspace.
+     |      
+     |      For built-in roles (admin, editor, viewer), the method maps the
+     |      role to the corresponding SpacetimeDB permission level and calls
+     |      ``grant_space_access``.
+     |      
+     |      For custom roles, the caller **must** supply explicit permission
+     |      list. The method grants access with a ``"custom"`` permission
+     |      level and records the custom role metadata in a ``RoleTemplate``
+     |      table if the role does not already exist.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          user_id: The identity hex of the user to assign the role to.
+     |          role: Role name — one of ``"admin"``, ``"editor"``,
+     |              ``"viewer"``, or any custom role name.
+     |          permissions: Required when ``role="custom"``. Optional for
+     |              built-in roles (defaults to the built-in template
+     |              permissions). A list of permission strings from:
+     |              ``"read"``, ``"write"``, ``"delete"``, ``"share"``,
+     |              ``"admin"``.
+     |      
+     |      Returns:
+     |          Reducer status dict with extra ``role`` and ``user_id`` keys.
+     |      
+     |      Raises:
+     |          InvalidRoleError: If the role name is unknown and not custom.
+     |          InvalidPermissionError: If any permission is not recognised.
+     |          RBACError: On backend failure.
+     |  
+     |  bulk_assign_roles(self, workspace_id: 'str', assignments: 'list[dict[str, Any]]') -> 'list[dict[str, Any]]'
+     |      Assign multiple roles at once.
+     |      
+     |      Each assignment dict must have ``user_id`` and ``role`` keys.
+     |      Optionally ``permissions`` for custom roles.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          assignments: List of dicts, each with ``user_id`` and ``role``.
+     |      
+     |      Returns:
+     |          List of individual result dicts.
+     |  
+     |  bulk_revoke_roles(self, workspace_id: 'str', user_ids: 'list[str]') -> 'list[dict[str, Any]]'
+     |      Revoke roles for multiple users at once.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          user_ids: List of user identity hex strings.
+     |      
+     |      Returns:
+     |          List of individual result dicts.
+     |  
+     |  check_permission(self, workspace_id: 'str', user_id: 'str', permission: 'str', resource_id: 'str | None' = None) -> 'bool'
+     |      Check whether a user has a specific permission at workspace scope.
+     |      
+     |      This is a **client-side** check that introspects the workspace's
+     |      member list. For authoritative server-side enforcement, rely on
+     |      SpacetimeDB reducer-level access controls.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          user_id: The identity hex of the user.
+     |          permission: One of ``"read"``, ``"write"``, ``"delete"``,
+     |              ``"share"``, ``"admin"``.
+     |          resource_id: Optional resource ID for resource-level checks.
+     |              Currently uses workspace-level inheritance: resource-level
+     |              checks fall back to the workspace permission level.
+     |      
+     |      Returns:
+     |          ``True`` if the user has the permission, ``False`` otherwise.
+     |  
+     |  create_custom_role(self, workspace_id: 'str', role_name: 'str', permissions: 'list[str]', description: 'str' = '') -> 'dict[str, Any]'
+     |      Register or update a custom role definition for a workspace.
+     |      
+     |      The role definition is stored client-side in the ``role_template``
+     |      table managed by the SDK. Once registered, the role can be assigned
+     |      by name via :meth:`assign_role`.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          role_name: The custom role name (e.g. ``"moderator"``).
+     |          permissions: List of permission strings from ``"read"``,
+     |              ``"write"``, ``"delete"``, ``"share"``, ``"admin"``.
+     |          description: Optional human-readable description.
+     |      
+     |      Returns:
+     |          Dict with status and the registered role template.
+     |      
+     |      Raises:
+     |          InvalidPermissionError: If any permission is not recognised.
+     |  
+     |  delete_custom_role(self, workspace_id: 'str', role_name: 'str') -> 'dict[str, Any]'
+     |      Delete a custom role template.
+     |      
+     |      Does **not** revoke existing assignments of this role — they are
+     |      preserved but the role degrades to the native permission level.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          role_name: The custom role name to delete.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  demote_from_system_admin(self, target_identity: 'str') -> 'dict[str, Any]'
+     |      Demote a system admin back to regular user.
+     |      
+     |      Wraps the ``demote_admin`` reducer.
+     |      
+     |      Args:
+     |          target_identity: The identity hex of the admin to demote.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  get_custom_role(self, workspace_id: 'str', role_name: 'str') -> 'dict[str, Any] | None'
+     |      Get a custom role template by name.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          role_name: The custom role name.
+     |      
+     |      Returns:
+     |          Role template dict or ``None``.
+     |  
+     |  get_effective_permissions(self, workspace_id: 'str', user_id: 'str', resource_id: 'str | None' = None) -> 'set[str]'
+     |      Get the effective permission set for a user at a given scope.
+     |      
+     |      For workspace-level checks, returns the permissions of the user's
+     |      assigned role. For resource-level checks, currently falls back
+     |      to workspace-level inheritance (resources inherit workspace
+     |      permissions).
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          user_id: The identity hex of the user.
+     |          resource_id: Optional resource ID for resource-level checks.
+     |      
+     |      Returns:
+     |          Set of permission strings the user effectively holds.
+     |  
+     |  list_custom_roles(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      List all custom role templates defined for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          List of role template dicts.
+     |  
+     |  list_role_assignments(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      List all role assignments (members) for a workspace.
+     |      
+     |      Wraps ``list_space_members`` and normalises the output to
+     |      include the role name alongside the native permission level.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          List of member dicts with keys: id, workspace_id, user_id,
+     |          role, permission_level, granted_by, created_at.
+     |  
+     |  list_system_admins(self) -> 'list[dict[str, Any]]'
+     |      List all system-level admin accounts.
+     |      
+     |      Returns:
+     |          List of admin account records.
+     |  
+     |  promote_to_system_admin(self, target_identity: 'str') -> 'dict[str, Any]'
+     |      Promote a user to system-level admin.
+     |      
+     |      Wraps the ``promote_admin`` reducer.
+     |      
+     |      Args:
+     |          target_identity: The identity hex of the user to promote.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  revoke_role(self, workspace_id: 'str', user_id: 'str') -> 'dict[str, Any]'
+     |      Revoke a user's role (all permissions) for a workspace.
+     |      
+     |      Wraps the ``revoke_space_access`` reducer.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          user_id: The identity hex of the user to revoke access from.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+    
+    class RoleAssignment(builtins.object)
+     |  RoleAssignment(workspace_id: 'str', user_id: 'str', role: 'str', permission_level: 'str' = '', granted_by: 'str' = '') -> None
+     |  
+     |  A record of a user assigned to a role at some scope.
+     |  
+     |  Attributes:
+     |      workspace_id: The workspace scope.
+     |      user_id: The identity hex string of the user.
+     |      role: The role name (``"admin"``, ``"editor"``, ``"viewer"``, or a
+     |          custom role name).
+     |      permission_level: The SpacetimeDB-native permission string
+     |          (``"owner"``, ``"editor"``, ``"viewer"`` — or ``"custom"``).
+     |      granted_by: The identity hex of the granter.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, workspace_id: 'str', user_id: 'str', role: 'str', permission_level: 'str' = '', granted_by: 'str' = '') -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'granted_by': 'str', 'permission_level': 'str', 'ro...
+     |  
+     |  __dataclass_fields__ = {'granted_by': Field(name='granted_by',type='st...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('workspace_id', 'user_id', 'role', 'permission_level...
+     |  
+     |  granted_by = ''
+     |  
+     |  permission_level = ''
+    
+    class RoleTemplate(builtins.object)
+     |  RoleTemplate(name: 'str', permissions: 'set[str]', description: 'str' = '') -> None
+     |  
+     |  A named template mapping permissions to a role.
+     |  
+     |  Attributes:
+     |      name: The role name (e.g. ``"editor"``, ``"moderator"``).
+     |      permissions: The set of resource-level permission strings granted
+     |          by this role.
+     |      description: Optional human-readable description.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, name: 'str', permissions: 'set[str]', description: 'str' = '') -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_dict(self) -> 'dict[str, Any]'
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'description': 'str', 'name': 'str', 'permissions':...
+     |  
+     |  __dataclass_fields__ = {'description': Field(name='description',type='...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('name', 'permissions', 'description')
+     |  
+     |  description = ''
+    
+    class UserNotFoundError(RBACError)
+     |  Raised when a user identity is not found in the system.
+     |  
+     |  Method resolution order:
+     |      UserNotFoundError
+     |      RBACError
+     |      spacetime_memory.client._base.SpacetimeDBError
+     |      builtins.RuntimeError
+     |      builtins.Exception
+     |      builtins.BaseException
+     |      builtins.object
+     |  
+     |  Data descriptors inherited from spacetime_memory.client._base.SpacetimeDBError:
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.RuntimeError:
+     |  
+     |  __init__(self, /, *args, **kwargs)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Static methods inherited from builtins.RuntimeError:
+     |  
+     |  __new__(*args, **kwargs) from builtins.type
+     |      Create and return a new object.  See help(type) for accurate signature.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.BaseException:
+     |  
+     |  __delattr__(self, name, /)
+     |      Implement delattr(self, name).
+     |  
+     |  __getattribute__(self, name, /)
+     |      Return getattr(self, name).
+     |  
+     |  __reduce__(...)
+     |      Helper for pickle.
+     |  
+     |  __repr__(self, /)
+     |      Return repr(self).
+     |  
+     |  __setattr__(self, name, value, /)
+     |      Implement setattr(self, name, value).
+     |  
+     |  __setstate__(...)
+     |  
+     |  __str__(self, /)
+     |      Return str(self).
+     |  
+     |  add_note(...)
+     |      Exception.add_note(note) --
+     |      add a note to the exception
+     |  
+     |  with_traceback(...)
+     |      Exception.with_traceback(tb) --
+     |      set self.__traceback__ to tb and return self.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from builtins.BaseException:
+     |  
+     |  __cause__
+     |      exception cause
+     |  
+     |  __context__
+     |      exception context
+     |  
+     |  __dict__
+     |  
+     |  __suppress_context__
+     |  
+     |  __traceback__
+     |  
+     |  args
+
+DATA
+    ALL_PERMISSIONS = {'admin', 'delete', 'read', 'share', 'write'}
+    BUILTIN_ROLES = {'admin': 'owner', 'editor': 'editor', 'viewer': 'view...
+    PERMISSION_ADMIN = 'admin'
+    PERMISSION_DELETE = 'delete'
+    PERMISSION_READ = 'read'
+    PERMISSION_SHARE = 'share'
+    PERMISSION_WRITE = 'write'
+    ROLE_ADMIN = 'admin'
+    ROLE_CUSTOM = 'custom'
+    ROLE_EDITOR = 'editor'
+    ROLE_TEMPLATES = {'admin': {'admin', 'delete', 'read', 'share', 'write...
+    ROLE_VIEWER = 'viewer'
+    __annotations__ = {'ALL_PERMISSIONS': 'set[str]', 'BUILTIN_ROLES': 'di...
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_rbac.py
+
+
+</pre>
+</body></html>

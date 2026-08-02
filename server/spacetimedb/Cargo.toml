@@ -1,0 +1,46 @@
+[package]
+name = "spacetime-memory"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Multi-layer memory infrastructure for AI agents on SpacetimeDB"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = 2
+codegen-units = 16
+lto = "thin"
+strip = false
+debug = false
+
+[dependencies]
+spacetimedb = { version = "2.6" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
+regex = "1"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+p256 = { version = "0.13", features = ["pem", "sha2", "arithmetic"] }
+base64 = "0.22"
+aes-gcm = "0.10"
+# getrandom comes in via p256 → crypto-bigint → rand_core. The wasi backend
+# imports `wasi_snapshot_preview1::random_get`, which the STDB host does not
+# provide — the module then fails the pre-publish check. The "custom" backend
+# removes the wasi import; nothing in the module calls getrandom at runtime
+# (reducers use ctx.rng(), ECDSA signing is deterministic RFC6979).
+getrandom = { version = "0.2", features = ["custom"] }
+
+[dev-dependencies]
+# `rand` is dev-only: thread_rng links wasi `random_get`, which the STDB host
+# does not provide — having it as a regular dependency makes the release
+# module unpublishable. Reducers use ctx.rng() instead.
+rand = "0.8"
+serde_json = "1"           # benchmark JSON parsing/writing
+# Test utilities — these compile on host target (not wasm32)
+rstest = "0.18"            # parameterized tests
+pretty_assertions = "1"    # readable diff output
+reqwest = { version = "0.12", features = ["blocking"] }  # integration tests (HTTP)

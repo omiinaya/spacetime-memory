@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.shmr API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.shmr</h1>
+<pre>Help on module spacetime_memory.shmr in spacetime_memory:
+
+NAME
+    spacetime_memory.shmr
+
+DESCRIPTION
+    Self-Harmonizing Memory Reasoning (SHMR)
+    ========================================
+    Memory resonance engine — clusters related memories by embedding similarity,
+    uses LLM to harmonize contradictions into stable beliefs.
+    
+    Based on mnemosyne's shmr.py (AxDSan/mnemosyne), rearchitected for
+    Spacetime Memory's SpacetimeDB backend.
+    
+    Core flow:
+    1. Fetch recent memories with embeddings
+    2. Cluster by cosine similarity (connected components)
+    3. For each cluster: LLM harmonization → beliefs
+    4. Compute harmony score (beliefs × cluster centroid)
+    5. Store beliefs in SpacetimeDB via reducer
+
+CLASSES
+    builtins.object
+        ResonanceResult
+    
+    class ResonanceResult(builtins.object)
+     |  ResonanceResult(workspace_id: 'str', clusters_found: 'int' = 0, beliefs_generated: 'int' = 0, contradictions_resolved: 'int' = 0, harmony_score_avg: 'float' = 0.0, duration_ms: 'int' = 0, errors: 'int' = 0) -> None
+     |  
+     |  Result of one SHMR resonance pass.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, workspace_id: 'str', clusters_found: 'int' = 0, beliefs_generated: 'int' = 0, contradictions_resolved: 'int' = 0, harmony_score_avg: 'float' = 0.0, duration_ms: 'int' = 0, errors: 'int' = 0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'beliefs_generated': 'int', 'clusters_found': 'int'...
+     |  
+     |  __dataclass_fields__ = {'beliefs_generated': Field(name='beliefs_gener...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('workspace_id', 'clusters_found', 'beliefs_generated...
+     |  
+     |  beliefs_generated = 0
+     |  
+     |  clusters_found = 0
+     |  
+     |  contradictions_resolved = 0
+     |  
+     |  duration_ms = 0
+     |  
+     |  errors = 0
+     |  
+     |  harmony_score_avg = 0.0
+
+FUNCTIONS
+    shmr_resonate(client: 'Client', workspace_id: 'str', days: 'int' = 7, max_iterations: 'int' = 3, similarity_threshold: 'float' = 0.7, dry_run: 'bool' = False) -> 'ResonanceResult'
+        Run one SHMR resonance pass on a workspace.
+        
+        Fetches recent memories, clusters by embedding similarity,
+        harmonizes each cluster via LLM, and stores beliefs.
+        
+        Args:
+            client: Authenticated Spacetime Memory client.
+            workspace_id: Target workspace.
+            days: How many days of memories to consider.
+            max_iterations: Maximum resonance rounds.
+            similarity_threshold: Cosine similarity threshold for clustering.
+            dry_run: If True, don't store results.
+
+DATA
+    HARMONY_PROMPT = "You are the Self-Harmonizing Memory Reasoner for...p...
+    SHMR_BATCH_SIZE = 50
+    SHMR_HARMONY_THRESHOLD = 0.6
+    SHMR_MAX_ITERATIONS = 3
+    SHMR_MIN_CLUSTER_SIZE = 2
+    SHMR_MODEL = ''
+    SHMR_SIMILARITY_THRESHOLD = 0.7
+    SHMR_TEMPERATURE = 0.2
+    __annotations__ = {'_DEPRECATED_ENV_MAP': 'dict[str, str]'}
+    logger = <Logger spacetime_memory.shmr (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/shmr.py
+
+
+</pre>
+</body></html>

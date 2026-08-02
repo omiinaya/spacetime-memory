@@ -1,0 +1,67 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "stdb",
+    "judge_model": "deepseek/deepseek-chat",
+    "answer_model": "deepseek/deepseek-chat",
+    "total_questions": 3,
+    "primary_count": 3,
+    "timestamp": "2026-07-29T11:46:46.391079"
+  },
+  "metrics": {
+    "primary": {
+      "total": 3,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 1,
+        "correct": 0,
+        "accuracy": 0.0
+      },
+      "temporal": {
+        "total": 2,
+        "correct": 0,
+        "accuracy": 0.0
+      }
+    },
+    "overall": {
+      "total": 3,
+      "correct": 0,
+      "accuracy": 0.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not provide any information about the date Carol"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not provide the correct date or any relevant inf"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any of the correct items from the go"
+    }
+  ]
+}

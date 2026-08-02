@@ -1,0 +1,30 @@
+[Unit]
+Description=Tantivy BM25 Search Sidecar for Spacetime-Memory
+Documentation=https://github.com/omiinaya/spacetime-memory
+After=network-online.target spacetimedb.service embedder-sidecar.service
+Wants=network-online.target
+Requires=spacetimedb.service
+
+[Service]
+Type=simple
+User=#USER#
+Group=#GROUP#
+ExecStart=#BINARY# --warmup
+WorkingDirectory=#WORKDIR#
+Environment="HOME=#HOME#"
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="TANTIVY_PORT=9091"
+Environment="TANTIVY_INDEX_DIR=#TANTIVY_INDEX_DIR#"
+Environment="SPACETIMEDB_URL=http://#STDB_HOST#:#STDB_PORT#"
+Environment="SPACETIMEDB_DB=#STDB_DB#"
+Environment="REINDEX_SCRIPT=#REINDEX_SCRIPT#"
+Restart=always
+RestartSec=5
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

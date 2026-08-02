@@ -1,0 +1,343 @@
+{
+  "benchmark": "BEAM (Temporal-Aware BM25 + Multi-Query Fusion)",
+  "scenarios": 27,
+  "overall": {
+    "passed": 74,
+    "total": 82,
+    "accuracy": 0.9024
+  },
+  "by_ability": {
+    "ABS": {
+      "passed": 6,
+      "total": 6,
+      "accuracy": 1.0
+    },
+    "ALL": {
+      "passed": 6,
+      "total": 8,
+      "accuracy": 0.75
+    },
+    "CR": {
+      "passed": 3,
+      "total": 5,
+      "accuracy": 0.6
+    },
+    "EO": {
+      "passed": 6,
+      "total": 6,
+      "accuracy": 1.0
+    },
+    "IE": {
+      "passed": 9,
+      "total": 9,
+      "accuracy": 1.0
+    },
+    "IF": {
+      "passed": 4,
+      "total": 6,
+      "accuracy": 0.6667
+    },
+    "KU": {
+      "passed": 8,
+      "total": 8,
+      "accuracy": 1.0
+    },
+    "MR": {
+      "passed": 9,
+      "total": 9,
+      "accuracy": 1.0
+    },
+    "PF": {
+      "passed": 11,
+      "total": 11,
+      "accuracy": 1.0
+    },
+    "SUM": {
+      "passed": 5,
+      "total": 5,
+      "accuracy": 1.0
+    },
+    "TR": {
+      "passed": 7,
+      "total": 9,
+      "accuracy": 0.7778
+    }
+  },
+  "scenario_results": [
+    {
+      "id": "beam_ie_01",
+      "ability": "IE",
+      "description": "Extract a named entity's role from a single factual memory",
+      "difficulty": "easy",
+      "queries_total": 2,
+      "queries_passed": 2,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_ie_02",
+      "ability": "IE",
+      "description": "Extract multiple facts about one entity from a compound memory",
+      "difficulty": "medium",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_ie_03",
+      "ability": "IE",
+      "description": "Extract precise numerical data and names from a dense technical document",
+      "difficulty": "hard",
+      "queries_total": 4,
+      "queries_passed": 4,
+      "accuracy": 0.75,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_mr_01",
+      "ability": "MR",
+      "description": "Retrieve a single, unique memory from a set of distractors",
+      "difficulty": "easy",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_mr_02",
+      "ability": "MR",
+      "description": "Retrieve across semantically overlapping memories to find the correct one",
+      "difficulty": "medium",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_mr_03",
+      "ability": "MR",
+      "description": "Retrieve across a large set of similar-structured memories",
+      "difficulty": "hard",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_tr_01",
+      "ability": "TR",
+      "description": "Determine which event happened first from two timestamped memories",
+      "difficulty": "easy",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 0.7778,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_tr_02",
+      "ability": "TR",
+      "description": "Reconstruct a chronological sequence from intermixed facts",
+      "difficulty": "medium",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_tr_03",
+      "ability": "TR",
+      "description": "Reason about overlapping time windows and scheduling conflicts",
+      "difficulty": "hard",
+      "queries_total": 3,
+      "queries_passed": 1,
+      "accuracy": 0.3333,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_abs_01",
+      "ability": "ABS",
+      "description": "Correctly abstain when asked about something not in the memory store",
+      "difficulty": "medium",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_abs_02",
+      "ability": "ABS",
+      "description": "Abstain when a specific detail is not available even though broader context exists",
+      "difficulty": "hard",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_cr_01",
+      "ability": "CR",
+      "description": "Counterfactual: what would be true if a known fact were different",
+      "difficulty": "medium",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 0.8333,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_cr_02",
+      "ability": "CR",
+      "description": "Multi-variable counterfactual: change two conditions and reason about the outcome",
+      "difficulty": "hard",
+      "queries_total": 2,
+      "queries_passed": 0,
+      "accuracy": 0.0,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_ku_01",
+      "ability": "KU",
+      "description": "Update a belief when contradictory information arrives",
+      "difficulty": "easy",
+      "queries_total": 2,
+      "queries_passed": 2,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_ku_02",
+      "ability": "KU",
+      "description": "Handle multiple sequential belief updates correctly",
+      "difficulty": "medium",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_ku_03",
+      "ability": "KU",
+      "description": "Track belief updates across multiple entities and conflicting sources",
+      "difficulty": "hard",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 0.6667,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_eo_01",
+      "ability": "EO",
+      "description": "Order entities by a given property",
+      "difficulty": "easy",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_eo_02",
+      "ability": "EO",
+      "description": "Order events by temporal sequence across multiple entities",
+      "difficulty": "medium",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_if_01",
+      "ability": "IF",
+      "description": "Single-hop inference from one fact",
+      "difficulty": "easy",
+      "queries_total": 1,
+      "queries_passed": 0,
+      "accuracy": 0.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_if_02",
+      "ability": "IF",
+      "description": "Multi-hop inference combining 2-3 facts",
+      "difficulty": "medium",
+      "queries_total": 2,
+      "queries_passed": 2,
+      "accuracy": 0.75,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_if_03",
+      "ability": "IF",
+      "description": "Complex inference requiring deductive chain of 4+ facts",
+      "difficulty": "hard",
+      "queries_total": 3,
+      "queries_passed": 2,
+      "accuracy": 0.5,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_pf_01",
+      "ability": "PF",
+      "description": "Track which entity has which role after a single change",
+      "difficulty": "easy",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.1
+    },
+    {
+      "id": "beam_pf_02",
+      "ability": "PF",
+      "description": "Track two properties of the same entity over time as they change independently",
+      "difficulty": "medium",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 0.8333,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_pf_03",
+      "ability": "PF",
+      "description": "Track properties across multiple parallel entity timelines",
+      "difficulty": "hard",
+      "queries_total": 5,
+      "queries_passed": 5,
+      "accuracy": 0.8333,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_sum_01",
+      "ability": "SUM",
+      "description": "Summarize the belief state of a single entity across multiple memories",
+      "difficulty": "medium",
+      "queries_total": 2,
+      "queries_passed": 2,
+      "accuracy": 1.0,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_sum_02",
+      "ability": "SUM",
+      "description": "Summarize a complex belief evolution with contradictions and resolutions",
+      "difficulty": "hard",
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 0.6667,
+      "avg_latency_ms": 0.2
+    },
+    {
+      "id": "beam_narrative_01",
+      "ability": "ALL",
+      "description": "End-to-end narrative: a complete belief timeline across multiple entities with temporal, counterfactual, and inference challenges",
+      "difficulty": "hard",
+      "queries_total": 8,
+      "queries_passed": 6,
+      "accuracy": 0.75,
+      "avg_latency_ms": 0.5
+    }
+  ],
+  "comparison": {
+    "standalone_bm25": 0.829,
+    "bm25_multi_query_fusion": 0.866,
+    "temporal_aware": 0.9024
+  }
+}

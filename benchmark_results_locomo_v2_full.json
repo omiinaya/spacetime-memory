@@ -1,0 +1,24 @@
+{
+  "benchmark": "LoCoMo v2",
+  "timestamp": 1785303360.7295175,
+  "model": "deepseek/deepseek-chat",
+  "report": {
+    "__primary__": {
+      "categories": [
+        "single-hop",
+        "temporal",
+        "multi-hop",
+        "open-domain"
+      ],
+      "total": 0,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "__overall__": {
+      "total": 0,
+      "correct": 0,
+      "accuracy": 0.0
+    }
+  },
+  "results": []
+}

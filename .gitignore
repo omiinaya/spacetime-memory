@@ -1,0 +1,50 @@
+*.egg-info/
+*.onnx
+*.pyc
+*.tsbuildinfo
+.spacetime/
+__pycache__/
+data/cache/
+data/control-db/
+data/dbs/
+data/logs/
+data/program-bytes/
+data/database_identity
+data/metadata.toml
+dist/
+model/
+node_modules/
+target/
+venv/
+.venv/
+.upstream-venv/
+build/
+.env
+coverage
+*.profraw
+.coverage
+data/
+
+# Helper scripts for writing test files via terminal
+_write_e2e*
+
+# Token files (contain secrets — load from env vars instead)
+scripts/.cron_identity_token
+scripts/.cron_jwt_token
+scripts/.replication_identity_token
+
+# Backup artifacts
+spacetime-memory-backup-*.json
+
+# Debug/junk scripts (should never be committed)
+debug_*.py
+batch_*.py
+_fix_*.py
+_migrate_*.py
+_patch_*.py
+e2e_*_check.py
+.hermes_tmp_*
+XXXXX_test_*.md
+
+# MkDocs build output
+site/

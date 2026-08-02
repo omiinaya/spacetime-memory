@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._session API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._session</h1>
+<pre>Help on module spacetime_memory.client._session in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._session - Session and agent step management mixin.
+
+CLASSES
+    builtins.object
+        SessionMixin
+    
+    class SessionMixin(builtins.object)
+     |  Spacetime-Memory session and agent step mixin.
+     |  
+     |  Provides Client methods related to sessions, session messages,
+     |  reasoning steps, and peer session lookups.
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  add_agent_step(self, session_id: 'str', workspace_id: 'str', step_type: 'str', content: 'str', summary: 'str' = '', parent_step_id: 'str' = '') -> 'dict[str, Any]'
+     |      Record an agent reasoning step (thought, action, tool_call, etc.).
+     |      
+     |      Calls the ``add_agent_step`` reducer to append a reasoning step to a
+     |      session's chain of thought.
+     |      
+     |      Args:
+     |          session_id: The session to attach the step to.
+     |          workspace_id: The workspace containing the session.
+     |          step_type: One of ``"thought"``, ``"action"``, ``"observation"``,
+     |              ``"tool_call"``, or ``"tool_result"``.
+     |          content: The step content (text or JSON).
+     |          summary: Optional short summary of the step.
+     |          parent_step_id: Optional parent step ID for chain-of-thought
+     |              linking.
+     |      
+     |      Returns:
+     |          The reducer status dict. On success the calling tool can extract
+     |          the created step id from the ``"id"`` key.
+     |  
+     |  create_session(self, workspace_id: 'str', session_id: 'str' = '', context: 'str' = '', metadata: 'dict | None' = None) -> 'dict'
+     |      Create a new session.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to create the session in.
+     |          session_id: Optional session ID (auto-generated if empty).
+     |          context: Optional session context.
+     |          metadata: Optional metadata dict.
+     |      
+     |      Returns:
+     |          The reducer status dict.
+     |  
+     |  delete_message(self, message_id: 'str') -> 'dict[str, Any]'
+     |      Call delete_message reducer to delete a message.
+     |  
+     |  delete_session_steps(self, session_id: 'str') -> 'dict[str, Any]'
+     |      Call delete_session_steps reducer to delete all agent steps for a session.
+     |  
+     |  get_peer_sessions(self, peer_id: 'str') -> 'list[dict[str, Any]]'
+     |      List sessions a peer has participated in.
+     |  
+     |  get_session_messages(self, session_id: 'str') -> 'list[dict[str, Any]]'
+     |      Retrieve messages for a session.
+     |  
+     |  get_session_steps(self, session_id: 'str') -> 'list[dict[str, Any]]'
+     |      Retrieve all reasoning steps for a session.
+     |      
+     |      Calls the ``get_session_steps`` reducer which writes to the
+     |      ``session_step_result`` table, then queries that table.
+     |      
+     |      Args:
+     |          session_id: The session to get steps for.
+     |      
+     |      Returns:
+     |          A list of step dicts ordered by creation time, each with keys:
+     |          query_hash, id, session_id, workspace_id, step_type, content,
+     |          summary, parent_step_id, created_at.
+     |  
+     |  join_session(self, session_id: 'str') -> 'dict'
+     |      Join an existing session.
+     |      
+     |      Args:
+     |          session_id: The session ID to join.
+     |      
+     |      Returns:
+     |          The reducer status dict.
+     |  
+     |  leave_session(self, session_id: 'str') -> 'dict'
+     |      Leave a session.
+     |      
+     |      Args:
+     |          session_id: The session ID to leave.
+     |      
+     |      Returns:
+     |          The reducer status dict.
+     |  
+     |  send_message(self, session_id: 'str', sender_id: 'str', content: 'str', content_type: 'str' = 'text', metadata_json: 'str' = '{}') -> 'dict[str, Any]'
+     |      Call send_message reducer to send a message in a session.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_session.py
+
+
+</pre>
+</body></html>

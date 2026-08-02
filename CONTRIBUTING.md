@@ -1,0 +1,307 @@
+# Contributing to Spacetime Memory
+
+Thank you for your interest in contributing to Spacetime Memory! This project is a multi-layer memory infrastructure for AI agents built on SpacetimeDB.
+
+## Table of Contents
+
+- [Code of Conduct](#code-of-conduct)
+- [How to Contribute](#how-to-contribute)
+- [Development Setup](#development-setup)
+- [Pull Request Process](#pull-request-process)
+- [Coding Standards](#coding-standards)
+- [AI Agent Contributors](#ai-agent-contributors)
+- [Getting Help](#getting-help)
+
+## Code of Conduct
+
+This project adheres to a simple principle: **be excellent to each other.** All contributors, whether human or AI, are expected to:
+
+- Use welcoming and inclusive language
+- Be respectful of differing viewpoints and experiences
+- Accept constructive criticism gracefully
+- Focus on what is best for the project
+- Show empathy towards other community members
+
+## How to Contribute
+
+### Reporting Bugs
+
+1. Check the [GitHub Issues](https://github.com/omiinaya/spacetime-memory/issues) for existing reports
+2. Use the bug report template
+3. Include: environment details (Python version, Rust version, SpacetimeDB version), steps to reproduce, expected vs actual behavior, logs if available
+
+### Suggesting Features
+
+1. Open a [feature request](https://github.com/omiinaya/spacetime-memory/issues/new)
+2. Describe the problem you're solving, not just your proposed solution
+3. Reference existing adapters or patterns if applicable
+
+### Submitting Changes
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-change`)
+3. Make your changes (see [Development Setup](#development-setup))
+4. Write or update tests
+5. Run the test suite
+6. Run linters
+7. Open a pull request against `dev`
+
+## Development Setup
+
+### Prerequisites
+
+- **Rust toolchain** (`cargo`, `rustup`) — install via [rustup.rs](https://rustup.rs/)
+- **SpacetimeDB CLI v2.6+** — install via `spacetime version upgrade` or download from [releases](https://github.com/clockworklabs/SpacetimeDB/releases)
+- **Python 3.10+** — check with `python --version`
+- **Node.js 18+** (optional, for frontend development)
+
+### Required Tools
+
+To run the full test suite, you need:
+- **make** — runs all build/test targets
+- **pytest** (Python) — `pip install pytest pytest-asyncio pytest-mock`
+- **vitest** (TypeScript/Frontend) — installed via `npm install` in `sdk/typescript/` and `client/`
+- **SpacetimeDB CLI v2.6+** — for integration tests and module publishing
+
+### Quick Start
+
+```bash
+git clone https://github.com/omiinaya/spacetime-memory.git
+cd spacetime-memory
+make setup                                            # Install SDK + build Rust module
+spacetime start --listen-addr 0.0.0.0:3001 &         # Start SpacetimeDB
+spacetime publish spacetime-memory -p server/spacetimedb/ --yes  # Deploy module
+make test-unit                                        # Verify setup
+```
+
+### Running Tests
+
+#### Python Tests
+
+```bash
+# Unit tests only — no STDB needed
+make test-unit
+
+# Full Python suite (unit + integration) — needs STDB on :3001
+make test
+
+# Specific test file
+cd sdk/python && python -m pytest tests/test_memories.py -v
+
+# Tests matching a keyword
+cd sdk/python && python -m pytest tests/ -k "export or pipeline or rbac" -v
+
+# Specific adapter test suite
+cd sdk/python && python -m pytest tests/ -k "mem0 or zep or graphiti" -v
+
+# Integration tests only — auto-builds module
+make test-integration
+```
+
+Use `-m unit` to skip integration tests (no STDB needed). The integration tests auto-publish the module via HTTP API and skip cleanly if no STDB is running.
+
+#### Rust Tests
+
+```bash
+# Rust unit tests (no STDB needed)
+cargo test --manifest-path server/spacetimedb/Cargo.toml
+
+# Or via make
+make test-rust
+```
+
+#### TypeScript SDK Tests
+
+```bash
+cd sdk/typescript
+npx vitest run          # Run all TS tests
+npx vitest run -- testNamePattern "mem0"  # Filter by test name
+```
+
+#### Frontend Tests
+
+```bash
+cd client
+npx vitest run          # Run frontend vitest tests
+npx vitest run -- testNamePattern "GraphViz"  # Specific component test
+
+# Or via make
+make test-frontend
+```
+
+#### End-to-End Smoke Test
+
+```bash
+make smoke              # Verifies full pipeline: STDB → module → SDK → search
+```
+
+### Frontend Development Workflow
+
+The frontend (`client/`) is built with **React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS**:
+
+```bash
+# Start Vite dev server (hot-reload)
+cd client
+npm install
+npm run dev              # → http://localhost:5173
+
+# Build for production
+npm run build
+
+# Run Playwright E2E tests (requires dev server running)
+npx playwright test
+
+# Lint and type-check
+npx tsc --noEmit
+npx eslint src/
+```
+
+The frontend uses the `callReducer`/`executeSql` API to communicate with SpacetimeDB. Pages are organized under `client/src/pages/` (36 pages total) with shared components in `client/src/components/` and `client/src/components/ui/` (shadcn primitives). The SpacetimeDB type bindings auto-generated by `spacetime generate` live in `client/src/lib/module-bindings/`.
+
+### JWT Key Rotation
+
+The project supports zero-downtime JWT signing key rotation. This enables
+changing the ECDSA P-256 key used to sign tokens without invalidating
+existing sessions or losing data.
+
+**Quick rotation** (generate + register + update symlinks):
+```bash
+python scripts/rotate-keys.py rotate --name "ecdsa-p256-2026-rotation-1"
+```
+
+**Step-by-step:**
+```bash
+# 1. Generate a new key pair
+python scripts/rotate-keys.py generate --name "ecdsa-p256-2026-rotation-1"
+# Note: this creates data/id_ecdsa_pkcs8_<kid>.pem + .pub
+
+# 2. Register it with the WASM module (this automatically retires the old key)
+python scripts/rotate-keys.py register --key-id <kid> --update-config
+
+# 3. Restart SpacetimeDB to pick up the new key path
+systemctl --user restart spacetimedb
+
+# 4. (Optional) Revoke the old key once all tokens have expired
+python scripts/rotate-keys.py revoke <old-kid>
+```
+
+**Key management commands:**
+| Command | Description |
+|---------|-------------|
+| `python scripts/rotate-keys.py list` | List all registered keys |
+| `python scripts/rotate-keys.py current` | Show current signing key |
+| `python scripts/rotate-keys.py revoke <kid>` | Revoke a compromised key |
+| `python scripts/rotate-keys.py purge` | Clean up expired keys |
+
+**Architecture:**
+- The WASM module stores all trusted signing keys in the `jwt_signing_key` table.
+- Only ONE key is ``is_current`` (used for signing new tokens).
+- Old keys remain ``is_trusted`` so previously-signed tokens continue to verify.
+- The `kid` JWT header identifies which key signed the token.
+- Once all tokens from the old key have expired, it can be retired.
+
+For detailed development instructions, see [AGENTS.md](AGENTS.md) (Development Guide section) or [`docs/development.md`](docs/development.md).
+
+### Available Make Targets
+
+| Target | Description |
+|--------|-------------|
+| `make help` | List all targets |
+| `make setup` | Full dev setup: install SDK + build Rust module |
+| `make install-sdk` | Install Python SDK in editable mode |
+| `make build-module` | Build Rust WASM module |
+| `make start-stdb` | Start SpacetimeDB standalone (background) |
+| `make test-unit` | Run unit tests (no STDB needed) |
+| `make test` | Run full test suite (unit + integration) |
+| `make test-integration` | Run integration tests (auto-publishes module) |
+| `make test-rust` | Run Rust unit tests |
+| `make test-frontend` | Run frontend vitest tests |
+| `make ci` | Run full local CI pipeline |
+| `make clean` | Clean build artifacts |
+| `make smoke` | Run end-to-end smoke test |
+
+## Pull Request Process
+
+1. **Ensure tests pass** — `make test-unit` at minimum. Run `make test` or `make ci` if you have a live SpacetimeDB.
+2. **Lint your code** — `ruff check .` for Python, `cargo fmt --check && cargo clippy` for Rust.
+3. **Update documentation** — update `AGENTS.md` (agent schema/development guide), `docs/`, or `README.md` as appropriate.
+4. **Add a CHANGELOG entry** (if applicable) — see `CHANGELOG.md` for format.
+5. **Open the PR** against `main` with a clear title and description:
+   - What does this change do?
+   - Why is it needed?
+   - How was it tested?
+   - Are there any breaking changes?
+6. **Address CI feedback** — the project runs 5 CI workflows (Rust, Rust Integration, Python SDK, TypeScript SDK, Python Integration). Ensure all pass before requesting review.
+
+## Coding Standards
+
+### Python
+
+- **PEP 8** enforced via [ruff](https://docs.astral.sh/ruff/) (line length 100, double quotes)
+- **Type hints** on all function signatures (`from __future__ import annotations`)
+- **Google-style docstrings** with `Args:`, `Returns:`, `Raises:`, `Example:`
+- **Import order**: standard library → third-party → local, one blank line between groups
+- **No bare `except:`** — catch specific exceptions
+- **No `print()` in production** — use structured logging via `configure_logging()`
+
+Configuration is in `sdk/python/pyproject.toml`.
+
+### Rust
+
+- **rustfmt** for formatting (`cargo fmt`)
+- **clippy** for linting (`cargo clippy`)
+- **All writes through reducers** — no raw SQL DML
+- **All reads through `query_table` reducer** for private tables
+- Use `ctx.timestamp` and `ctx.rng()` (not `SystemTime::now()` or `OsRng`)
+- Return `Result<(), String>` from all reducers
+
+### Commit Messages
+
+```
+<area>: <short imperative description>
+
+<optional body explaining what and why, not how>
+```
+
+Area prefixes: `cli`, `sdk(client)`, `sdk(compounder)`, `server(replication)`, `server(knowledge_graph)`, `docs`, `ci`, `docker`, etc.
+
+## AI Agent Contributors
+
+> *Spacetime Memory is designed for AI agents — it only makes sense that AI agents help build it too.*
+
+### Guidelines for AI Agents
+
+1. **Read AGENTS.md first.** It contains both the wiki/schema conventions and the full development guide. It's the single source of truth for agent-accessible documentation.
+
+2. **CLAUDE.md is a signpost only.** For detailed instructions, always refer to `AGENTS.md`. The CLAUDE.md file exists for IDE/agent tooling integration and contains critical rules and file references.
+
+3. **Be honest about what works.** If you cannot run tests because no SpacetimeDB instance is available, say so. If the Rust module doesn't compile, report the errors. Never fabricate build or test output.
+
+4. **Append to AGENTS.md, don't replace.** The development section is additive — it supplements the existing wiki/schema content. Both are essential.
+
+5. **Use `make` targets** for build, test, and CI operations. The Makefile is the single source of truth for these workflows.
+
+6. **Check CI first** before touching a file that has CI enforcement. The `.github/workflows/ci.yml` defines what gets validated on every PR.
+
+7. **Update documentation as you go.** If you add a new CLI command, document it in `cli/stmem.py`'s help text and in `AGENTS.md`'s CLI Tools table. If you add a new reducer, document the corresponding Python method.
+
+8. **Respect the adapter parity model.** When modifying a drop-in adapter, run `scripts/compare-upstream.py` (if available) to verify signature parity against the upstream library.
+
+### What AI Agents Should NOT Do
+
+- **Do not delete or restructure existing wiki/schema content in AGENTS.md** — the user-facing wiki documentation and the development guide serve different audiences. Append, don't restructure.
+- **Do not modify CI workflows** without explicitly validating the YAML syntax and understanding the full pipeline.
+- **Do not add dependencies** without updating `pyproject.toml`, `Cargo.toml`, or `setup.py` as appropriate.
+- **Do not commit generated/build artifacts** — anything in `target/`, `__pycache__/`, `*.egg-info/`, `node_modules/` should be in `.gitignore`.
+
+## Getting Help
+
+- **GitHub Issues** — bug reports and feature requests
+- **[AGENTS.md](AGENTS.md)** — agent wiki schema + development guide
+- **[README.md](README.md)** — project overview and quick start
+- **`docs/development.md`** — developer setup guide
+- **`Makefile`** — all available build/test targets
+
+---
+
+*By contributing, you agree that your contributions will be licensed under the MIT License.*

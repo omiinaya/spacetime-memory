@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._memories_tags API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._memories_tags</h1>
+<pre>Help on module spacetime_memory.client._memories_tags in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._memories_tags - Tag management mixin.
+
+CLASSES
+    builtins.object
+        TagMixin
+    
+    class TagMixin(builtins.object)
+     |  Spacetime-Memory tag management mixin.
+     |  
+     |  Provides Client methods related to memory tagging and organization.
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  batch_tag_memories(self, tag_id: 'str', memory_ids: 'list[str]') -> 'dict[str, Any]'
+     |      Batch-attach a tag to multiple memories in a single reducer call.
+     |      
+     |      Eliminates O(n) network round-trips for bulk tagging by sending all
+     |      memory IDs in one call to the ``batch_tag_memories`` reducer.
+     |      
+     |      Args:
+     |          tag_id: The tag to attach.
+     |          memory_ids: List of memory ID strings to tag. Already-tagged
+     |              memories are silently skipped (idempotent).
+     |      
+     |      Returns:
+     |          Dict with ``status``: ``"ok"`` on success.
+     |  
+     |  batch_untag_memories(self, tag_id: 'str', memory_ids: 'list[str]') -> 'dict[str, Any]'
+     |      Batch-remove a tag from multiple memories in a single reducer call.
+     |      
+     |      Eliminates O(n) network round-trips for bulk untagging by sending all
+     |      memory IDs in one call to the ``batch_untag_memories`` reducer.
+     |      
+     |      Args:
+     |          tag_id: The tag to detach.
+     |          memory_ids: List of memory ID strings to untag. Missing
+     |              associations are silently skipped (idempotent).
+     |      
+     |      Returns:
+     |          Dict with ``status``: ``"ok"`` on success.
+     |  
+     |  create_tag(self, workspace_id: 'str', name: 'str', color: 'str' = '#808080') -> 'None'
+     |      Create a new tag for organizing memories.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          name: Tag display name.
+     |          color: Hex color string (default: ``"#808080"``).
+     |  
+     |  delete_tag(self, tag_id: 'str') -> 'None'
+     |      Delete a tag and all its memory associations.
+     |      
+     |      Args:
+     |          tag_id: The tag ID to delete.
+     |  
+     |  list_tags(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      List all tags in a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          List of tag dicts with id, workspace_id, name, color, created_at.
+     |  
+     |  list_tags_by_memory(self, memory_id: 'str') -> 'list[dict[str, Any]]'
+     |      List all tags attached to a specific memory.
+     |      
+     |      Calls the ``list_tags_by_memory`` reducer which writes to the
+     |      ``memory_tag_result`` table, then queries that table.
+     |      
+     |      Args:
+     |          memory_id: The memory to look up tags for.
+     |      
+     |      Returns:
+     |          A list of dicts with keys: id, memory_id, tag_id, tag_name, tag_color.
+     |  
+     |  search_by_tags(self, workspace_id: 'str', tag_ids: 'list[str]', query: 'str' = '', limit: 'int' = 10) -> 'list[dict[str, Any]]'
+     |      Search memories by tag filter, optionally with semantic ranking.
+     |      
+     |      Only memories that have ALL specified tags are returned (intersection).
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          tag_ids: List of tag IDs to filter by (AND intersection).
+     |          query: Optional query string for semantic ranking. Pass empty
+     |              string to skip semantic similarity (results ordered by recency).
+     |          limit: Maximum number of results.
+     |      
+     |      Returns:
+     |          List of hybrid_result rows matching all tags, sorted by
+     |          relevance (if query provided) or recency.
+     |  
+     |  tag_memory(self, memory_id: 'str', tag_id: 'str') -> 'None'
+     |      Attach a tag to a memory.
+     |      
+     |      Args:
+     |          memory_id: The memory to tag.
+     |          tag_id: The tag to attach.
+     |  
+     |  untag_memory(self, memory_id: 'str', tag_id: 'str') -> 'None'
+     |      Remove a tag from a memory.
+     |      
+     |      Args:
+     |          memory_id: The tagged memory.
+     |          tag_id: The tag to detach.
+     |  
+     |  update_tag(self, tag_id: 'str', name: 'str' = '', color: 'str' = '#808080') -> 'None'
+     |      Update a tag's name and/or color.
+     |      
+     |      Args:
+     |          tag_id: The tag ID to update.
+     |          name: New display name (empty string leaves unchanged).
+     |          color: New hex color string.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_memories_tags.py
+
+
+</pre>
+</body></html>

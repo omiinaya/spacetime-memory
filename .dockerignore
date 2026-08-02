@@ -1,0 +1,17 @@
+.git/
+.gitignore
+client/node_modules/
+server/spacetimedb/target/
+server/embedder/target/
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+data/cache/
+data/control-db/
+data/dbs/
+data/logs/
+data/program-bytes/
+data/database_identity
+data/metadata.toml
+*.onnx

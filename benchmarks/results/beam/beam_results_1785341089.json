@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "benchmark": "beam",
+    "pipeline": "bm25",
+    "judge_model": "deepseek/deepseek-chat",
+    "total_questions": 0,
+    "timestamp": "2026-07-29T12:04:49.097056"
+  },
+  "metrics": {
+    "overall": {
+      "total": 0,
+      "correct": 0,
+      "accuracy": 0
+    },
+    "by_ability": {}
+  },
+  "results": []
+}

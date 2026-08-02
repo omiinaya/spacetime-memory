@@ -1,0 +1,9 @@
+{
+  "pipeline": "stdb",
+  "metrics": {
+    "P@5": 47.19,
+    "R@5": 92.4,
+    "queries": 64
+  },
+  "timestamp": 1785558464.1464312
+}

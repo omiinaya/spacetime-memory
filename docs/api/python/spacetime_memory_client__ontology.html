@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._ontology API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._ontology</h1>
+<pre>Help on module spacetime_memory.client._ontology in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._ontology - Ontology management module — Graphiti parity.
+
+DESCRIPTION
+    Provides a type hierarchy and relationship type system for knowledge graph
+    entities. Extends the existing KG infrastructure with:
+    
+    - Entity type hierarchy (e.g. Person > Employee > Manager)
+    - Relationship type definitions with constraints (source_type, target_type,
+      allowed predicates)
+    - Schema validation for nodes and edges against the ontology
+    - Namespace management for organising ontologies
+    - Search recipe definitions (named search configurations)
+    - Saga tracking — long-running KG operations with rollback
+    
+    All data is stored via structured entries in the workspace's memory/directive
+    infrastructure, with client-side logic providing validation and processing.
+
+CLASSES
+    builtins.object
+        EntityTypeDefinition
+        OntologyMixin
+        RelationTypeDefinition
+        Saga
+        SagaStep
+        SearchRecipe
+    
+    class EntityTypeDefinition(builtins.object)
+     |  EntityTypeDefinition(id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', parent_type: 'str' = '', properties: 'list[str]' = <factory>, description: 'str' = '', namespace: 'str' = '', created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |  
+     |  Definition of an entity type in the ontology hierarchy.
+     |  
+     |  Attributes:
+     |      id: Unique identifier.
+     |      workspace_id: The workspace this type belongs to.
+     |      name: Human-readable type name (e.g. "Person", "Employee").
+     |      parent_type: Optional parent type name for hierarchy (e.g. "Person").
+     |      properties: List of allowed property key names for this type.
+     |      description: Free-text description.
+     |      namespace: Optional namespace for organising ontologies.
+     |      created_at: Unix micros timestamp.
+     |      updated_at: Unix micros timestamp.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', parent_type: 'str' = '', properties: 'list[str]' = <factory>, description: 'str' = '', namespace: 'str' = '', created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_storage_dict(self) -> 'dict[str, Any]'
+     |      Serialise to a dict for storage in the ontology entry table.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |  
+     |  from_storage_dict(row: 'dict[str, Any]') -> "'EntityTypeDefinition'" from builtins.type
+     |      Parse an EntityTypeDefinition from a storage row.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'created_at': 'int', 'description': 'str', 'id': 's...
+     |  
+     |  __dataclass_fields__ = {'created_at': Field(name='created_at',type='in...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('id', 'workspace_id', 'name', 'parent_type', 'proper...
+     |  
+     |  created_at = 0
+     |  
+     |  description = ''
+     |  
+     |  id = ''
+     |  
+     |  name = ''
+     |  
+     |  namespace = ''
+     |  
+     |  parent_type = ''
+     |  
+     |  updated_at = 0
+     |  
+     |  workspace_id = ''
+    
+    class OntologyMixin(builtins.object)
+     |  Spacetime-Memory ontology mixin.
+     |  
+     |  Provides Client methods for ontology management — entity type hierarchy,
+     |  relation types with constraints, schema validation, namespaces, search
+     |  recipes, and saga tracking.
+     |  
+     |  Inherits from ClientBase for connection infrastructure.  Data is stored
+     |  either via backend reducers (when available) or in an internal dict.
+     |  
+     |  Methods defined here:
+     |  
+     |  complete_saga_step(self, saga_id: 'str', step_name: 'str', result: 'Any' = None) -> 'dict[str, Any]'
+     |      Mark a step within a saga as completed.
+     |      
+     |      Args:
+     |          saga_id: The saga ID.
+     |          step_name: The name of the step to complete.
+     |          result: Optional result data to store with the step.
+     |      
+     |      Returns:
+     |          Dict with reducer response status.
+     |  
+     |  create_entity_type(self, workspace_id: 'str', name: 'str', parent_type: 'str' = '', properties: 'list[str] | None' = None, description: 'str' = '', namespace: 'str' = '') -> 'dict[str, Any]'
+     |      Create a new entity type in the ontology hierarchy.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          name: Type name (e.g. "Employee").
+     |          parent_type: Optional parent type name (e.g. "Person").
+     |          properties: List of allowed property key names.
+     |          description: Free-text description.
+     |          namespace: Optional namespace for organising ontologies.
+     |      
+     |      Returns:
+     |          Dict with ``status`` and ``id`` keys.
+     |  
+     |  create_relation_type(self, workspace_id: 'str', name: 'str', source_types: 'list[str] | None' = None, target_types: 'list[str] | None' = None, properties: 'list[str] | None' = None, description: 'str' = '', namespace: 'str' = '') -> 'dict[str, Any]'
+     |      Create a new relationship type with source/target constraints.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          name: Relationship type name (e.g. "reports_to", "works_at").
+     |          source_types: List of allowed source entity type names.
+     |          target_types: List of allowed target entity type names.
+     |          properties: List of allowed property key names for edges.
+     |          description: Free-text description.
+     |          namespace: Optional namespace for organising ontologies.
+     |      
+     |      Returns:
+     |          Dict with ``status`` and ``id`` keys.
+     |  
+     |  create_saga(self, workspace_id: 'str', name: 'str', steps: 'list[dict[str, Any]] | None' = None) -> 'dict[str, Any]'
+     |      Create a new saga for tracking a multi-step KG operation.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          name: Human-readable name (e.g. "import_contacts_batch").
+     |          steps: Optional list of step dicts, each with ``name`` and
+     |              ``action`` keys.
+     |      
+     |      Returns:
+     |          Dict with ``status`` and ``id`` keys.
+     |  
+     |  create_search_recipe(self, workspace_id: 'str', name: 'str', search_params: 'dict[str, Any] | None' = None, description: 'str' = '') -> 'dict[str, Any]'
+     |      Create a named search configuration (recipe).
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          name: Human-readable name (e.g. "recent_concepts").
+     |          search_params: Dict of search parameters such as ``query``,
+     |              ``limit``, ``filters``, ``search_type``, etc.
+     |          description: Free-text description.
+     |      
+     |      Returns:
+     |          Dict with ``status`` and ``id`` keys.
+     |  
+     |  delete_entity_type(self, type_id: 'str') -> 'dict[str, Any]'
+     |      Delete an entity type by its ID.
+     |      
+     |      Args:
+     |          type_id: The entity type ID.
+     |      
+     |      Returns:
+     |          Dict with reducer response status.
+     |  
+     |  delete_relation_type(self, type_id: 'str') -> 'dict[str, Any]'
+     |      Delete a relation type by its ID.
+     |      
+     |      Args:
+     |          type_id: The relation type ID.
+     |      
+     |      Returns:
+     |          Dict with reducer response status.
+     |  
+     |  get_entity_type(self, type_id: 'str') -> 'dict[str, Any] | None'
+     |      Get an entity type definition by its ID.
+     |      
+     |      Args:
+     |          type_id: The entity type ID.
+     |      
+     |      Returns:
+     |          Entity type dict, or ``None`` if not found.
+     |  
+     |  get_relation_type(self, type_id: 'str') -> 'dict[str, Any] | None'
+     |      Get a relation type definition by its ID.
+     |      
+     |      Args:
+     |          type_id: The relation type ID.
+     |      
+     |      Returns:
+     |          Relation type dict, or ``None`` if not found.
+     |  
+     |  get_saga(self, saga_id: 'str') -> 'dict[str, Any] | None'
+     |      Get a saga by its ID.
+     |      
+     |      Args:
+     |          saga_id: The saga ID.
+     |      
+     |      Returns:
+     |          Saga dict, or ``None`` if not found.
+     |  
+     |  get_search_recipe(self, recipe_id: 'str') -> 'dict[str, Any] | None'
+     |      Get a search recipe by its ID.
+     |      
+     |      Args:
+     |          recipe_id: The search recipe ID.
+     |      
+     |      Returns:
+     |          Search recipe dict, or ``None`` if not found.
+     |  
+     |  list_entity_types(self, workspace_id: 'str', parent_type: 'str | None' = None) -> 'list[dict[str, Any]]'
+     |      List entity types in a workspace, optionally filtered by parent.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          parent_type: If set, only return types with this parent.
+     |      
+     |      Returns:
+     |          List of entity type dicts.
+     |  
+     |  list_relation_types(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      List all relation types in a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          List of relation type dicts.
+     |  
+     |  list_sagas(self, workspace_id: 'str', status: 'str | None' = None) -> 'list[dict[str, Any]]'
+     |      List sagas in a workspace, optionally filtered by status.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          status: If set, only return sagas with this status
+     |              (e.g. ``"active"``, ``"completed"``, ``"rolled_back"``).
+     |      
+     |      Returns:
+     |          List of saga dicts.
+     |  
+     |  rollback_saga(self, saga_id: 'str') -> 'dict[str, Any]'
+     |      Mark a saga as rolled back.
+     |      
+     |      Sets the saga status to ``"rolled_back"`` and all pending steps to
+     |      ``"rolled_back"``.
+     |      
+     |      Args:
+     |          saga_id: The saga ID.
+     |      
+     |      Returns:
+     |          Dict with reducer response status.
+     |  
+     |  search_with_recipe(self, workspace_id: 'str', query: 'str', recipe_name: 'str') -> 'list[dict[str, Any]]'
+     |      Execute a search using a named recipe.
+     |      
+     |      Looks up the recipe by name in the workspace, then calls
+     |      ``client.search()`` with the recipe's parameters merged with
+     |      the provided query.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          query: The search query string.
+     |          recipe_name: Name of the search recipe to use.
+     |      
+     |      Returns:
+     |          List of search result dicts.
+     |  
+     |  validate_edge(self, edge_data: 'dict[str, Any]', relation_type: 'str', workspace_id: 'str' = '') -> 'dict[str, Any]'
+     |      Validate a KG edge against a relation type definition.
+     |      
+     |      Checks:
+     |      - The relation type exists in the workspace ontology.
+     |      - Source and target node types match the constraints (if available).
+     |      - Unknown properties generate warnings.
+     |      
+     |      Args:
+     |          edge_data: The edge data dict (keys like ``relation``,
+     |              ``source_node_id``, ``target_node_id``, plus custom properties).
+     |          relation_type: The relation type name to validate against.
+     |          workspace_id: Target workspace (required for ontology lookup).
+     |      
+     |      Returns:
+     |          Dict with ``valid`` (bool), ``errors`` (list), ``warnings`` (list).
+     |  
+     |  validate_node(self, node_data: 'dict[str, Any]', entity_type: 'str', workspace_id: 'str' = '') -> 'dict[str, Any]'
+     |      Validate a KG node against an entity type definition.
+     |      
+     |      Checks:
+     |      - The entity type exists in the workspace ontology.
+     |      - All keys in *node_data* are allowed properties for that type
+     |        (plus standard KG fields like ``label``, ``summary``, ``id``).
+     |      - Unknown properties generate warnings.
+     |      
+     |      Args:
+     |          node_data: The node data dict (keys like ``label``, ``summary``,
+     |              plus custom properties).
+     |          entity_type: The entity type name to validate against.
+     |          workspace_id: Target workspace (required for ontology lookup).
+     |      
+     |      Returns:
+     |          Dict with ``valid`` (bool), ``errors`` (list), ``warnings`` (list).
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+    
+    class RelationTypeDefinition(builtins.object)
+     |  RelationTypeDefinition(id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', source_types: 'list[str]' = <factory>, target_types: 'list[str]' = <factory>, properties: 'list[str]' = <factory>, description: 'str' = '', namespace: 'str' = '', created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |  
+     |  Definition of a relationship type in the ontology.
+     |  
+     |  Attributes:
+     |      id: Unique identifier.
+     |      workspace_id: The workspace this relation type belongs to.
+     |      name: Human-readable name (e.g. "reports_to", "works_at").
+     |      source_types: List of allowed source entity type names.
+     |      target_types: List of allowed target entity type names.
+     |      properties: List of allowed property key names for edges of this type.
+     |      description: Free-text description.
+     |      namespace: Optional namespace for organising ontologies.
+     |      created_at: Unix micros timestamp.
+     |      updated_at: Unix micros timestamp.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', source_types: 'list[str]' = <factory>, target_types: 'list[str]' = <factory>, properties: 'list[str]' = <factory>, description: 'str' = '', namespace: 'str' = '', created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_storage_dict(self) -> 'dict[str, Any]'
+     |      Serialise to a dict for storage in the ontology entry table.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |  
+     |  from_storage_dict(row: 'dict[str, Any]') -> "'RelationTypeDefinition'" from builtins.type
+     |      Parse a RelationTypeDefinition from a storage row.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'created_at': 'int', 'description': 'str', 'id': 's...
+     |  
+     |  __dataclass_fields__ = {'created_at': Field(name='created_at',type='in...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('id', 'workspace_id', 'name', 'source_types', 'targe...
+     |  
+     |  created_at = 0
+     |  
+     |  description = ''
+     |  
+     |  id = ''
+     |  
+     |  name = ''
+     |  
+     |  namespace = ''
+     |  
+     |  updated_at = 0
+     |  
+     |  workspace_id = ''
+    
+    class Saga(builtins.object)
+     |  Saga(id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', steps: 'list[SagaStep]' = <factory>, status: 'str' = 'active', created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |  
+     |  Tracks a multi-step KG operation with rollback support.
+     |  
+     |  Attributes:
+     |      id: Unique identifier.
+     |      workspace_id: The workspace this saga belongs to.
+     |      name: Human-readable name (e.g. "import_contacts_batch").
+     |      steps: List of SagaStep instances.
+     |      status: One of "active", "completed", "rolled_back", "failed".
+     |      created_at: Unix micros timestamp.
+     |      updated_at: Unix micros timestamp.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', steps: 'list[SagaStep]' = <factory>, status: 'str' = 'active', created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_storage_dict(self) -> 'dict[str, Any]'
+     |      Serialise to a dict for storage.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |  
+     |  from_storage_dict(row: 'dict[str, Any]') -> "'Saga'" from builtins.type
+     |      Parse a Saga from a storage row.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'created_at': 'int', 'id': 'str', 'name': 'str', 's...
+     |  
+     |  __dataclass_fields__ = {'created_at': Field(name='created_at',type='in...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('id', 'workspace_id', 'name', 'steps', 'status', 'cr...
+     |  
+     |  created_at = 0
+     |  
+     |  id = ''
+     |  
+     |  name = ''
+     |  
+     |  status = 'active'
+     |  
+     |  updated_at = 0
+     |  
+     |  workspace_id = ''
+    
+    class SagaStep(builtins.object)
+     |  SagaStep(name: 'str' = '', action: 'str' = '', result: 'Any' = None, status: 'str' = 'pending', created_at: 'int' = 0) -> None
+     |  
+     |  A single step within a saga.
+     |  
+     |  Attributes:
+     |      name: Step name (unique within the saga).
+     |      action: Description of the action performed.
+     |      result: JSON-serialisable result or status of the step.
+     |      status: One of "pending", "completed", "failed", "rolled_back".
+     |      created_at: Unix micros timestamp.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, name: 'str' = '', action: 'str' = '', result: 'Any' = None, status: 'str' = 'pending', created_at: 'int' = 0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'action': 'str', 'created_at': 'int', 'name': 'str'...
+     |  
+     |  __dataclass_fields__ = {'action': Field(name='action',type='str',defau...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('name', 'action', 'result', 'status', 'created_at')
+     |  
+     |  action = ''
+     |  
+     |  created_at = 0
+     |  
+     |  name = ''
+     |  
+     |  result = None
+     |  
+     |  status = 'pending'
+    
+    class SearchRecipe(builtins.object)
+     |  SearchRecipe(id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', search_params: 'dict[str, Any]' = <factory>, description: 'str' = '', created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |  
+     |  A named search configuration.
+     |  
+     |  Attributes:
+     |      id: Unique identifier.
+     |      workspace_id: The workspace this recipe belongs to.
+     |      name: Human-readable name (e.g. "recent_concepts", "kg_semantic_search").
+     |      search_params: Dict of search parameters (query, limit, filters, etc.).
+     |      description: Free-text description.
+     |      created_at: Unix micros timestamp.
+     |      updated_at: Unix micros timestamp.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', search_params: 'dict[str, Any]' = <factory>, description: 'str' = '', created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_storage_dict(self) -> 'dict[str, Any]'
+     |      Serialise to a dict for storage.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |  
+     |  from_storage_dict(row: 'dict[str, Any]') -> "'SearchRecipe'" from builtins.type
+     |      Parse a SearchRecipe from a storage row.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'created_at': 'int', 'description': 'str', 'id': 's...
+     |  
+     |  __dataclass_fields__ = {'created_at': Field(name='created_at',type='in...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('id', 'workspace_id', 'name', 'search_params', 'desc...
+     |  
+     |  created_at = 0
+     |  
+     |  description = ''
+     |  
+     |  id = ''
+     |  
+     |  name = ''
+     |  
+     |  updated_at = 0
+     |  
+     |  workspace_id = ''
+
+DATA
+    __annotations__ = {'_ONTO_STORE': 'dict[str, dict[str, Any]]'}
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_ontology.py
+
+
+</pre>
+</body></html>

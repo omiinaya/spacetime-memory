@@ -1,0 +1,476 @@
+{
+  "benchmark": "LongMemEval",
+  "method": "in-process BM25 + multi-query fusion",
+  "split": "s",
+  "questions": 50,
+  "overall": {
+    "hits": 50,
+    "total": 50,
+    "recall_at_all_5": 1.0
+  },
+  "per_type": {
+    "single-session-user": {
+      "hits": 50,
+      "total": 50,
+      "recall": 100.0
+    }
+  },
+  "reference_scores": {
+    "Mnemosyne": 98.9,
+    "Mempalace": 96.6
+  },
+  "beats_reference": true,
+  "total_time_s": 5.1,
+  "details": {
+    "e47becba": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 53,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What degree did I graduate with?"
+    },
+    "118b2229": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 45,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How long is my daily commute to work?"
+    },
+    "51a45a95": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where did I redeem a $5 coupon on coffee creamer?"
+    },
+    "58bf7951": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 57,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What play did I attend at the local community theater?"
+    },
+    "1e043500": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What is the name of the playlist I created on Spotify?"
+    },
+    "c5e8278d": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 44,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What was my last name before I changed it?"
+    },
+    "6ade9755": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 51,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where do I take yoga classes?"
+    },
+    "6f9b354f": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What color did I repaint my bedroom walls?"
+    },
+    "58ef2f1c": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "When did I volunteer at the local animal shelter's fundraising dinner?"
+    },
+    "f8c5f88b": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 46,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where did I buy my new tennis racket from?"
+    },
+    "5d3d2817": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 53,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What was my previous occupation?"
+    },
+    "7527f7e2": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 45,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How much did I spend on a designer handbag?"
+    },
+    "c960da58": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 46,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How many playlists do I have on Spotify?"
+    },
+    "3b6f954b": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where did I attend for my study abroad program?"
+    },
+    "726462e0": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 48,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What was the discount I got on my first purchase from the new clothing brand?"
+    },
+    "94f70d80": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 49,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How long did it take me to assemble the IKEA bookshelf?"
+    },
+    "66f24dbb": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What did I buy for my sister's birthday gift?"
+    },
+    "ad7109d1": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 44,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What speed is my new internet plan?"
+    },
+    "af8d2e46": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How many shirts did I pack for my 5-day trip to Costa Rica?"
+    },
+    "dccbc061": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 49,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What was my previous stance on spirituality?"
+    },
+    "c8c3f81d": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 52,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What brand are my favorite running shoes?"
+    },
+    "8ebdbe50": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 48,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What certification did I complete last month?"
+    },
+    "6b168ec8": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How many bikes do I own?"
+    },
+    "75499fd8": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 52,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What breed is my dog?"
+    },
+    "21436231": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How many largemouth bass did I catch on my fishing trip to Lake Michigan?"
+    },
+    "95bcc1c8": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 46,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How many amateur comedians did I watch perform at the open mic night?"
+    },
+    "0862e8bf": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 50,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What is the name of my cat?"
+    },
+    "853b0a1d": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 52,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How old was I when my grandma gave me the silver necklace?"
+    },
+    "a06e4cfe": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 53,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What is my preferred gin-to-vermouth ratio for a classic gin martini?"
+    },
+    "37d43f65": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 49,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How much RAM did I upgrade my laptop to?"
+    },
+    "b86304ba": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 41,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How much is the painting of a sunset worth in terms of the amount I paid for it?"
+    },
+    "d52b4f67": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 52,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where did I attend my cousin's wedding?"
+    },
+    "25e5aa4f": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 45,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where did I complete my Bachelor's degree in Computer Science?"
+    },
+    "caf9ead2": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 43,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How long did it take to move to the new apartment?"
+    },
+    "8550ddae": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 42,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What type of cocktail recipe did I try last weekend?"
+    },
+    "60d45044": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 51,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What type of rice is my favorite?"
+    },
+    "3f1e9474": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 52,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Who did I have a conversation with about destiny?"
+    },
+    "86b68151": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 47,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where did I buy my new bookshelf from?"
+    },
+    "577d4d32": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 46,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What time do I stop checking work emails and messages?"
+    },
+    "ec81a493": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 51,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How many copies of my favorite artist's debut album were released worldwide?"
+    },
+    "15745da0": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 47,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How long have I been collecting vintage cameras?"
+    },
+    "e01b8e2f": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 53,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where did I go on a week-long trip with my family?"
+    },
+    "bc8a6e93": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 48,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What did I bake for my niece's birthday party?"
+    },
+    "ccb36322": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 46,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What is the name of the music streaming service have I been using lately?"
+    },
+    "001be529": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 51,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How long did I wait for the decision on my asylum application?"
+    },
+    "b320f3f8": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 46,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What type of action figure did I buy from a thrift store?"
+    },
+    "19b5f2b3": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 43,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How long was I in Japan for?"
+    },
+    "4fd1909e": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 55,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "Where did I attend the Imagine Dragons concert?"
+    },
+    "545bd2b5": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 44,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "How much screen time have I been averaging on Instagram per day?"
+    },
+    "8a137a7f": {
+      "question_type": "single-session-user",
+      "n_haystack_sessions": 51,
+      "n_answer_sessions": 1,
+      "found_in_top5": 1,
+      "all_found": true,
+      "n_variants": 3,
+      "query": "What type of bulb did I replace in my bedside lamp?"
+    }
+  }
+}

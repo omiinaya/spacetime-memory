@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._memories API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._memories</h1>
+<pre>Help on module spacetime_memory.client._memories in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._memories - Memory storage, search, and management mixin.
+
+CLASSES
+    builtins.object
+        MemoryMixin
+    
+    class MemoryMixin(builtins.object)
+     |  Spacetime-Memory memory mixin.
+     |  
+     |  Provides Client methods related to memory management.
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  auto_invalidate(self, old_memory_id: 'str', new_memory_id: 'str') -> 'dict[str, Any]'
+     |      Auto-invalidate an old memory fact in favor of a new contradictory fact.
+     |      
+     |      This sets ``valid_to`` on the old memory and leaves the new memory active.
+     |      
+     |      Args:
+     |          old_memory_id: ID of the memory to be invalidated.
+     |          new_memory_id: ID of the new memory that supersedes it.
+     |      
+     |      Returns:
+     |          The reducer response dict.
+     |  
+     |  batch_delete_memories(self, workspace_id: 'str', memory_ids: 'list[str]') -> 'dict[str, Any]'
+     |      Batch-deactivate multiple memories in a single reducer call.
+     |      
+     |      Much faster than N sequential ``delete_memory()`` calls because it
+     |      sends all IDs in one network round-trip to the
+     |      ``batch_delete_memories`` reducer.
+     |      
+     |      Parameters
+     |      ----------
+     |      workspace_id:
+     |          Target workspace for scoping access control.
+     |      memory_ids:
+     |          List of memory ID strings to deactivate. Missing IDs are
+     |          silently skipped (idempotent).
+     |      
+     |      Returns
+     |      -------
+     |      Dict with ``status``: ``"ok"`` on success.
+     |  
+     |  delete_memory(self, memory_id: 'str') -> 'dict[str, Any]'
+     |      Deactivate a memory. Idempotent -- succeeds if already deleted.
+     |  
+     |  escalate_memories(self, workspace_id: 'str', l2_to_l1: 'int' = 5, l1_to_l0: 'int' = 20) -> 'dict[str, Any]'
+     |      Batch-escalate memory tiers based on access_count thresholds.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to escalate memories in.
+     |          l2_to_l1: Access count threshold for L2→L1 escalation (default: 5).
+     |          l1_to_l0: Access count threshold for L1→L0 escalation (default: 20).
+     |  
+     |  fuzzy_get(self, workspace_id: 'str', name: 'str', *, field: 'str' = 'content', threshold: 'float' = 0.5, limit: 'int' = 50) -> 'dict[str, Any] | None'
+     |      Find the closest-matching memory by string similarity (QMD parity).
+     |      
+     |      Fetches up to *limit* memories from the workspace and uses
+     |      ``difflib.SequenceMatcher`` to find the one whose *field* value is
+     |      most similar to *name*.
+     |      
+     |      Returns the best match if similarity >= *threshold*, otherwise
+     |      ``None``.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to search.
+     |          name: The target name to fuzzy-match against.
+     |          field: Which memory field to compare (default ``"content"``).
+     |          threshold: Minimum similarity ratio (0.0-1.0, default 0.5).
+     |          limit: Max memories to scan (default 50).
+     |  
+     |  get_context_chain(self, memory_id: 'str') -> 'dict[str, Any]'
+     |      Return the context chain for a memory: workspace context + memory context.
+     |  
+     |  get_memory(self, memory_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get a single memory by ID.  Auto-reinforces on read.
+     |  
+     |  get_memory_images(self, memory_id: 'str') -> 'list[dict[str, Any]]'
+     |      Retrieve images associated with a memory.
+     |      
+     |      Parses the memory's context field for the ``__images__:`` prefix
+     |      and returns the parsed JSON array of image objects.
+     |      
+     |      Args:
+     |          memory_id: The memory ID to retrieve images for.
+     |      
+     |      Returns:
+     |          A list of image dicts with ``url`` and ``alt_text`` keys,
+     |          or an empty list if no images are found.
+     |  
+     |  get_user_memories(self, user_scope: 'str', workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get all memories scoped to a specific user within a workspace.
+     |      
+     |      Calls the ``get_user_memories`` reducer which populates the
+     |      ``user_memory_result`` table, then reads from it.
+     |      
+     |      Args:
+     |          user_scope: The user identity hash to filter by.
+     |          workspace_id: The workspace to search in.
+     |      
+     |      Returns:
+     |          List of memory records scoped to the given user.
+     |  
+     |  glob_get(self, workspace_id: 'str', pattern: 'str', *, field: 'str' = 'id', limit: 'int' = 200) -> 'list[dict[str, Any]]'
+     |      Return all memories matching a glob pattern (QMD parity).
+     |      
+     |      Uses ``fnmatch``-style wildcards (``*``, ``?``, ``[...]``) against
+     |      the specified *field*.  Example::
+     |      
+     |          c.glob_get("ws-1", "auth-*")      # IDs starting with "auth-"
+     |          c.glob_get("ws-1", "auth-*", field="content")  # content match
+     |      
+     |      Args:
+     |          workspace_id: The workspace to search.
+     |          pattern: Glob pattern (e.g. ``"journals/2025-05*"``,
+     |                   ``"*auth*"``).
+     |          field: Which memory field to match against (default ``"id"``).
+     |          limit: Max memories to scan (default 200).
+     |      
+     |      Returns:
+     |          List of matching memory dicts (empty list if none match).
+     |  
+     |  list_memories(self, workspace_id: 'str', memory_type: 'str' = '', limit: 'int' = 50) -> 'list[dict[str, Any]]'
+     |      List active memories in a workspace.
+     |  
+     |  rate_memory(self, memory_id: 'str', rating: 'str', peer_id: 'str') -> 'dict[str, Any]'
+     |      Rate a memory to adjust its trust score.
+     |      
+     |      Args:
+     |          memory_id: The memory to rate.
+     |          rating: "helpful" (score 5), "unhelpful" (score 1),
+     |                  or an integer string "1"-"5" for graded feedback.
+     |          peer_id: The peer submitting the rating.
+     |  
+     |  reinforce(self, memory_id: 'str') -> 'dict[str, Any]'
+     |      Reinforce a memory (bump access_count + strength).
+     |  
+     |  set_memory_context(self, memory_id: 'str', context: 'str') -> 'dict[str, Any]'
+     |      Attach a context string to a memory for QMD-style context trees.
+     |  
+     |  set_memory_scope(self, memory_id: 'str', user_scope: 'str') -> 'dict[str, Any]'
+     |      Scope an existing memory to a specific user identity for isolation.
+     |      
+     |      Parameters
+     |      ----------
+     |      memory_id:
+     |          The UUID of the memory to scope.
+     |      user_scope:
+     |          The user identity hash to scope the memory to. Pass empty string
+     |          to make the memory shared/unscoped.
+     |  
+     |  set_workspace_context(self, workspace_id: 'str', context: 'str') -> 'dict[str, Any]'
+     |      Attach a context string to a workspace for QMD-style context trees.
+     |  
+     |  store(self, workspace_id: 'str', content: 'str' = '', summary: 'str' = '', memory_type: 'str' = 'experience', peer_id: 'str' = '', observer_id: 'str' = '', entities_json: 'str' = '[]', confidence: 'float' = 0.8, source_session_id: 'str' = '', source_message_id: 'str' = '', tier: 'str' = '', veracity_tier: 'str' = '', veracity_sources: 'int' = 1, images_json: 'str' = '', images: 'str | list[str] | None' = None, dedup: 'bool' = False, dedup_threshold: 'float' = 0.95) -> 'dict[str, Any]'
+     |      Store a memory. Auto-indexes via the embedder.
+     |      
+     |      Args:
+     |          veracity_tier: Mnemosyne veracity tier -- one of "stated",
+     |              "unknown", "inferred", "imported", "tool". Overrides
+     |              ``confidence`` using Bayesian compounding.
+     |          veracity_sources: Number of independent confirmations of
+     |              this fact (default 1 = no compounding). Used with
+     |              ``veracity_tier`` to compute compounded confidence.
+     |          images_json: JSON string of image attachments to associate
+     |              with this memory (e.g., URLs or base64 data URIs).
+     |              Stored in the ``context`` field.  Pass "" (default)
+     |              to store no images.
+     |          dedup: Zero-scheduler dedup-on-write. When True, run a semantic
+     |              duplicate check before inserting; if a near-duplicate
+     |              (similarity >= ``dedup_threshold``) exists in the workspace,
+     |              reinforce it and return ``{"status": "reinforced", ...}``
+     |              instead of inserting a duplicate.
+     |          dedup_threshold: Cosine similarity threshold for dedup (0.95
+     |              catches near-verbatim duplicates only).
+     |      
+     |      Returns:
+     |          Dict with at least ``id`` — the real memory id (resolved from the
+     |          reducer-written ``memory_insert_result`` table, with a
+     |          content-match fallback).
+     |  
+     |  store_batch(self, workspace_id: 'str', items: 'list[dict[str, Any]]') -> 'list[dict[str, Any]]'
+     |      Store multiple memories in a single reducer call.
+     |      
+     |      Embeds all items in one batch call to the embedder, then sends a
+     |      single ``store_memory_batch`` reducer with all items.  Much faster
+     |      than N sequential ``store()`` calls when the embedder sidecar is
+     |      the bottleneck.
+     |      
+     |      After the STDB reducer, indexes all items into the Tantivy BM25
+     |      sidecar in a single batch HTTP call (``/index/batch``) instead of
+     |      N sequential calls.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace UUID.
+     |          items: List of dicts, each with:
+     |              - ``content`` (str, required)
+     |              - ``summary`` (str, optional)
+     |              - ``memory_type`` (str, default ``"experience"``)
+     |              - ``peer_id`` (str, optional)
+     |              - ``observer_id`` (str, optional)
+     |              - ``entities_json`` (str, optional)
+     |              - ``confidence`` (float, default 0.8)
+     |              - ``source_session_id`` (str, optional)
+     |              - ``source_message_id`` (str, optional)
+     |              - ``images_json`` (str, optional) — JSON string of image
+     |                attachments to associate with this memory (e.g., URLs or
+     |                base64 data URIs).  Stored in the memory's ``context``
+     |                field.  Pass ``""`` (default) for no images.
+     |      
+     |      Returns:
+     |          List of reducer result dicts.
+     |  
+     |  update_memory(self, memory_id: 'str', content: 'str', summary: 'str' = '', confidence: 'float' = 0.8, expires_at: 'int | None' = None) -> 'dict[str, Any]'
+     |      Update a memory's content/summary/confidence.
+     |      
+     |      Parameters
+     |      ----------
+     |      memory_id:
+     |          Target memory ID.
+     |      content:
+     |          New body text.
+     |      summary:
+     |          New short summary (default ``""`` = no summary).
+     |      confidence:
+     |          New confidence score 0.0-1.0 (default ``0.8``).
+     |      expires_at:
+     |          Expiration timestamp in microseconds (epoch).
+     |          Special values:
+     |          - ``None`` (default): preserve the current expiration.
+     |          - ``0``: clear expiration (memory never expires).
+     |          - ``>0``: set to the given absolute timestamp.
+     |      
+     |      Note
+     |      ----
+     |      This method sends 5 arguments when ``expires_at`` is explicitly set,
+     |      or 4 arguments when ``expires_at`` is ``None`` (default).  The 4-arg
+     |      form is backward-compatible with pre-``expires_at`` WASM binaries.
+     |      The 5-arg form requires the ``expires_at`` reducer (rebuilt WASM).
+     |  
+     |  update_memory_tier(self, memory_id: 'str', tier: 'str') -> 'dict[str, Any]'
+     |      Change a memory's compression tier.
+     |      
+     |      Parameters
+     |      ----------
+     |      memory_id:
+     |          Target memory ID.
+     |      tier:
+     |          New tier. Must be one of ``"L0"``, ``"L1"``, or ``"L2"``.
+     |          L0 = highest importance / shortest retention window,
+     |          L2 = lowest importance / longest retention window.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_memories.py
+
+
+</pre>
+</body></html>

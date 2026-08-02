@@ -1,0 +1,363 @@
+Loading BEAM scenarios...
+  Extracted 27 scenarios from 'scenarios' key
+  27 scenarios
+
+=== STDB Pipeline === (judge: deepseek/deepseek-chat)
+Workspace: e10a659bee784764a99f9a072a9c6e47
+
+Storing 27 scenarios...
+  Stored 20/27
+
+[1/27] [IE] Q: What is Dr. Elena Vasquez's position at NeuroLink Labs?...
+  ✓ Expected: Chief Scientific Officer
+  ✓ Got: Dr. Elena Vasquez is the Chief Scientific Officer at NeuroLi
+
+[1/27] [IE] Q: Who is the CSO of NeuroLink Labs?...
+  ✓ Expected: Elena Vasquez
+  ✓ Got: Dr. Elena Vasquez
+
+[2/27] [IE] Q: Who owns Project Chimera?...
+  ✓ Expected: Phoenix Dynamics; Horizon Energy
+  ✓ Got: Project Chimera is owned by Phoenix Dynamics (51% stake) and
+
+[2/27] [IE] Q: What percentage stake does Phoenix Dynamics hold in Project Chimera?...
+  ✓ Expected: 51%
+  ✓ Got: 51%
+
+[2/27] [IE] Q: Where is Project Chimera headquartered?...
+  ✓ Expected: Geneva; Switzerland
+  ✓ Got: Geneva, Switzerland
+
+[3/27] [IE] Q: What was the output of the ARES-9 reactor?...
+  ✓ Expected: 847 terajoules
+  ✓ Got: 847 terajoules of sustained output over 1,022 seconds on Apr
+
+[3/27] [IE] Q: How long did the ARES-9 experiment last?...
+  ✓ Expected: 1022 seconds; 1,022 seconds
+  ✓ Got: 1,022 seconds
+
+[3/27] [IE] Q: Who led the ARES-9 experiment?...
+  ✓ Expected: Yuki Tanaka; Anders Lindqvist
+  ✓ Got: Dr. Yuki Tanaka (Tokyo Institute of Fusion) and Prof. Anders
+
+[3/27] [IE] Q: How much liquid helium was used for cooling?...
+  ✓ Expected: 38,000 liters; 38000
+  ✓ Got: 38,000 liters of liquid helium at 4.2 Kelvin.
+
+[4/27] [MR] Q: When is the quarterly all-hands meeting?...
+  ✓ Expected: July 24; Friday
+  ✓ Got: Friday, July 24 at 2PM EST in Conference Room A.
+
+[4/27] [MR] Q: What time is the server maintenance window?...
+  ✓ Expected: 2AM-6AM EST; July 19
+  ✓ Got: Sunday July 19, 2026 from 2AM-6AM EST.
+
+[4/27] [MR] Q: Where is the company picnic?...
+  ✓ Expected: Riverside Park
+  ✓ Got: Riverside Park on August 15.
+
+[5/27] [MR] Q: Who is the CFO of Acme Corp?...
+  ✓ Expected: Priya Patel
+  ✓ Got: Priya Patel is the CFO of Acme Corp.
+
+[5/27] [MR] Q: Who chairs the board at Acme Corp?...
+  ✓ Expected: Michael Torres
+  ✓ Got: Michael Torres
+
+[5/27] [MR] Q: Who founded Acme Corp?...
+  ✓ Expected: Sarah Chen; James Rodriguez
+  ✓ Got: Sarah Chen and James Rodriguez founded Acme Corp in 2018.
+
+[6/27] [MR] Q: What's the password policy?...
+  ✓ Expected: 90 days; 12 characters
+  ✓ Got: Passwords must be rotated every 90 days and be at least 12 c
+
+[6/27] [MR] Q: How often is security training required?...
+  ✓ Expected: 30 days of hire
+  ✓ Got: Security awareness training is required within 30 days of hi
+
+[6/27] [MR] Q: What's the SLA for a critical incident?...
+  ✓ Expected: 15 minutes
+  ✓ Got: 15 minutes for critical.
+
+[7/27] [TR] Q: Did the company launch v1.0 before or after the Series A?...
+  ✓ Expected: before; January 2020; before Series A
+  ✓ Got: The company launched v1.0 on January 10, 2020, before the Se
+
+[7/27] [TR] Q: Which happened first: Series A or Series B?...
+  ✓ Expected: Series A
+  ✓ Got: Series A.
+
+[7/27] [TR] Q: How long after founding did the first enterprise customer sign?...
+  ✓ Expected: 20 months; 1 year 8 months; November 2020
+  ✓ Got: 1 year and 8 months (founded March 15, 2019; first enterpris
+
+[8/27] [TR] Q: What was Maya's first role at the company?...
+  ✓ Expected: junior developer
+  ✓ Got: Maya's first role at the company was junior developer, which
+
+[8/27] [TR] Q: Put Maya's career milestones in chronological order...
+  ✓ Expected: junior developer; senior developer; team lead; PhD
+  ✓ Got: 1. Maya joined the team as a junior developer in June 2021. 
+
+[8/27] [TR] Q: Did Maya become team lead before or after completing her PhD?...
+  ✓ Expected: before
+  ✓ Got: Maya became team lead in July 2024 before completing her PhD
+
+[9/27] [TR] Q: During which months is Alex working on both Aurora and Boreas?...
+  ✓ Expected: April 2026; May 2026; June 2026
+  ✓ Got: April 2026 to June 2026.
+
+[9/27] [TR] Q: How many total months is Alex assigned to projects in 2026?...
+  ✓ Expected: 10; eleven; 11
+  ✓ Got: Alex is assigned to projects for a total of **10 months** in
+
+[9/27] [TR] Q: Is Alex violating the two-project policy at any point?...
+  ✗ Expected: no; never; 2 max
+  ✗ Got: Yes, Alex violates the two-project policy from April 2026 to
+
+[10/27] [ABS] Q: What is the Q4 2026 marketing budget?...
+  ✓ Expected: 
+  ✓ Got: The Q4 2026 marketing budget is not mentioned in the provide
+
+[10/27] [ABS] Q: Who is the CEO of the company?...
+  ✓ Expected: 
+  ✓ Got: The answer depends on which company you're referring to:
+
+- 
+
+[10/27] [ABS] Q: What cloud provider does the company use?...
+  ✓ Expected: AWS
+  ✓ Got: AWS
+
+[11/27] [ABS] Q: What is the expected revenue of the merged entity?...
+  ✓ Expected: 
+  ✓ Got: The expected revenue of the merged entity (Zenith-Apex Holdi
+
+[11/27] [ABS] Q: When was the merger announced?...
+  ✓ Expected: February 14, 2026
+  ✓ Got: February 14, 2026.
+
+[11/27] [ABS] Q: How many employees does Apex Industries have?...
+  ✓ Expected: 12,000
+  ✓ Got: 12,000 employees.
+
+[12/27] [CR] Q: If the company had chosen Go instead of Python, how many new engineers would the...
+  ✓ Expected: 12
+  ✓ Got: 12 new engineers.
+
+[12/27] [CR] Q: If Go were chosen, how much would the migration have cost?...
+  ✓ Expected: $3.6M; 3.6 million
+  ✓ Got: $3.6M
+
+[12/27] [CR] Q: If Go were chosen, how long would the migration have taken?...
+  ✓ Expected: 5 months
+  ✓ Got: 5 months.
+
+[13/27] [CR] Q: If the company had released only 4 features in total during 2025, what would the...
+  ✓ Expected: $8M; 8 million
+  ✓ Got: $8M
+
+[13/27] [CR] Q: If the company had released all 6 features in Q1 2025 instead of spreading them ...
+  ✓ Expected: 6
+  ✓ Got: 6
+
+[14/27] [KU] Q: When is the Project Odyssey deadline?...
+  ✓ Expected: November 30, 2026; Nov 30
+  ✓ Got: November 30, 2026
+
+[14/27] [KU] Q: What was the original deadline for Project Odyssey before the change?...
+  ✓ Expected: December 15, 2026; Dec 15
+  ✓ Got: December 15, 2026
+
+[15/27] [KU] Q: When is the HQ relocation to Austin now expected?...
+  ✓ Expected: Q2 2026; second quarter 2026
+  ✓ Got: Q3 2026
+
+[15/27] [KU] Q: Why was the relocation delayed?...
+  ✓ Expected: permitting issues; Austin office building
+  ✓ Got: The relocation was initially delayed to Q3 2026 due to permi
+
+[15/27] [KU] Q: Why was the relocation accelerated again?...
+  ✓ Expected: tax incentives; Texas
+  ✓ Got: Due to tax incentives offered by the state of Texas.
+
+[16/27] [KU] Q: What is TechGlobal's official Q2 2026 revenue according to their SEC filing?...
+  ✓ Expected: $2.07B; 2.07 billion
+  ✓ Got: The provided excerpts do not contain information about TechG
+
+[16/27] [KU] Q: What was the initial press release Q2 revenue number?...
+  ✓ Expected: $2.1B; 2.1 billion
+  ✓ Got: $2.1B
+
+[16/27] [KU] Q: What did the employee-on-twitter claim about Q2 revenue?...
+  ✗ Expected: 
+  ✗ Got: The anonymous analyst claimed TechGlobal's Q2 revenue was $1
+
+[17/27] [EO] Q: Order the teams by size from largest to smallest...
+  ✗ Expected: Delta; Beta; Alpha; Gamma
+  ✗ Got: Platform B team: 25, Platform A team: 12, Platform C team: 1
+
+[17/27] [EO] Q: Which is the smallest team?...
+  ✓ Expected: Gamma
+  ✓ Got: Team Gamma with 5 members.
+
+[17/27] [EO] Q: Which is the largest team?...
+  ✗ Expected: Delta
+  ✗ Got: The engineering team with 43 members (as of June 2026).
+
+[18/27] [EO] Q: Put the product launches in chronological order...
+  ✗ Expected: CometML v1; NovaSearch v1; Pulsar Analytics; NovaSearch v2
+  ✗ Got: 1. Comet Labs shipped CometML v1 in 2018.  
+2. Nova Corp lau
+
+[18/27] [EO] Q: Which product launched last?...
+  ✗ Expected: Pulsar Analytics v2; 2023
+  ✗ Got: NovaSearch v2 in 2021.
+
+[18/27] [EO] Q: What happened to Comet Labs in 2022?...
+  ✓ Expected: acquired
+  ✓ Got: Comet Labs was acquired in 2022.
+
+[19/27] [IF] Q: How many shares does John own at minimum?...
+  ✓ Expected: 500,000; 500000
+  ✓ Got: 500,000 shares
+
+[20/27] [IF] Q: When will the security team review the unusual API spike?...
+  ✓ Expected: Friday; tomorrow
+  ✓ Got: The security team will review the unusual API spike on Frida
+
+[20/27] [IF] Q: If the unusual activity is confirmed, who gets notified?...
+  ✓ Expected: CISO
+  ✓ Got: The CISO gets notified.
+
+[21/27] [IF] Q: Can Sarah authorize the $200,000 server budget by herself?...
+  ✓ Expected: no; cannot
+  ✓ Got: No, Sarah cannot authorize the $200,000 server budget by her
+
+[21/27] [IF] Q: Who is the most junior person who could authorize the $200,000 budget?...
+  ✓ Expected: David; L6
+  ✓ Got: An employee at level L6 can authorize the $200,000 budget, a
+
+[21/27] [IF] Q: What is Sarah's maximum authorization limit?...
+  ✗ Expected: $100,000; 100000
+  ✗ Got: The context does not provide information about Sarah's autho
+
+[22/27] [PF] Q: Who is the current CMO of HealthBridge?...
+  ✓ Expected: Marcus Lee
+  ✓ Got: Dr. Marcus Lee is the current CMO of HealthBridge, appointed
+
+[22/27] [PF] Q: Who was the previous CMO of HealthBridge?...
+  ✓ Expected: Nina Patel
+  ✓ Got: Dr. Nina Patel was the previous CMO of HealthBridge.
+
+[22/27] [PF] Q: When did Dr. Patel become CMO?...
+  ✓ Expected: January 2025
+  ✓ Got: January 2025
+
+[23/27] [PF] Q: Who is the current CEO of Helios Energy?...
+  ✓ Expected: Elena Kowalski
+  ✓ Got: Elena Kowalski is the current CEO of Helios Energy, effectiv
+
+[23/27] [PF] Q: Where is Helios Energy's current HQ?...
+  ✓ Expected: Denver, CO; Denver
+  ✓ Got: Denver, CO
+
+[23/27] [PF] Q: What was Helios Energy's highest market cap?...
+  ✓ Expected: $52B; 52 billion
+  ✓ Got: $52B
+
+[24/27] [PF] Q: What is the current status of Platform C?...
+  ✓ Expected: GA; generally available; active
+  ✓ Got: Platform C status: GA (General Availability), users: 15,000,
+
+[24/27] [PF] Q: How many users does Platform A have after the June 2026 migration?...
+  ✓ Expected: 35,000; 35000
+  ✓ Got: Platform A has 35,000 users after the June 2026 migration.
+
+[24/27] [PF] Q: What was Platform A's original SLA?...
+  ✓ Expected: 99.5%
+  ✓ Got: 99.5%
+
+[24/27] [PF] Q: What is Platform A's SLA after July 2026?...
+  ✓ Expected: best-effort
+  ✓ Got: After July 2026, Platform A's SLA is reduced to best-effort.
+
+[24/27] [PF] Q: Which platform has the most users currently?...
+  ✓ Expected: Platform B; 120,000
+  ✓ Got: Platform B (modern) with 120,000 users.
+
+[25/27] [SUM] Q: Summarize what we know about Orion Robotics...
+  ✓ Expected: 
+  ✓ Got: Orion Robotics was founded in 2017 by Dr. Wei Zhang, special
+
+[25/27] [SUM] Q: What is Orion Robotics' specialization?...
+  ✓ Expected: warehouse automation
+  ✓ Got: warehouse automation
+
+[26/27] [SUM] Q: Summarize the CloudSync MRR trajectory over the first half of 2026...
+  ✓ Expected: 
+  ✓ Got: January 2026: $4.2M  
+March 2026: Drops to $3.8M (loses 3 cu
+
+[26/27] [SUM] Q: What caused CloudSync's MRR drop in March 2026?...
+  ✓ Expected: lost enterprise customers; reliability concerns
+  ✓ Got: CloudSync's MRR dropped to $3.8M in March 2026 due to losing
+
+[26/27] [SUM] Q: What was CloudSync's MRR in June 2026?...
+  ✓ Expected: $4.5M; 4.5 million
+  ✓ Got: $4.5M
+
+[27/27] [ALL] Q: Who founded Vertex AI?...
+  ✓ Expected: Rachel Kim; Mark Torres
+  ✓ Got: Dr. Rachel Kim and Mark Torres.
+
+[27/27] [ALL] Q: What was Vertex AI's initial focus, and how did it change?...
+  ✓ Expected: enterprise NLP; healthcare
+  ✓ Got: Vertex AI's initial focus was enterprise NLP. In 2022, it pi
+
+[27/27] [ALL] Q: Put Vertex AI's funding rounds in order with amounts...
+  ✗ Expected: Seed $5M; Series A $25M; Series B $80M
+  ✗ Got: 1. Seed round: $5M (2021)  
+2. Series A: $25M (2022)  
+3. Se
+
+[27/27] [ALL] Q: What happened in November 2024 that affected Vertex AI?...
+  ✓ Expected: data breach; patient records
+  ✓ Got: In November 2024, Vertex AI suffered a data breach exposing 
+
+[27/27] [ALL] Q: What was the impact of DiagnoAI's competing product on Vertex AI stock?...
+  ✓ Expected: dropped 12%
+  ✓ Got: Vertex AI stock dropped 12% in one week after DiagnoAI's com
+
+[27/27] [ALL] Q: If Vertex AI had not acquired MedSync Labs, would they have had clinical trial m...
+  ✓ Expected: 
+  ✓ Got: No, Vertex AI would not have had clinical trial matching cap
+
+[27/27] [ALL] Q: What was Vertex AI's headcount progression from founding to IPO?...
+  ✗ Expected: 10; 120; 450
+  ✗ Got: 2020: Founded (headcount not specified)
+2021: (headcount not
+
+[27/27] [ALL] Q: Summarize Vertex AI's journey from founding to 2026...
+  ✓ Expected: 
+  ✓ Got: - **2020**: Founded in Boston by Dr. Rachel Kim and Mark Tor
+
+============================================================
+BEAM RESULTS (judge: deepseek/deepseek-chat)
+============================================================
+OVERALL: 89.02% (73/82)
+  ABS   Abstention                    : 100.00%  (   6/   6)
+  ALL   End-to-end Narrative          :  75.00%  (   6/   8)
+  CR    Counterfactual Reasoning      : 100.00%  (   5/   5)
+  EO    Entity Ordering               :  33.33%  (   2/   6)
+  IE    Information Extraction        : 100.00%  (   9/   9)
+  IF    Inference                     :  83.33%  (   5/   6)
+  KU    Knowledge Updating            :  87.50%  (   7/   8)
+  MR    Memory Retrieval              : 100.00%  (   9/   9)
+  PF    Property Following            : 100.00%  (  11/  11)
+  SUM   Summarization                 : 100.00%  (   5/   5)
+  TR    Temporal Reasoning            :  88.89%  (   8/   9)
+
+Results saved to: $HOME/spacetime-memory/benchmarks/results/beam/beam_results_1785359279.json
+{"overall": {"total": 82, "correct": 73, "accuracy": 89.02}, "by_ability": {"ABS": {"name": "Abstention", "total": 6, "correct": 6, "accuracy": 100.0}, "ALL": {"name": "End-to-end Narrative", "total": 8, "correct": 6, "accuracy": 75.0}, "CR": {"name": "Counterfactual Reasoning", "total": 5, "correct": 5, "accuracy": 100.0}, "EO": {"name": "Entity Ordering", "total": 6, "correct": 2, "accuracy": 33.33}, "IE": {"name": "Information Extraction", "total": 9, "correct": 9, "accuracy": 100.0}, "IF": {"name": "Inference", "total": 6, "correct": 5, "accuracy": 83.33}, "KU": {"name": "Knowledge Updating", "total": 8, "correct": 7, "accuracy": 87.5}, "MR": {"name": "Memory Retrieval", "total": 9, "correct": 9, "accuracy": 100.0}, "PF": {"name": "Property Following", "total": 11, "correct": 11, "accuracy": 100.0}, "SUM": {"name": "Summarization", "total": 5, "correct": 5, "accuracy": 100.0}, "TR": {"name": "Temporal Reasoning", "total": 9, "correct": 8, "accuracy": 88.89}}}

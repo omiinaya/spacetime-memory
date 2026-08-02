@@ -1,0 +1,142 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "stdb",
+    "judge_model": "deepseek/deepseek-chat",
+    "answer_model": "deepseek/deepseek-chat",
+    "total_questions": 10,
+    "primary_count": 10,
+    "timestamp": "2026-07-30T03:17:29.534810"
+  },
+  "metrics": {
+    "primary": {
+      "total": 10,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 1,
+        "correct": 0,
+        "accuracy": 0.0
+      },
+      "single-hop": {
+        "total": 3,
+        "correct": 0,
+        "accuracy": 0.0
+      },
+      "temporal": {
+        "total": 6,
+        "correct": 0,
+        "accuracy": 0.0
+      }
+    },
+    "overall": {
+      "total": 10,
+      "correct": 0,
+      "accuracy": 0.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not provide any information about the date Caroline"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not provide any information or correct date related"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not provide any information related to the fields C"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What did Caroline research?",
+      "expected": "Adoption agencies",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any correct items from the gold answ"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What is Caroline's identity?",
+      "expected": "Transgender woman",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any correct items from the gold answ"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie run a charity race?",
+      "expected": "The sunday before 25 May 2023",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any correct information from the gol"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When is Melanie planning on going camping?",
+      "expected": "June 2023",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not provide any information about Melanie's camping"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What is Caroline's relationship status?",
+      "expected": "Single",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain the correct factual information from"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline give a speech at a school?",
+      "expected": "The week before 9 June 2023",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer does not contain any correct information from the gol"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline meet up with her friends, family, and mentors?",
+      "expected": "The week before 9 June 2023",
+      "answer": "I don't have enough information to answer this question.",
+      "is_correct": false,
+      "reasoning": "```json\n{\"reasoning\": \"The generated answer does not provide any information about when Caroline met"
+    }
+  ]
+}

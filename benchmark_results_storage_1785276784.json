@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-07-28T22:13:04Z",
+  "storage": {
+    "stdb_bytes": 0,
+    "tantivy_bytes": 6616688288,
+    "embeddings_bytes": 2589,
+    "total_bytes": 6616690877
+  },
+  "row_counts": {
+    "memory": -1,
+    "entity": -1,
+    "memory_graph": -1,
+    "veracity_evidence": -1,
+    "anomaly_result": -1,
+    "knowledge_node": -1
+  },
+  "prometheus_metrics": {}
+}

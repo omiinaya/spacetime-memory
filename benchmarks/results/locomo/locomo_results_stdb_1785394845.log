@@ -1,0 +1,17 @@
+Loading LoCoMo dataset...
+  1986 total questions (1540 primary, 446 adversarial)
+
+=== STDB Pipeline === (judge: deepseek/deepseek-chat)
+Workspace: b4c6d150339d4dca81315b98ba47d208 (name: locomo_benchmark_1785394850)
+
+Storing conversation 0...
+  Stored batch 1/2 (16 sessions)
+  Stored batch 2/2 (3 sessions)
+  Total: 19 sessions stored
+
+Storing conversation 1...
+  Stored batch 1/2 (16 sessions)
+  Stored batch 2/2 (3 sessions)
+  Total: 19 sessions stored
+
+Storing conversation 2...

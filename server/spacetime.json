@@ -1,0 +1,5 @@
+{
+  "server": "local-3001",
+  "module-path": "./spacetimedb",
+  "database": "stmem-1783501584"
+}

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._pattern_detection API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._pattern_detection</h1>
+<pre>Help on module spacetime_memory.client._pattern_detection in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._pattern_detection - Server-side pattern detection mixin.
+
+DESCRIPTION
+    Wraps the SpacetimeDB server-side pattern detection reducers:
+    - detect_temporal_clusters
+    - detect_entity_cooccurrences
+    - detect_topic_clusters
+    
+    Each reducer reads from the memory table server-side and writes results to
+    a result table (compute-and-store pattern). This mixin calls the reducer,
+    then reads from the result table.
+
+CLASSES
+    builtins.object
+        PatternDetectionMixin
+    
+    class PatternDetectionMixin(builtins.object)
+     |  Mixin providing server-side pattern detection methods.
+     |  
+     |  Methods defined here:
+     |  
+     |  detect_entity_cooccurrences(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Detect entity co‑occurrence patterns.
+     |      
+     |      Pairs of entities (from ``entities_json``) that frequently appear
+     |      together in the same memory. Requires admin auth.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to analyse.
+     |      
+     |      Returns:
+     |          List of co‑occurrence dicts with keys: id, workspace_id,
+     |          entity_a, entity_b, count, strength, created_at.
+     |          Sorted by count descending.
+     |  
+     |  detect_temporal_clusters(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Detect temporal clusters — groups of memories stored close together in time.
+     |      
+     |      Uses 30-minute buckets server-side. Requires admin auth.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to analyse.
+     |      
+     |      Returns:
+     |          List of cluster dicts with keys: id, workspace_id, start_time,
+     |          end_time, count, memory_ids (JSON string), summary_terms (JSON string),
+     |          created_at. Sorted by start_time descending.
+     |  
+     |  detect_topic_clusters(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Detect topic clusters — groups of memories organised by shared term frequency.
+     |      
+     |      Identifies top frequent terms across memories, then groups memories
+     |      that share each top term. Requires admin auth.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to analyse.
+     |      
+     |      Returns:
+     |          List of topic cluster dicts with keys: id, workspace_id,
+     |          topic, count, memory_ids (JSON string), top_terms (JSON string),
+     |          avg_confidence, created_at. Sorted by count descending.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_pattern_detection.py
+
+
+</pre>
+</body></html>

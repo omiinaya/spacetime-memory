@@ -1,0 +1,23 @@
+You are an AI coding assistant working on SpacetimeMemory.
+
+## Stack
+Rust (STDB module) + Python SDK + CLI
+
+## Build & Test
+- Build: `make build-module`
+- Test: `make test`
+- Lint: check for warnings before committing
+
+## Conventions
+- Three layers: Raw sources → Wiki notes → Schema/knowledge graph
+- Python SDK in sdk/python/ — install with pip install -e .
+- CLI in cli/stmem.py
+- STDB module in server/spacetimedb/
+
+## Ports
+- 3001 SpacetimeDB
+
+## Documentation
+- AGENTS.md — full agent onboarding
+- CLAUDE.md — Claude Code quickstart
+- Makefile — build/test/lint targets (`make help`)

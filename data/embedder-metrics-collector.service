@@ -1,0 +1,22 @@
+[Unit]
+Description=Embedder Metrics Collector — serves /api/embedder-metrics on port 9190
+After=network-online.target embedder-sidecar.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hindsight
+Group=hindsight
+ExecStart=/usr/local/lib/hermes-agent/venv/bin/python3 $HOME/spacetime-memory/scripts/embedder_metrics_collector.py serve
+WorkingDirectory=$HOME/spacetime-memory
+Environment="HOME=$HOME"
+Environment="EMBEDDER_METRICS_URL=http://localhost:9090/metrics"
+Environment="EMBEDDER_COLLECTOR_PORT=9190"
+Restart=always
+RestartSec=5
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

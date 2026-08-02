@@ -1,0 +1,140 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spacetime-memory"
+version = "1.0.0"
+description = "Multi-layer memory infrastructure for AI agents on SpacetimeDB"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    {name = "Spacetime Memory Contributors"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+cli = [
+    "click>=8.1",
+    "rich>=13.0",
+]
+subscription = [
+    "websockets>=14.0",
+]
+cross-encoder = [
+    "numpy>=1.24",
+    "onnxruntime>=1.20",
+    "tokenizers>=0.21",
+]
+otel = [
+    "opentelemetry-api>=1.28",
+    "opentelemetry-sdk>=1.28",
+    "opentelemetry-exporter-otlp-proto-http>=1.28",
+]
+rerank = [
+    "numpy>=1.24",
+    "onnxruntime>=1.20",
+    "tokenizers>=0.21",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-mock>=3.10",
+    "click>=8",
+    "feedparser>=6",
+    "ruff>=0.6",
+    "spacetime-memory[rerank]",
+    "spacetime-memory[subscription]",
+]
+gpu = [
+    "onnxruntime-gpu>=1.20",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.25",
+    "mkdocs-autorefs>=1.0",
+    "spacetime-memory[subscription]",
+]
+langchain = [
+    "langchain-core>=0.3",
+    "langgraph>=0.2",
+]
+all = [
+    "click>=8.1",
+    "rich>=13.0",
+    "numpy>=1.24",
+    "onnxruntime>=1.20",
+    "tokenizers>=0.21",
+    "langchain-core>=0.3",
+    "langgraph>=0.2",
+    "feedparser>=6",
+    "opentelemetry-api>=1.28",
+    "opentelemetry-sdk>=1.28",
+    "opentelemetry-exporter-otlp-proto-http>=1.28",
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.25",
+    "mkdocs-autorefs>=1.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+ignore = ["E501"]
+# Production lint gate: syntax/undefined-name (E9), pyflakes (F), pycodestyle
+# essentials (E4/E7/W). Broad-except (BLE001), blind try/except-pass (S110),
+# and other opinionated style rules are intentionally not enforced.
+select = ["E4", "E7", "E9", "F", "W"]
+
+# Re-export `__init__.py` files intentionally import symbols for the public
+# API (and CLI command modules for click registration side-effects).
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+# Test files bootstrap `sys.path` before imports (repo-root access for CLI),
+# which legitimately triggers E402.
+"tests/*" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[project.urls]
+Homepage = "https://github.com/omiinaya/spacetime-memory"
+Documentation = "https://omiinaya.github.io/spacetime-memory/"
+Repository = "https://github.com/omiinaya/spacetime-memory"
+
+[project.scripts]
+stmem = "spacetime_memory.cli:cli"
+spacetime-memory = "spacetime_memory.cli:cli"
+spacetime-benchmark = "scripts.benchmark:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["tests"]
+markers = [
+    "unit: tests that mock HTTP -- no SpacetimeDB required",
+    "integration: tests that need a running SpacetimeDB standalone",
+    "e2e: adapter wire-compatibility tests that need a running SpacetimeDB standalone",
+    "embedder: tests that also need the ONNX embedder sidecar on :9090",
+    "connector_integration: tests that need live connector API credentials",
+    "asyncio: async test -- requires pytest-asyncio plugin",
+]
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

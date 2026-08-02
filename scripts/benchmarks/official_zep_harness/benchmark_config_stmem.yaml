@@ -1,0 +1,22 @@
+# LOCOMO Benchmark Configuration — Spacetime-Memory backend
+# Models point at the local LLM proxy (OpenAI-compatible, :4004).
+
+evaluation_concurrency: 2
+ingestion_concurrency: 1
+
+graph_params:
+  edge_limit: 15
+  edge_reranker: "cross_encoder"
+  node_limit: 5
+  node_reranker: "cross_encoder"
+
+models:
+  response_model: "deepseek-v4-flash-free"
+  response_temperature: 0.0
+  grader_model: "deepseek-v4-flash-free"
+  grader_temperature: 0.0
+
+locomo:
+  num_users: 1
+  max_session_count: 35
+  data_url: "https://raw.githubusercontent.com/snap-research/locomo/refs/heads/main/data/locomo10.json"

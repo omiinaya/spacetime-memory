@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._memories_search API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._memories_search</h1>
+<pre>Help on module spacetime_memory.client._memories_search in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._memories_search - Memory search and hybrid retrieval mixin.
+
+CLASSES
+    spacetime_memory.client._session_search.SessionSearchMixin(builtins.object)
+        SearchMixin
+    
+    class SearchMixin(spacetime_memory.client._session_search.SessionSearchMixin)
+     |  Spacetime-Memory search and hybrid retrieval mixin.
+     |  
+     |  Provides Client methods related to semantic search, keyword search,
+     |  hybrid fusion, entity-aware boosting, and cross-encoder reranking.
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Method resolution order:
+     |      SearchMixin
+     |      spacetime_memory.client._session_search.SessionSearchMixin
+     |      builtins.object
+     |  
+     |  Methods defined here:
+     |  
+     |  cross_encoder_rerank(self, query: 'str', candidates: 'list[dict[str, Any]]', content_key: 'str' = 'memory_content', top_k: 'int' = 20) -> 'list[dict[str, Any]]'
+     |      Cross-encoder re-rank candidates for more accurate relevance scoring.
+     |      
+     |      Uses the local ONNX cross-encoder model for re-ranking search results
+     |      by semantic relevance to the query, beyond cosine-similarity.
+     |      
+     |      Args:
+     |          query: The query string to evaluate relevance against.
+     |          candidates: Array of candidate objects to re-rank.
+     |          content_key: Key in each candidate dict containing the text (default "memory_content").
+     |          top_k: Number of top candidates to return after re-ranking.
+     |      
+     |      Returns:
+     |          Re-ranked candidates sorted by cross-encoder score (descending),
+     |          each with a ``crossEncoderScore`` field added.
+     |  
+     |  detect_patterns(self, workspace_id: 'str', *, limit: 'int' = 200, include_clusters: 'bool' = True, include_terms: 'bool' = True, include_co_occur: 'bool' = True) -> 'dict[str, Any]'
+     |      Run pattern detection on a workspace's memories.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to analyze.
+     |          limit: Max memories to fetch for analysis.
+     |          include_clusters: Run temporal clustering.
+     |          include_terms: Run frequent term extraction.
+     |          include_co_occur: Run co-occurrence detection.
+     |      
+     |      Returns:
+     |          Dict with ``temporal_clusters``, ``frequent_terms``,
+     |          ``co_occurrences``, ``total_memories``, ``summary``.
+     |  
+     |  search(self, workspace_id: 'str', query: 'str' = '', memory_type: 'str' = '', tier: 'str' = '', limit: 'int' = 20, semantic: 'bool' = True, rerank: 'bool' = False, rerank_endpoint: 'str | None' = None, rerank_model: 'str | None' = None, rerank_api_key: 'str | None' = None, cross_encoder: 'bool' = True, query_expansion: 'bool' = False, polyphonic: 'bool' = False, mmr_lambda: 'float' = 0.0, fusion_weights: 'dict[str, float] | None' = None, entity_types: 'list[str] | None' = None, temporal_filter: 'dict[str, Any] | None' = None, before: 'float | int | None' = None, after: 'float | int | None' = None, return_schema: 'str | type | None' = None) -> 'list[dict[str, Any]]'
+     |      Search memories.  When *semantic* is True uses hybrid search.
+     |      
+     |      Args:
+     |          temporal_filter: Optional dict with ``"from"`` and/or ``"to"`` keys
+     |                  (Unix timestamps) to filter results by creation time.
+     |                  Shorthand for ``before``/``after`` — entries are used
+     |                  only when the corresponding explicit param is not set.
+     |                  Example: ``{"from": 1700000000, "to": 1700086400}``.
+     |          rerank: If True, passes top results through an LLM reranker
+     |                  (QMD-style) for relevance re-scoring.
+     |          rerank_endpoint: OpenAI-compatible base URL for reranker
+     |                  (default: ``LLM_RERANK_ENDPOINT`` env var).
+     |          rerank_model: Model name for reranker
+     |                  (default: ``LLM_RERANK_MODEL`` env var).
+     |          rerank_api_key: API key for reranker
+     |                  (default: ``LLM_RERANK_API_KEY`` or ``OPENAI_API_KEY`` env var).
+     |          cross_encoder: If True (default), passes top results through a local ONNX
+     |                  cross-encoder (ms-marco-MiniLM-L-6-v2) for discriminative
+     |                  relevance scoring. Falls back gracefully if model files are
+     |                  not available.
+     |          query_expansion: If True, expands the query with synonyms and
+     |                  related terms via LLM before searching.
+     |          polyphonic: If True, uses Reciprocal Rank Fusion (RRF) with
+     |                  diversity penalty instead of min-max normalization.
+     |          mmr_lambda: If > 0, applies Maximal Marginal Relevance reranking.
+     |                  0.7 is a good default (70% relevance, 30% diversity).
+     |          fusion_weights: Optional dict of strategy weights for min-max fusion.
+     |                  Keys: ``"semantic"``, ``"keyword"``, ``"binary"``, ``"graph"``, ``"temporal"``.
+     |                  Values should sum to ~1.0. Omit or pass None to use defaults.
+     |          entity_types: Optional list of entity_type values to filter results by.
+     |                  e.g. ``["memory", "note"]`` to return only memories and notes,
+     |                  or ``["node"]`` for KG nodes only. Applied after fusion and
+     |                  enrichment, in both hybrid and keyword-fallback paths.
+     |          before: Optional Unix timestamp — only return results with
+     |                  ``created_at < before``.
+     |          after: Optional Unix timestamp — only return results with
+     |                  ``created_at > after``.
+     |          return_schema: If ``"llm"``, returns ``list[LLMSearchResult]`` with compact
+     |                  fields (id, content, relevance, type, snippet, created_at).
+     |                  If a ``TypedDict`` subclass, keeps only the annotated fields.
+     |                  ``None`` (default) returns raw dicts unchanged.
+     |  
+     |  search_with_filters(self, workspace_id: 'str', query: 'str' = '', memory_type: 'str' = '', tier: 'str' = '', metadata_filter: 'str' = '', location_filter: 'str' = '', limit: 'int' = 20, return_schema: 'str | type | None' = None) -> 'list[dict[str, Any]]'
+     |      Search with metadata and location filters. Honcho parity.
+     |      
+     |      Args:
+     |          return_schema: If ``"llm"``, returns ``list[LLMSearchResult]`` with compact
+     |                  fields (id, content, relevance, type, snippet, created_at).
+     |                  If a ``TypedDict`` subclass, keeps only the annotated fields.
+     |                  ``None`` (default) returns raw dicts unchanged.
+     |  
+     |  temporal_search_with_weight(self, workspace_id: 'str', query: 'str' = '', memory_type: 'str' = '', tier: 'str' = '', limit: 'int' = 20, recency_weight: 'float' = 0.7, time_context: 'str' = '', return_schema: 'str | type | None' = None) -> 'list[dict[str, Any]]'
+     |      Time-weighted memory retrieval with configurable recency decay.
+     |      
+     |      Like the ``temporal`` strategy in :meth:`search`, but with:
+     |      - Exponential recency boost controlled by ``recency_weight`` (0.0–1.0).
+     |        Higher values penalize older memories more strongly.
+     |        Default 0.7 provides a good balance (roughly corresponding to a
+     |        7-day half-life with 70% recency influence).
+     |      - ``time_context`` filters memories by age: "recent" (24h),
+     |        "last_week", "last_month", "last_3_months", "last_year", or
+     |        "" (no filter).
+     |      
+     |      Results are written to the ``HybridResult`` table with strategy
+     |      ``temporal_weighted_<weight_int>``, keyed by a unique query hash
+     |      that includes the recency_weight. Read back via SQL on
+     |      ``hybrid_result`` filtered by workspace_id and query_hash.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to search.
+     |          query: The search query (for query hash and optional semantic boosting).
+     |          memory_type: Optional ``memory_type`` filter (e.g., "world_fact").
+     |          tier: Optional tier filter ("L0", "L1", "L2").
+     |          limit: Max results to return (default 20).
+     |          recency_weight: How much to penalise old memories (0.0–1.0).
+     |              0.0 = no recency bias, 1.0 = strong exponential decay.
+     |          time_context: Temporal filter keyword as described above.
+     |          return_schema: If ``"llm"``, returns ``list[LLMSearchResult]`` with compact
+     |                  fields (id, content, relevance, type, snippet, created_at).
+     |                  If a ``TypedDict`` subclass, keeps only the annotated fields.
+     |                  ``None`` (default) returns raw dicts unchanged.
+     |      
+     |      Returns:
+     |          List of hybrid_result rows matching the search.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from spacetime_memory.client._session_search.SessionSearchMixin:
+     |  
+     |  search_sessions_semantic(self, query: 'str', limit: 'int' = 10, return_schema: 'str | type | None' = None) -> 'list[dict[str, Any]]'
+     |      Semantically search across all sessions/workspaces.
+     |      
+     |      Embeds the query, calls the ``search_sessions_semantic`` reducer,
+     |      and reads results from ``session_search_result``.
+     |      
+     |      Args:
+     |          query: The natural-language search query.
+     |          limit: Maximum number of results to return (default 10).
+     |          return_schema: If ``"llm"``, returns ``list[LLMSearchResult]`` with
+     |              compact fields (id, content, relevance, type, snippet, created_at).
+     |              If a ``TypedDict`` subclass, keeps only the annotated fields.
+     |              ``None`` (default) returns raw dicts unchanged.
+     |      
+     |      Returns:
+     |          List of matching session rows, sorted by relevance score
+     |          descending.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from spacetime_memory.client._session_search.SessionSearchMixin:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_memories_search.py
+
+
+</pre>
+</body></html>

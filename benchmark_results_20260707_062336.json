@@ -1,0 +1,156 @@
+{
+  "timestamp": "2026-07-07T10:23:36Z",
+  "host": "127.0.0.1",
+  "port": "3001",
+  "database": "c2009b3b9ff7eabfd1401360f6b54b23680558a1360b3e1d934c42d75cfa2c4c",
+  "workspace_id": "bench-ws-1",
+  "iterations": 20,
+  "embedder_available": true,
+  "tantivy_available": true,
+  "latency": [
+    {
+      "label": "memory.store (single, short, via c.store)",
+      "n": 20,
+      "fails": 0,
+      "p50": 55.7,
+      "p90": 68.6,
+      "p99": 98.6,
+      "mean": 58.6,
+      "min": 43.5,
+      "max": 103.8
+    },
+    {
+      "label": "memory.store (single, long, via c.store)",
+      "n": 20,
+      "fails": 0,
+      "p50": 54.3,
+      "p90": 67.5,
+      "p99": 73.2,
+      "mean": 55.7,
+      "min": 42.7,
+      "max": 73.8
+    },
+    {
+      "label": "memory.store (batch 10, via c.store)",
+      "n": 10,
+      "fails": 0,
+      "p50": 668.0,
+      "p90": 709.0,
+      "p99": 724.1,
+      "mean": 665.8,
+      "min": 588.4,
+      "max": 725.7
+    },
+    {
+      "label": "search.tantivy.keyword (top-5)",
+      "n": 20,
+      "fails": 0,
+      "p50": 0.8,
+      "p90": 0.8,
+      "p99": 1.6,
+      "mean": 0.8,
+      "min": 0.7,
+      "max": 1.7
+    },
+    {
+      "label": "search.wasm.keyword (top-5, via hybrid_search)",
+      "n": 20,
+      "fails": 0,
+      "p50": 88.0,
+      "p90": 90.5,
+      "p99": 93.0,
+      "mean": 88.3,
+      "min": 86.1,
+      "max": 93.3
+    },
+    {
+      "label": "search.semantic (top-5, w/ embedder + Tantivy)",
+      "n": 0,
+      "fails": 3,
+      "p50": 0,
+      "p90": 0,
+      "p99": 0,
+      "mean": 0,
+      "min": 0,
+      "max": 0
+    },
+    {
+      "label": "graph.query",
+      "n": 20,
+      "fails": 0,
+      "p50": 9.6,
+      "p90": 10.1,
+      "p99": 10.5,
+      "mean": 9.7,
+      "min": 9.2,
+      "max": 10.5
+    },
+    {
+      "label": "memory.count (_query)",
+      "n": 5,
+      "fails": 0,
+      "p50": 26.4,
+      "p90": 26.8,
+      "p99": 26.9,
+      "mean": 26.5,
+      "min": 26.2,
+      "max": 26.9
+    },
+    {
+      "label": "ping (round-trip)",
+      "n": 20,
+      "fails": 0,
+      "p50": 0.8,
+      "p90": 0.9,
+      "p99": 1.0,
+      "mean": 0.8,
+      "min": 0.8,
+      "max": 1.1
+    },
+    {
+      "label": "create_node (KG)",
+      "n": 10,
+      "fails": 0,
+      "p50": 1.6,
+      "p90": 1.8,
+      "p99": 1.8,
+      "mean": 1.6,
+      "min": 1.5,
+      "max": 1.8
+    },
+    {
+      "label": "create_edge (KG)",
+      "n": 10,
+      "fails": 0,
+      "p50": 1.6,
+      "p90": 1.7,
+      "p99": 1.9,
+      "mean": 1.6,
+      "min": 1.4,
+      "max": 1.9
+    },
+    {
+      "label": "get_neighbors",
+      "n": 10,
+      "fails": 0,
+      "p50": 37.6,
+      "p90": 39.4,
+      "p99": 40.7,
+      "mean": 37.9,
+      "min": 36.5,
+      "max": 40.8
+    }
+  ],
+  "quality": {
+    "keyword-only (Tantivy BM25 + graph + temporal)": {
+      "P@5": 0.6,
+      "R@5": 0.6,
+      "MRR": 0.7
+    },
+    "hybrid (Tantivy BM25 + semantic + graph + temporal)": {
+      "P@5": 0.0,
+      "R@5": 0.0,
+      "MRR": 0.0
+    }
+  }
+}

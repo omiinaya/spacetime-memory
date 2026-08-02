@@ -1,0 +1,17 @@
+[package]
+name = "tantivy-sidecar"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Tantivy BM25 search sidecar for spacetime-memory"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tantivy = { version = "0.24", features = ["stopwords", "mmap"] }
+dashmap = "6"
+uuid = { version = "1", features = ["v4"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio-util = "0.7"

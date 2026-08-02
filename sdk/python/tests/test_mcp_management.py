@@ -1,0 +1,1650 @@
+import pytest
+
+pytest.skip("requires MCP server runtime (server/mcp/)", allow_module_level=True)
+
+class TestDeleteWorkspace:
+    """Tests for the delete_workspace MCP tool."""
+
+    def test_delete_workspace_calls_client(self, mock_mcp_client):
+        from server.mcp.main import delete_workspace
+
+        mock_mcp_client.delete_workspace.return_value = {
+            "status": "ok",
+            "id": "ws1",
+        }
+        result = delete_workspace(workspace_id="ws1")
+        assert result["status"] == "ok"
+        mock_mcp_client.delete_workspace.assert_called_once_with("ws1")
+
+
+class TestFuzzyGet:
+    """Tests for the fuzzy_get MCP tool."""
+
+    def test_finds_best_match(self, mock_mcp_client):
+        from server.mcp.main import fuzzy_get
+
+        mock_mcp_client.fuzzy_get.return_value = {
+            "id": "abc123",
+            "content": "Hello world",
+            "score": 0.85,
+        }
+        result = fuzzy_get(
+            workspace_id="ws1", name="hello", field="content", threshold=0.5, limit=50
+        )
+        assert "abc123" in result
+        assert "Hello world" in result
+        mock_mcp_client.fuzzy_get.assert_called_once_with(
+            workspace_id="ws1",
+            name="hello",
+            field="content",
+            threshold=0.5,
+            limit=50,
+        )
+
+    def test_no_match(self, mock_mcp_client):
+        from server.mcp.main import fuzzy_get
+
+        mock_mcp_client.fuzzy_get.return_value = None
+        result = fuzzy_get(workspace_id="ws1", name="xyz")
+        assert "No memory found" in result
+        assert "0.5" in result
+
+    def test_passes_defaults(self, mock_mcp_client):
+        from server.mcp.main import fuzzy_get
+
+        mock_mcp_client.fuzzy_get.return_value = None
+        fuzzy_get(workspace_id="ws1", name="test")
+        mock_mcp_client.fuzzy_get.assert_called_once_with(
+            workspace_id="ws1",
+            name="test",
+            field="content",
+            threshold=0.5,
+            limit=50,
+        )
+
+
+class TestDetectPatterns:
+    """Tests for the detect_patterns MCP tool."""
+
+    def test_returns_json(self, mock_mcp_client):
+        from server.mcp.main import detect_patterns
+
+        mock_mcp_client.detect_patterns.return_value = {
+            "temporal_clusters": [{"date": "2026-07-06", "count": 5}],
+            "frequent_terms": [{"term": "AI", "count": 10}],
+            "co_occurrences": [{"pair": ("AI", "ML"), "count": 3}],
+            "total_memories": 100,
+            "summary": "Found patterns.",
+        }
+        result = detect_patterns(workspace_id="ws1")
+        assert "temporal_clusters" in result
+        assert "AI" in result
+        mock_mcp_client.detect_patterns.assert_called_once_with(
+            workspace_id="ws1",
+            limit=200,
+            include_clusters=True,
+            include_terms=True,
+            include_co_occur=True,
+        )
+
+    def test_disables_flags(self, mock_mcp_client):
+        from server.mcp.main import detect_patterns
+
+        mock_mcp_client.detect_patterns.return_value = {}
+        detect_patterns(
+            workspace_id="ws1",
+            limit=50,
+            include_clusters=False,
+            include_terms=True,
+            include_co_occur=False,
+        )
+        mock_mcp_client.detect_patterns.assert_called_once_with(
+            workspace_id="ws1",
+            limit=50,
+            include_clusters=False,
+            include_terms=True,
+            include_co_occur=False,
+        )
+
+
+class TestGetNoteByDate:
+    """Tests for the get_note_by_date MCP tool."""
+
+    def test_returns_notes_for_date(self, mock_mcp_client):
+        from server.mcp.main import get_note_by_date
+
+        mock_mcp_client.get_note_by_date.return_value = [
+            {"id": "n1", "title": "Test", "note_date": "2026-07-06", "content": "Content"},
+        ]
+        result = get_note_by_date(note_date="2026-07-06")
+        assert len(result) == 1
+        assert result[0]["title"] == "Test"
+        mock_mcp_client.get_note_by_date.assert_called_once_with("2026-07-06")
+
+    def test_empty_date(self, mock_mcp_client):
+        from server.mcp.main import get_note_by_date
+
+        mock_mcp_client.get_note_by_date.return_value = []
+        result = get_note_by_date(note_date="2099-01-01")
+        assert result == []
+        mock_mcp_client.get_note_by_date.assert_called_once_with("2099-01-01")
+
+
+class TestListMemories:
+    """Tests for the list_memories MCP tool."""
+
+    def test_lists_memories(self, mock_mcp_client):
+        from server.mcp.main import list_memories
+
+        mock_mcp_client.list_memories.return_value = [
+            {"id": "m1", "content": "First", "memory_type": "experience"},
+            {"id": "m2", "content": "Second", "memory_type": "experience"},
+        ]
+        result = list_memories(workspace_id="ws1")
+        assert len(result) == 2
+        assert result[0]["id"] == "m1"
+        mock_mcp_client.list_memories.assert_called_once_with(
+            "ws1",
+            "",
+            50,
+        )
+
+    def test_filters_by_memory_type(self, mock_mcp_client):
+        from server.mcp.main import list_memories
+
+        mock_mcp_client.list_memories.return_value = [
+            {"id": "m3", "content": "Observation", "memory_type": "observation"},
+        ]
+        result = list_memories(workspace_id="ws1", memory_type="observation", limit=10)
+        assert len(result) == 1
+        assert result[0]["memory_type"] == "observation"
+        mock_mcp_client.list_memories.assert_called_once_with(
+            "ws1",
+            "observation",
+            10,
+        )
+
+    def test_empty_workspace(self, mock_mcp_client):
+        from server.mcp.main import list_memories
+
+        mock_mcp_client.list_memories.return_value = []
+        result = list_memories(workspace_id="empty_ws")
+        assert result == []
+        mock_mcp_client.list_memories.assert_called_once_with(
+            "empty_ws",
+            "",
+            50,
+        )
+
+
+# ── glob_get ────────────────────────────────────────────────────────────
+
+
+class TestGlobGet:
+    """Tests for the glob_get MCP tool."""
+
+    def test_finds_matching_memories(self, mock_mcp_client):
+        from server.mcp.main import glob_get
+
+        mock_mcp_client.glob_get.return_value = [
+            {"id": "auth-token-1", "content": "Auth token config"},
+            {"id": "auth-token-2", "content": "Another auth token"},
+        ]
+        result = glob_get(workspace_id="ws1", pattern="auth-*")
+        assert "auth-token-1" in result
+        assert "auth-token-2" in result
+        mock_mcp_client.glob_get.assert_called_once_with(
+            workspace_id="ws1",
+            pattern="auth-*",
+            field="id",
+            limit=200,
+        )
+
+    def test_no_matches_returns_message(self, mock_mcp_client):
+        from server.mcp.main import glob_get
+
+        mock_mcp_client.glob_get.return_value = []
+        result = glob_get(workspace_id="ws1", pattern="nope-*")
+        assert "No memories matching pattern" in result
+        assert "nope-*" in result
+
+    def test_custom_field_and_limit(self, mock_mcp_client):
+        from server.mcp.main import glob_get
+
+        mock_mcp_client.glob_get.return_value = [
+            {"id": "m1", "content": "agent memory"},
+        ]
+        result = glob_get(workspace_id="ws1", pattern="*agent*", field="content", limit=50)
+        assert "agent memory" in result
+        mock_mcp_client.glob_get.assert_called_once_with(
+            workspace_id="ws1",
+            pattern="*agent*",
+            field="content",
+            limit=50,
+        )
+
+    def test_empty_pattern(self, mock_mcp_client):
+        from server.mcp.main import glob_get
+
+        mock_mcp_client.glob_get.return_value = []
+        result = glob_get(workspace_id="ws1", pattern="")
+        assert "No memories matching pattern" in result
+        mock_mcp_client.glob_get.assert_called_once_with(
+            workspace_id="ws1",
+            pattern="",
+            field="id",
+            limit=200,
+        )
+
+
+# ── search_with_filters ─────────────────────────────────────────────────
+
+
+class TestSearchWithFilters:
+    """Tests for the search_with_filters MCP tool."""
+
+    def test_filters_by_metadata(self, mock_mcp_client):
+        from server.mcp.main import search_with_filters
+
+        mock_mcp_client.search_with_filters.return_value = [
+            {"id": "m1", "content": "Confidential doc", "metadata": {"source": "wiki"}},
+            {"id": "m2", "content": "Another doc", "metadata": {"source": "wiki"}},
+        ]
+        result = search_with_filters(
+            workspace_id="ws1",
+            metadata_filter='{"source": "wiki"}',
+        )
+        assert len(result) == 2
+        assert result[0]["metadata"]["source"] == "wiki"
+        mock_mcp_client.search_with_filters.assert_called_once_with(
+            workspace_id="ws1",
+            query="",
+            memory_type="",
+            tier="",
+            metadata_filter='{"source": "wiki"}',
+            location_filter="",
+            limit=20,
+            return_schema=None,
+        )
+
+    def test_filters_by_location(self, mock_mcp_client):
+        from server.mcp.main import search_with_filters
+
+        mock_mcp_client.search_with_filters.return_value = [
+            {"id": "m1", "content": "Nearby place", "location": {"lat": 37.77}},
+        ]
+        result = search_with_filters(
+            workspace_id="ws1",
+            location_filter='{"lat": 37.77, "lng": -122.42}',
+        )
+        assert len(result) == 1
+        assert result[0]["id"] == "m1"
+        mock_mcp_client.search_with_filters.assert_called_once_with(
+            workspace_id="ws1",
+            query="",
+            memory_type="",
+            tier="",
+            metadata_filter="",
+            location_filter='{"lat": 37.77, "lng": -122.42}',
+            limit=20,
+            return_schema=None,
+        )
+
+    def test_all_params_passed(self, mock_mcp_client):
+        from server.mcp.main import search_with_filters
+
+        mock_mcp_client.search_with_filters.return_value = []
+        search_with_filters(
+            workspace_id="ws2",
+            query="test query",
+            memory_type="note",
+            tier="L0",
+            metadata_filter='{"priority": "high"}',
+            location_filter='{"city": "NYC"}',
+            limit=5,
+        )
+        mock_mcp_client.search_with_filters.assert_called_once_with(
+            workspace_id="ws2",
+            query="test query",
+            memory_type="note",
+            tier="L0",
+            metadata_filter='{"priority": "high"}',
+            location_filter='{"city": "NYC"}',
+            limit=5,
+            return_schema=None,
+        )
+
+    def test_empty_result_returns_empty_list(self, mock_mcp_client):
+        from server.mcp.main import search_with_filters
+
+        mock_mcp_client.search_with_filters.return_value = []
+        result = search_with_filters(workspace_id="ws1")
+        assert result == []
+
+
+# ── Citation tools (add_node_citation, add_edge_citation, get_citations) ──
+
+
+class TestAddNodeCitation:
+    """Tests for the add_node_citation MCP tool."""
+
+    def test_adds_citation(self, mock_mcp_client):
+        from server.mcp.main import add_node_citation
+
+        mock_mcp_client.add_node_citation.return_value = {
+            "status": "ok",
+            "citation_id": "cit1",
+        }
+        result = add_node_citation(
+            workspace_id="ws1",
+            node_id="n1",
+            memory_id="mem1",
+            description="Supports the entity summary",
+        )
+        assert result["status"] == "ok"
+        assert result["citation_id"] == "cit1"
+        mock_mcp_client.add_node_citation.assert_called_once_with(
+            "ws1",
+            "n1",
+            "mem1",
+            "Supports the entity summary",
+        )
+
+    def test_minimal_args(self, mock_mcp_client):
+        from server.mcp.main import add_node_citation
+
+        mock_mcp_client.add_node_citation.return_value = {"status": "ok"}
+        result = add_node_citation(
+            workspace_id="ws1",
+            node_id="n1",
+            memory_id="mem1",
+        )
+        assert result["status"] == "ok"
+        mock_mcp_client.add_node_citation.assert_called_once_with(
+            "ws1",
+            "n1",
+            "mem1",
+            "",
+        )
+
+
+class TestAddEdgeCitation:
+    """Tests for the add_edge_citation MCP tool."""
+
+    def test_adds_edge_citation(self, mock_mcp_client):
+        from server.mcp.main import add_edge_citation
+
+        mock_mcp_client.add_edge_citation.return_value = {
+            "status": "ok",
+            "citation_id": "cit2",
+        }
+        result = add_edge_citation(
+            workspace_id="ws1",
+            edge_id="e1",
+            memory_id="mem2",
+            description="Supports this edge relationship",
+        )
+        assert result["status"] == "ok"
+        mock_mcp_client.add_edge_citation.assert_called_once_with(
+            "ws1",
+            "e1",
+            "mem2",
+            "Supports this edge relationship",
+        )
+
+    def test_edge_citation_minimal(self, mock_mcp_client):
+        from server.mcp.main import add_edge_citation
+
+        mock_mcp_client.add_edge_citation.return_value = {"status": "ok"}
+        result = add_edge_citation(
+            workspace_id="ws1",
+            edge_id="e1",
+            memory_id="mem2",
+        )
+        assert result["status"] == "ok"
+        mock_mcp_client.add_edge_citation.assert_called_once_with(
+            "ws1",
+            "e1",
+            "mem2",
+            "",
+        )
+
+
+class TestGetCitations:
+    """Tests for the get_citations MCP tool."""
+
+    def test_gets_citations_for_node(self, mock_mcp_client):
+        from server.mcp.main import get_citations
+
+        mock_mcp_client.get_citations.return_value = [
+            {
+                "entity_id": "n1",
+                "entity_type": "node",
+                "source_memory_id": "mem1",
+                "description": "Supports entity",
+                "created_at": 1700000000,
+            },
+        ]
+        result = get_citations(
+            workspace_id="ws1",
+            entity_id="n1",
+            entity_type="node",
+        )
+        assert len(result) == 1
+        assert result[0]["source_memory_id"] == "mem1"
+        mock_mcp_client.get_citations.assert_called_once_with(
+            "ws1",
+            "n1",
+            "node",
+        )
+
+    def test_gets_citations_for_edge(self, mock_mcp_client):
+        from server.mcp.main import get_citations
+
+        mock_mcp_client.get_citations.return_value = [
+            {
+                "entity_id": "e1",
+                "entity_type": "edge",
+                "source_memory_id": "mem2",
+                "description": "Supports edge",
+            },
+        ]
+        result = get_citations(
+            workspace_id="ws1",
+            entity_id="e1",
+            entity_type="edge",
+        )
+        assert len(result) == 1
+        assert result[0]["entity_type"] == "edge"
+        mock_mcp_client.get_citations.assert_called_once_with(
+            "ws1",
+            "e1",
+            "edge",
+        )
+
+    def test_empty_citations(self, mock_mcp_client):
+        from server.mcp.main import get_citations
+
+        mock_mcp_client.get_citations.return_value = []
+        result = get_citations(
+            workspace_id="ws1",
+            entity_id="nonexistent",
+        )
+        assert result == []
+        mock_mcp_client.get_citations.assert_called_once_with(
+            "ws1",
+            "nonexistent",
+            "node",
+        )
+
+    def test_default_entity_type_is_node(self, mock_mcp_client):
+        from server.mcp.main import get_citations
+
+        mock_mcp_client.get_citations.return_value = []
+        get_citations(workspace_id="ws1", entity_id="n1")
+        mock_mcp_client.get_citations.assert_called_once_with(
+            "ws1",
+            "n1",
+            "node",
+        )
+
+
+# ── delete_tour ─────────────────────────────────────────────────────
+
+
+class TestDeleteTour:
+    """Tests for the delete_tour MCP tool."""
+
+    def test_deletes_tour(self, mock_mcp_client):
+        from server.mcp.main import delete_tour
+
+        result = delete_tour(tour_id="tour123")
+        assert "deleted" in result
+        assert "tour123" in result
+        mock_mcp_client.delete_tour.assert_called_once_with("tour123")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import delete_tour
+
+        delete_tour(tour_id="my-tour-id")
+        mock_mcp_client.delete_tour.assert_called_once_with("my-tour-id")
+
+
+# ── delete_tour_stop ─────────────────────────────────────────────────
+
+
+class TestDeleteTourStop:
+    """Tests for the delete_tour_stop MCP tool."""
+
+    def test_deletes_stop(self, mock_mcp_client):
+        from server.mcp.main import delete_tour_stop
+
+        result = delete_tour_stop(stop_id="stop123")
+        assert "deleted" in result
+        assert "stop123" in result
+        mock_mcp_client.delete_tour_stop.assert_called_once_with("stop123")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import delete_tour_stop
+
+        delete_tour_stop(stop_id="my-stop-id")
+        mock_mcp_client.delete_tour_stop.assert_called_once_with("my-stop-id")
+
+
+# ── resolve_entity ──────────────────────────────────────────────────
+
+
+class TestResolveEntity:
+    """Tests for the resolve_entity MCP tool."""
+
+    def test_resolves_entity(self, mock_mcp_client):
+        from server.mcp.main import resolve_entity
+
+        result = resolve_entity(workspace_id="ws1", name="Alice")
+        assert "resolved" in result
+        assert "Alice" in result
+        assert "ws1" in result
+        mock_mcp_client.resolve_entity.assert_called_once_with("ws1", "Alice")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import resolve_entity
+
+        resolve_entity(workspace_id="ws-abc", name="Bob")
+        mock_mcp_client.resolve_entity.assert_called_once_with("ws-abc", "Bob")
+
+
+# ── get_directory ────────────────────────────────────────────────────────
+
+
+class TestGetDirectory:
+    """Tests for the get_directory MCP tool."""
+
+    def test_gets_by_id(self, mock_mcp_client):
+        from server.mcp.main import get_directory
+
+        mock_mcp_client.get_directory.return_value = [
+            {"id": "dir1", "name": "Projects", "path": "/projects"},
+        ]
+        result = get_directory(workspace_id="ws1", path_or_id="dir1")
+        assert "dir1" in result
+        assert "Projects" in result
+        mock_mcp_client.get_directory.assert_called_once_with("ws1", "dir1")
+
+    def test_gets_by_path(self, mock_mcp_client):
+        from server.mcp.main import get_directory
+
+        get_directory(workspace_id="ws1", path_or_id="/projects/ai")
+        mock_mcp_client.get_directory.assert_called_once_with("ws1", "/projects/ai")
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import get_directory
+
+        mock_mcp_client.get_directory.return_value = []
+        result = get_directory(workspace_id="ws1", path_or_id="nonexistent")
+        assert "[]" in result
+
+
+# ── link_memory_to_directory / unlink_memory_from_directory ────────────
+
+
+class TestLinkMemoryToDirectory:
+    """Tests for the link_memory_to_directory MCP tool."""
+
+    def test_links_memory(self, mock_mcp_client):
+        from server.mcp.main import link_memory_to_directory
+
+        result = link_memory_to_directory(
+            directory_id="dir-abc", memory_id="mem-xyz", workspace_id="ws1"
+        )
+        assert "link" in result.lower()
+        mock_mcp_client.link_memory_to_directory.assert_called_once_with(
+            "dir-abc", "mem-xyz", "ws1"
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import link_memory_to_directory
+
+        link_memory_to_directory("d1", "m1", "w1")
+        mock_mcp_client.link_memory_to_directory.assert_called_once_with("d1", "m1", "w1")
+
+
+class TestUnlinkMemoryFromDirectory:
+    """Tests for the unlink_memory_from_directory MCP tool."""
+
+    def test_unlinks_memory(self, mock_mcp_client):
+        from server.mcp.main import unlink_memory_from_directory
+
+        result = unlink_memory_from_directory(directory_id="dir-abc", memory_id="mem-xyz")
+        assert "unlink" in result.lower()
+        mock_mcp_client.unlink_memory_from_directory.assert_called_once_with("dir-abc", "mem-xyz")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import unlink_memory_from_directory
+
+        unlink_memory_from_directory("d1", "m1")
+        mock_mcp_client.unlink_memory_from_directory.assert_called_once_with("d1", "m1")
+
+
+# ── backup / restore ──────────────────────────────────────────────────
+
+
+class TestBackup:
+    """Tests for the backup MCP tool."""
+
+    def test_backup_with_default_path(self, mock_mcp_client):
+        from server.mcp.main import backup
+
+        mock_mcp_client.backup.return_value = {
+            "status": "ok",
+            "path": "spacetime-memory-backup-2026-07-27.json",
+            "tables": ["memory", "note", "kg_node"],
+            "total_rows": 150,
+            "table_count": 3,
+        }
+        result = backup(workspace_id="default")
+        assert "Backup written" in result
+        assert "150" in result
+        mock_mcp_client.backup.assert_called_once_with(output_path=None)
+
+    def test_backup_with_custom_path(self, mock_mcp_client):
+        from server.mcp.main import backup
+
+        mock_mcp_client.backup.return_value = {
+            "status": "ok",
+            "path": "/tmp/my-backup.json",
+            "tables": ["memory"],
+            "total_rows": 42,
+            "table_count": 1,
+        }
+        result = backup(workspace_id="ws1", output_path="/tmp/my-backup.json")
+        assert "/tmp/my-backup.json" in result
+        assert "42" in result
+        mock_mcp_client.backup.assert_called_once_with(output_path="/tmp/my-backup.json")
+
+    def test_backup_empty_result(self, mock_mcp_client):
+        from server.mcp.main import backup
+
+        mock_mcp_client.backup.return_value = {
+            "status": "ok",
+            "path": "backup.json",
+            "tables": [],
+            "total_rows": 0,
+            "table_count": 0,
+        }
+        result = backup(workspace_id="empty")
+        assert "0" in result
+
+
+class TestRestore:
+    """Tests for the restore MCP tool."""
+
+    def test_restore_success(self, mock_mcp_client):
+        from server.mcp.main import restore
+
+        mock_mcp_client.restore.return_value = {
+            "restored": ["memory", "note"],
+            "total_rows": 200,
+        }
+        result = restore(input_path="/tmp/backup.json")
+        assert "200" in result
+        assert "2 table(s)" in result
+        mock_mcp_client.restore.assert_called_once_with("/tmp/backup.json")
+
+    def test_restore_no_data(self, mock_mcp_client):
+        from server.mcp.main import restore
+
+        mock_mcp_client.restore.return_value = {
+            "restored": [],
+            "total_rows": 0,
+        }
+        result = restore(input_path="/tmp/empty-backup.json")
+        assert "0" in result
+
+
+# ── create_api_key / deactivate_api_key / list_api_keys ────────────────
+
+
+class TestCreateApiKey:
+    """Tests for the create_api_key MCP tool."""
+
+    def test_creates_key(self, mock_mcp_client):
+        from server.mcp.main import create_api_key
+
+        mock_mcp_client.create_api_key.return_value = {
+            "status": "ok",
+            "api_key": "sk-abc123...",
+            "id": "key-001",
+        }
+        result = create_api_key(
+            workspace_id="ws1",
+            name="test-key",
+            permissions='["read"]',
+        )
+        assert "test-key" in result
+        assert "sk-abc123" in result
+        assert "key-001" in result
+        assert "Save this secret" in result
+        mock_mcp_client.create_api_key.assert_called_once_with(
+            workspace_id="ws1",
+            name="test-key",
+            permissions='["read"]',
+        )
+
+    def test_creates_key_with_write_perms(self, mock_mcp_client):
+        from server.mcp.main import create_api_key
+
+        mock_mcp_client.create_api_key.return_value = {
+            "status": "ok",
+            "api_key": "sk-xyz...",
+            "id": "key-002",
+        }
+        result = create_api_key(
+            workspace_id="ws1",
+            name="admin-key",
+            permissions='["read", "write"]',
+        )
+        assert "admin-key" in result
+        mock_mcp_client.create_api_key.assert_called_once_with(
+            workspace_id="ws1",
+            name="admin-key",
+            permissions='["read", "write"]',
+        )
+
+
+class TestDeactivateApiKey:
+    """Tests for the deactivate_api_key MCP tool."""
+
+    def test_deactivates_key(self, mock_mcp_client):
+        from server.mcp.main import deactivate_api_key
+
+        mock_mcp_client.deactivate_api_key.return_value = {
+            "status": "ok",
+        }
+        result = deactivate_api_key(key_id="key-001")
+        assert "key-001" in result
+        assert "deactivated" in result
+        mock_mcp_client.deactivate_api_key.assert_called_once_with("key-001")
+
+    def test_deactivate_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import deactivate_api_key
+
+        deactivate_api_key(key_id="key-abc")
+        mock_mcp_client.deactivate_api_key.assert_called_once_with("key-abc")
+
+
+class TestListApiKeys:
+    """Tests for the list_api_keys MCP tool."""
+
+    def test_lists_keys(self, mock_mcp_client):
+        from server.mcp.main import list_api_keys
+
+        mock_mcp_client.list_api_keys.return_value = [
+            {
+                "api_key_id": "key-001",
+                "name": "read-key",
+                "permissions": '["read"]',
+                "is_active": True,
+                "created_at": 1000,
+            },
+            {
+                "api_key_id": "key-002",
+                "name": "admin-key",
+                "permissions": '["read", "write"]',
+                "is_active": False,
+                "created_at": 2000,
+            },
+        ]
+        result = list_api_keys(workspace_id="ws1")
+        assert "Total: 2" in result
+        assert "read-key" in result
+        assert "admin-key" in result
+        assert "✅" in result
+        assert "❌" in result
+        mock_mcp_client.list_api_keys.assert_called_once_with("ws1")
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import list_api_keys
+
+        mock_mcp_client.list_api_keys.return_value = []
+        result = list_api_keys(workspace_id="ws1")
+        assert "No API keys found" in result
+        mock_mcp_client.list_api_keys.assert_called_once_with("ws1")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import list_api_keys
+
+        mock_mcp_client.list_api_keys.return_value = []
+        list_api_keys(workspace_id="ws-abc")
+        mock_mcp_client.list_api_keys.assert_called_once_with("ws-abc")
+
+
+# ── set_workspace_context / set_memory_context / get_context_chain ──────
+
+
+class TestSetWorkspaceContext:
+    """Tests for the set_workspace_context MCP tool."""
+
+    def test_sets_context(self, mock_mcp_client):
+        from server.mcp.main import set_workspace_context
+
+        mock_mcp_client.set_workspace_context.return_value = {
+            "status": "ok",
+        }
+        result = set_workspace_context(workspace_id="ws1", context="Agent session context data")
+        assert "ok" in result.get("status", "")
+        mock_mcp_client.set_workspace_context.assert_called_once_with(
+            "ws1", "Agent session context data"
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import set_workspace_context
+
+        set_workspace_context(workspace_id="ws-abc", context="test context")
+        mock_mcp_client.set_workspace_context.assert_called_once_with("ws-abc", "test context")
+
+
+class TestSetMemoryContext:
+    """Tests for the set_memory_context MCP tool."""
+
+    def test_sets_context(self, mock_mcp_client):
+        from server.mcp.main import set_memory_context
+
+        mock_mcp_client.set_memory_context.return_value = {
+            "status": "ok",
+        }
+        result = set_memory_context(memory_id="mem-123", context="Memory-specific context")
+        assert "ok" in result.get("status", "")
+        mock_mcp_client.set_memory_context.assert_called_once_with(
+            "mem-123", "Memory-specific context"
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import set_memory_context
+
+        set_memory_context(memory_id="mem-xyz", context="ctx")
+        mock_mcp_client.set_memory_context.assert_called_once_with("mem-xyz", "ctx")
+
+
+class TestGetContextChain:
+    """Tests for the get_context_chain MCP tool."""
+
+    def test_gets_context_chain(self, mock_mcp_client):
+        from server.mcp.main import get_context_chain
+
+        mock_mcp_client.get_context_chain.return_value = {
+            "workspace_context": "WS context",
+            "memory_context": "Memory context",
+        }
+        result = get_context_chain(memory_id="mem-123")
+        assert result["workspace_context"] == "WS context"
+        assert result["memory_context"] == "Memory context"
+        mock_mcp_client.get_context_chain.assert_called_once_with("mem-123")
+
+    def test_empty_chain(self, mock_mcp_client):
+        from server.mcp.main import get_context_chain
+
+        mock_mcp_client.get_context_chain.return_value = {
+            "workspace_context": "",
+            "memory_context": "",
+        }
+        result = get_context_chain(memory_id="mem-nonexistent")
+        assert result["workspace_context"] == ""
+        assert result["memory_context"] == ""
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import get_context_chain
+
+        get_context_chain(memory_id="mem-xyz")
+        mock_mcp_client.get_context_chain.assert_called_once_with("mem-xyz")
+
+
+# ── set_decay_model / get_decay_config (decay model tools) ──────────────
+
+
+class TestSetDecayModel:
+    """Tests for the set_decay_model MCP tool."""
+
+    def test_sets_linear_default(self, mock_mcp_client):
+        from server.mcp.main import set_decay_model
+
+        mock_mcp_client.set_decay_model.return_value = {"status": "ok"}
+        result = set_decay_model(
+            workspace_id="ws1",
+        )
+        assert "Decay model configured" in result
+        assert "linear" in result
+        mock_mcp_client.set_decay_model.assert_called_once_with(
+            workspace_id="ws1",
+            model="linear",
+            decay_rate=0.005,
+            max_days=90,
+            weibull_shape=0.6,
+            weibull_scale=30.0,
+        )
+
+    def test_sets_weibull(self, mock_mcp_client):
+        from server.mcp.main import set_decay_model
+
+        mock_mcp_client.set_decay_model.return_value = {"status": "ok"}
+        result = set_decay_model(
+            workspace_id="ws2",
+            model="weibull",
+            weibull_shape=0.8,
+            weibull_scale=45.0,
+        )
+        assert "weibull" in result
+        mock_mcp_client.set_decay_model.assert_called_once_with(
+            workspace_id="ws2",
+            model="weibull",
+            decay_rate=0.005,
+            max_days=90,
+            weibull_shape=0.8,
+            weibull_scale=45.0,
+        )
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import set_decay_model
+
+        mock_mcp_client.set_decay_model.return_value = {"status": "ok"}
+        set_decay_model(workspace_id="ws-abc", model="linear", decay_rate=0.01)
+        mock_mcp_client.set_decay_model.assert_called_once_with(
+            workspace_id="ws-abc",
+            model="linear",
+            decay_rate=0.01,
+            max_days=90,
+            weibull_shape=0.6,
+            weibull_scale=30.0,
+        )
+
+
+class TestGetDecayConfig:
+    """Tests for the get_decay_config MCP tool."""
+
+    def test_returns_config(self, mock_mcp_client):
+        from server.mcp.main import get_decay_config
+
+        mock_mcp_client.get_decay_config.return_value = {
+            "id": "ws1",
+            "model": "linear",
+            "decay_rate": 0.005,
+            "max_days": 90,
+        }
+        result = get_decay_config(workspace_id="ws1")
+        assert "Decay config" in result
+        assert "model" in result
+        assert "linear" in result
+        assert "decay_rate" in result
+        mock_mcp_client.get_decay_config.assert_called_once_with("ws1")
+
+    def test_no_config(self, mock_mcp_client):
+        from server.mcp.main import get_decay_config
+
+        mock_mcp_client.get_decay_config.return_value = None
+        result = get_decay_config(workspace_id="ws-none")
+        assert "No decay configuration" in result
+        mock_mcp_client.get_decay_config.assert_called_once_with("ws-none")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import get_decay_config
+
+        mock_mcp_client.get_decay_config.return_value = None
+        get_decay_config(workspace_id="ws-abc")
+        mock_mcp_client.get_decay_config.assert_called_once_with("ws-abc")
+
+
+# ── batch_update_memories ────────────────────────────────────────────────
+
+
+class TestBatchUpdateMemories:
+    """Tests for the batch_update_memories MCP tool."""
+
+    def test_batch_updates_success(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+
+        mock_mcp_client.batch_update_memories.return_value = {
+            "status": "ok",
+            "updated": 2,
+        }
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='["mem-001", "mem-002"]',
+            updates_json='{"summary": "Updated summary", "confidence": 0.95}',
+        )
+        assert "Batch update complete" in result
+        assert "ok" in result
+        assert "2/2" in result
+        mock_mcp_client.batch_update_memories.assert_called_once_with(
+            workspace_id="ws1",
+            memory_ids=["mem-001", "mem-002"],
+            updates={"summary": "Updated summary", "confidence": 0.95},
+        )
+
+    def test_batch_partial_errors(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+
+        mock_mcp_client.batch_update_memories.return_value = {
+            "status": "partial",
+            "updated": 1,
+            "errors": ["Memory 'mem-002' not found"],
+        }
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='["mem-001", "mem-002"]',
+            updates_json='{"confidence": 0.9}',
+        )
+        assert "partial" in result
+        assert "1/2" in result
+        assert "Memory 'mem-002' not found" in result
+        mock_mcp_client.batch_update_memories.assert_called_once_with(
+            workspace_id="ws1",
+            memory_ids=["mem-001", "mem-002"],
+            updates={"confidence": 0.9},
+        )
+
+    def test_invalid_memory_ids_json(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json="not-json",
+            updates_json='{"summary": "test"}',
+        )
+        assert "Error" in result
+        assert "valid JSON array" in result
+
+    def test_invalid_updates_json(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='["mem-001"]',
+            updates_json="not-json",
+        )
+        assert "Error" in result
+        assert "valid JSON object" in result
+
+    def test_non_array_memory_ids(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='"not-an-array"',
+            updates_json='{"summary": "test"}',
+        )
+        assert "Error" in result
+        assert "JSON array" in result
+
+    def test_non_dict_updates(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+
+        result = batch_update_memories(
+            workspace_id="ws1",
+            memory_ids_json='["mem-001"]',
+            updates_json='"not-a-dict"',
+        )
+        assert "Error" in result
+        assert "JSON object" in result
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import batch_update_memories
+
+        mock_mcp_client.batch_update_memories.return_value = {
+            "status": "ok",
+            "updated": 1,
+        }
+        batch_update_memories(
+            workspace_id="ws-abc",
+            memory_ids_json='["mem-xyz"]',
+            updates_json='{"tier": "important"}',
+        )
+        mock_mcp_client.batch_update_memories.assert_called_once_with(
+            workspace_id="ws-abc",
+            memory_ids=["mem-xyz"],
+            updates={"tier": "important"},
+        )
+
+
+# ── ping ──────────────────────────────────────────────────────────────────
+
+
+class TestPing:
+    """Tests for the ping MCP diagnostic tool."""
+
+    def test_ping_ok(self, mock_mcp_client):
+        from server.mcp.main import ping
+
+        mock_mcp_client.ping.return_value = {
+            "status": "ok",
+            "latency_ms": 3.2,
+        }
+        result = ping()
+        assert "reachable" in result
+        assert "3.2" in result
+        mock_mcp_client.ping.assert_called_once_with()
+
+    def test_ping_error(self, mock_mcp_client):
+        from server.mcp.main import ping
+
+        mock_mcp_client.ping.return_value = {
+            "status": "error",
+            "message": "Connection refused",
+            "latency_ms": 5001.0,
+        }
+        result = ping()
+        assert "unreachable" in result
+        assert "Connection refused" in result
+        assert "5001" in result
+        mock_mcp_client.ping.assert_called_once_with()
+
+    def test_ping_unknown_status(self, mock_mcp_client):
+        from server.mcp.main import ping
+
+        mock_mcp_client.ping.return_value = {
+            "latency_ms": 0.0,
+        }
+        result = ping()
+        assert "unreachable" in result or "unknown" in result.lower()
+        mock_mcp_client.ping.assert_called_once_with()
+
+    def test_ping_calls_client(self, mock_mcp_client):
+        from server.mcp.main import ping
+
+        mock_mcp_client.ping.return_value = {
+            "status": "ok",
+            "latency_ms": 1.0,
+        }
+        ping()
+        mock_mcp_client.ping.assert_called_once_with()
+
+
+# ── add_alias ─────────────────────────────────────────────────────────────
+
+
+class TestAddAlias:
+    """Tests for the add_alias MCP tool."""
+
+    def test_adds_alias(self, mock_mcp_client):
+        from server.mcp.main import add_alias
+
+        mock_mcp_client.add_alias.return_value = None
+        result = add_alias(entity_link_id="el-123", alias="Bob")
+        assert "Alias" in result
+        assert "Bob" in result
+        assert "el-123" in result
+        mock_mcp_client.add_alias.assert_called_once_with("el-123", "Bob")
+
+    def test_calls_client_method(self, mock_mcp_client):
+        from server.mcp.main import add_alias
+
+        mock_mcp_client.add_alias.return_value = None
+        add_alias(entity_link_id="el-xyz-987", alias="Alice")
+        mock_mcp_client.add_alias.assert_called_once_with("el-xyz-987", "Alice")
+
+
+# ── list_peers ─────────────────────────────────────────────────────────────
+
+
+class TestListPeers:
+    """Tests for the list_peers MCP tool."""
+
+    def test_lists_all_peers(self, mock_mcp_client):
+        from server.mcp.main import list_peers
+
+        mock_mcp_client.list_peers.return_value = [
+            {"peer_id": "peer-001", "workspace_id": "ws1"},
+            {"peer_id": "peer-002", "workspace_id": "ws1"},
+        ]
+        result = list_peers()
+        assert len(result) == 2
+        assert result[0]["peer_id"] == "peer-001"
+        assert result[1]["peer_id"] == "peer-002"
+        mock_mcp_client.list_peers.assert_called_once_with(None)
+
+    def test_filters_by_workspace(self, mock_mcp_client):
+        from server.mcp.main import list_peers
+
+        mock_mcp_client.list_peers.return_value = [
+            {"peer_id": "peer-001", "workspace_id": "ws1"},
+        ]
+        result = list_peers(workspace_id="ws1")
+        assert len(result) == 1
+        mock_mcp_client.list_peers.assert_called_once_with("ws1")
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import list_peers
+
+        mock_mcp_client.list_peers.return_value = []
+        result = list_peers(workspace_id="empty-ws")
+        assert result == []
+        mock_mcp_client.list_peers.assert_called_once_with("empty-ws")
+
+    def test_returns_profile_metadata(self, mock_mcp_client):
+        from server.mcp.main import list_peers
+
+        mock_mcp_client.list_peers.return_value = [
+            {
+                "peer_id": "peer-003",
+                "workspace_id": "ws2",
+                "profile": {"name": "Alice", "tags": ["researcher"]},
+            },
+        ]
+        result = list_peers()
+        assert result[0]["profile"]["name"] == "Alice"
+        assert "researcher" in result[0]["profile"]["tags"]
+
+
+# ── list_profiles ────────────────────────────────────────────────────────────
+
+
+class TestListProfiles:
+    """Tests for the list_profiles MCP tool."""
+
+    def test_lists_profiles_for_workspace(self, mock_mcp_client):
+        from server.mcp.main import list_profiles
+
+        mock_mcp_client.list_profiles.return_value = [
+            {"peer_id": "p1", "static_facts_json": "[]", "tags_json": "[]"},
+            {"peer_id": "p2", "static_facts_json": "[]", "tags_json": "[]"},
+        ]
+        result = list_profiles(workspace_id="ws-1")
+        assert len(result) == 2
+        assert result[0]["peer_id"] == "p1"
+        assert result[1]["peer_id"] == "p2"
+        mock_mcp_client.list_profiles.assert_called_once_with("ws-1")
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import list_profiles
+
+        mock_mcp_client.list_profiles.return_value = []
+        result = list_profiles(workspace_id="empty-ws")
+        assert result == []
+        mock_mcp_client.list_profiles.assert_called_once_with("empty-ws")
+
+    def test_returns_profile_details(self, mock_mcp_client):
+        from server.mcp.main import list_profiles
+
+        mock_mcp_client.list_profiles.return_value = [
+            {
+                "peer_id": "p-003",
+                "static_facts_json": '[{"key": "expertise", "value": "AI"}]',
+                "dynamic_context_json": '{"status": "active"}',
+                "tags_json": '["researcher"]',
+            },
+        ]
+        result = list_profiles(workspace_id="ws-2")
+        assert "AI" in result[0]["static_facts_json"]
+        assert "active" in result[0]["dynamic_context_json"]
+        assert mock_mcp_client.list_profiles.call_count == 1
+
+
+# ── get_peer_reputation ──────────────────────────────────────────────────────
+
+
+class TestGetPeerReputation:
+    """Tests for the get_peer_reputation MCP tool."""
+
+    def test_returns_reputation_for_peer(self, mock_mcp_client):
+        from server.mcp.main import get_peer_reputation
+
+        mock_mcp_client.get_peer_reputation.return_value = {
+            "id": "peer-001",
+            "trust_score": 0.92,
+            "feedback_count": 15,
+            "positive_feedback": 14,
+            "negative_feedback": 1,
+        }
+        result = get_peer_reputation(peer_id="peer-001")
+        assert result["id"] == "peer-001"
+        assert result["trust_score"] == 0.92
+        assert result["feedback_count"] == 15
+        mock_mcp_client.get_peer_reputation.assert_called_once_with("peer-001")
+
+    def test_returns_none_for_unknown_peer(self, mock_mcp_client):
+        from server.mcp.main import get_peer_reputation
+
+        mock_mcp_client.get_peer_reputation.return_value = None
+        result = get_peer_reputation(peer_id="unknown-peer")
+        assert result is None
+        mock_mcp_client.get_peer_reputation.assert_called_once_with("unknown-peer")
+
+    def test_includes_all_reputation_fields(self, mock_mcp_client):
+        from server.mcp.main import get_peer_reputation
+
+        mock_mcp_client.get_peer_reputation.return_value = {
+            "id": "peer-002",
+            "trust_score": 0.75,
+            "feedback_count": 8,
+            "positive_feedback": 6,
+            "negative_feedback": 2,
+            "last_updated": "2026-06-27T12:00:00Z",
+        }
+        result = get_peer_reputation(peer_id="peer-002")
+        assert result["trust_score"] == 0.75
+        assert result["feedback_count"] == 8
+        assert result["positive_feedback"] == 6
+        assert result["negative_feedback"] == 2
+        assert result["last_updated"] == "2026-06-27T12:00:00Z"
+
+
+# ── run_maintenance ──────────────────────────────────────────────────────────
+
+
+class TestRunMaintenance:
+    """Tests for the run_maintenance MCP tool."""
+
+    def test_triggers_maintenance(self, mock_mcp_client):
+        from server.mcp.main import run_maintenance
+
+        mock_mcp_client.run_maintenance.return_value = {
+            "status": "ok",
+            "expired": 5,
+            "decayed": 12,
+            "deduped": 3,
+        }
+        result = run_maintenance()
+        assert result["status"] == "ok"
+        assert result["expired"] == 5
+        assert result["decayed"] == 12
+        assert result["deduped"] == 3
+        mock_mcp_client.run_maintenance.assert_called_once_with()
+
+    def test_returns_clean_state(self, mock_mcp_client):
+        from server.mcp.main import run_maintenance
+
+        mock_mcp_client.run_maintenance.return_value = {
+            "status": "ok",
+            "expired": 0,
+            "decayed": 0,
+            "deduped": 0,
+        }
+        result = run_maintenance()
+        assert result["expired"] == 0
+        assert result["decayed"] == 0
+        assert result["deduped"] == 0
+
+
+# ── check_embedder_health ────────────────────────────────────────────────────
+
+
+class TestCheckEmbedderHealth:
+    """Tests for the check_embedder_health MCP tool."""
+
+    def test_returns_healthy(self, mock_mcp_client):
+        from server.mcp.main import check_embedder_health
+
+        mock_mcp_client.check_embedder_health.return_value = {
+            "status": "ok",
+            "reachable": True,
+            "model": "nomic-embed-text-v1.5",
+        }
+        result = check_embedder_health()
+        assert result["status"] == "ok"
+        assert result["reachable"] is True
+        mock_mcp_client.check_embedder_health.assert_called_once_with()
+
+    def test_returns_unreachable(self, mock_mcp_client):
+        from server.mcp.main import check_embedder_health
+
+        mock_mcp_client.check_embedder_health.return_value = {
+            "status": "error",
+            "reachable": False,
+            "message": "Connection refused",
+        }
+        result = check_embedder_health()
+        assert result["status"] == "error"
+        assert result["reachable"] is False
+        assert "Connection refused" in result["message"]
+
+    def test_returns_embedder_details(self, mock_mcp_client):
+        from server.mcp.main import check_embedder_health
+
+        mock_mcp_client.check_embedder_health.return_value = {
+            "status": "ok",
+            "reachable": True,
+            "model": "nomic-embed-text-v1.5",
+            "dimension": 768,
+            "uptime_seconds": 3600,
+        }
+        result = check_embedder_health()
+        assert result["model"] == "nomic-embed-text-v1.5"
+        assert result["dimension"] == 768
+        assert result["uptime_seconds"] == 3600
+
+
+# ── detect_communities ────────────────────────────────────────────────────
+
+
+class TestDetectCommunities:
+    """Tests for the detect_communities MCP tool."""
+
+    def test_detects_communities(self, mock_mcp_client):
+        from server.mcp.main import detect_communities
+
+        mock_mcp_client.detect_communities.return_value = {
+            "status": "ok",
+            "workspace_id": "ws-1",
+            "nodes_processed": 42,
+            "communities_found": 5,
+        }
+        result = detect_communities(workspace_id="ws-1")
+        assert result["status"] == "ok"
+        assert result["nodes_processed"] == 42
+        assert result["communities_found"] == 5
+        mock_mcp_client.detect_communities.assert_called_once_with("ws-1")
+
+    def test_no_nodes(self, mock_mcp_client):
+        from server.mcp.main import detect_communities
+
+        mock_mcp_client.detect_communities.return_value = {
+            "status": "ok",
+            "workspace_id": "empty-ws",
+            "nodes_processed": 0,
+            "communities_found": 0,
+        }
+        result = detect_communities(workspace_id="empty-ws")
+        assert result["nodes_processed"] == 0
+        assert result["communities_found"] == 0
+
+    def test_none_result(self, mock_mcp_client):
+        from server.mcp.main import detect_communities
+
+        mock_mcp_client.detect_communities.return_value = None
+        result = detect_communities(workspace_id="no-ws")
+        assert "error" in result
+
+
+# ── seed_communities ────────────────────────────────────────────────────
+
+
+class TestSeedCommunities:
+    """Tests for the seed_communities MCP tool."""
+
+    def test_seeds_communities(self, mock_mcp_client):
+        from server.mcp.main import seed_communities
+
+        mock_mcp_client.seed_communities.return_value = {
+            "status": "ok",
+            "workspace_id": "ws-1",
+        }
+        result = seed_communities(workspace_id="ws-1")
+        assert result["status"] == "ok"
+        assert result["workspace_id"] == "ws-1"
+        mock_mcp_client.seed_communities.assert_called_once_with("ws-1")
+
+    def test_no_unassigned_nodes(self, mock_mcp_client):
+        from server.mcp.main import seed_communities
+
+        mock_mcp_client.seed_communities.return_value = {
+            "status": "ok",
+            "workspace_id": "ws-empty",
+            "message": "All nodes already assigned to communities",
+        }
+        result = seed_communities(workspace_id="ws-empty")
+        assert result["status"] == "ok"
+        assert "All nodes already assigned" in result["message"]
+
+
+# ── detect_bridge_nodes ─────────────────────────────────────────────────
+
+
+class TestDetectBridgeNodes:
+    """Tests for the detect_bridge_nodes MCP tool."""
+
+    def test_detects_bridge_nodes(self, mock_mcp_client):
+        from server.mcp.main import detect_bridge_nodes
+
+        mock_mcp_client.detect_bridge_nodes.return_value = [
+            {"node_id": "n1", "label": "AI", "bridge_score": 0.85, "communities": [1, 2, 3]},
+            {"node_id": "n2", "label": "Data", "bridge_score": 0.72, "communities": [1, 4]},
+        ]
+        result = detect_bridge_nodes(workspace_id="ws-1")
+        import json
+
+        parsed = json.loads(result)
+        assert len(parsed) == 2
+        assert parsed[0]["node_id"] == "n1"
+        assert parsed[0]["bridge_score"] == 0.85
+        mock_mcp_client.detect_bridge_nodes.assert_called_once_with("ws-1", 20, 2)
+
+    def test_empty_result(self, mock_mcp_client):
+        from server.mcp.main import detect_bridge_nodes
+
+        mock_mcp_client.detect_bridge_nodes.return_value = []
+        result = detect_bridge_nodes(workspace_id="ws-nobridge")
+        import json
+
+        parsed = json.loads(result)
+        assert parsed == []
+
+    def test_with_custom_params(self, mock_mcp_client):
+        from server.mcp.main import detect_bridge_nodes
+
+        mock_mcp_client.detect_bridge_nodes.return_value = []
+        detect_bridge_nodes(workspace_id="ws-1", limit=10, min_communities=3)
+        mock_mcp_client.detect_bridge_nodes.assert_called_once_with("ws-1", 10, 3)
+
+
+# ── create_entity_link ──────────────────────────────────────────────────
+
+
+class TestCreateEntityLink:
+    """Tests for the create_entity_link MCP tool."""
+
+    def test_creates_entity_link(self, mock_mcp_client):
+        from server.mcp.main import create_entity_link
+
+        mock_mcp_client.create_entity_link.return_value = None  # returns None
+        result = create_entity_link(
+            workspace_id="ws-1",
+            canonical_name="Alice",
+            entity_type="person",
+            description="A researcher",
+        )
+        assert "Alice" in result
+        assert "ws-1" in result
+        mock_mcp_client.create_entity_link.assert_called_once_with(
+            "ws-1",
+            "Alice",
+            "person",
+            "A researcher",
+        )
+
+    def test_without_description(self, mock_mcp_client):
+        from server.mcp.main import create_entity_link
+
+        mock_mcp_client.create_entity_link.return_value = None
+        result = create_entity_link(
+            workspace_id="ws-1",
+            canonical_name="Bob",
+            entity_type="org",
+        )
+        assert "Bob" in result
+        mock_mcp_client.create_entity_link.assert_called_once_with(
+            "ws-1",
+            "Bob",
+            "org",
+            "",
+        )
+
+
+# ── list_context_packs ──────────────────────────────────────────────────
+
+
+class TestListContextPacks:
+    """Tests for the list_context_packs MCP tool."""
+
+    def test_lists_packs(self, mock_mcp_client):
+        from server.mcp.main import list_context_packs
+
+        mock_mcp_client.list_context_packs.return_value = [
+            {"id": "pack-1", "workspace_id": "ws-1", "created_at": "2026-06-27T00:00:00Z"},
+            {"id": "pack-2", "workspace_id": "ws-1", "created_at": "2026-06-27T01:00:00Z"},
+        ]
+        result = list_context_packs(workspace_id="ws-1")
+        assert len(result) == 2
+        assert result[0]["id"] == "pack-1"
+        mock_mcp_client.list_context_packs.assert_called_once_with("ws-1")
+
+    def test_empty_workspace(self, mock_mcp_client):
+        from server.mcp.main import list_context_packs
+
+        mock_mcp_client.list_context_packs.return_value = []
+        result = list_context_packs(workspace_id="empty-ws")
+        assert result == []
+
+
+# ── list_context_entries ────────────────────────────────────────────────
+
+
+class TestListContextEntries:
+    """Tests for the list_context_entries MCP tool."""
+
+    def test_lists_entries(self, mock_mcp_client):
+        from server.mcp.main import list_context_entries
+
+        mock_mcp_client.list_context_entries.return_value = [
+            {"id": "entry-1", "pack_id": "pack-1", "content": "Agent state: active"},
+        ]
+        result = list_context_entries(pack_id="pack-1")
+        assert len(result) == 1
+        assert result[0]["content"] == "Agent state: active"
+        mock_mcp_client.list_context_entries.assert_called_once_with("pack-1")
+
+    def test_no_entries(self, mock_mcp_client):
+        from server.mcp.main import list_context_entries
+
+        mock_mcp_client.list_context_entries.return_value = []
+        result = list_context_entries(pack_id="empty-pack")
+        assert result == []
+
+
+# ── list_context_deltas ─────────────────────────────────────────────────
+
+
+class TestListContextDeltas:
+    """Tests for the list_context_deltas MCP tool."""
+
+    def test_lists_deltas(self, mock_mcp_client):
+        from server.mcp.main import list_context_deltas
+
+        mock_mcp_client.list_context_deltas.return_value = [
+            {
+                "previous_pack_id": "pack-1",
+                "current_pack_id": "pack-2",
+                "change": "summary modified",
+            },
+        ]
+        result = list_context_deltas(previous_pack_id="pack-1")
+        assert len(result) == 1
+        assert result[0]["change"] == "summary modified"
+        mock_mcp_client.list_context_deltas.assert_called_once_with("pack-1")
+
+    def test_no_deltas(self, mock_mcp_client):
+        from server.mcp.main import list_context_deltas
+
+        mock_mcp_client.list_context_deltas.return_value = []
+        result = list_context_deltas(previous_pack_id="nonexistent")
+        assert result == []
+# ── require_api_key decorator ─────────────────────────────────────────────
+
+

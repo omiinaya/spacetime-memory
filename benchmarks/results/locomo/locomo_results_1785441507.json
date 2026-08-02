@@ -1,0 +1,92 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "bm25",
+    "judge_model": "deepseek-v4-flash-free",
+    "answer_model": "deepseek-v4-flash-free",
+    "total_questions": 5,
+    "primary_count": 5,
+    "timestamp": "2026-07-30T15:58:27.253606"
+  },
+  "metrics": {
+    "primary": {
+      "total": 5,
+      "correct": 5,
+      "accuracy": 100.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 1,
+        "correct": 1,
+        "accuracy": 100.0
+      },
+      "single-hop": {
+        "total": 2,
+        "correct": 2,
+        "accuracy": 100.0
+      },
+      "temporal": {
+        "total": 2,
+        "correct": 2,
+        "accuracy": 100.0
+      }
+    },
+    "overall": {
+      "total": 5,
+      "correct": 5,
+      "accuracy": 100.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "yesterday",
+      "is_correct": true,
+      "reasoning": "We are given: Question: \"When did Caroline go to the LGBTQ support group?\" Gold answer: \"7 May 2023\""
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "last year",
+      "is_correct": true,
+      "reasoning": "We are to compare the gold answer \"2022\" and the generated answer \"last year\". The question is \"When"
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "counseling and mental health",
+      "is_correct": true,
+      "reasoning": "The generated answer includes 'counseling' which matches the gold answer, and 'mental health' is semantically related to psychology."
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What did Caroline research?",
+      "expected": "Adoption agencies",
+      "answer": "We are given a conversation between Caroline and Melanie. The question is: \"What did Caroline research?\" We need to extract from the excerpts where Caroline mentions researching something.\n\nLooking through the excerpts:\n\nIn excerpt [1], Caroline says: \"Gonna continue my edu and check out career options, which is pretty exciting!\" and then Melanie asks about jobs, Caroline says she's keen on counseling or mental health. But research? Not explicitly.\n\nIn excerpt [2], Caroline says: \"Yep! Do your research and find an adoption agency or lawyer.\" And later: \"Being ourselves is such a great feeling. It's an ongoing adventure of learning and growing.\" But Caroline is advising Melanie on adoption; not her own research.\n\nIn excerpt [3], no mention of research.\n\nIn excerpt [4], no mention.\n\nIn excerpt [5], no mention.\n\nIn excerpt [6], no mention.\n\nIn excerpt [7], no mention.\n\nIn excerpt [8], no mention.\n\nWait, at the very beginning of the conversation in [1], Caroline says: \"Well, I'm off to go do some research.\" That is at the end of [1]. She says: \"Totally agree, Mel. Relaxing and expressing ourselves is key. Well, I'm off to go do some research.\" She doesn't specify what research. But earlier in that conversation, she mentioned she wants to continue her education and check out career options. So perhaps she is researching career options. Also in [2] she mentions researching adoption for her own adoption? She says: \"Yep! Do your research and find an adoption agency or lawyer.\" That is advice to Melanie, but she also might be doing research for herself? In [2], she says she contacted her mentor for adoption advice and is ready to adopt. So she might be researching adoption. But the question is specifically \"What did Caroline research?\" It could be career options, or adoption, or both. We need to see if there's a specific mention.\n\nIn [1], she says she's off to do research, but doesn't specify what. In the same conversation, she said she's going to continue her education and check out career options. So likely she is researching career options. Also in [2], she says she has been researching adoption? She says \"Do your research...\" that is to Melanie, but she might have done her own. In [6], she says she applied to adoption agencies and got help from an",
+      "is_correct": true,
+      "reasoning": "We are told that the gold answer is \"Adoption agencies\". The generated answer is a long reasoning th"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What is Caroline's identity?",
+      "expected": "Transgender woman",
+      "answer": "a transgender woman",
+      "is_correct": true,
+      "reasoning": "The generated answer matches the gold answer exactly in meaning."
+    }
+  ]
+}

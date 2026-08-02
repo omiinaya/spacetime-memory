@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._cognitive_ops API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._cognitive_ops</h1>
+<pre>Help on module spacetime_memory.client._cognitive_ops in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._cognitive_ops - Cognitive operations mixin — Cognee parity.
+
+DESCRIPTION
+    A formal "cognitive operations" abstraction — named ops that wrap
+    pipeline stages. Each operation has a type: observe, filter, extract,
+    transform, classify, rank, or store.
+    
+    Operations are registered via the ``cognitive_op`` table and can be
+    executed individually or as part of a pipeline.
+
+CLASSES
+    builtins.object
+        CognitiveOpMixin
+    
+    class CognitiveOpMixin(builtins.object)
+     |  Mixin for cognitive operation management — Cognee parity.
+     |  
+     |  Provides a named cognitive operations abstraction that wraps
+     |  processing pipeline stages.
+     |  
+     |  Methods defined here:
+     |  
+     |  classify(self, workspace_id: 'str', content: 'str') -> 'list[dict[str, Any]]'
+     |      Classify — categorization operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to classify in.
+     |          content: Content to categorize.
+     |      
+     |      Returns:
+     |          List of classification results.
+     |  
+     |  execute_cognitive_op(self, workspace_id: 'str', op_id: 'str', input_data: 'Any' = None) -> 'dict[str, Any]'
+     |      Execute a cognitive operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace containing the op.
+     |          op_id: ID of the operation to execute.
+     |          input_data: Input data for the operation (will be JSON-serialized).
+     |      
+     |      Returns:
+     |          The operation result dict.
+     |  
+     |  extract(self, workspace_id: 'str', content: 'str') -> 'list[dict[str, Any]]'
+     |      Extract — entity extraction operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to extract in.
+     |          content: Text content to extract entities from.
+     |      
+     |      Returns:
+     |          List of extraction results.
+     |  
+     |  filter(self, workspace_id: 'str', results: 'list[Any]', criteria: 'str' = '') -> 'list[dict[str, Any]]'
+     |      Filter — result filtering operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to filter in.
+     |          results: Results to filter.
+     |          criteria: Filter criteria as string.
+     |      
+     |      Returns:
+     |          Filtered results.
+     |  
+     |  get_cognitive_ops(self, workspace_id: 'str', op_type_filter: 'str' = '') -> 'list[dict[str, Any]]'
+     |      Get cognitive operations, optionally filtered by type.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to get ops from.
+     |          op_type_filter: Filter by op_type. Empty or "all" returns all.
+     |      
+     |      Returns:
+     |          List of cognitive operation dicts.
+     |  
+     |  get_cognitive_pipeline(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get the ordered pipeline of registered cognitive ops.
+     |      
+     |      The pipeline follows the standard order:
+     |      observe → extract → classify → filter → transform → rank → store
+     |      
+     |      Args:
+     |          workspace_id: Workspace to get pipeline from.
+     |      
+     |      Returns:
+     |          Ordered list of cognitive operation dicts.
+     |  
+     |  observe(self, workspace_id: 'str', query: 'str') -> 'list[dict[str, Any]]'
+     |      Observe — semantic search observation operation.
+     |      
+     |      Finds and returns cognitive ops of type "observe", or runs
+     |      a semantic search query.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to observe in.
+     |          query: Search query.
+     |      
+     |      Returns:
+     |          List of observation results.
+     |  
+     |  rank(self, workspace_id: 'str', results: 'list[Any]') -> 'list[dict[str, Any]]'
+     |      Rank — re-ranking operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to rank in.
+     |          results: List of results to re-rank.
+     |      
+     |      Returns:
+     |          List of ranked results.
+     |  
+     |  register_cognitive_op(self, workspace_id: 'str', name: 'str', op_type: 'str', description: 'str' = '', config_json: 'str' = '{}', pipeline_stage_type: 'str' = '') -> 'dict[str, Any]'
+     |      Register a new cognitive operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to register the op in.
+     |          name: Unique operation name (e.g. "entity_extract", "semantic_search").
+     |          op_type: Operation type: "observe", "filter", "extract",
+     |              "transform", "classify", "rank", or "store".
+     |          description: Human-readable description.
+     |          config_json: Operation-specific JSON configuration.
+     |          pipeline_stage_type: Maps to an existing pipeline stage type.
+     |      
+     |      Returns:
+     |          The reducer result.
+     |  
+     |  run_cognitive_pipeline(self, workspace_id: 'str', op_types: 'list[str] | None' = None) -> 'list[dict[str, Any]]'
+     |      Run multiple cognitive operations in sequence (a pipeline).
+     |      
+     |      Args:
+     |          workspace_id: Workspace to run the pipeline in.
+     |          op_types: List of op_types to run in order. If None, runs all
+     |              ops in the default pipeline order.
+     |      
+     |      Returns:
+     |          List of results from each pipeline stage.
+     |  
+     |  store(self, workspace_id: 'str', results: 'list[Any]') -> 'list[dict[str, Any]]'
+     |      Store — persist results operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to store in.
+     |          results: Results to store.
+     |      
+     |      Returns:
+     |          List of storage results.
+     |  
+     |  transform(self, workspace_id: 'str', content: 'str', operation: 'str' = '') -> 'list[dict[str, Any]]'
+     |      Transform — content transformation operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace to transform in.
+     |          content: Content to transform.
+     |          operation: Transformation operation name.
+     |      
+     |      Returns:
+     |          List of transformation results.
+     |  
+     |  unregister_cognitive_op(self, workspace_id: 'str', op_id: 'str') -> 'dict[str, Any]'
+     |      Unregister (delete) a cognitive operation.
+     |      
+     |      Args:
+     |          workspace_id: Workspace containing the op.
+     |          op_id: ID of the operation to delete.
+     |      
+     |      Returns:
+     |          The reducer result.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_cognitive_ops.py
+
+
+</pre>
+</body></html>

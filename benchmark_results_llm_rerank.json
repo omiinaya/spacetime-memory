@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-07-07T13:22:11Z",
+  "dataset": {
+    "memories": 50,
+    "queries": 25
+  },
+  "config": {
+    "embedder": "bge-m3 (1024d)",
+    "keyword": "term overlap (baseline)",
+    "llm_rerank_endpoint": "http://127.0.0.1:4002/v1",
+    "llm_rerank_model": "deepseek-v4-flash-free"
+  },
+  "results": {
+    "keyword-only (term overlap)": {
+      "P@5": 0.4933,
+      "R@5": 0.4933,
+      "MRR": 0.4627,
+      "seed_time_s": 0,
+      "avg_query_ms": 0
+    },
+    "hybrid (bge-m3 semantic)": {
+      "P@5": 0.7467,
+      "R@5": 0.7467,
+      "MRR": 0.6433,
+      "seed_time_s": 68.7,
+      "avg_query_ms": 544
+    },
+    "hybrid + LLM rerank (deepseek-v4-flash-free)": {
+      "P@5": 0.8267,
+      "R@5": 0.8267,
+      "MRR": 0.96,
+      "seed_time_s": 68.7,
+      "avg_query_ms": 16332
+    }
+  }
+}

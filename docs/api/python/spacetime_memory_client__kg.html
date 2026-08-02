@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._kg API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._kg</h1>
+<pre>Help on module spacetime_memory.client._kg in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._kg - Knowledge graph mixin.
+
+CLASSES
+    builtins.object
+        KGMixin
+    
+    class KGMixin(builtins.object)
+     |  Spacetime-Memory kg mixin.
+     |  
+     |  Provides Client methods related to kg management.
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  add_dynamic_context(self, peer_id: 'str', context: 'str') -> 'dict[str, Any]'
+     |      Add dynamic context to a peer's profile.
+     |  
+     |  add_edge_citation(self, workspace_id: 'str', edge_id: 'str', memory_id: 'str', description: 'str' = '') -> 'dict[str, Any]'
+     |      Add a citation linking a KG edge to a source memory.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          edge_id: The knowledge graph edge ID.
+     |          memory_id: The memory record that supports this edge.
+     |          description: Optional description of the citation relationship.
+     |  
+     |  add_fact(self, workspace_id: 'str', peer_id: 'str', content: 'str', fact_type: 'str' = 'dynamic', category: 'str' = 'custom', confidence: 'float' = 0.8, source: 'str' = 'manual', tier: 'str' = 'L1') -> 'dict[str, Any]'
+     |      Add a fact about a peer.
+     |      
+     |      Parameters
+     |      ----------
+     |      workspace_id:
+     |          The workspace ID.
+     |      peer_id:
+     |          The peer to associate the fact with.
+     |      content:
+     |          The fact content text.
+     |      fact_type:
+     |          Fact type (e.g. ``"dynamic"``, ``"static"``).
+     |      category:
+     |          Fact category (e.g. ``"custom"``).
+     |      confidence:
+     |          Confidence score (0.0–1.0). Default 0.8.
+     |      source:
+     |          Source of the fact (e.g. ``"manual"``).
+     |      tier:
+     |          Memory tier: ``"L0"``, ``"L1"``, or ``"L2"``.
+     |  
+     |  add_node_citation(self, workspace_id: 'str', node_id: 'str', memory_id: 'str', description: 'str' = '') -> 'dict[str, Any]'
+     |      Add a citation linking a KG node to a source memory.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          node_id: The knowledge graph node ID.
+     |          memory_id: The memory record that supports this node.
+     |          description: Optional description of the citation relationship.
+     |  
+     |  add_profile_fact(self, peer_id: 'str', fact: 'str') -> 'dict[str, Any]'
+     |      Add a fact to a peer's profile (appended to static_facts_json array).
+     |  
+     |  assign_to_community(self, node_id: 'str', community_id: 'int') -> 'dict[str, Any]'
+     |      Call assign_to_community reducer to assign a node to a community.
+     |  
+     |  bfs(self, workspace_id: 'str', start_node_id: 'str', max_depth: 'int' = 3) -> 'None'
+     |      BFS traversal from a start node up to max_depth (alias for graph_bfs).
+     |      
+     |      Results are in graph_traversal_result table, keyed by query_id.
+     |      
+     |      Args:
+     |          workspace_id: The workspace ID.
+     |          start_node_id: The starting node ID.
+     |          max_depth: Maximum traversal depth (default 3).
+     |  
+     |  compute_community_hierarchy(self, workspace_id: 'str') -> 'dict[str, Any]'
+     |      Build hierarchical community dendrogram using agglomerative clustering.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to build hierarchy for.
+     |      
+     |      Returns:
+     |          Reducer status.
+     |  
+     |  compute_god_nodes(self, workspace_id: 'str', top_n: 'int' = 10) -> 'dict[str, Any]'
+     |      Call compute_god_nodes reducer to compute top-N most connected nodes.
+     |  
+     |  compute_pagerank(self, workspace_id: 'str', damping: 'float' = 0.85, max_iterations: 'int' = 100) -> 'dict[str, Any]'
+     |      Compute PageRank centrality for all nodes in a workspace.
+     |      
+     |      Args:
+     |          workspace_id: The workspace to compute PageRank for.
+     |          damping: PageRank damping factor (default: 0.85).
+     |          max_iterations: Maximum iterations (default: 100).
+     |      
+     |      Returns:
+     |          Reducer status.
+     |  
+     |  create_community(self, workspace_id: 'str', name: 'str', summary: 'str' = '') -> 'dict[str, Any]'
+     |      Call create_community reducer to create a KG community.
+     |  
+     |  create_edge(self, workspace_id: 'str', source_node_id: 'str', target_node_id: 'str', relation: 'str', weight: 'float' = 1.0, confidence: 'str' = 'EXTRACTED', metadata_json: 'str' = '{}', source_memory_id: 'str' = '', source_document_id: 'str' = '') -> 'dict[str, Any]'
+     |      Create a directed, typed edge between two KG nodes.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          source_node_id: Source node ID.
+     |          target_node_id: Target node ID.
+     |          relation: Relationship type label.
+     |          weight: Edge weight (default: 1.0).
+     |          confidence: Confidence level (default: "EXTRACTED").
+     |          metadata_json: Optional JSON metadata string.
+     |          source_memory_id: Optional memory record ID that supports this edge.
+     |  
+     |  create_node(self, workspace_id: 'str', label: 'str', node_type: 'str' = 'concept', summary: 'str' = '', metadata_json: 'str' = '{}', source_memory_id: 'str' = '', source_document_id: 'str' = '') -> 'dict[str, Any]'
+     |      Create a knowledge-graph node and auto-index it.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          label: Node label (used as display name).
+     |          node_type: Type category (default: "concept").
+     |          summary: Optional summary text.
+     |          metadata_json: Optional JSON metadata string.
+     |          source_memory_id: Optional memory record ID that supports this node.
+     |          source_document_id: Optional source document ID for provenance.
+     |  
+     |  cross_link(self, workspace_id: 'str' = 'default', limit: 'int' = 50, similarity_threshold: 'float' = 0.7) -> 'dict[str, Any]'
+     |      Find memories semantically related but not yet linked, and create edges.
+     |      
+     |      Uses semantic search to find near-neighbours, then checks if
+     |      an edge already exists before creating one.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace (default "default").
+     |          limit: Max memories to scan.
+     |          similarity_threshold: Min similarity to auto-link (0.0-1.0).
+     |      
+     |      Returns:
+     |          Dict with ``links_created`` and ``pairs_checked``.
+     |  
+     |  delete_edge(self, edge_id: 'str') -> 'dict[str, Any]'
+     |      Soft-delete a knowledge-graph edge by ID.
+     |      
+     |      Removes the edge from the KG (sets ``is_active = false``).
+     |      
+     |      Args:
+     |          edge_id: The ID of the edge to delete.
+     |  
+     |  delete_fact(self, fact_id: 'str') -> 'dict[str, Any]'
+     |      Deactivate a fact (soft delete).
+     |      
+     |      Parameters
+     |      ----------
+     |      fact_id:
+     |          The fact ID to delete.
+     |      
+     |      Returns:
+     |          The reducer result dict.
+     |  
+     |  delete_mental_model(self, model_id: 'str') -> 'dict[str, Any]'
+     |      Delete a mental model.
+     |      
+     |      Parameters
+     |      ----------
+     |      model_id:
+     |          The UUID of the mental model to delete.
+     |  
+     |  delete_node(self, node_id: 'str') -> 'dict[str, Any]'
+     |      Soft-delete a knowledge-graph node by ID.
+     |      
+     |      Removes the node from the KG (sets ``is_active = false``).
+     |      The node's edges remain but become orphaned.
+     |      
+     |      Args:
+     |          node_id: The ID of the node to delete.
+     |  
+     |  delete_peer(self, peer_id: 'str') -> 'dict[str, Any]'
+     |      Call delete_peer reducer to delete a peer.
+     |  
+     |  detect_communities(self, workspace_id: 'str') -> 'dict[str, Any]'
+     |      Run label-propagation community detection.
+     |  
+     |  detect_ripple_impact(self, workspace_id: 'str', source_type: 'str', source_id: 'str') -> 'dict[str, Any]'
+     |      Call detect_ripple_impact reducer to find affected KG nodes.
+     |  
+     |  dismiss_ripple_impact(self, impact_id: 'str') -> 'dict[str, Any]'
+     |      Call dismiss_ripple_impact reducer to dismiss a ripple impact.
+     |  
+     |  get_citations(self, workspace_id: 'str', entity_id: 'str', entity_type: 'str' = 'node') -> 'list[dict[str, Any]]'
+     |      Get all citations for a KG entity (node or edge).
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          entity_id: The node or edge ID.
+     |          entity_type: "node" (default) or "edge".
+     |      
+     |      Returns:
+     |          List of citation records with source_memory_id, description, and timestamp.
+     |  
+     |  get_community(self, community_id: 'int') -> 'dict[str, Any]'
+     |      Get community details and its nodes.
+     |  
+     |  get_edge_history(self, edge_group_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get all historical versions of a knowledge-graph edge.
+     |      
+     |      Edges in the KG are versioned — when an edge is updated, a new
+     |      version is created with the same ``edge_group_id``. This method
+     |      returns every version ordered by ``created_at``, letting you
+     |      trace how a relationship evolved over time.
+     |      
+     |      Args:
+     |          edge_group_id: The group ID of the edge(s) to query. All
+     |              versions sharing this group ID are returned.
+     |      
+     |      Returns:
+     |          List of edge version records with source_node_id,
+     |          target_node_id, relation, weight, confidence, version, and
+     |          timestamps (created_at, valid_at, invalid_at).
+     |  
+     |  get_mental_model(self, model_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get a single mental model by its ID.
+     |      
+     |      Parameters
+     |      ----------
+     |      model_id:
+     |          The UUID of the mental model.
+     |  
+     |  get_neighbors(self, node_id: 'str', workspace_id: 'str' = '') -> 'list[dict[str, Any]]'
+     |      Get edges connected to a node within an optional workspace.
+     |  
+     |  get_neighbors_via_reducer(self, workspace_id: 'str', node_id: 'str') -> 'None'
+     |      Get immediate neighbours of a node.
+     |      Results in graph_traversal_result table with depth=1.
+     |  
+     |  get_node(self, node_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get a KG node by ID.
+     |  
+     |  get_peer_memory_summary(self, peer_id: 'str') -> 'None'
+     |      Call get_peer_memory_summary reducer; results in peer_summary_result table.
+     |  
+     |  get_profile(self, peer_id: 'str') -> 'dict[str, Any] | None'
+     |      Get a peer's profile by peer_id.
+     |  
+     |  get_profile_context(self, peer_id: 'str') -> 'dict[str, Any] | None'
+     |      Get profile context result for a peer (calls get_profile_context reducer).
+     |  
+     |  get_ripple_impacts(self, workspace_id: 'str', source_id: 'str' = '') -> 'None'
+     |      Call get_ripple_impacts reducer; results in ripple_impact_result table.
+     |  
+     |  get_search_results(self, workspace_id: 'str' = '', query_hash: 'str' = '') -> 'dict[str, Any]'
+     |      Get search results for a query hash.
+     |      
+     |      Args:
+     |          workspace_id: Optional workspace ID.
+     |          query_hash: The query hash to retrieve results for.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  get_stale_nodes(self, workspace_id: 'str') -> 'None'
+     |      Call get_stale_nodes reducer; results in stale_nodes_result table.
+     |  
+     |  graph_bfs(self, workspace_id: 'str', start_node_id: 'str', max_depth: 'int' = 3) -> 'None'
+     |      BFS traversal from a start node up to max_depth.
+     |      Results are in graph_traversal_result table, keyed by query_id.
+     |  
+     |  lint_workspace(self, workspace_id: 'str') -> 'dict[str, Any]'
+     |      Lint a workspace: count orphan KG nodes (nodes with no edges).
+     |      
+     |      Args:
+     |          workspace_id: The workspace ID.
+     |      
+     |      Returns:
+     |          Dict with ``orphans`` count and ``total`` node count.
+     |  
+     |  list_facts(self, workspace_id: 'str', peer_id: 'str' = '', fact_type: 'str' = '', tier: 'str' = '', category: 'str' = '') -> 'list[dict[str, Any]]'
+     |      List facts for a workspace with optional filters.
+     |      
+     |      Parameters
+     |      ----------
+     |      workspace_id:
+     |          The workspace ID.
+     |      peer_id:
+     |          Optional: filter by peer ID.
+     |      fact_type:
+     |          Optional: filter by fact type.
+     |      tier:
+     |          Optional: filter by memory tier.
+     |      category:
+     |          Optional: filter by category.
+     |      
+     |      Returns:
+     |          List of fact records from the ``fact_result`` table.
+     |  
+     |  list_mental_models(self, workspace_id: 'str', status: 'str' = '') -> 'list[dict[str, Any]]'
+     |      List mental models for a workspace, optionally filtered by status.
+     |      
+     |      Parameters
+     |      ----------
+     |      workspace_id:
+     |          The workspace ID.
+     |      status:
+     |          Optional filter: ``"pending"``, ``"completed"``, ``"failed"``,
+     |          or ``""`` for all.
+     |  
+     |  list_profiles(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      List all profiles in a workspace (via peers → profiles).
+     |  
+     |  list_subscriptions(self, workspace_id: 'str' = '') -> 'dict[str, Any]'
+     |      List subscriptions for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Optional workspace ID.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  query_graph(self, workspace_id: 'str', query: 'str' = '') -> 'list[dict[str, Any]]'
+     |      Search KG nodes by label within a workspace.
+     |  
+     |  resolve_ripple_impact(self, impact_id: 'str') -> 'dict[str, Any]'
+     |      Call resolve_ripple_impact reducer to mark an impact as resolved.
+     |  
+     |  search_facts(self, workspace_id: 'str', query: 'str', tier: 'str' = '') -> 'list[dict[str, Any]]'
+     |      Search facts by content text (substring / case-insensitive match).
+     |      
+     |      Parameters
+     |      ----------
+     |      workspace_id:
+     |          The workspace ID.
+     |      query:
+     |          The search query text.
+     |      tier:
+     |          Optional: filter by memory tier (``"L0"``, ``"L1"``, ``"L2"``).
+     |      
+     |      Returns:
+     |          List of matching fact records from the ``fact_result`` table.
+     |  
+     |  search_profiles(self, workspace_id: 'str', query: 'str', limit: 'int' = 20) -> 'list[dict[str, Any]]'
+     |      Search profiles by static_facts or dynamic_context (client-side filter).
+     |  
+     |  seed_communities(self, workspace_id: 'str') -> 'dict[str, Any]'
+     |      Seed unassigned nodes into new communities.
+     |  
+     |  shortest_path(self, workspace_id: 'str', source_id: 'str', target_id: 'str', max_hops: 'int' = 6) -> 'None'
+     |      Shortest path between two nodes.
+     |      Results in shortest_path_result table, ordered by step_order.
+     |  
+     |  store_answer(self, query: 'str', answer: 'str', workspace_id: 'str' = 'default', title: 'str' = '', source_memory_ids: 'list[str] | None' = None) -> 'dict[str, Any]'
+     |      Store an answer as a wiki note, automatically linking to entities.
+     |      
+     |      Creates a note, extracts topics as KG nodes, and links them via edges.
+     |      
+     |      Args:
+     |          query: The question/query that prompted this answer.
+     |          answer: The answer text (markdown).
+     |          workspace_id: The workspace ID (default "default").
+     |          title: Optional title (default auto-generated from query).
+     |          source_memory_ids: Optional list of source memory IDs to link.
+     |      
+     |      Returns:
+     |          Dict with ``note`` (created note info), ``entities`` (list of KG node IDs),
+     |          and ``links`` (number of edges created).
+     |  
+     |  suggest_connections(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Find KG node pairs that share neighbors but aren't directly connected.
+     |      
+     |      Useful for suggesting new graph connections.
+     |      
+     |      Args:
+     |          workspace_id: The workspace ID.
+     |      
+     |      Returns:
+     |          List of KG node records from the workspace.
+     |  
+     |  synthesize_mental_models(self, workspace_id: 'str', memory_ids: 'list[str]') -> 'dict[str, Any]'
+     |      Request synthesis of a mental model from a set of source memories.
+     |      
+     |      Creates a pending ``MentalModel`` record. Run ``mental_model_synthesis.py``
+     |      to generate actual LLM content.
+     |      
+     |      Parameters
+     |      ----------
+     |      workspace_id:
+     |          The workspace containing the source memories.
+     |      memory_ids:
+     |          List of memory IDs to synthesize a mental model from.
+     |  
+     |  update_edge(self, edge_id: 'str', relation: 'str', weight: 'float' = 1.0, metadata_json: 'str' = '{}') -> 'dict[str, Any]'
+     |      Update an existing knowledge-graph edge's mutable fields.
+     |      
+     |      Args:
+     |          edge_id: The ID of the edge to update.
+     |          relation: New relationship type label.
+     |          weight: New edge weight (default: 1.0).
+     |          metadata_json: Updated JSON metadata string.
+     |  
+     |  update_fact(self, fact_id: 'str', content: 'str' = '', confidence: 'float' = 0.0, category: 'str' = '', tier: 'str' = '') -> 'dict[str, Any]'
+     |      Update a fact's content, confidence, category, and/or tier.
+     |      
+     |      Empty string parameters leave the corresponding field unchanged.
+     |      A confidence of 0.0 leaves confidence unchanged.
+     |      
+     |      Parameters
+     |      ----------
+     |      fact_id:
+     |          The fact ID to update.
+     |      content:
+     |          New content text (empty string = no change).
+     |      confidence:
+     |          New confidence score (0.0 = no change, 0.0–1.0).
+     |      category:
+     |          New category (empty string = no change).
+     |      tier:
+     |          New memory tier: ``"L0"``, ``"L1"``, or ``"L2"`` (empty string = no change).
+     |      
+     |      Returns:
+     |          The reducer result dict.
+     |  
+     |  update_mental_model(self, model_id: 'str', content: 'str', confidence: 'float' = 0.5, status: 'str' = 'completed') -> 'dict[str, Any]'
+     |      Update the content, confidence, and status of an existing mental model.
+     |      
+     |      Parameters
+     |      ----------
+     |      model_id:
+     |          The UUID of the mental model.
+     |      content:
+     |          The new synthesized content.
+     |      confidence:
+     |          Confidence score (0.0–1.0) for this mental model. Default 0.5.
+     |      status:
+     |          Status: ``"pending"``, ``"completed"``, or ``"failed"``.
+     |  
+     |  update_node(self, node_id: 'str', label: 'str', node_type: 'str' = 'concept', summary: 'str' = '', metadata_json: 'str' = '{}', source_memory_id: 'str' = '', source_document_id: 'str' = '') -> 'dict[str, Any]'
+     |      Update an existing knowledge-graph node's mutable fields.
+     |      
+     |      Args:
+     |          node_id: The ID of the node to update.
+     |          label: New label (display name).
+     |          node_type: Type category (default: ``"concept"``).
+     |          summary: Updated summary text.
+     |          metadata_json: Updated JSON metadata string.
+     |          source_memory_id: Optional source memory ID.
+     |          source_document_id: Optional source document ID for provenance.
+     |  
+     |  update_peer(self, peer_id: 'str', name: 'str', metadata_json: 'str' = '{}') -> 'dict[str, Any]'
+     |      Call update_peer reducer to update a peer's name and metadata.
+     |  
+     |  upsert_profile(self, peer_id: 'str', static_facts: 'str' = '', dynamic_context: 'str' = '', preferences: 'str' = '', tags: 'str' = '') -> 'dict[str, Any]'
+     |      Create or update a peer profile.
+     |      
+     |      Args:
+     |          peer_id: The peer ID.
+     |          static_facts: JSON-encoded list of fact strings.
+     |          dynamic_context: JSON-encoded list of context strings.
+     |          preferences: JSON-encoded object of key-value preferences.
+     |          tags: JSON-encoded list of tag strings.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_kg.py
+
+
+</pre>
+</body></html>

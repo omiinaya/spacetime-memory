@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": [
+      "ES2022",
+      "dom"
+    ],
+    "declaration": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "client.ts",
+    "compounder.ts",
+    "delta_sync.ts",
+    "mem0.ts",
+    "ws_subscription.ts",
+    "zep.ts",
+    "graphiti.ts",
+    "honcho.ts",
+    "hindsight.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.llm API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.llm</h1>
+<pre>Help on module spacetime_memory.llm in spacetime_memory:
+
+NAME
+    spacetime_memory.llm - Shared LLM client for optional LLM-powered adapter features.
+
+DESCRIPTION
+    Provides a thin wrapper around OpenAI-compatible chat completion APIs.
+    All methods gracefully degrade when no API key is configured — the
+    adapters continue to work, they just fall back to their non-LLM paths.
+    
+    Usage::
+    
+        from spacetime_memory.llm import LLMClient
+    
+        llm = LLMClient()
+        summary = llm.summarize("Long text to summarize...")
+        if summary:
+            print(summary)
+    
+    Environment variables:
+    
+    - ``OPENAI_API_KEY`` — required for LLM calls
+    - ``OPENAI_BASE_URL`` — API base URL (default: ``https://api.openai.com/v1``)
+    - ``LLM_MODEL`` — model name (default: ``gpt-4o-mini``)
+
+CLASSES
+    builtins.object
+        LLMClient
+    
+    class LLMClient(builtins.object)
+     |  LLMClient(api_key: 'str | None' = None, base_url: 'str | None' = None, model: 'str | None' = None) -> 'None'
+     |  
+     |  Lightweight OpenAI-compatible chat completion client.
+     |  
+     |  Attributes:
+     |      model: The model name to use (from ``LLM_MODEL`` env var).
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, api_key: 'str | None' = None, base_url: 'str | None' = None, model: 'str | None' = None) -> 'None'
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  chat(self, messages: 'list[dict[str, str]]', *, temperature: 'float' = 0.3, max_tokens: 'int' = 1024, response_format: 'dict[str, Any] | None' = None, timeout: 'int' = 60) -> 'str | None'
+     |      Call the chat completion API.
+     |      
+     |      Args:
+     |          messages: List of ``{"role": ..., "content": ...}`` dicts.
+     |          temperature: Sampling temperature.
+     |          max_tokens: Max tokens in response.
+     |          response_format: Optional JSON mode config (e.g. ``{"type": "json_object"}``).
+     |          timeout: Request timeout in seconds.
+     |      
+     |      Returns:
+     |          The response content string, or ``None`` if not configured or on failure.
+     |  
+     |  extract_entities_llm(self, text: 'str') -> 'list[dict[str, Any]] | None'
+     |      Extract named entities from text using LLM.
+     |      
+     |      Returns a list of entity dicts with ``name``, ``entity_type``
+     |      ("person" | "company" | "org" | "product" | "location"), and
+     |      optional ``aliases`` and ``description``.  Falls back to None
+     |      when no API key is configured — callers should use regex
+     |      extraction as backup.
+     |      
+     |      Args:
+     |          text: The text to extract entities from.
+     |      
+     |      Returns:
+     |          List of entity dicts, or None if LLM not configured or call fails.
+     |  
+     |  extract_facts(self, text: 'str') -> 'list[str] | None'
+     |      Extract key facts from text as a list of strings.
+     |      
+     |      Args:
+     |          text: The text to extract facts from.
+     |      
+     |      Returns:
+     |          List of fact strings, or ``None`` if LLM not configured.
+     |  
+     |  summarize(self, text: 'str', instruction: 'str' = '') -> 'str | None'
+     |      Summarize text using the LLM.
+     |      
+     |      Args:
+     |          text: The text to summarize.
+     |          instruction: Optional extra instruction for the summarization.
+     |      
+     |      Returns:
+     |          Summary string, or ``None`` if LLM not configured or call fails.
+     |  
+     |  summarize_community(self, community_name: 'str', nodes: 'list[dict[str, Any]]', edges: 'list[dict[str, Any]]') -> 'str | None'
+     |      Generate a narrative summary for a knowledge-graph community.
+     |      
+     |      Args:
+     |          community_name: Name/label of the community.
+     |          nodes: List of node dicts with ``name`` and optionally ``summary``.
+     |          edges: List of edge dicts with ``relation``, ``fact``,
+     |              ``source_node``, ``target_node``.
+     |      
+     |      Returns:
+     |          Narrative summary string, or ``None`` if LLM not configured.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Readonly properties defined here:
+     |  
+     |  available
+     |      Whether the LLM client is configured and can make calls.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.llm (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/llm.py
+
+
+</pre>
+</body></html>

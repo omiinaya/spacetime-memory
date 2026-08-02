@@ -1,0 +1,200 @@
+[
+  {
+    "query": "Who is the CTO?",
+    "relevant_ids": [
+      "mem-02"
+    ],
+    "description": "Simple entity lookup"
+  },
+  {
+    "query": "What's our RAG architecture?",
+    "relevant_ids": [
+      "mem-23",
+      "mem-45"
+    ],
+    "description": "Technical architecture question"
+  },
+  {
+    "query": "Tell me about the February outage",
+    "relevant_ids": [
+      "mem-11"
+    ],
+    "description": "Incident recall"
+  },
+  {
+    "query": "What embedding model do we use?",
+    "relevant_ids": [
+      "mem-08",
+      "mem-23",
+      "mem-45"
+    ],
+    "description": "Technical spec question"
+  },
+  {
+    "query": "What happened at the Q1 board meeting?",
+    "relevant_ids": [
+      "mem-27"
+    ],
+    "description": "Meeting recall"
+  },
+  {
+    "query": "How do we do model evaluation?",
+    "relevant_ids": [
+      "mem-14",
+      "mem-25",
+      "mem-32"
+    ],
+    "description": "Multi-document synthesis"
+  },
+  {
+    "query": "What's our pricing strategy?",
+    "relevant_ids": [
+      "mem-44",
+      "mem-21"
+    ],
+    "description": "Business question"
+  },
+  {
+    "query": "Who works on the ML platform team?",
+    "relevant_ids": [
+      "mem-03",
+      "mem-04"
+    ],
+    "description": "Team lookup"
+  },
+  {
+    "query": "How did we handle the rate limiting incident?",
+    "relevant_ids": [
+      "mem-12"
+    ],
+    "description": "Incident details"
+  },
+  {
+    "query": "What's our competitive position?",
+    "relevant_ids": [
+      "mem-36",
+      "mem-37",
+      "mem-38"
+    ],
+    "description": "Competitive analysis synthesis"
+  },
+  {
+    "query": "Tell me about enterprise features",
+    "relevant_ids": [
+      "mem-15",
+      "mem-18"
+    ],
+    "description": "Product feature question"
+  },
+  {
+    "query": "What database do we use?",
+    "relevant_ids": [
+      "mem-06",
+      "mem-48"
+    ],
+    "description": "Infrastructure question"
+  },
+  {
+    "query": "What did we decide about LLM hosting?",
+    "relevant_ids": [
+      "mem-09"
+    ],
+    "description": "Decision recall"
+  },
+  {
+    "query": "Who are our customers?",
+    "relevant_ids": [
+      "mem-19",
+      "mem-20",
+      "mem-21"
+    ],
+    "description": "Customer overview"
+  },
+  {
+    "query": "What experiments are we running?",
+    "relevant_ids": [
+      "mem-30",
+      "mem-31",
+      "mem-32"
+    ],
+    "description": "Research overview"
+  },
+  {
+    "query": "How's the team structured?",
+    "relevant_ids": [
+      "mem-01",
+      "mem-33"
+    ],
+    "description": "Org structure"
+  },
+  {
+    "query": "What compliance certifications do we have?",
+    "relevant_ids": [
+      "mem-39",
+      "mem-40"
+    ],
+    "description": "Compliance question"
+  },
+  {
+    "query": "Tell me about the strategy pivot",
+    "relevant_ids": [
+      "mem-28"
+    ],
+    "description": "Strategy decision"
+  },
+  {
+    "query": "How do we handle observability?",
+    "relevant_ids": [
+      "mem-47",
+      "mem-42"
+    ],
+    "description": "Observability question"
+  },
+  {
+    "query": "What partnerships do we have?",
+    "relevant_ids": [
+      "mem-41",
+      "mem-42"
+    ],
+    "description": "Partnership overview"
+  },
+  {
+    "query": "Tell me about the hackathon",
+    "relevant_ids": [
+      "mem-34"
+    ],
+    "description": "Event recall"
+  },
+  {
+    "query": "What GPU infrastructure do we have?",
+    "relevant_ids": [
+      "mem-46",
+      "mem-45"
+    ],
+    "description": "Infrastructure question"
+  },
+  {
+    "query": "How did the company start?",
+    "relevant_ids": [
+      "mem-49",
+      "mem-50"
+    ],
+    "description": "Company history"
+  },
+  {
+    "query": "What's the NPS score?",
+    "relevant_ids": [
+      "mem-22"
+    ],
+    "description": "Metric lookup"
+  },
+  {
+    "query": "How do we deploy ML models?",
+    "relevant_ids": [
+      "mem-24",
+      "mem-46",
+      "mem-30"
+    ],
+    "description": "Deployment question"
+  }
+]

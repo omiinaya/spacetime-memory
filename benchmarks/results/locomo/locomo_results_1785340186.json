@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "stdb",
+    "judge_model": "deepseek/deepseek-chat",
+    "answer_model": "deepseek/deepseek-chat",
+    "total_questions": 1,
+    "primary_count": 1,
+    "timestamp": "2026-07-29T11:49:46.927733"
+  },
+  "metrics": {
+    "primary": {
+      "total": 1,
+      "correct": 1,
+      "accuracy": 100.0
+    },
+    "by_category": {
+      "temporal": {
+        "total": 1,
+        "correct": 1,
+        "accuracy": 100.0
+      }
+    },
+    "overall": {
+      "total": 1,
+      "correct": 1,
+      "accuracy": 100.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "Caroline went to the LGBTQ support group yesterday, as mentioned in the first conversation excerpt.",
+      "is_correct": true,
+      "reasoning": "```json\n{\n  \"reasoning\": \"The generated answer provides a relative date ('yesterday') which is consi"
+    }
+  ]
+}

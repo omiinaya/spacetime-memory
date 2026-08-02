@@ -1,0 +1,85 @@
+{
+  "metadata": {
+    "benchmark": "beam",
+    "pipeline": "stdb_82_full",
+    "judge_model": "deepseek/deepseek-chat",
+    "total_questions": 82,
+    "timestamp": "2026-07-30T11:24:02.603365"
+  },
+  "metrics": {
+    "overall": {
+      "total": 82,
+      "correct": 76,
+      "accuracy": 92.68
+    },
+    "by_ability": {
+      "IE": {
+        "name": "Information Extraction",
+        "total": 9,
+        "correct": 9,
+        "accuracy": 100.0
+      },
+      "MR": {
+        "name": "Memory Retrieval",
+        "total": 9,
+        "correct": 9,
+        "accuracy": 100.0
+      },
+      "CR": {
+        "name": "Counterfactual Reasoning",
+        "total": 5,
+        "correct": 5,
+        "accuracy": 100.0
+      },
+      "ABS": {
+        "name": "Abstention",
+        "total": 6,
+        "correct": 6,
+        "accuracy": 100.0
+      },
+      "TR": {
+        "name": "Temporal Reasoning",
+        "total": 9,
+        "correct": 8,
+        "accuracy": 88.89
+      },
+      "KU": {
+        "name": "Knowledge Updating",
+        "total": 8,
+        "correct": 6,
+        "accuracy": 75.0
+      },
+      "PF": {
+        "name": "Property Following",
+        "total": 11,
+        "correct": 10,
+        "accuracy": 90.91
+      },
+      "EO": {
+        "name": "Entity Ordering",
+        "total": 6,
+        "correct": 4,
+        "accuracy": 66.67
+      },
+      "IF": {
+        "name": "Inference",
+        "total": 6,
+        "correct": 6,
+        "accuracy": 100.0
+      },
+      "SUM": {
+        "name": "Summarization",
+        "total": 5,
+        "correct": 5,
+        "accuracy": 100.0
+      },
+      "ALL": {
+        "name": "End-to-end Narrative",
+        "total": 8,
+        "correct": 8,
+        "accuracy": 100.0
+      }
+    }
+  },
+  "results": []
+}

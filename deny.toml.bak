@@ -1,0 +1,25 @@
+# cargo-deny configuration
+[advisories]
+vulnerability = "deny"
+unmaintained = "all"
+yanked = "all"
+notice = "all"
+unsound = "all"
+ignore = [
+    # Known-safe advisories — these are vetted false positives or
+    # transient issues that don't affect this project's use case.
+    #{ id = "RUSTSEC-0000-0000", reason = "example" },
+]
+
+[bans]
+multiple-versions = "deny"
+# Core dependencies that have benign duplicates
+skip = [
+    #{ name = "some-crate" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

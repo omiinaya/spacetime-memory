@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spacetime Memory</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      </div>
+      <div class="header-text">
+        <h1>Spacetime Memory</h1>
+        <span class="header-subtitle">Page Clipper</span>
+      </div>
+      <div class="header-badge" id="badge-count">0</div>
+    </div>
+
+    <!-- Current Page Info -->
+    <div class="page-info">
+      <div class="page-title" id="page-title">Loading...</div>
+      <div class="page-url" id="page-url"></div>
+    </div>
+
+    <!-- Main Clip Button -->
+    <button class="clip-btn" id="clip-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+      </svg>
+      Clip Page to Memory
+    </button>
+
+    <!-- Selection indicator -->
+    <div class="selection-indicator" id="selection-indicator" style="display:none">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 7V4h16v3"></path>
+        <path d="M9 20h6"></path>
+        <path d="M12 4v16"></path>
+      </svg>
+      <span id="selection-text">Text selected on page</span>
+    </div>
+
+    <!-- Toast notification area -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Status / Result -->
+    <div class="status" id="status"></div>
+
+    <!-- Recent Clips -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Recent Clips</h2>
+      </div>
+      <div class="clip-list" id="clip-list">
+        <div class="clip-list-empty">No clips yet. Start clipping pages!</div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="section">
+      <div class="section-header settings-toggle" id="settings-toggle">
+        <h2>Settings</h2>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </div>
+      <div class="settings-panel" id="settings-panel" style="display:none">
+        <div class="form-group">
+          <label for="db-host">SpacetimeDB Host</label>
+          <input type="text" id="db-host" value="localhost:3001" placeholder="localhost:3001" />
+        </div>
+        <div class="form-group">
+          <label for="db-identity">Database Identity</label>
+          <input type="text" id="db-identity" placeholder="your-db-identity" />
+        </div>
+        <div class="form-group">
+          <label for="workspace-id">Workspace ID</label>
+          <input type="text" id="workspace-id" placeholder="your-workspace-id" />
+        </div>
+        <div class="form-group">
+          <label for="peer-id">Peer ID</label>
+          <input type="text" id="peer-id" value="browser-extension" placeholder="browser-extension" />
+        </div>
+        <button class="save-btn" id="save-settings">Save Settings</button>
+        <div class="save-status" id="save-status"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Spacetime Memory Clipper v1.0.0</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

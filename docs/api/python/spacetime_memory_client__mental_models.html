@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._mental_models API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._mental_models</h1>
+<pre>Help on module spacetime_memory.client._mental_models in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._mental_models - Mental models / directives mixin — Hindsight parity.
+
+DESCRIPTION
+    Mental models are structured directives that define how an agent should
+    think about a domain. They extend the Directive concept (from the
+    Rust ``directive`` module) with:
+    
+    - **MentalModel** — a named thinking pattern with rules, constraints, and heuristics
+    - **Disposition** — a persistent behavioural tendency (optimistic, skeptical, etc.)
+    - **Directive templates** — reusable directive patterns
+    
+    All data is stored via the existing ``directive`` table using the
+    ``create_directive`` reducer with ``category='mental_model'`` etc.
+    Client-side logic provides the enhanced processing (``apply_mental_model``).
+
+CLASSES
+    builtins.object
+        Disposition
+        MentalModel
+        MentalModelMixin
+    
+    class Disposition(builtins.object)
+     |  Disposition(id: 'str' = '', workspace_id: 'str' = '', disposition_type: 'str' = 'neutral', intensity: 'int' = 3, description: 'str' = '', active: 'bool' = True, created_at: 'int' = 0) -> None
+     |  
+     |  A persistent behavioural tendency for an agent.
+     |  
+     |  Attributes:
+     |      id: The directive ID (populated after storage).
+     |      workspace_id: The workspace this disposition belongs to.
+     |      disposition_type: One of "optimistic", "skeptical", "neutral",
+     |          "cautious", "creative", "analytical", "empathetic".
+     |      intensity: Strength of the disposition (1–5).
+     |      description: Free-text elaboration.
+     |      active: Whether this disposition is currently applied.
+     |      created_at: Unix micros timestamp.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, id: 'str' = '', workspace_id: 'str' = '', disposition_type: 'str' = 'neutral', intensity: 'int' = 3, description: 'str' = '', active: 'bool' = True, created_at: 'int' = 0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_directive_args(self, title: 'str' = '') -> 'dict[str, Any]'
+     |      Build the description JSON for storing as a directive.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |  
+     |  from_directive(row: 'dict[str, Any]') -> "'Disposition'" from builtins.type
+     |      Parse a Disposition from a directive table row.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'active': 'bool', 'created_at': 'int', 'description...
+     |  
+     |  __dataclass_fields__ = {'active': Field(name='active',type='bool',defa...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('id', 'workspace_id', 'disposition_type', 'intensity...
+     |  
+     |  active = True
+     |  
+     |  created_at = 0
+     |  
+     |  description = ''
+     |  
+     |  disposition_type = 'neutral'
+     |  
+     |  id = ''
+     |  
+     |  intensity = 3
+     |  
+     |  workspace_id = ''
+    
+    class MentalModel(builtins.object)
+     |  MentalModel(id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', rules: 'list[str]' = <factory>, constraints: 'list[str]' = <factory>, heuristics: 'list[str]' = <factory>, description: 'str' = '', tags: 'list[str]' = <factory>, status: 'str' = 'active', priority: 'int' = 3, created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |  
+     |  A structured thinking pattern that guides agent reasoning.
+     |  
+     |  Attributes:
+     |      id: Unique identifier.
+     |      workspace_id: The workspace this model belongs to.
+     |      name: Human-readable name (e.g. "Customer Empathy Lens").
+     |      rules: List of prescriptive rules the agent must follow.
+     |      constraints: List of boundaries or limitations.
+     |      heuristics: List of mental shortcuts / thinking patterns.
+     |      description: Free-text description of when/how to apply.
+     |      tags: Categorisation tags.
+     |      status: "active" or "inactive".
+     |      priority: Priority level (1–5).
+     |      created_at: Unix micros timestamp.
+     |      updated_at: Unix micros timestamp.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, id: 'str' = '', workspace_id: 'str' = '', name: 'str' = '', rules: 'list[str]' = <factory>, constraints: 'list[str]' = <factory>, heuristics: 'list[str]' = <factory>, description: 'str' = '', tags: 'list[str]' = <factory>, status: 'str' = 'active', priority: 'int' = 3, created_at: 'int' = 0, updated_at: 'int' = 0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_directive_args(self) -> 'dict[str, Any]'
+     |      Build the description JSON for storing as a directive.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |  
+     |  from_directive(row: 'dict[str, Any]') -> "'MentalModel'" from builtins.type
+     |      Parse a MentalModel from a directive table row.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'constraints': 'list[str]', 'created_at': 'int', 'd...
+     |  
+     |  __dataclass_fields__ = {'constraints': Field(name='constraints',type='...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('id', 'workspace_id', 'name', 'rules', 'constraints'...
+     |  
+     |  created_at = 0
+     |  
+     |  description = ''
+     |  
+     |  id = ''
+     |  
+     |  name = ''
+     |  
+     |  priority = 3
+     |  
+     |  status = 'active'
+     |  
+     |  updated_at = 0
+     |  
+     |  workspace_id = ''
+    
+    class MentalModelMixin(builtins.object)
+     |  Client mixin that provides mental model, disposition, and directive
+     |  template operations on top of the existing ``directive`` table.
+     |  
+     |  All persistent storage uses the ``create_directive`` / ``list_directives``
+     |  reducers; client-side logic provides the ``apply_mental_model`` enrichment.
+     |  
+     |  Methods defined here:
+     |  
+     |  apply_mental_model(self, workspace_id: 'str', model_id: 'str', context: 'dict[str, Any] | None' = None) -> 'dict[str, Any]'
+     |      Apply a mental model to a context dict, returning an enhanced copy.
+     |      
+     |      This is a **client-side** enrichment: it reads the mental model,
+     |      then merges the model's rules, constraints, and heuristics into
+     |      the context under a ``mental_model`` key.  No LLM call or reducer
+     |      is involved.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace (used for lookup fallback).
+     |          model_id: The mental model directive ID.
+     |          context: Optional base context dict to enhance.  If ``None``,
+     |              starts with an empty dict.
+     |      
+     |      Returns:
+     |          Enhanced context dict with a ``mental_model`` key containing
+     |          the model's structured fields.
+     |  
+     |  clear_disposition(self, workspace_id: 'str') -> 'dict[str, Any]'
+     |      Clear (deactivate) the current disposition for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  create_mental_model(self, workspace_id: 'str', name: 'str', rules: 'list[str] | None' = None, constraints: 'list[str] | None' = None, heuristics: 'list[str] | None' = None, tags: 'list[str] | None' = None, description: 'str' = '', priority: 'int' = 3) -> 'dict[str, Any]'
+     |      Create a named mental model for a workspace.
+     |      
+     |      The model is stored as a directive with ``category='mental_model'``.
+     |      The structured fields (rules, constraints, heuristics) are encoded
+     |      in the JSON description field.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          name: Human-readable name for the model.
+     |          rules: Prescriptive rules the agent should follow.
+     |          constraints: Boundaries and limitations.
+     |          heuristics: Mental shortcuts / thinking patterns.
+     |          tags: Categorisation tags.
+     |          description: Free-text elaboration.
+     |          priority: Importance level (1–5, default 3).
+     |      
+     |      Returns:
+     |          Dict with ``status`` and ``id`` keys.
+     |  
+     |  create_mental_model_from_template(self, workspace_id: 'str', template_name: 'str', **overrides: 'Any') -> 'dict[str, Any]'
+     |      Create a mental model from a built-in template.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          template_name: One of ``"analysis"``, ``"creative"``,
+     |              ``"critical"``, ``"empathetic"``.
+     |          **overrides: Override fields (e.g. ``name=...``).
+     |      
+     |      Returns:
+     |          Dict with ``status`` and ``id`` keys.
+     |  
+     |  delete_mental_model(self, model_id: 'str') -> 'dict[str, Any]'
+     |      Delete (abandon) a mental model.
+     |      
+     |      Args:
+     |          model_id: The directive ID.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  get_disposition(self, workspace_id: 'str') -> 'Disposition | None'
+     |      Get the currently active disposition for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          A ``Disposition`` instance, or ``None`` if none is set.
+     |  
+     |  get_mental_model(self, model_id: 'str') -> 'MentalModel | None'
+     |      Retrieve a single mental model by its directive ID.
+     |      
+     |      Args:
+     |          model_id: The directive ID.
+     |      
+     |      Returns:
+     |          A ``MentalModel`` instance, or ``None`` if not found.
+     |  
+     |  list_directive_templates(self) -> 'dict[str, dict[str, Any]]'
+     |      List available built-in directive templates.
+     |      
+     |      Returns:
+     |          Dict mapping template name to its metadata (title, rules,
+     |          constraints, heuristics).
+     |  
+     |  list_mental_models(self, workspace_id: 'str', status: 'str' = '') -> 'list[MentalModel]'
+     |      List mental models in a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          status: Optional filter — ``"active"`` or ``"inactive"``.
+     |      
+     |      Returns:
+     |          List of ``MentalModel`` instances.
+     |  
+     |  set_disposition(self, workspace_id: 'str', disposition_type: 'str', intensity: 'int' = 3, description: 'str' = '') -> 'dict[str, Any]'
+     |      Set the agent's disposition for a workspace.
+     |      
+     |      The disposition is stored as a directive with
+     |      ``category='disposition'``.  Setting a new disposition replaces
+     |      any existing active one (marks the old one as inactive).
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          disposition_type: One of ``"optimistic"``, ``"skeptical"``,
+     |              ``"neutral"``, ``"cautious"``, ``"creative"``,
+     |              ``"analytical"``, ``"empathetic"``.
+     |          intensity: Strength 1–5 (default 3).
+     |          description: Optional elaboration.
+     |      
+     |      Returns:
+     |          Dict with ``status`` and ``id`` keys.
+     |  
+     |  update_mental_model(self, model_id: 'str', name: 'str | None' = None, rules: 'list[str] | None' = None, constraints: 'list[str] | None' = None, heuristics: 'list[str] | None' = None, tags: 'list[str] | None' = None, description: 'str | None' = None, priority: 'int | None' = None) -> 'dict[str, Any]'
+     |      Update an existing mental model's fields.
+     |      
+     |      Args:
+     |          model_id: The directive ID.
+     |          name: New name (title).
+     |          rules: New rules list.
+     |          constraints: New constraints list.
+     |          heuristics: New heuristics list.
+     |          tags: New tags list.
+     |          description: New description.
+     |          priority: New priority (1–5).
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    DIRECTIVE_TEMPLATES = {'analysis': {'category': 'mental_model', 'descr...
+    __annotations__ = {'DIRECTIVE_TEMPLATES': 'dict[str, dict[str, Any]]'}
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_mental_models.py
+
+
+</pre>
+</body></html>

@@ -1,0 +1,1847 @@
+{
+  "meta": {
+    "name": "BEAM -- Belief-based Evaluation for Artificial Memory",
+    "version": "1.0.0",
+    "timestamp": "2026-07-29T11:10:42Z",
+    "abilities": {
+      "IE": "Information Extraction \u2014 extract facts from plain-text memory",
+      "MR": "Memory Retrieval \u2014 retrieve relevant memories given a query",
+      "TR": "Temporal Reasoning \u2014 reason about when events occurred and their order",
+      "ABS": "Abstractive Summarization / Abstention \u2014 summarize or refuse to answer when data insufficient",
+      "CR": "Counterfactual Reasoning \u2014 reason about what would be true under changed conditions",
+      "KU": "Knowledge Updating \u2014 correctly update beliefs when new information contradicts old",
+      "EO": "Entity Ordering \u2014 order entities/events by time, priority, or logical sequence",
+      "IF": "Inference \u2014 draw logical conclusions from multiple facts",
+      "PF": "Property/Attribute Following \u2014 track which entity has which property as properties change over time",
+      "SUM": "Summarization \u2014 produce concise summaries of belief states across multiple documents"
+    },
+    "config": {
+      "mode": "sdk",
+      "embedder": "bm25-only (no embedder in standalone)",
+      "keyword": "Tantivy BM25 sidecar",
+      "fusion_model": "semantic:0.65, keyword:0.25, graph:0.05, temporal:0.05"
+    }
+  },
+  "overall": {
+    "accuracy": 0.6341,
+    "scenarios": 27,
+    "total_queries": 82,
+    "passed_queries": 52,
+    "avg_latency_ms": 253.7
+  },
+  "per_ability": [
+    {
+      "ability": "ABS",
+      "name": "Abstractive Summarization / Abstention",
+      "accuracy": 1.0,
+      "passed": 6,
+      "total": 6,
+      "avg_latency_ms": 711.6
+    },
+    {
+      "ability": "ALL",
+      "name": "End-to-end Narrative",
+      "accuracy": 0.375,
+      "passed": 3,
+      "total": 8,
+      "avg_latency_ms": 570.7
+    },
+    {
+      "ability": "CR",
+      "name": "Counterfactual Reasoning",
+      "accuracy": 0.6666,
+      "passed": 4,
+      "total": 5,
+      "avg_latency_ms": 981.5
+    },
+    {
+      "ability": "EO",
+      "name": "Entity Ordering",
+      "accuracy": 0.5834,
+      "passed": 4,
+      "total": 6,
+      "avg_latency_ms": 607.8
+    },
+    {
+      "ability": "IE",
+      "name": "Information Extraction",
+      "accuracy": 0.75,
+      "passed": 8,
+      "total": 9,
+      "avg_latency_ms": 411.2
+    },
+    {
+      "ability": "IF",
+      "name": "Inference",
+      "accuracy": 0.3056,
+      "passed": 3,
+      "total": 6,
+      "avg_latency_ms": 549.3
+    },
+    {
+      "ability": "KU",
+      "name": "Knowledge Updating",
+      "accuracy": 0.6111,
+      "passed": 7,
+      "total": 8,
+      "avg_latency_ms": 784.7
+    },
+    {
+      "ability": "MR",
+      "name": "Memory Retrieval",
+      "accuracy": 0.7778,
+      "passed": 7,
+      "total": 9,
+      "avg_latency_ms": 472.4
+    },
+    {
+      "ability": "PF",
+      "name": "Property/Attribute Following",
+      "accuracy": 0.5889,
+      "passed": 7,
+      "total": 11,
+      "avg_latency_ms": 640.9
+    },
+    {
+      "ability": "SUM",
+      "name": "Summarization",
+      "accuracy": 0.4166,
+      "passed": 2,
+      "total": 5,
+      "avg_latency_ms": 485.0
+    },
+    {
+      "ability": "TR",
+      "name": "Temporal Reasoning",
+      "accuracy": 0.1111,
+      "passed": 1,
+      "total": 9,
+      "avg_latency_ms": 633.8
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "beam_ie_01",
+      "ability": "IE",
+      "description": "Extract a named entity's role from a single factual memory",
+      "difficulty": "easy",
+      "seeded": 1,
+      "queries_total": 2,
+      "queries_passed": 1,
+      "accuracy": 0.5,
+      "avg_latency_ms": 562.0
+    },
+    {
+      "id": "beam_ie_02",
+      "ability": "IE",
+      "description": "Extract multiple facts about one entity from a compound memory",
+      "difficulty": "medium",
+      "seeded": 1,
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 372.8
+    },
+    {
+      "id": "beam_ie_03",
+      "ability": "IE",
+      "description": "Extract precise numerical data and names from a dense technical document",
+      "difficulty": "hard",
+      "seeded": 1,
+      "queries_total": 4,
+      "queries_passed": 4,
+      "accuracy": 0.75,
+      "avg_latency_ms": 298.9
+    },
+    {
+      "id": "beam_mr_01",
+      "ability": "MR",
+      "description": "Retrieve a single, unique memory from a set of distractors",
+      "difficulty": "easy",
+      "seeded": 4,
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 524.4
+    },
+    {
+      "id": "beam_mr_02",
+      "ability": "MR",
+      "description": "Retrieve across semantically overlapping memories to find the correct one",
+      "difficulty": "medium",
+      "seeded": 5,
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 560.4
+    },
+    {
+      "id": "beam_mr_03",
+      "ability": "MR",
+      "description": "Retrieve across a large set of similar-structured memories",
+      "difficulty": "hard",
+      "seeded": 7,
+      "queries_total": 3,
+      "queries_passed": 1,
+      "accuracy": 0.3333,
+      "avg_latency_ms": 332.4
+    },
+    {
+      "id": "beam_tr_01",
+      "ability": "TR",
+      "description": "Determine which event happened first from two timestamped memories",
+      "difficulty": "easy",
+      "seeded": 5,
+      "queries_total": 3,
+      "queries_passed": 0,
+      "accuracy": 0.0,
+      "avg_latency_ms": 556.2
+    },
+    {
+      "id": "beam_tr_02",
+      "ability": "TR",
+      "description": "Reconstruct a chronological sequence from intermixed facts",
+      "difficulty": "medium",
+      "seeded": 5,
+      "queries_total": 3,
+      "queries_passed": 0,
+      "accuracy": 0.0,
+      "avg_latency_ms": 251.0
+    },
+    {
+      "id": "beam_tr_03",
+      "ability": "TR",
+      "description": "Reason about overlapping time windows and scheduling conflicts",
+      "difficulty": "hard",
+      "seeded": 4,
+      "queries_total": 3,
+      "queries_passed": 1,
+      "accuracy": 0.3333,
+      "avg_latency_ms": 1094.1
+    },
+    {
+      "id": "beam_abs_01",
+      "ability": "ABS",
+      "description": "Correctly abstain when asked about something not in the memory store",
+      "difficulty": "medium",
+      "seeded": 3,
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 859.3
+    },
+    {
+      "id": "beam_abs_02",
+      "ability": "ABS",
+      "description": "Abstain when a specific detail is not available even though broader context exists",
+      "difficulty": "hard",
+      "seeded": 3,
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 563.9
+    },
+    {
+      "id": "beam_cr_01",
+      "ability": "CR",
+      "description": "Counterfactual: what would be true if a known fact were different",
+      "difficulty": "medium",
+      "seeded": 2,
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 0.8333,
+      "avg_latency_ms": 830.8
+    },
+    {
+      "id": "beam_cr_02",
+      "ability": "CR",
+      "description": "Multi-variable counterfactual: change two conditions and reason about the outcome",
+      "difficulty": "hard",
+      "seeded": 2,
+      "queries_total": 2,
+      "queries_passed": 1,
+      "accuracy": 0.5,
+      "avg_latency_ms": 1132.3
+    },
+    {
+      "id": "beam_ku_01",
+      "ability": "KU",
+      "description": "Update a belief when contradictory information arrives",
+      "difficulty": "easy",
+      "seeded": 2,
+      "queries_total": 2,
+      "queries_passed": 2,
+      "accuracy": 0.5,
+      "avg_latency_ms": 708.9
+    },
+    {
+      "id": "beam_ku_02",
+      "ability": "KU",
+      "description": "Handle multiple sequential belief updates correctly",
+      "difficulty": "medium",
+      "seeded": 3,
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 0.8333,
+      "avg_latency_ms": 860.9
+    },
+    {
+      "id": "beam_ku_03",
+      "ability": "KU",
+      "description": "Track belief updates across multiple entities and conflicting sources",
+      "difficulty": "hard",
+      "seeded": 4,
+      "queries_total": 3,
+      "queries_passed": 2,
+      "accuracy": 0.5,
+      "avg_latency_ms": 784.4
+    },
+    {
+      "id": "beam_eo_01",
+      "ability": "EO",
+      "description": "Order entities by a given property",
+      "difficulty": "easy",
+      "seeded": 1,
+      "queries_total": 3,
+      "queries_passed": 2,
+      "accuracy": 0.6667,
+      "avg_latency_ms": 673.4
+    },
+    {
+      "id": "beam_eo_02",
+      "ability": "EO",
+      "description": "Order events by temporal sequence across multiple entities",
+      "difficulty": "medium",
+      "seeded": 6,
+      "queries_total": 3,
+      "queries_passed": 2,
+      "accuracy": 0.5,
+      "avg_latency_ms": 542.1
+    },
+    {
+      "id": "beam_if_01",
+      "ability": "IF",
+      "description": "Single-hop inference from one fact",
+      "difficulty": "easy",
+      "seeded": 1,
+      "queries_total": 1,
+      "queries_passed": 0,
+      "accuracy": 0.0,
+      "avg_latency_ms": 319.8
+    },
+    {
+      "id": "beam_if_02",
+      "ability": "IF",
+      "description": "Multi-hop inference combining 2-3 facts",
+      "difficulty": "medium",
+      "seeded": 3,
+      "queries_total": 2,
+      "queries_passed": 2,
+      "accuracy": 0.75,
+      "avg_latency_ms": 742.8
+    },
+    {
+      "id": "beam_if_03",
+      "ability": "IF",
+      "description": "Complex inference requiring deductive chain of 4+ facts",
+      "difficulty": "hard",
+      "seeded": 4,
+      "queries_total": 3,
+      "queries_passed": 1,
+      "accuracy": 0.1667,
+      "avg_latency_ms": 585.4
+    },
+    {
+      "id": "beam_pf_01",
+      "ability": "PF",
+      "description": "Track which entity has which role after a single change",
+      "difficulty": "easy",
+      "seeded": 2,
+      "queries_total": 3,
+      "queries_passed": 3,
+      "accuracy": 1.0,
+      "avg_latency_ms": 705.1
+    },
+    {
+      "id": "beam_pf_02",
+      "ability": "PF",
+      "description": "Track two properties of the same entity over time as they change independently",
+      "difficulty": "medium",
+      "seeded": 4,
+      "queries_total": 3,
+      "queries_passed": 1,
+      "accuracy": 0.3333,
+      "avg_latency_ms": 548.1
+    },
+    {
+      "id": "beam_pf_03",
+      "ability": "PF",
+      "description": "Track properties across multiple parallel entity timelines",
+      "difficulty": "hard",
+      "seeded": 6,
+      "queries_total": 5,
+      "queries_passed": 3,
+      "accuracy": 0.4333,
+      "avg_latency_ms": 669.6
+    },
+    {
+      "id": "beam_sum_01",
+      "ability": "SUM",
+      "description": "Summarize the belief state of a single entity across multiple memories",
+      "difficulty": "medium",
+      "seeded": 5,
+      "queries_total": 2,
+      "queries_passed": 1,
+      "accuracy": 0.5,
+      "avg_latency_ms": 338.2
+    },
+    {
+      "id": "beam_sum_02",
+      "ability": "SUM",
+      "description": "Summarize a complex belief evolution with contradictions and resolutions",
+      "difficulty": "hard",
+      "seeded": 5,
+      "queries_total": 3,
+      "queries_passed": 1,
+      "accuracy": 0.3333,
+      "avg_latency_ms": 631.7
+    },
+    {
+      "id": "beam_narrative_01",
+      "ability": "ALL",
+      "description": "End-to-end narrative: a complete belief timeline across multiple entities with temporal, counterfactual, and inference challenges",
+      "difficulty": "hard",
+      "seeded": 11,
+      "queries_total": 8,
+      "queries_passed": 3,
+      "accuracy": 0.375,
+      "avg_latency_ms": 570.7
+    }
+  ],
+  "details": [
+    {
+      "scenario": "beam_ie_01",
+      "ability": "IE",
+      "query_results": [
+        {
+          "query": "What is Dr. Elena Vasquez's position at NeuroLink Labs?",
+          "latency_ms": 538.6,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "Chief Scientific Officer"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "Who is the CSO of NeuroLink Labs?",
+          "latency_ms": 585.5,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Elena Vasquez"
+          ],
+          "matched": [
+            "Elena Vasquez"
+          ],
+          "top_content": [
+            "Dr. Elena Vasquez is the Chief Scientific Officer at NeuroLink Labs, a biotech company developing brain-computer interfa"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_ie_02",
+      "ability": "IE",
+      "query_results": [
+        {
+          "query": "Who owns Project Chimera?",
+          "latency_ms": 291.5,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Phoenix Dynamics",
+            "Horizon Energy"
+          ],
+          "matched": [
+            "Phoenix Dynamics",
+            "Horizon Energy"
+          ],
+          "top_content": [
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i"
+          ]
+        },
+        {
+          "query": "What percentage stake does Phoenix Dynamics hold in Project Chimera?",
+          "latency_ms": 343.4,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "51%"
+          ],
+          "matched": [
+            "51%"
+          ],
+          "top_content": [
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i"
+          ]
+        },
+        {
+          "query": "Where is Project Chimera headquartered?",
+          "latency_ms": 483.6,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Geneva",
+            "Switzerland"
+          ],
+          "matched": [
+            "Geneva",
+            "Switzerland"
+          ],
+          "top_content": [
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i",
+            "Dr. Elena Vasquez is the Chief Scientific Officer at NeuroLink Labs, a biotech company developing brain-computer interfa"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_ie_03",
+      "ability": "IE",
+      "query_results": [
+        {
+          "query": "What was the output of the ARES-9 reactor?",
+          "latency_ms": 310.1,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "847 terajoules"
+          ],
+          "matched": [
+            "847 terajoules"
+          ],
+          "top_content": [
+            "The ARES-9 reactor achieved 847 terajoules of sustained output over 1,022 seconds on April 12, 2026. This surpasses the ",
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i",
+            "Dr. Elena Vasquez is the Chief Scientific Officer at NeuroLink Labs, a biotech company developing brain-computer interfa"
+          ]
+        },
+        {
+          "query": "How long did the ARES-9 experiment last?",
+          "latency_ms": 323.5,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "1022 seconds",
+            "1,022 seconds"
+          ],
+          "matched": [
+            "1,022 seconds"
+          ],
+          "top_content": [
+            "The ARES-9 reactor achieved 847 terajoules of sustained output over 1,022 seconds on April 12, 2026. This surpasses the ",
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i",
+            "Dr. Elena Vasquez is the Chief Scientific Officer at NeuroLink Labs, a biotech company developing brain-computer interfa"
+          ]
+        },
+        {
+          "query": "Who led the ARES-9 experiment?",
+          "latency_ms": 297.0,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Yuki Tanaka",
+            "Anders Lindqvist"
+          ],
+          "matched": [
+            "Yuki Tanaka",
+            "Anders Lindqvist"
+          ],
+          "top_content": [
+            "The ARES-9 reactor achieved 847 terajoules of sustained output over 1,022 seconds on April 12, 2026. This surpasses the ",
+            "Dr. Elena Vasquez is the Chief Scientific Officer at NeuroLink Labs, a biotech company developing brain-computer interfa",
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i"
+          ]
+        },
+        {
+          "query": "How much liquid helium was used for cooling?",
+          "latency_ms": 265.0,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "38,000 liters",
+            "38000"
+          ],
+          "matched": [
+            "38,000 liters"
+          ],
+          "top_content": [
+            "The ARES-9 reactor achieved 847 terajoules of sustained output over 1,022 seconds on April 12, 2026. This surpasses the ",
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_mr_01",
+      "ability": "MR",
+      "query_results": [
+        {
+          "query": "When is the quarterly all-hands meeting?",
+          "latency_ms": 407.7,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "July 24",
+            "Friday"
+          ],
+          "matched": [
+            "July 24",
+            "Friday"
+          ],
+          "top_content": [
+            "The quarterly all-hands meeting is scheduled for Friday, July 24 at 2PM EST in Conference Room A. Remote attendees shoul",
+            "The Q3 board meeting agenda includes budget review, headcount planning, and the new product roadmap presentation.",
+            "Server maintenance window is Sunday July 19, 2026 from 2AM-6AM EST. API services will be degraded during this period."
+          ]
+        },
+        {
+          "query": "What time is the server maintenance window?",
+          "latency_ms": 564.2,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "2AM-6AM EST",
+            "July 19"
+          ],
+          "matched": [
+            "2AM-6AM EST",
+            "July 19"
+          ],
+          "top_content": [
+            "Server maintenance window is Sunday July 19, 2026 from 2AM-6AM EST. API services will be degraded during this period.",
+            "The quarterly all-hands meeting is scheduled for Friday, July 24 at 2PM EST in Conference Room A. Remote attendees shoul",
+            "The company picnic has been rescheduled to August 15 at Riverside Park due to weather concerns."
+          ]
+        },
+        {
+          "query": "Where is the company picnic?",
+          "latency_ms": 601.4,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Riverside Park"
+          ],
+          "matched": [
+            "Riverside Park"
+          ],
+          "top_content": [
+            "The company picnic has been rescheduled to August 15 at Riverside Park due to weather concerns.",
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i",
+            "The quarterly all-hands meeting is scheduled for Friday, July 24 at 2PM EST in Conference Room A. Remote attendees shoul"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_mr_02",
+      "ability": "MR",
+      "query_results": [
+        {
+          "query": "Who is the CFO of Acme Corp?",
+          "latency_ms": 689.5,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Priya Patel"
+          ],
+          "matched": [
+            "Priya Patel"
+          ],
+          "top_content": [
+            "Acme Corp's CFO is Priya Patel, who joined from Goldman Sachs in 2023.",
+            "Acme Corp's CTO is James Rodriguez, formerly VP of Engineering at DataStream Inc.",
+            "Acme Corp's CEO is Sarah Chen, appointed in January 2025 after serving as COO for 3 years."
+          ]
+        },
+        {
+          "query": "Who chairs the board at Acme Corp?",
+          "latency_ms": 594.5,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Michael Torres"
+          ],
+          "matched": [
+            "Michael Torres"
+          ],
+          "top_content": [
+            "Acme Corp's board chair is Michael Torres, founding partner of Nexus Ventures.",
+            "Acme Corp's CEO is Sarah Chen, appointed in January 2025 after serving as COO for 3 years.",
+            "Acme Corp's CFO is Priya Patel, who joined from Goldman Sachs in 2023."
+          ]
+        },
+        {
+          "query": "Who founded Acme Corp?",
+          "latency_ms": 397.1,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Sarah Chen",
+            "James Rodriguez"
+          ],
+          "matched": [
+            "Sarah Chen",
+            "James Rodriguez"
+          ],
+          "top_content": [
+            "Acme Corp was founded by Sarah Chen and James Rodriguez in 2018 as a data analytics startup.",
+            "Acme Corp's board chair is Michael Torres, founding partner of Nexus Ventures.",
+            "Acme Corp's CFO is Priya Patel, who joined from Goldman Sachs in 2023."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_mr_03",
+      "ability": "MR",
+      "query_results": [
+        {
+          "query": "What's the password policy?",
+          "latency_ms": 217.0,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "90 days",
+            "12 characters"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "How often is security training required?",
+          "latency_ms": 523.1,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "30 days of hire"
+          ],
+          "matched": [
+            "30 days of hire"
+          ],
+          "top_content": [
+            "Policy TERM-001: All employees must complete security awareness training within 30 days of hire.",
+            "Policy TERM-002: Password rotation is required every 90 days. Passwords must be at least 12 characters with 3 character ",
+            "Policy TERM-005: Incident response SLA is 15 minutes for critical, 1 hour for high, 4 hours for medium, 24 hours for low"
+          ]
+        },
+        {
+          "query": "What's the SLA for a critical incident?",
+          "latency_ms": 257.2,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "15 minutes"
+          ],
+          "matched": [],
+          "top_content": []
+        }
+      ]
+    },
+    {
+      "scenario": "beam_tr_01",
+      "ability": "TR",
+      "query_results": [
+        {
+          "query": "Did the company launch v1.0 before or after the Series A?",
+          "latency_ms": 752.6,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "before",
+            "January 2020",
+            "before Series A"
+          ],
+          "matched": [],
+          "top_content": [
+            "Product v1.0 launched on January 10, 2020.",
+            "The Series A funding round closed on September 22, 2021, raising $12M.",
+            "The company was founded on March 15, 2019 by Alice and Bob."
+          ]
+        },
+        {
+          "query": "Which happened first: Series A or Series B?",
+          "latency_ms": 216.4,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "Series A"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "How long after founding did the first enterprise customer sign?",
+          "latency_ms": 699.6,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "20 months",
+            "1 year 8 months",
+            "November 2020"
+          ],
+          "matched": [],
+          "top_content": [
+            "The company's first enterprise customer signed on November 5, 2020.",
+            "The company was founded on March 15, 2019 by Alice and Bob.",
+            "Acme Corp's CEO is Sarah Chen, appointed in January 2025 after serving as COO for 3 years."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_tr_02",
+      "ability": "TR",
+      "query_results": [
+        {
+          "query": "What was Maya's first role at the company?",
+          "latency_ms": 188.1,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "junior developer"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "Put Maya's career milestones in chronological order",
+          "latency_ms": 208.1,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "junior developer",
+            "senior developer",
+            "team lead",
+            "PhD"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "Did Maya become team lead before or after completing her PhD?",
+          "latency_ms": 356.8,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "before"
+          ],
+          "matched": [],
+          "top_content": [
+            "Maya became team lead in July 2024.",
+            "Maya completed her PhD part-time in December 2024.",
+            "Maya joined the team as a junior developer in June 2021."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_tr_03",
+      "ability": "TR",
+      "query_results": [
+        {
+          "query": "During which months is Alex working on both Aurora and Boreas?",
+          "latency_ms": 1212.7,
+          "passed": true,
+          "score": 0.6667,
+          "expected": [
+            "April 2026",
+            "May 2026",
+            "June 2026"
+          ],
+          "matched": [
+            "April 2026",
+            "June 2026"
+          ],
+          "top_content": [
+            "Alex's project assignment: Project Aurora runs from January 2026 to June 2026.",
+            "Alex's project assignment: Project Boreas runs from April 2026 to October 2026.",
+            "Alex's project assignment: Project Cyclone runs from March 2026 to March 2026 (one-month sprint)."
+          ]
+        },
+        {
+          "query": "How many total months is Alex assigned to projects in 2026?",
+          "latency_ms": 929.1,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "10",
+            "eleven",
+            "11"
+          ],
+          "matched": [],
+          "top_content": [
+            "Alex's project assignment: Project Cyclone runs from March 2026 to March 2026 (one-month sprint).",
+            "Alex's project assignment: Project Boreas runs from April 2026 to October 2026.",
+            "Alex's project assignment: Project Aurora runs from January 2026 to June 2026."
+          ]
+        },
+        {
+          "query": "Is Alex violating the two-project policy at any point?",
+          "latency_ms": 1140.5,
+          "passed": false,
+          "score": 0.3333,
+          "expected": [
+            "no",
+            "never",
+            "2 max"
+          ],
+          "matched": [
+            "no"
+          ],
+          "top_content": [
+            "Company policy: employees can be assigned to at most 2 active projects simultaneously.",
+            "Alex's project assignment: Project Aurora runs from January 2026 to June 2026.",
+            "Alex's project assignment: Project Boreas runs from April 2026 to October 2026."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_abs_01",
+      "ability": "ABS",
+      "query_results": [
+        {
+          "query": "What is the Q4 2026 marketing budget?",
+          "latency_ms": 1046.5,
+          "passed": true,
+          "score": 1.0,
+          "expected": [],
+          "matched": [],
+          "note": "abstain check - no specific expected content"
+        },
+        {
+          "query": "Who is the CEO of the company?",
+          "latency_ms": 824.7,
+          "passed": true,
+          "score": 1.0,
+          "expected": [],
+          "matched": [],
+          "note": "abstain check - no specific expected content"
+        },
+        {
+          "query": "What cloud provider does the company use?",
+          "latency_ms": 706.6,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "AWS"
+          ],
+          "matched": [
+            "AWS"
+          ],
+          "top_content": [
+            "The company uses AWS for cloud infrastructure with a monthly spend of approximately $120,000.",
+            "The company's first enterprise customer signed on November 5, 2020.",
+            "Policy TERM-007: All external-facing APIs must use OAuth 2.0 with JWT tokens expiring within 15 minutes."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_abs_02",
+      "ability": "ABS",
+      "query_results": [
+        {
+          "query": "What is the expected revenue of the merged entity?",
+          "latency_ms": 835.9,
+          "passed": true,
+          "score": 1.0,
+          "expected": [],
+          "matched": [],
+          "note": "abstain check - no specific expected content"
+        },
+        {
+          "query": "When was the merger announced?",
+          "latency_ms": 506.9,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "February 14, 2026"
+          ],
+          "matched": [
+            "February 14, 2026"
+          ],
+          "top_content": [
+            "The merger between Zenith Corp and Apex Industries was announced on February 14, 2026. The combined entity will operate ",
+            "The company was founded on March 15, 2019 by Alice and Bob.",
+            "The company's first enterprise customer signed on November 5, 2020."
+          ]
+        },
+        {
+          "query": "How many employees does Apex Industries have?",
+          "latency_ms": 349.0,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "12,000"
+          ],
+          "matched": [
+            "12,000"
+          ],
+          "top_content": [
+            "Apex Industries reported $3.1B in 2025 revenue with 12,000 employees.",
+            "Zenith Corp's 2025 revenue was $8.2B with 34,000 employees across 22 countries.",
+            "The merger between Zenith Corp and Apex Industries was announced on February 14, 2026. The combined entity will operate "
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_cr_01",
+      "ability": "CR",
+      "query_results": [
+        {
+          "query": "If the company had chosen Go instead of Python, how many new engineers would they have needed to hire?",
+          "latency_ms": 643.7,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "12"
+          ],
+          "matched": [
+            "12"
+          ],
+          "top_content": [
+            "The alternative considered was Go, which would have required hiring 12 new engineers at an estimated cost of $3.6M but w",
+            "The company chose Python for its main backend because of the team's existing expertise. The migration from Java took 8 m",
+            "The engineering team has 43 members as of June 2026."
+          ]
+        },
+        {
+          "query": "If Go were chosen, how much would the migration have cost?",
+          "latency_ms": 1113.8,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "$3.6M",
+            "3.6 million"
+          ],
+          "matched": [
+            "$3.6M"
+          ],
+          "top_content": [
+            "The company chose Python for its main backend because of the team's existing expertise. The migration from Java took 8 m",
+            "The alternative considered was Go, which would have required hiring 12 new engineers at an estimated cost of $3.6M but w",
+            "The marketing team's budget for Q3 2026 is $450,000."
+          ]
+        },
+        {
+          "query": "If Go were chosen, how long would the migration have taken?",
+          "latency_ms": 734.9,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "5 months"
+          ],
+          "matched": [
+            "5 months"
+          ],
+          "top_content": [
+            "The company chose Python for its main backend because of the team's existing expertise. The migration from Java took 8 m",
+            "The alternative considered was Go, which would have required hiring 12 new engineers at an estimated cost of $3.6M but w",
+            "Maya led the migration project which started in August 2023 and completed in February 2024."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_cr_02",
+      "ability": "CR",
+      "query_results": [
+        {
+          "query": "If the company had released only 4 features in total during 2025, what would the approximate R&D cost have been?",
+          "latency_ms": 1207.9,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "$8M",
+            "8 million"
+          ],
+          "matched": [],
+          "top_content": [
+            "In the 2025 product launch, the company released 3 features in Q1 (real-time sync, batch export, role-based access), 2 i",
+            "Historical data: each feature costs approximately $2M in R&D and generates on average $0.8M in new ARR.",
+            "The company chose Python for its main backend because of the team's existing expertise. The migration from Java took 8 m"
+          ]
+        },
+        {
+          "query": "If the company had released all 6 features in Q1 2025 instead of spreading them across the year, how many features would have been released in Q1?",
+          "latency_ms": 1056.7,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "6"
+          ],
+          "matched": [
+            "6"
+          ],
+          "top_content": [
+            "In the 2025 product launch, the company released 3 features in Q1 (real-time sync, batch export, role-based access), 2 i",
+            "The marketing team's budget for Q3 2026 is $450,000.",
+            "The engineering team has 43 members as of June 2026."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_ku_01",
+      "ability": "KU",
+      "query_results": [
+        {
+          "query": "When is the Project Odyssey deadline?",
+          "latency_ms": 739.1,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "November 30, 2026",
+            "Nov 30"
+          ],
+          "matched": [
+            "November 30, 2026"
+          ],
+          "top_content": [
+            "The project deadline for Project Odyssey is December 15, 2026.",
+            "UPDATE: Project Odyssey deadline has been moved up to November 30, 2026 due to the client's board meeting schedule.",
+            "Alex's project assignment: Project Boreas runs from April 2026 to October 2026."
+          ]
+        },
+        {
+          "query": "What was the original deadline for Project Odyssey before the change?",
+          "latency_ms": 678.6,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "December 15, 2026",
+            "Dec 15"
+          ],
+          "matched": [
+            "December 15, 2026"
+          ],
+          "top_content": [
+            "The project deadline for Project Odyssey is December 15, 2026.",
+            "UPDATE: Project Odyssey deadline has been moved up to November 30, 2026 due to the client's board meeting schedule.",
+            "Alex's project assignment: Project Aurora runs from January 2026 to June 2026."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_ku_02",
+      "ability": "KU",
+      "query_results": [
+        {
+          "query": "When is the HQ relocation to Austin now expected?",
+          "latency_ms": 896.1,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "Q2 2026",
+            "second quarter 2026"
+          ],
+          "matched": [
+            "Q2 2026"
+          ],
+          "top_content": [
+            "UPDATE March 2026: Due to tax incentives offered by the state of Texas, the HQ relocation to Austin is accelerated and n",
+            "UPDATE January 2026: The HQ relocation to Austin has been delayed to Q3 2026 because of permitting issues with the Austi",
+            "The CEO announced that the company's headquarters will relocate from San Francisco to Austin by Q2 2026."
+          ]
+        },
+        {
+          "query": "Why was the relocation delayed?",
+          "latency_ms": 739.7,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "permitting issues",
+            "Austin office building"
+          ],
+          "matched": [
+            "permitting issues",
+            "Austin office building"
+          ],
+          "top_content": [
+            "UPDATE January 2026: The HQ relocation to Austin has been delayed to Q3 2026 because of permitting issues with the Austi",
+            "UPDATE March 2026: Due to tax incentives offered by the state of Texas, the HQ relocation to Austin is accelerated and n",
+            "The CEO announced that the company's headquarters will relocate from San Francisco to Austin by Q2 2026."
+          ]
+        },
+        {
+          "query": "Why was the relocation accelerated again?",
+          "latency_ms": 946.9,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "tax incentives",
+            "Texas"
+          ],
+          "matched": [
+            "tax incentives",
+            "Texas"
+          ],
+          "top_content": [
+            "UPDATE March 2026: Due to tax incentives offered by the state of Texas, the HQ relocation to Austin is accelerated and n",
+            "UPDATE January 2026: The HQ relocation to Austin has been delayed to Q3 2026 because of permitting issues with the Austi",
+            "The CEO announced that the company's headquarters will relocate from San Francisco to Austin by Q2 2026."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_ku_03",
+      "ability": "KU",
+      "query_results": [
+        {
+          "query": "What is TechGlobal's official Q2 2026 revenue according to their SEC filing?",
+          "latency_ms": 324.1,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "$2.07B",
+            "2.07 billion"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "What was the initial press release Q2 revenue number?",
+          "latency_ms": 1058.4,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "$2.1B",
+            "2.1 billion"
+          ],
+          "matched": [
+            "$2.1B"
+          ],
+          "top_content": [
+            "On July 1, the press release stated that TechGlobal's Q2 revenue was $2.1B, up 15% YoY.",
+            "An anonymous analyst on July 20 claimed TechGlobal's Q2 revenue was only $1.95B, but this was never confirmed by any off",
+            "On July 15, TechGlobal's CFO stated in an interview that Q2 revenue was actually $2.05B due to delayed currency adjustme"
+          ]
+        },
+        {
+          "query": "What did the employee-on-twitter claim about Q2 revenue?",
+          "latency_ms": 970.8,
+          "passed": true,
+          "score": 1.0,
+          "expected": [],
+          "matched": [],
+          "note": "abstain check - no specific expected content"
+        }
+      ]
+    },
+    {
+      "scenario": "beam_eo_01",
+      "ability": "EO",
+      "query_results": [
+        {
+          "query": "Order the teams by size from largest to smallest",
+          "latency_ms": 557.4,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "Delta",
+            "Beta",
+            "Alpha",
+            "Gamma"
+          ],
+          "matched": [],
+          "top_content": [
+            "The engineering team has 43 members as of June 2026.",
+            "The ARES-9 reactor achieved 847 terajoules of sustained output over 1,022 seconds on April 12, 2026. This surpasses the ",
+            "Project Chimera is a joint venture between Phoenix Dynamics (51% stake) and Horizon Energy (49% stake). It was founded i"
+          ]
+        },
+        {
+          "query": "Which is the smallest team?",
+          "latency_ms": 609.8,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Gamma"
+          ],
+          "matched": [
+            "Gamma"
+          ],
+          "top_content": [
+            "Team Alpha has 8 members. Team Beta has 12 members. Team Gamma has 5 members. Team Delta has 15 members.",
+            "The engineering team has 43 members as of June 2026.",
+            "Maya became team lead in July 2024."
+          ]
+        },
+        {
+          "query": "Which is the largest team?",
+          "latency_ms": 853.1,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Delta"
+          ],
+          "matched": [
+            "Delta"
+          ],
+          "top_content": [
+            "The engineering team has 43 members as of June 2026.",
+            "Team Alpha has 8 members. Team Beta has 12 members. Team Gamma has 5 members. Team Delta has 15 members.",
+            "Maya became team lead in July 2024."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_eo_02",
+      "ability": "EO",
+      "query_results": [
+        {
+          "query": "Put the product launches in chronological order",
+          "latency_ms": 631.4,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "CometML v1",
+            "NovaSearch v1",
+            "Pulsar Analytics",
+            "NovaSearch v2"
+          ],
+          "matched": [
+            "NovaSearch v1",
+            "NovaSearch v2"
+          ],
+          "top_content": [
+            "In the 2025 product launch, the company released 3 features in Q1 (real-time sync, batch export, role-based access), 2 i",
+            "Product v1.0 launched on January 10, 2020.",
+            "Nova Corp launched its first product (NovaSearch v1) in 2019."
+          ]
+        },
+        {
+          "query": "Which product launched last?",
+          "latency_ms": 280.4,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "Pulsar Analytics v2",
+            "2023"
+          ],
+          "matched": [],
+          "top_content": [
+            "Product v1.0 launched on January 10, 2020.",
+            "Nova Corp launched its first product (NovaSearch v1) in 2019.",
+            "In the 2025 product launch, the company released 3 features in Q1 (real-time sync, batch export, role-based access), 2 i"
+          ]
+        },
+        {
+          "query": "What happened to Comet Labs in 2022?",
+          "latency_ms": 714.6,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "acquired"
+          ],
+          "matched": [
+            "acquired"
+          ],
+          "top_content": [
+            "Comet Labs was acquired in 2022.",
+            "Comet Labs shipped CometML v1 in 2018.",
+            "The ARES-9 reactor achieved 847 terajoules of sustained output over 1,022 seconds on April 12, 2026. This surpasses the "
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_if_01",
+      "ability": "IF",
+      "query_results": [
+        {
+          "query": "How many shares does John own at minimum?",
+          "latency_ms": 319.8,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "500,000",
+            "500000"
+          ],
+          "matched": [],
+          "top_content": [
+            "All directors at the company must hold at least 5% equity. John is a director. The company has 10M total shares outstand",
+            "The alternative considered was Go, which would have required hiring 12 new engineers at an estimated cost of $3.6M but w",
+            "Company policy: employees can be assigned to at most 2 active projects simultaneously."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_if_02",
+      "ability": "IF",
+      "query_results": [
+        {
+          "query": "When will the security team review the unusual API spike?",
+          "latency_ms": 909.8,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "Friday",
+            "tomorrow"
+          ],
+          "matched": [
+            "Friday"
+          ],
+          "top_content": [
+            "The security team reviews access logs every Friday. If any unusual activity is detected, they escalate to the CISO. The ",
+            "An unusual spike in API calls from an unknown IP was detected in the access logs.",
+            "Server maintenance window is Sunday July 19, 2026 from 2AM-6AM EST. API services will be degraded during this period."
+          ]
+        },
+        {
+          "query": "If the unusual activity is confirmed, who gets notified?",
+          "latency_ms": 575.8,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "CISO"
+          ],
+          "matched": [
+            "CISO"
+          ],
+          "top_content": [
+            "The security team reviews access logs every Friday. If any unusual activity is detected, they escalate to the CISO. The ",
+            "An unusual spike in API calls from an unknown IP was detected in the access logs.",
+            "An anonymous analyst on July 20 claimed TechGlobal's Q2 revenue was only $1.95B, but this was never confirmed by any off"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_if_03",
+      "ability": "IF",
+      "query_results": [
+        {
+          "query": "Can Sarah authorize the $200,000 server budget by herself?",
+          "latency_ms": 746.5,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "no",
+            "cannot"
+          ],
+          "matched": [],
+          "top_content": [
+            "Employees with level L4 or above can authorize budget up to $50,000. L5 can authorize up to $100,000. L6 can authorize u",
+            "The team needs a budget of $200,000 for a new server cluster.",
+            "VP level and above (L7+) can authorize any budget with board approval for amounts over $1M."
+          ]
+        },
+        {
+          "query": "Who is the most junior person who could authorize the $200,000 budget?",
+          "latency_ms": 788.5,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "David",
+            "L6"
+          ],
+          "matched": [
+            "L6"
+          ],
+          "top_content": [
+            "Employees with level L4 or above can authorize budget up to $50,000. L5 can authorize up to $100,000. L6 can authorize u",
+            "VP level and above (L7+) can authorize any budget with board approval for amounts over $1M.",
+            "The team needs a budget of $200,000 for a new server cluster."
+          ]
+        },
+        {
+          "query": "What is Sarah's maximum authorization limit?",
+          "latency_ms": 221.3,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "$100,000",
+            "100000"
+          ],
+          "matched": [],
+          "top_content": []
+        }
+      ]
+    },
+    {
+      "scenario": "beam_pf_01",
+      "ability": "PF",
+      "query_results": [
+        {
+          "query": "Who is the current CMO of HealthBridge?",
+          "latency_ms": 946.3,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Marcus Lee"
+          ],
+          "matched": [
+            "Marcus Lee"
+          ],
+          "top_content": [
+            "Dr. Nina Patel resigned as CMO of HealthBridge in December 2025. Dr. Marcus Lee was appointed as the new CMO effective J",
+            "Dr. Nina Patel was appointed Chief Medical Officer at HealthBridge in January 2025.",
+            "Acme Corp's CTO is James Rodriguez, formerly VP of Engineering at DataStream Inc."
+          ]
+        },
+        {
+          "query": "Who was the previous CMO of HealthBridge?",
+          "latency_ms": 749.4,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Nina Patel"
+          ],
+          "matched": [
+            "Nina Patel"
+          ],
+          "top_content": [
+            "Dr. Nina Patel resigned as CMO of HealthBridge in December 2025. Dr. Marcus Lee was appointed as the new CMO effective J",
+            "Dr. Nina Patel was appointed Chief Medical Officer at HealthBridge in January 2025.",
+            "Acme Corp's CFO is Priya Patel, who joined from Goldman Sachs in 2023."
+          ]
+        },
+        {
+          "query": "When did Dr. Patel become CMO?",
+          "latency_ms": 419.5,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "January 2025"
+          ],
+          "matched": [
+            "January 2025"
+          ],
+          "top_content": [
+            "Dr. Nina Patel resigned as CMO of HealthBridge in December 2025. Dr. Marcus Lee was appointed as the new CMO effective J",
+            "Dr. Nina Patel was appointed Chief Medical Officer at HealthBridge in January 2025.",
+            "Acme Corp's CFO is Priya Patel, who joined from Goldman Sachs in 2023."
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_pf_02",
+      "ability": "PF",
+      "query_results": [
+        {
+          "query": "Who is the current CEO of Helios Energy?",
+          "latency_ms": 1000.5,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Elena Kowalski"
+          ],
+          "matched": [
+            "Elena Kowalski"
+          ],
+          "top_content": [
+            "June 2025: Helios Energy announces CEO transition. Thomas Grey retires, Elena Kowalski named new CEO effective August 1.",
+            "Company: Helios Energy. Market cap: $45B. CEO: Thomas Grey. HQ: Houston, TX.",
+            "October 2025: Helios Energy relocates HQ to Denver, CO. Market cap now $48B."
+          ]
+        },
+        {
+          "query": "Where is Helios Energy's current HQ?",
+          "latency_ms": 323.9,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "Denver, CO",
+            "Denver"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "What was Helios Energy's highest market cap?",
+          "latency_ms": 319.9,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "$52B",
+            "52 billion"
+          ],
+          "matched": [],
+          "top_content": []
+        }
+      ]
+    },
+    {
+      "scenario": "beam_pf_03",
+      "ability": "PF",
+      "query_results": [
+        {
+          "query": "What is the current status of Platform C?",
+          "latency_ms": 787.2,
+          "passed": true,
+          "score": 0.6667,
+          "expected": [
+            "GA",
+            "generally available",
+            "active"
+          ],
+          "matched": [
+            "GA",
+            "active"
+          ],
+          "top_content": [
+            "Platform C (experimental) status: beta, users: 5,000, SLA: none, team size: 6",
+            "June 2026: Platform C promoted to GA, SLA set to 99.5%, users grow to 15,000, team grows to 10.",
+            "Platform B (modern) status: active, users: 120,000, SLA: 99.9%, team size: 25"
+          ]
+        },
+        {
+          "query": "How many users does Platform A have after the June 2026 migration?",
+          "latency_ms": 891.2,
+          "passed": true,
+          "score": 0.5,
+          "expected": [
+            "35,000",
+            "35000"
+          ],
+          "matched": [
+            "35,000"
+          ],
+          "top_content": [
+            "June 2026: Platform A users drop to 35,000 as migration to B accelerates. 3 team members reassigned to Platform B.",
+            "June 2026: Platform C promoted to GA, SLA set to 99.5%, users grow to 15,000, team grows to 10.",
+            "Platform A (legacy) status: active, users: 50,000, SLA: 99.5%, team size: 12"
+          ]
+        },
+        {
+          "query": "What was Platform A's original SLA?",
+          "latency_ms": 332.5,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "99.5%"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "What is Platform A's SLA after July 2026?",
+          "latency_ms": 481.0,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "best-effort"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "Which platform has the most users currently?",
+          "latency_ms": 855.9,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Platform B",
+            "120,000"
+          ],
+          "matched": [
+            "Platform B",
+            "120,000"
+          ],
+          "top_content": [
+            "June 2026: Platform C promoted to GA, SLA set to 99.5%, users grow to 15,000, team grows to 10.",
+            "Platform B (modern) status: active, users: 120,000, SLA: 99.9%, team size: 25",
+            "Platform A (legacy) status: active, users: 50,000, SLA: 99.5%, team size: 12"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": "beam_sum_01",
+      "ability": "SUM",
+      "query_results": [
+        {
+          "query": "Summarize what we know about Orion Robotics",
+          "latency_ms": 382.3,
+          "passed": true,
+          "score": 1.0,
+          "expected": [],
+          "matched": [],
+          "note": "summary produced (448 chars)"
+        },
+        {
+          "query": "What is Orion Robotics' specialization?",
+          "latency_ms": 294.2,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "warehouse automation"
+          ],
+          "matched": [],
+          "top_content": []
+        }
+      ]
+    },
+    {
+      "scenario": "beam_sum_02",
+      "ability": "SUM",
+      "query_results": [
+        {
+          "query": "Summarize the CloudSync MRR trajectory over the first half of 2026",
+          "latency_ms": 1160.9,
+          "passed": true,
+          "score": 1.0,
+          "expected": [],
+          "matched": [],
+          "note": "summary produced (537 chars)"
+        },
+        {
+          "query": "What caused CloudSync's MRR drop in March 2026?",
+          "latency_ms": 365.7,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "lost enterprise customers",
+            "reliability concerns"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "What was CloudSync's MRR in June 2026?",
+          "latency_ms": 368.6,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "$4.5M",
+            "4.5 million"
+          ],
+          "matched": [],
+          "top_content": []
+        }
+      ]
+    },
+    {
+      "scenario": "beam_narrative_01",
+      "ability": "ALL",
+      "query_results": [
+        {
+          "query": "Who founded Vertex AI?",
+          "latency_ms": 735.5,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "Rachel Kim",
+            "Mark Torres"
+          ],
+          "matched": [
+            "Rachel Kim",
+            "Mark Torres"
+          ],
+          "top_content": [
+            "Vertex AI was founded in 2020 by Dr. Rachel Kim and Mark Torres in Boston, MA. Initial focus: enterprise NLP.",
+            "2021: Vertex AI launches TextMind API, their first product. 10 customers by EOY. Seed round: $5M from Acer Capital.",
+            "2022: Vertex AI pivots from general NLP to healthcare-specific AI after customer demand. Series A: $25M led by HealthVen"
+          ]
+        },
+        {
+          "query": "What was Vertex AI's initial focus, and how did it change?",
+          "latency_ms": 419.8,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "enterprise NLP",
+            "healthcare"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "Put Vertex AI's funding rounds in order with amounts",
+          "latency_ms": 317.9,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "Seed $5M",
+            "Series A $25M",
+            "Series B $80M"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "What happened in November 2024 that affected Vertex AI?",
+          "latency_ms": 1028.6,
+          "passed": true,
+          "score": 1.0,
+          "expected": [
+            "data breach",
+            "patient records"
+          ],
+          "matched": [
+            "data breach",
+            "patient records"
+          ],
+          "top_content": [
+            "2024: Vertex AI suffers a data breach in November exposing 12,000 patient records. Stock-based compensation clawbacks tr",
+            "2026: Vertex AI responds in May with DiagnosText v2 featuring radiology-specific enhancements. Regains market confidence",
+            "2022: Vertex AI pivots from general NLP to healthcare-specific AI after customer demand. Series A: $25M led by HealthVen"
+          ]
+        },
+        {
+          "query": "What was the impact of DiagnoAI's competing product on Vertex AI stock?",
+          "latency_ms": 448.1,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "dropped 12%"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "If Vertex AI had not acquired MedSync Labs, would they have had clinical trial matching capabilities?",
+          "latency_ms": 718.1,
+          "passed": true,
+          "score": 1.0,
+          "expected": [],
+          "matched": [],
+          "note": "abstain check - no specific expected content"
+        },
+        {
+          "query": "What was Vertex AI's headcount progression from founding to IPO?",
+          "latency_ms": 410.3,
+          "passed": false,
+          "score": 0.0,
+          "expected": [
+            "10",
+            "120",
+            "450"
+          ],
+          "matched": [],
+          "top_content": []
+        },
+        {
+          "query": "Summarize Vertex AI's journey from founding to 2026",
+          "latency_ms": 487.2,
+          "passed": false,
+          "score": 0.0,
+          "expected": [],
+          "matched": [],
+          "note": "summary too brief"
+        }
+      ]
+    }
+  ]
+}

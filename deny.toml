@@ -1,0 +1,70 @@
+# cargo-deny configuration
+[advisories]
+unmaintained = "all"
+yanked = "warn"
+unsound = "all"
+ignore = [
+    # Known-safe advisories — these are vetted false positives or
+    # transient issues that don't affect this project's use case.
+    #{ id = "RUSTSEC-0000-0000", reason = "example" },
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "ISC",
+    "Unlicense",
+    "CC0-1.0",
+    "Zlib",
+    "BSL-1.0",
+    "0BSD",
+    "BSD-2-Clause",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
+    "OpenSSL",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "deny"
+# Benign duplicates across the three crate workspaces.
+# These arise from incompatible major-version bumps in transitive
+# dependencies — they are safe and cannot be unified without
+# upstream changes.
+skip = [
+    { name = "cpufeatures", reason = "0.2.x via aes/sha2, 0.3.x via blake3 — different major lines" },
+    { name = "getrandom", reason = "0.2.x, 0.3.x, 0.4.x — three major versions in transitive deps" },
+    { name = "heck", reason = "0.4.1 via spacetimedb-bindings-macro, 0.5.0 via enum-as-inner" },
+    { name = "r-efi", reason = "5.x via getrandom 0.3, 6.x via getrandom 0.4 — platform dep" },
+    { name = "rand", reason = "0.8.x dev-dep, 0.9.x via spacetimedb-sats" },
+    { name = "rand_chacha", reason = "0.3.x via rand 0.8, 0.9.x via rand 0.9" },
+    { name = "rand_core", reason = "0.6.x via crypto ecosystem, 0.9.x via new rand" },
+    { name = "base64", reason = "0.13 via spm_precompiled, 0.22 via ureq" },
+    { name = "console", reason = "0.15 via old indicatif, 0.16 via new indicatif" },
+    { name = "indicatif", reason = "0.17 via hf-hub, 0.18 via tokenizers" },
+    { name = "nom", reason = "7.x via spm_precompiled, 8.x via tract" },
+    { name = "hashbrown", reason = "0.14 via dashmap, 0.15 via lru/tantivy" },
+    { name = "linux-raw-sys", reason = "0.4 via old rustix (fs4), 0.12 via new rustix (tempfile)" },
+    { name = "rustix", reason = "0.38 via fs4, 1.x via tempfile" },
+    { name = "windows-sys", reason = "multiple pinned versions from different deps" },
+    { name = "windows-targets", reason = "multiple pinned versions from windows-sys deps" },
+    { name = "windows_aarch64_gnullvm", reason = "platform dep pinned by windows-targets" },
+    { name = "windows_aarch64_msvc", reason = "platform dep pinned by windows-targets" },
+    { name = "windows_i686_gnu", reason = "platform dep pinned by windows-targets" },
+    { name = "windows_i686_gnullvm", reason = "platform dep pinned by windows-targets" },
+    { name = "windows_i686_msvc", reason = "platform dep pinned by windows-targets" },
+    { name = "windows_x86_64_gnu", reason = "platform dep pinned by windows-targets" },
+    { name = "windows_x86_64_gnullvm", reason = "platform dep pinned by windows-targets" },
+    { name = "windows_x86_64_msvc", reason = "platform dep pinned by windows-targets" },
+    { name = "wit-bindgen", reason = "0.51 via wasip3, 0.57 via wasip2" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

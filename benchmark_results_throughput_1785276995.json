@@ -1,0 +1,59 @@
+{
+  "1": {
+    "concurrency": 1,
+    "duration_secs": 5,
+    "total_operations": 112,
+    "total_wall_time": 5.04,
+    "qps_overall": 22.2,
+    "per_operation": {
+      "store": {
+        "count": 112,
+        "p50_ms": 42.7,
+        "p90_ms": 61.3,
+        "p99_ms": 73.2,
+        "mean_ms": 45.0,
+        "min_ms": 31.5,
+        "max_ms": 89.1,
+        "qps": 22.2
+      }
+    }
+  },
+  "4": {
+    "concurrency": 4,
+    "duration_secs": 5,
+    "total_operations": 164,
+    "total_wall_time": 5.13,
+    "qps_overall": 32.0,
+    "per_operation": {
+      "store": {
+        "count": 164,
+        "p50_ms": 126.7,
+        "p90_ms": 165.5,
+        "p99_ms": 200.7,
+        "mean_ms": 123.8,
+        "min_ms": 12.5,
+        "max_ms": 203.8,
+        "qps": 32.0
+      }
+    }
+  },
+  "16": {
+    "concurrency": 16,
+    "duration_secs": 5,
+    "total_operations": 644,
+    "total_wall_time": 5.1,
+    "qps_overall": 126.3,
+    "per_operation": {
+      "store": {
+        "count": 644,
+        "p50_ms": 121.7,
+        "p90_ms": 166.2,
+        "p99_ms": 211.1,
+        "mean_ms": 125.4,
+        "min_ms": 52.7,
+        "max_ms": 234.7,
+        "qps": 126.3
+      }
+    }
+  }
+}

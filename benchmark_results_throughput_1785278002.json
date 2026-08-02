@@ -1,0 +1,149 @@
+{
+  "1": {
+    "concurrency": 1,
+    "duration_secs": 5,
+    "total_operations": 239,
+    "total_wall_time": 5.02,
+    "qps_overall": 47.6,
+    "per_operation": {
+      "store": {
+        "count": 60,
+        "p50_ms": 43.5,
+        "p90_ms": 74.2,
+        "p99_ms": 93.2,
+        "mean_ms": 49.4,
+        "min_ms": 32.4,
+        "max_ms": 93.2,
+        "qps": 11.9
+      },
+      "semantic_search": {
+        "count": 60,
+        "p50_ms": 21.4,
+        "p90_ms": 46.0,
+        "p99_ms": 62.1,
+        "mean_ms": 25.1,
+        "min_ms": 18.6,
+        "max_ms": 62.1,
+        "qps": 11.9
+      },
+      "keyword_search": {
+        "count": 60,
+        "p50_ms": 1.0,
+        "p90_ms": 25.0,
+        "p99_ms": 37.7,
+        "mean_ms": 5.3,
+        "min_ms": 0.9,
+        "max_ms": 37.7,
+        "qps": 11.9
+      },
+      "graph_query": {
+        "count": 59,
+        "p50_ms": 3.8,
+        "p90_ms": 5.2,
+        "p99_ms": 6.2,
+        "mean_ms": 4.0,
+        "min_ms": 3.3,
+        "max_ms": 6.2,
+        "qps": 11.7
+      }
+    }
+  },
+  "4": {
+    "concurrency": 4,
+    "duration_secs": 5,
+    "total_operations": 406,
+    "total_wall_time": 5.08,
+    "qps_overall": 79.9,
+    "per_operation": {
+      "store": {
+        "count": 102,
+        "p50_ms": 89.8,
+        "p90_ms": 141.5,
+        "p99_ms": 612.0,
+        "mean_ms": 112.3,
+        "min_ms": 24.6,
+        "max_ms": 628.0,
+        "qps": 20.1
+      },
+      "semantic_search": {
+        "count": 102,
+        "p50_ms": 52.0,
+        "p90_ms": 77.5,
+        "p99_ms": 195.3,
+        "mean_ms": 57.6,
+        "min_ms": 25.4,
+        "max_ms": 242.1,
+        "qps": 20.1
+      },
+      "keyword_search": {
+        "count": 101,
+        "p50_ms": 7.3,
+        "p90_ms": 37.2,
+        "p99_ms": 204.8,
+        "mean_ms": 21.1,
+        "min_ms": 1.0,
+        "max_ms": 484.5,
+        "qps": 19.9
+      },
+      "graph_query": {
+        "count": 101,
+        "p50_ms": 6.8,
+        "p90_ms": 10.3,
+        "p99_ms": 16.1,
+        "mean_ms": 7.1,
+        "min_ms": 3.6,
+        "max_ms": 16.7,
+        "qps": 19.9
+      }
+    }
+  },
+  "16": {
+    "concurrency": 16,
+    "duration_secs": 5,
+    "total_operations": 716,
+    "total_wall_time": 5.11,
+    "qps_overall": 140.0,
+    "per_operation": {
+      "store": {
+        "count": 179,
+        "p50_ms": 163.6,
+        "p90_ms": 201.2,
+        "p99_ms": 226.7,
+        "mean_ms": 165.8,
+        "min_ms": 101.3,
+        "max_ms": 232.2,
+        "qps": 35.0
+      },
+      "semantic_search": {
+        "count": 179,
+        "p50_ms": 233.3,
+        "p90_ms": 287.7,
+        "p99_ms": 346.9,
+        "mean_ms": 237.6,
+        "min_ms": 118.3,
+        "max_ms": 351.4,
+        "qps": 35.0
+      },
+      "keyword_search": {
+        "count": 179,
+        "p50_ms": 17.0,
+        "p90_ms": 39.2,
+        "p99_ms": 55.5,
+        "mean_ms": 20.6,
+        "min_ms": 1.9,
+        "max_ms": 91.4,
+        "qps": 35.0
+      },
+      "graph_query": {
+        "count": 179,
+        "p50_ms": 25.4,
+        "p90_ms": 39.6,
+        "p99_ms": 53.2,
+        "mean_ms": 27.2,
+        "min_ms": 5.4,
+        "max_ms": 61.8,
+        "qps": 35.0
+      }
+    }
+  }
+}

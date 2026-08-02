@@ -1,0 +1,67 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "stdb",
+    "judge_model": "deepseek-v4-flash-free",
+    "answer_model": "deepseek-v4-flash-free",
+    "total_questions": 3,
+    "primary_count": 3,
+    "timestamp": "2026-08-01T04:06:06.825698"
+  },
+  "metrics": {
+    "primary": {
+      "total": 3,
+      "correct": 3,
+      "accuracy": 100.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 1,
+        "correct": 1,
+        "accuracy": 100.0
+      },
+      "temporal": {
+        "total": 2,
+        "correct": 2,
+        "accuracy": 100.0
+      }
+    },
+    "overall": {
+      "total": 3,
+      "correct": 3,
+      "accuracy": 100.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "7 May 2023",
+      "is_correct": true,
+      "reasoning": "The generated answer exactly matches the gold answer date of 7 May 2023."
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "in 2022 (last year relative to May 8, 2023)",
+      "is_correct": true,
+      "reasoning": "The generated answer specifies the same year, 2022, as the gold answer, with additional context that does not change the fact."
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "Counseling and mental health (e.g., psychology or social work)",
+      "is_correct": true,
+      "reasoning": "The generated answer includes counseling and psychology, which are the core fields mentioned in the gold answer, and the extra mention of social work does not contradict it."
+    }
+  ]
+}

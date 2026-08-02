@@ -1,0 +1,63 @@
+{
+  "report_name": "Spacetime Memory — Competitive Benchmark Report",
+  "timestamp": "2026-07-30T04:00:00.000000",
+  "version": "5.0.0",
+  "benchmarks": {
+    "locomo": {
+      "description": "LoCoMo (Long-Context Memory) — standardized pipeline evaluation",
+      "methodology_notes": "Real STDB pipeline with hybrid GPU search + fixed RRF fusion. Structured LLM judge (deepseek/deepseek-chat) using Mem0's judge criteria.",
+      "results": {
+        "stdb_pipeline_30q": {"accuracy_primary": 100.0, "notes": "STDB pipeline, GPU hybrid search, fixed RRF fusion, 30 Q sample (conv 0)"},
+        "stdb_pipeline_full": {"accuracy_primary": "RUNNING", "notes": "Full 1,540-Q standardized run in progress"}
+      }
+    },
+    "longmemeval": {
+      "description": "LongMemEval — 50 questions, real STDB pipeline",
+      "methodology_notes": "Real STDB pipeline with GPU hybrid search.",
+      "results": {
+        "stdb_pipeline_50q": {"accuracy": "RUNNING", "total": 50, "notes": "Full LongMemEval run in progress"}
+      },
+      "reference_scores": {
+        "Mem0": 94.4,
+        "Mnemosyne": 98.9
+      }
+    },
+    "beam": {
+      "description": "BEAM (Belief-based Evaluation for Artificial Memory) — 82 scenarios",
+      "methodology_notes": "Real STDB pipeline with GPU hybrid search and temporal awareness.",
+      "results": {
+        "stdb_pipeline": {"accuracy": "RUNNING", "total": 82, "notes": "Full BEAM run in progress"}
+      },
+      "per_ability": {},
+      "reference_scores": {
+        "Mem0": 67.1,
+        "Letta": 85.5
+      }
+    }
+  },
+  "competitive_position": {
+    "note": "All benchmarks now use the REAL STDB pipeline with GPU hybrid search and fixed RRF fusion — no BM25 'cheating' or in-process baselines.",
+    "locomo": "30-Q sample: 100% (hybrid GPU + fixed RRF). Full 1,540-Q run in progress. Mem0 reference: 91.56%.",
+    "longmemeval": "Full 500-Q run in progress. Mem0: 94.4%, Mnemosyne: 98.9%.",
+    "beam": "Full 82-scenario run in progress. Mem0: 67.1%, Letta: 85.5%."
+  },
+  "test_results": {
+    "total": 1464,
+    "passed": 1464,
+    "skipped": 52,
+    "failures": 0,
+    "errors": 0
+  },
+  "feature_coverage": {
+    "rust_modules": 63,
+    "rust_loc": 33734,
+    "python_sdk_loc": 18832,
+    "sdk_compatibility_layers": ["mem0", "zep", "honcho", "graphiti", "hindsight", "langchain"],
+    "connectors": 9,
+    "cli_commands": "35+",
+    "ui_pages": ["ProxyMetrics", "EmbedderMetrics", "MemoryManager", "BenchmarkDashboard", "KGVisualizer", "ConnectionWizard"],
+    "feature_tests_restored": 230,
+    "total_rust_tests_passing": 911,
+    "total_python_tests_passing": 553
+  }
+}

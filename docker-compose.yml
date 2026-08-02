@@ -1,0 +1,161 @@
+# Spacetime Memory — Full Stack Deployment
+#
+# Starts all services needed for a running spacetime-memory instance:
+#   - SpacetimeDB (v2.6) — the database engine
+#   - Embedder sidecar (ONNX) — vector embeddings
+#   - Tantivy sidecar — BM25 keyword search
+#   - Webhook sidecar — HTTP delivery for webhook events
+#   - MCP server — Model Context Protocol interface for AI agents
+#   - Frontend (optional) — React dashboard UI
+#
+# Usage:
+#   docker compose up -d                    # Start all services
+#   docker compose up -d stdb               # Start database only
+#   docker compose up -d --build            # Rebuild and start
+#   docker compose logs -f                  # Follow logs
+#   docker compose down                     # Stop everything
+
+services:
+
+  # ── SpacetimeDB ───────────────────────────────────────────────────────
+  stdb:
+    image: ghcr.io/spacetimedb/spacetimedb:v2.6.1
+    container_name: spacetime-memory-db
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "3001:3001"    # HTTP API
+      - "3002:3002"    # WebSocket (realtime subscriptions)
+    volumes:
+      - stdb_data:/var/lib/spacetimedb
+    environment:
+      SPACETIMEDB_ADDR: "0.0.0.0:3001"
+      SPACETIMEDB_WS_ADDR: "0.0.0.0:3002"
+      SPACETIMEDB_LOG_LEVEL: "info"
+      SPACETIMEDB_DATA_DIR: "/var/lib/spacetimedb"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Publish the memory module to SpacetimeDB on startup.
+  # Uses the spacetime CLI to publish the WASM binary.
+  publish:
+    image: ghcr.io/spacetimedb/spacetimedb:v2.6.1
+    container_name: spacetime-memory-publish
+    platform: linux/amd64
+    restart: "no"
+    depends_on:
+      stdb:
+        condition: service_healthy
+    volumes:
+      - ./server/spacetimedb/target/wasm32-unknown-unknown/release/spacetime_memory.wasm:/module.wasm:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        spacetime publish --server http://stdb:3001 -y spacetime-memory /module.wasm
+    profiles:
+      - publish
+
+  # ── Embedder Sidecar (ONNX) ──────────────────────────────────────────
+  embedder:
+    build:
+      context: ./server/embedder
+      dockerfile: Dockerfile
+    container_name: spacetime-memory-embedder
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    environment:
+      EMBEDDER_PORT: "9090"
+      EMBEDDER_MODEL: "bge-m3"
+      EMBEDDER_DEVICE: "cpu"
+      RUST_LOG: "info"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Tantivy Sidecar (BM25) ────────────────────────────────────────────
+  tantivy:
+    build:
+      context: ./server/tantivy-sidecar
+      dockerfile: Dockerfile
+    container_name: spacetime-memory-tantivy
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    environment:
+      TANTIVY_PORT: "9091"
+      STDB_URL: "http://stdb:3001"
+      RUST_LOG: "info"
+    depends_on:
+      stdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Webhook Sidecar ───────────────────────────────────────────────────
+  webhook:
+    build:
+      context: ./server/webhook-sidecar
+      dockerfile: Dockerfile
+    container_name: spacetime-memory-webhook
+    restart: unless-stopped
+    environment:
+      STDB_URL: "http://stdb:3001"
+      POLL_INTERVAL_SECS: "5"
+      MAX_RETRIES: "3"
+      REQUEST_TIMEOUT_SECS: "10"
+      RUST_LOG: "info"
+    depends_on:
+      stdb:
+        condition: service_healthy
+
+  # ── MCP Server ────────────────────────────────────────────────────────
+  mcp:
+    build:
+      context: ./server/mcp
+      dockerfile: Dockerfile
+    container_name: spacetime-memory-mcp
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      STDB_URL: "http://stdb:3001"
+      STDB_DB: "spacetime-memory"
+      MCP_PORT: "9092"
+      MCP_TRANSPORT: "sse"
+      RUST_LOG: "info"
+    depends_on:
+      stdb:
+        condition: service_healthy
+
+  # ── Frontend (React Dashboard) ────────────────────────────────────────
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: spacetime-memory-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_STDB_URL: "http://localhost:3001"
+      VITE_STDB_DB: "spacetime-memory"
+      VITE_MCP_URL: "http://localhost:9092"
+    depends_on:
+      stdb:
+        condition: service_healthy
+
+volumes:
+  stdb_data:

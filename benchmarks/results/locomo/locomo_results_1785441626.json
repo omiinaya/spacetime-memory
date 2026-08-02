@@ -1,0 +1,142 @@
+{
+  "metadata": {
+    "benchmark": "locomo",
+    "pipeline": "bm25",
+    "judge_model": "deepseek-v4-flash-free",
+    "answer_model": "deepseek-v4-flash-free",
+    "total_questions": 10,
+    "primary_count": 10,
+    "timestamp": "2026-07-30T16:00:26.335542"
+  },
+  "metrics": {
+    "primary": {
+      "total": 10,
+      "correct": 7,
+      "accuracy": 70.0
+    },
+    "by_category": {
+      "multi-hop": {
+        "total": 1,
+        "correct": 1,
+        "accuracy": 100.0
+      },
+      "single-hop": {
+        "total": 3,
+        "correct": 1,
+        "accuracy": 33.33
+      },
+      "temporal": {
+        "total": 6,
+        "correct": 5,
+        "accuracy": 83.33
+      }
+    },
+    "overall": {
+      "total": 10,
+      "correct": 7,
+      "accuracy": 70.0
+    }
+  },
+  "results": [
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected": "7 May 2023",
+      "answer": "yesterday",
+      "is_correct": true,
+      "reasoning": "We are given: Question: \"When did Caroline go to the LGBTQ support group?\" Gold answer: \"7 May 2023\""
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie paint a sunrise?",
+      "expected": 2022,
+      "answer": "last year",
+      "is_correct": true,
+      "reasoning": "We are given: Question: \"When did Melanie paint a sunrise?\" Gold answer: \"2022\". Generated answer: \""
+    },
+    {
+      "conv": 0,
+      "category": 3,
+      "category_name": "multi-hop",
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected": "Psychology, counseling certification",
+      "answer": "counseling and mental health",
+      "is_correct": true,
+      "reasoning": "The generated answer includes 'counseling' which directly matches the gold answer's 'counseling certification' and 'mental health' is semantically related to 'Psychology', capturing the same factual knowledge."
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What did Caroline research?",
+      "expected": "Adoption agencies",
+      "answer": "career options in counseling and mental health",
+      "is_correct": false,
+      "reasoning": "The generated answer discusses career options in counseling and mental health, which is a different topic from adoption agencies mentioned in the gold answer."
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What is Caroline's identity?",
+      "expected": "Transgender woman",
+      "answer": "trans woman",
+      "is_correct": true,
+      "reasoning": "The generated answer 'trans woman' is a paraphrased equivalent of the gold answer 'Transgender woman', conveying the same identity."
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Melanie run a charity race?",
+      "expected": "The sunday before 25 May 2023",
+      "answer": "last Saturday",
+      "is_correct": false,
+      "reasoning": "We are asked to compare the gold answer \"The sunday before 25 May 2023\" with the generated answer \"l"
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When is Melanie planning on going camping?",
+      "expected": "June 2023",
+      "answer": "next month",
+      "is_correct": true,
+      "reasoning": "We are asked to compare the gold answer \"June 2023\" with the generated answer \"next month\". The ques"
+    },
+    {
+      "conv": 0,
+      "category": 1,
+      "category_name": "single-hop",
+      "question": "What is Caroline's relationship status?",
+      "expected": "Single",
+      "answer": "Not mentioned in the conversation excerpts.",
+      "is_correct": false,
+      "reasoning": "The generated answer incorrectly states the relationship status is not mentioned, while the gold answer confirms it is 'Single', so the generated answer lacks the correct factual knowledge."
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline give a speech at a school?",
+      "expected": "The week before 9 June 2023",
+      "answer": "last week",
+      "is_correct": true,
+      "reasoning": "We are given: Question: When did Caroline give a speech at a school? Gold answer: The week before 9 "
+    },
+    {
+      "conv": 0,
+      "category": 2,
+      "category_name": "temporal",
+      "question": "When did Caroline meet up with her friends, family, and mentors?",
+      "expected": "The week before 9 June 2023",
+      "answer": "last week",
+      "is_correct": true,
+      "reasoning": "We are given: Question: \"When did Caroline meet up with her friends, family, and mentors?\" Gold answ"
+    }
+  ]
+}

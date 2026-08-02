@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._reflection_loop API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._reflection_loop</h1>
+<pre>Help on module spacetime_memory.client._reflection_loop in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._reflection_loop - Autonomous reflection loop — Hindsight parity.
+
+DESCRIPTION
+    Provides an autonomous reflection system that periodically reflects on
+    accumulated memories, generates insights (patterns, contradictions, gaps,
+    observations, connections, syntheses), and maintains a reflection state
+    machine across cycles.
+    
+    Reference: https://github.com/vectorize-io/hindsight
+
+CLASSES
+    builtins.object
+        ReflectionLoopMixin
+    
+    class ReflectionLoopMixin(builtins.object)
+     |  Mixin for autonomous reflection loop lifecycle management.
+     |  
+     |  Provides methods to create, run, and manage reflection sessions
+     |  that autonomously analyze accumulated memories for patterns,
+     |  contradictions, knowledge gaps, and insights.
+     |  
+     |  Typical usage::
+     |  
+     |      client = Client(...)
+     |  
+     |      # Create a session
+     |      session = client.create_reflection_session(
+     |          workspace_id="ws-1",
+     |          peer_id="agent-1",
+     |          config={
+     |              "interval_minutes": 60,
+     |              "max_cycles": 100,
+     |              "focus_areas": ["user_preferences", "domain_knowledge"],
+     |              "min_confidence": 0.3,
+     |              "llm_model": "default"
+     |          }
+     |      )
+     |      session_id = session["session_id"]
+     |  
+     |      # Run a reflection cycle
+     |      client.start_reflection_cycle("ws-1", session_id)
+     |  
+     |      # Store insights
+     |      client.store_reflection_insight(
+     |          workspace_id="ws-1",
+     |          session_id=session_id,
+     |          content="User consistently prefers async communication",
+     |          confidence=0.85,
+     |          insight_type="pattern",
+     |          source_memory_ids=["mem-1", "mem-2"],
+     |          source_note_ids=[]
+     |      )
+     |  
+     |      # Complete session
+     |      client.complete_reflection_session("ws-1", session_id, "completed")
+     |  
+     |      # View results
+     |      sessions = client.get_reflection_sessions("ws-1")
+     |      insights = client.get_reflection_insights("ws-1", session_id)
+     |  
+     |      # Delete
+     |      client.delete_reflection_session("ws-1", session_id)
+     |  
+     |  Methods defined here:
+     |  
+     |  complete_reflection_session(self, workspace_id: 'str', session_id: 'str', status: 'str' = 'completed') -> 'dict[str, Any]'
+     |      Complete a reflection session.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          session_id: Session to complete.
+     |          status: Final status ("completed" or "failed").
+     |      
+     |      Returns:
+     |          Reducer status.
+     |  
+     |  create_reflection_session(self, workspace_id: 'str', peer_id: 'str', config: 'dict[str, Any] | None' = None) -> 'dict[str, Any]'
+     |      Create a new autonomous reflection session.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          peer_id: The agent / peer initiating reflection.
+     |          config: Configuration dict with keys:
+     |              - interval_minutes (int): Min between cycles (default: 60)
+     |              - max_cycles (int): Max reflection cycles (default: 100)
+     |              - focus_areas (list[str]): Areas to focus on (default: [])
+     |              - min_confidence (float): Min confidence to accept insights (default: 0.3)
+     |              - llm_model (str): Model to use (default: "default")
+     |      
+     |      Returns:
+     |          Reducer result with session_id.
+     |  
+     |  delete_reflection_session(self, workspace_id: 'str', session_id: 'str') -> 'dict[str, Any]'
+     |      Delete a reflection session and all its insights.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          session_id: Session to delete.
+     |      
+     |      Returns:
+     |          Reducer status.
+     |  
+     |  get_reflection_insights(self, workspace_id: 'str', session_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get all insights for a reflection session.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          session_id: Session to get insights for.
+     |      
+     |      Returns:
+     |          List of insight dicts.
+     |  
+     |  get_reflection_sessions(self, workspace_id: 'str') -> 'list[dict[str, Any]]'
+     |      Get all reflection sessions for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          List of session dicts.
+     |  
+     |  get_reflection_state(self, workspace_id: 'str', session_id: 'str') -> 'dict[str, Any]'
+     |      Get a combined snapshot of reflection state.
+     |      
+     |      Returns session metadata plus summary stats:
+     |      cycle_count, insights_count, recent insights (last 5),
+     |      status, session age.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          session_id: Session to inspect.
+     |      
+     |      Returns:
+     |          Dict with session details, insights summary, and stats.
+     |  
+     |  start_reflection_cycle(self, workspace_id: 'str', session_id: 'str') -> 'dict[str, Any]'
+     |      Start a new reflection cycle within a session.
+     |      
+     |      Increments the cycle counter and updates status to running.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          session_id: Session to cycle.
+     |      
+     |      Returns:
+     |          Reducer status.
+     |  
+     |  store_reflection_insight(self, workspace_id: 'str', session_id: 'str', content: 'str', confidence: 'float', insight_type: 'str', source_memory_ids: 'list[str] | None' = None, source_note_ids: 'list[str] | None' = None) -> 'dict[str, Any]'
+     |      Store an insight generated by a reflection cycle.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          session_id: Session this insight belongs to.
+     |          content: The insight text.
+     |          confidence: Confidence score (0.0-1.0).
+     |          insight_type: Type: "pattern", "contradiction", "gap",
+     |                       "observation", "connection", or "synthesis".
+     |          source_memory_ids: Memory IDs that inspired this insight.
+     |          source_note_ids: Note IDs that inspired this insight.
+     |      
+     |      Returns:
+     |          Reducer status.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_reflection_loop.py
+
+
+</pre>
+</body></html>

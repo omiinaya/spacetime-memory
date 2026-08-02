@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._export_import API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._export_import</h1>
+<pre>Help on module spacetime_memory.client._export_import in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._export_import - Export/Import mixin — client-side orchestration for data portability.
+
+DESCRIPTION
+    Provides:
+      - ``export_memories`` — export workspace memories to JSON, markdown, or CSV
+      - ``import_memories`` — import memories with merge/replace/skip strategy
+      - ``export_workspace`` — full workspace export (memories + KG + notes + profiles)
+      - ``import_workspace`` — full workspace import (all domains)
+    
+    All data is read via existing ``_query()`` calls and imported via existing
+    reducer calls (``store_memory``, ``create_node``, ``create_edge``,
+    ``create_note``, etc.).  No new STDB reducers are introduced — this is a
+    pure client-side orchestration layer.
+
+CLASSES
+    builtins.object
+        ExportImportMixin
+    
+    class ExportImportMixin(builtins.object)
+     |  Spacetime-Memory export/import mixin.
+     |  
+     |  Provides client-side orchestration for exporting and importing
+     |  workspace data across all supported domains (memories, knowledge
+     |  graph, notes, profiles).
+     |  
+     |  Inherits from ClientBase for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  export_memories(self, workspace_id: 'str', fmt: 'str' = 'json', filters: 'dict[str, Any] | None' = None) -> 'str'
+     |      Export all memories for a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          fmt: Output format — ``"json"`` (default), ``"markdown"``,
+     |              or ``"csv"``.
+     |          filters: Optional dict of field → value to filter by
+     |              (applied client-side after query).
+     |      
+     |      Returns:
+     |          Serialised export data as a string (JSON array, CSV text,
+     |          or concatenated markdown).
+     |      
+     |      Raises:
+     |          ValueError: On unknown format.
+     |  
+     |  export_workspace_bundle(self, workspace_id: 'str', include: 'list[str] | None' = None) -> 'str'
+     |      Export a full workspace as a JSON bundle.
+     |      
+     |      Note: named ``export_workspace_bundle`` to avoid colliding with
+     |      the existing ``WorkspaceMixin.export_workspace()`` which exports
+     |      notes as markdown only.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          include: List of domains to include. Defaults to all:
+     |              ``["memories", "kg", "notes", "profiles"]``.
+     |              Sub-options:
+     |              - ``"memories"`` — memory records
+     |              - ``"kg"`` — KG nodes + KG edges
+     |              - ``"notes"`` — wiki notes
+     |              - ``"profiles"`` — peer profiles
+     |      
+     |      Returns:
+     |          JSON string with a top-level object containing each domain
+     |          as a key mapping to its data array.  Metadata keys:
+     |          ``_exported_at``, ``_workspace_id``, ``_version``.
+     |  
+     |  import_memories(self, workspace_id: 'str', data: 'str', fmt: 'str' = 'json', strategy: 'str' = 'merge') -> 'dict[str, Any]'
+     |      Import memories into a workspace.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          data: Serialised memory data (JSON array string, CSV text,
+     |              or markdown text — depends on ``fmt``).
+     |          fmt: Input format — ``"json"`` (default), ``"csv"``,
+     |              or ``"markdown"``.
+     |          strategy: Conflict strategy — one of:
+     |              - ``"merge"`` (default): keep existing, add new
+     |              - ``"replace"``: overwrite existing with imported
+     |              - ``"skip"``: skip entries that already exist
+     |      
+     |      Returns:
+     |          Dict with keys: ``imported`` (count), ``skipped`` (count),
+     |          ``errors`` (list of error messages).
+     |      
+     |      Raises:
+     |          ValueError: On unknown format or strategy.
+     |          json.JSONDecodeError: On invalid JSON input.
+     |  
+     |  import_workspace(self, workspace_id: 'str', data: 'str', strategy: 'str' = 'merge') -> 'dict[str, Any]'
+     |      Import a full workspace from a JSON bundle created by
+     |      ``export_workspace_bundle()``.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace (may differ from the original).
+     |          data: The JSON bundle string produced by ``export_workspace()``.
+     |          strategy: Conflict strategy — ``"merge"`` (default),
+     |              ``"replace"``, or ``"skip"``.  Applied per record
+     |              across all domains.
+     |      
+     |      Returns:
+     |          Dict with per-domain counts: ``memories``, ``kg``, ``notes``,
+     |          ``profiles``, and ``errors`` (list of error messages).
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_export_import.py
+
+
+</pre>
+</body></html>

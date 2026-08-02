@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._checkpoint API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._checkpoint</h1>
+<pre>Help on module spacetime_memory.client._checkpoint in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._checkpoint - Checkpoint/Restore module — LangGraph-parity agent state snapshots.
+
+DESCRIPTION
+    Checkpoints save and restore agent state, allowing interrupted or long-running
+    tasks to resume.  Stored as memories with ``memory_type="checkpoint"`` whose
+    ``content`` is a JSON blob carrying ``state``, ``metadata``, and timestamps.
+    
+    TTL support: each checkpoint has an ``expires_at`` field (seconds since epoch).
+    When the TTL elapses, the checkpoint is considered stale and pruned by
+    :meth:`prune_checkpoints` or skipped by :meth:`list_checkpoints`.
+
+CLASSES
+    builtins.object
+        CheckpointMixin
+    
+    class CheckpointMixin(builtins.object)
+     |  Spacetime-Memory checkpoint/restore mixin.
+     |  
+     |  Provides LangGraph-parity checkpoint save, restore, list, prune, and
+     |  session tracking — all backed by the existing memory store.
+     |  
+     |  Checkpoints are ``memory_type="checkpoint"`` entries whose ``content``
+     |  is a JSON blob holding ``state``, ``metadata``, ``created_at``, and
+     |  ``expires_at``.
+     |  
+     |  Inherits from ``ClientBase`` for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  create_checkpoint(self, workspace_id: 'str', agent_id: 'str', state: 'str', metadata: 'dict[str, Any] | None' = None, ttl_seconds: 'int' = 2592000) -> 'dict[str, Any]'
+     |      Save an agent state snapshot as a checkpoint.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          agent_id: Unique identifier for the agent.
+     |          state: Serialised agent state (JSON string or opaque value).
+     |          metadata: Optional arbitrary metadata dict (e.g. ``{"step": 5,
+     |              "session_id": "sess_123"}``).
+     |          ttl_seconds: Time-to-live in seconds.  Defaults to 30 days.
+     |              Pass ``0`` for no-expiry (use with caution).
+     |      
+     |      Returns:
+     |          Reducer status dict with a ``checkpoint_id`` key.
+     |  
+     |  delete_checkpoint(self, checkpoint_id: 'str') -> 'dict[str, Any]'
+     |      Delete a single checkpoint by ID.
+     |      
+     |      Args:
+     |          checkpoint_id: The checkpoint's memory ID.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |      
+     |      Raises:
+     |          NotFoundError: If the checkpoint does not exist.
+     |  
+     |  get_checkpoint(self, checkpoint_id: 'str') -> 'dict[str, Any] | None'
+     |      Retrieve a single checkpoint by ID.
+     |      
+     |      Args:
+     |          checkpoint_id: The checkpoint's memory ID.
+     |      
+     |      Returns:
+     |          A checkpoint dict with keys ``checkpoint_id``, ``state``,
+     |          ``metadata``, ``created_at``, ``expires_at``, ``agent_id``,
+     |          ``workspace_id`` — or ``None`` if not found.
+     |  
+     |  list_active_sessions(self, workspace_id: 'str', max_age_seconds: 'int' = 3600) -> 'list[dict[str, Any]]'
+     |      List sessions that have recent checkpoints.
+     |      
+     |      Useful for discovering which agents/sessions are still active.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          max_age_seconds: Maximum age of the most recent checkpoint to
+     |              consider a session active.  Default ``3600`` (1 hour).
+     |      
+     |      Returns:
+     |          A list of dicts, each with keys ``agent_id``, ``session_id``
+     |          (if present in metadata), ``last_checkpoint_at``, and
+     |          ``checkpoint_count``.  Sorted by ``last_checkpoint_at``
+     |          descending.
+     |  
+     |  list_checkpoints(self, workspace_id: 'str', agent_id: 'str', include_expired: 'bool' = False) -> 'list[dict[str, Any]]'
+     |      List checkpoints for an agent, newest first.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          agent_id: The agent to list checkpoints for.
+     |          include_expired: If ``False`` (default), expired checkpoints are
+     |              omitted from the results.
+     |      
+     |      Returns:
+     |          A list of checkpoint dicts sorted by ``created_at`` descending.
+     |  
+     |  prune_checkpoints(self, workspace_id: 'str', agent_id: 'str', keep_last_n: 'int' = 10) -> 'dict[str, Any]'
+     |      Remove old checkpoints, keeping only the N most recent.
+     |      
+     |      Also removes any expired checkpoints regardless of count.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          agent_id: The agent whose checkpoints to prune.
+     |          keep_last_n: Maximum number of recent checkpoints to retain
+     |              (after removing expired ones).  Default ``10``.
+     |      
+     |      Returns:
+     |          A dict with ``pruned`` (int) and ``remaining`` (int) counters.
+     |  
+     |  restore_checkpoint(self, checkpoint_id: 'str') -> 'dict[str, Any] | None'
+     |      Retrieve checkpoint state for resuming an agent.
+     |      
+     |      This is semantically equivalent to :meth:`get_checkpoint` for the
+     |      restore use-case.  It returns the full checkpoint dict so the caller
+     |      can extract ``state``, ``metadata``, etc.
+     |      
+     |      Args:
+     |          checkpoint_id: The checkpoint's memory ID.
+     |      
+     |      Returns:
+     |          A checkpoint dict (same shape as :meth:`get_checkpoint`) or
+     |          ``None`` if not found.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    CHECKPOINT_MEMORY_TYPE = 'checkpoint'
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_checkpoint.py
+
+
+</pre>
+</body></html>

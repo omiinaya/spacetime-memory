@@ -1,0 +1,195 @@
+{
+  "workspace_id": "eval_df45aa60",
+  "num_queries": 18,
+  "num_memories": 25,
+  "metrics": {
+    "P@5": 0.0,
+    "R@5": 0.0,
+    "MRR": 0.0
+  },
+  "details": [
+    {
+      "query": "who is the CEO of Acme AI",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "f6a24e74-1b4f-46e4-bf6f-a8d58273"
+      ]
+    },
+    {
+      "query": "CTO background at Stripe",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "6f30c834-9c1c-46a1-aa53-7e3c074c"
+      ]
+    },
+    {
+      "query": "funding series A how much raised",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "be54d154-97e9-48d0-be23-d1974c44",
+        "1d112775-cad5-43ab-96a9-77591002"
+      ]
+    },
+    {
+      "query": "who are the customers of Acme",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "4755aa2d-c898-4388-84fa-edd3dfa9"
+      ]
+    },
+    {
+      "query": "what integrations does the product support",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "94df9443-86a1-47f4-91ac-101e7ab7"
+      ]
+    },
+    {
+      "query": "why is Acme better than competitors",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "8d503e88-1563-4761-8f57-8cbe08cd",
+        "f870ee3e-d90c-47a7-bf0b-91b050c0"
+      ]
+    },
+    {
+      "query": "tech stack backend infrastructure",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "d1781e3a-b27f-4244-9a5e-b67ba115"
+      ]
+    },
+    {
+      "query": "how many requests per day scale",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "bf7ab58c-694a-4110-b0ca-ff5b1038"
+      ]
+    },
+    {
+      "query": "latency SLA performance p99",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "29933bff-8a8e-4dac-a01a-3a3bc36a"
+      ]
+    },
+    {
+      "query": "Bob hiring what engineering roles",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "1fa3e5dc-81cf-4945-99cd-439364b0"
+      ]
+    },
+    {
+      "query": "Alice awards recognition Forbes TEDx",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "59c2b356-1983-402f-9b5a-f459ee73",
+        "688743b5-38fb-4f67-a280-4da4e5da"
+      ]
+    },
+    {
+      "query": "company founded when year",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "6f7c8075-ae64-4561-ab90-e3c4c97c"
+      ]
+    },
+    {
+      "query": "how many employees headcount",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "8c021eb8-cede-441f-8901-2adb516f"
+      ]
+    },
+    {
+      "query": "Alice previous work experience Google",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "099ac468-a286-4c4f-82ca-c2299ceb"
+      ]
+    },
+    {
+      "query": "model accuracy compared to Ada competitors",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "f870ee3e-d90c-47a7-bf0b-91b050c0"
+      ]
+    },
+    {
+      "query": "NPS score customer retention",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "cbca3b0f-19e7-4e80-8d95-6dd0aab7"
+      ]
+    },
+    {
+      "query": "GPT-4 models used in platform",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "b33f08eb-5876-4264-bc2f-438e5738"
+      ]
+    },
+    {
+      "query": "who designed the distributed inference system",
+      "p5": 0.0,
+      "r5": 0.0,
+      "rr": 0.0,
+      "retrieved": [],
+      "relevant": [
+        "0f29ec14-1450-44e9-8efc-4bb5cd4c"
+      ]
+    }
+  ]
+}

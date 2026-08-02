@@ -1,0 +1,84 @@
+{
+  "benchmark": "LoCoMo v9.1",
+  "timestamp": 1785320495.174547,
+  "report": {
+    "single-hop": {
+      "total": 2,
+      "correct": 1,
+      "accuracy": 50.0
+    },
+    "temporal": {
+      "total": 2,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "multi-hop": {
+      "total": 1,
+      "correct": 0,
+      "accuracy": 0.0
+    },
+    "__primary__": {
+      "categories": [
+        "single-hop",
+        "temporal",
+        "multi-hop",
+        "open-domain"
+      ],
+      "total": 5,
+      "correct": 1,
+      "accuracy": 20.0
+    },
+    "__overall__": {
+      "total": 5,
+      "correct": 1,
+      "accuracy": 20.0
+    }
+  },
+  "results": [
+    {
+      "question": "When did Caroline go to the LGBTQ support group?",
+      "expected_answer": "7 May 2023",
+      "actual_answer": "I don't know",
+      "matched_sessions": [],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "no"
+    },
+    {
+      "question": "When did Melanie paint a sunrise?",
+      "expected_answer": 2022,
+      "actual_answer": "I don't know",
+      "matched_sessions": [],
+      "is_correct": false,
+      "category": 2,
+      "reasoning": "no"
+    },
+    {
+      "question": "What fields would Caroline be likely to pursue in her educaton?",
+      "expected_answer": "Psychology, counseling certification",
+      "actual_answer": "I don't know",
+      "matched_sessions": [],
+      "is_correct": false,
+      "category": 3,
+      "reasoning": "no"
+    },
+    {
+      "question": "What did Caroline research?",
+      "expected_answer": "Adoption agencies",
+      "actual_answer": "I don't know",
+      "matched_sessions": [],
+      "is_correct": false,
+      "category": 1,
+      "reasoning": "no"
+    },
+    {
+      "question": "What is Caroline's identity?",
+      "expected_answer": "Transgender woman",
+      "actual_answer": "I don't know",
+      "matched_sessions": [],
+      "is_correct": true,
+      "category": 1,
+      "reasoning": "yes. the system's an"
+    }
+  ]
+}

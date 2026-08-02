@@ -1,0 +1,110 @@
+{
+  "10": {
+    "n_memories": 10,
+    "n_queries": 5,
+    "n_iterations": 2,
+    "seed_time_secs": 1.0,
+    "memories_stored": 10,
+    "search": {
+      "keyword_search": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.02,
+        "p99_ms": 0.02,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.02,
+        "samples": 10
+      },
+      "hybrid_search": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.0,
+        "p99_ms": 0.0,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0,
+        "samples": 10
+      },
+      "graph_query": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.01,
+        "p99_ms": 0.01,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.01,
+        "samples": 10
+      }
+    }
+  },
+  "100": {
+    "n_memories": 100,
+    "n_queries": 5,
+    "n_iterations": 2,
+    "seed_time_secs": 14.3,
+    "memories_stored": 100,
+    "search": {
+      "keyword_search": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.02,
+        "p99_ms": 0.02,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.02,
+        "samples": 10
+      },
+      "hybrid_search": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.0,
+        "p99_ms": 0.0,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0,
+        "samples": 10
+      },
+      "graph_query": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.01,
+        "p99_ms": 0.01,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.01,
+        "samples": 10
+      }
+    }
+  },
+  "1000": {
+    "n_memories": 1000,
+    "n_queries": 5,
+    "n_iterations": 2,
+    "seed_time_secs": 105.6,
+    "memories_stored": 1000,
+    "search": {
+      "keyword_search": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.01,
+        "p99_ms": 0.01,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.01,
+        "samples": 10
+      },
+      "hybrid_search": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.0,
+        "p99_ms": 0.0,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.0,
+        "samples": 10
+      },
+      "graph_query": {
+        "p50_ms": 0.0,
+        "p90_ms": 0.01,
+        "p99_ms": 0.01,
+        "mean_ms": 0.0,
+        "min_ms": 0.0,
+        "max_ms": 0.01,
+        "samples": 10
+      }
+    }
+  }
+}

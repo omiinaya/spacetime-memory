@@ -1,0 +1,26 @@
+{
+  "baseline_p50_ms": 319.44095649999997,
+  "current": {
+    "failures": 0,
+    "max_ms": 333.129744,
+    "mean_ms": 318.87932455,
+    "min_ms": 309.165809,
+    "n": 20,
+    "p50_ms": 319.44095649999997,
+    "p90_ms": 328.6615178,
+    "p99_ms": 332.54349995
+  },
+  "database_prefix": "c2007d378703b827",
+  "gate": {
+    "condition": "p50 > 2x baseline",
+    "passed": true
+  },
+  "iterations": 20,
+  "seed_count": 50,
+  "strategies": [
+    "semantic",
+    "keyword"
+  ],
+  "timestamp": "2026-07-08T12:21:29Z",
+  "workspace_id": "bench-hybrid-ws-1"
+}

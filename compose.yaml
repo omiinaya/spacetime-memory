@@ -1,0 +1,75 @@
+# ============================================================================
+# Spacetime Memory — Docker Compose
+# ============================================================================
+# Start with:
+#   docker compose up -d
+#
+# This starts SpacetimeDB standalone with the module pre-published and the
+# embedder sidecar listening for embedding requests.
+#
+# Environment variables (set in .env or shell):
+#   SPACETIMEDB_VERSION  — SpacetimeDB version (default: 2.6.1)
+#   SPACETIMEDB_PORT     — Host port (default: 3001)
+# ============================================================================
+
+services:
+  spacetimedb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spacetime-memory
+    container_name: spacetime-memory
+    ports:
+      - "${SPACETIMEDB_PORT:-3001}:3001"
+      - "9090:9090"
+      - "5173:5173"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPACETIMEDB_HOST: 0.0.0.0
+      SPACETIMEDB_PORT: 3001
+      # Frontend VITE_ vars — injected at container runtime so the static
+      # SPA (built at image build time) can connect to the right backend.
+      VITE_SPACETIMEDB_WS: "${VITE_SPACETIMEDB_WS:-ws://localhost:3001}"
+      VITE_SPACETIMEDB_HOST: "${VITE_SPACETIMEDB_HOST:-localhost:3001}"
+      VITE_SPACETIMEDB_DB: "${VITE_SPACETIMEDB_DB:-spacetime-memory}"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/3001"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    volumes:
+      - stmem-data:/app/data
+      - stmem-models:/app/model
+
+  tantivy-sidecar:
+    build:
+      context: server/tantivy-sidecar
+      dockerfile: Dockerfile
+    image: tantivy-sidecar
+    container_name: tantivy-sidecar
+    ports:
+      - "9091:9091"
+    environment:
+      TANTIVY_PORT: 9091
+      TANTIVY_INDEX_DIR: /app/data/tantivy
+      SPACETIMEDB_URL: http://spacetimedb:3001
+      SPACETIMEDB_DB: "${SPACETIMEDB_DB:-spacetime-memory}"
+    depends_on:
+      spacetimedb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9091/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    volumes:
+      - stmem-tantivy-index:/app/data/tantivy
+
+volumes:
+  stmem-data:
+  stmem-models:
+  stmem-tantivy-index:

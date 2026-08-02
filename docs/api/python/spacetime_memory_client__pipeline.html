@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._pipeline API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._pipeline</h1>
+<pre>Help on module spacetime_memory.client._pipeline in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._pipeline - Cognee-parity Pipeline system — configurable multi-stage cognitive pipelines.
+
+DESCRIPTION
+    Pipelines compose ordered stages:
+        Search → Filter → Extract → Transform → Store
+    
+    Usage::
+    
+        pipeline = client.create_pipeline(
+            workspace_id,
+            name="daily_summary",
+            stages=[
+                PipelineStage.search(query="daily updates", top_k=20),
+                PipelineStage.filter(min_confidence=0.5, max_age_hours=24),
+                PipelineStage.extract(type="entities"),
+                PipelineStage.transform(llm_prompt="Summarize these memories"),
+                PipelineStage.store(target="note", title="Daily Summary"),
+            ],
+            schedule="0 9 * * *",
+        )
+        result = pipeline.execute()
+
+CLASSES
+    builtins.object
+        PipelineDefinition
+        PipelineMixin
+        PipelineResult
+        PipelineStage
+    builtins.str(builtins.object)
+        StageType(builtins.str, enum.Enum)
+    enum.Enum(builtins.object)
+        StageType(builtins.str, enum.Enum)
+    
+    class PipelineDefinition(builtins.object)
+     |  PipelineDefinition(id: 'str', name: 'str', workspace_id: 'str', stages: 'list[PipelineStage]' = <factory>, schedule: 'str' = '', enabled: 'bool' = True, created_at: 'float' = 0.0, updated_at: 'float' = 0.0, last_run_at: 'float' = 0.0, last_status: 'str' = 'never_run', tags: 'dict[str, str]' = <factory>) -> None
+     |  
+     |  Complete pipeline definition created via ``create_pipeline()``.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, id: 'str', name: 'str', workspace_id: 'str', stages: 'list[PipelineStage]' = <factory>, schedule: 'str' = '', enabled: 'bool' = True, created_at: 'float' = 0.0, updated_at: 'float' = 0.0, last_run_at: 'float' = 0.0, last_status: 'str' = 'never_run', tags: 'dict[str, str]' = <factory>) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_dict(self) -> 'dict[str, Any]'
+     |      Serialize to a JSON-friendly dict.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |  
+     |  from_dict(d: 'dict[str, Any]') -> 'PipelineDefinition' from builtins.type
+     |      Deserialize from a dict produced by ``to_dict()``.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'created_at': 'float', 'enabled': 'bool', 'id': 'st...
+     |  
+     |  __dataclass_fields__ = {'created_at': Field(name='created_at',type='fl...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('id', 'name', 'workspace_id', 'stages', 'schedule', ...
+     |  
+     |  created_at = 0.0
+     |  
+     |  enabled = True
+     |  
+     |  last_run_at = 0.0
+     |  
+     |  last_status = 'never_run'
+     |  
+     |  schedule = ''
+     |  
+     |  updated_at = 0.0
+    
+    class PipelineMixin(builtins.object)
+     |  Spacetime-Memory pipeline mixin.
+     |  
+     |  Provides methods for creating, executing, and managing cognitive
+     |  pipelines.  Pipelines are composed of ordered stages (search → filter
+     |  → extract → transform → store) that process memories and knowledge.
+     |  
+     |  Pipeline definitions and execution logs are stored in-memory on the
+     |  client instance and optionally persisted via the note/memory system.
+     |  
+     |  Usage::
+     |  
+     |      client = Client(...)
+     |  
+     |      pipeline = client.create_pipeline(
+     |          workspace_id="ws-1",
+     |          name="daily_summary",
+     |          stages=[
+     |              PipelineStage.search(query="daily updates", top_k=20),
+     |              PipelineStage.filter(min_confidence=0.5),
+     |              PipelineStage.extract(type="entities"),
+     |              PipelineStage.transform(llm_prompt="Summarize these memories"),
+     |              PipelineStage.store(target="note", title="Daily Summary"),
+     |          ],
+     |          schedule="0 9 * * *",
+     |      )
+     |  
+     |      result = pipeline.execute()
+     |      print(result.success, result.duration_ms)
+     |  
+     |      pipelines = client.list_pipelines(workspace_id="ws-1")
+     |      status = client.get_pipeline_status(pipeline.id)
+     |      client.delete_pipeline(pipeline.id)
+     |  
+     |  Methods defined here:
+     |  
+     |  create_pipeline(self, workspace_id: 'str', name: 'str', stages: 'list[PipelineStage]', schedule: 'str' = '', tags: 'dict[str, str] | None' = None) -> 'PipelineDefinition'
+     |      Define a new cognitive pipeline.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          name: Human-readable name for the pipeline.
+     |          stages: Ordered list of ``PipelineStage`` instances.
+     |          schedule: Optional cron expression (e.g. ``"0 9 * * *"``).
+     |          tags: Optional metadata tags.
+     |      
+     |      Returns:
+     |          The created ``PipelineDefinition``.
+     |  
+     |  delete_pipeline(self, pipeline_id: 'str') -> 'dict[str, Any]'
+     |      Remove a pipeline definition.
+     |      
+     |      Args:
+     |          pipeline_id: The pipeline ID to delete.
+     |      
+     |      Returns:
+     |          Status dict.
+     |      
+     |      Raises:
+     |          KeyError: If the pipeline does not exist.
+     |  
+     |  execute_pipeline(self, pipeline_id: 'str', **overrides: 'Any') -> 'PipelineResult'
+     |      Run a pipeline synchronously.
+     |      
+     |      Each stage receives the output of the previous stage as its input.
+     |      The first stage (usually Search) receives no initial input.
+     |      
+     |      Args:
+     |          pipeline_id: The pipeline to execute.
+     |          **overrides: Optional overrides for stage parameters (e.g. ``query``).
+     |      
+     |      Returns:
+     |          A ``PipelineResult`` with per-stage outputs.
+     |      
+     |      Raises:
+     |          KeyError: If the pipeline does not exist.
+     |  
+     |  get_pipeline_status(self, pipeline_id: 'str') -> 'dict[str, Any]'
+     |      Check the status of a pipeline.
+     |      
+     |      Args:
+     |          pipeline_id: The pipeline ID.
+     |      
+     |      Returns:
+     |          Dict with pipeline status info including definition and recent logs.
+     |      
+     |      Raises:
+     |          KeyError: If the pipeline does not exist.
+     |  
+     |  list_pipelines(self, workspace_id: 'str | None' = None) -> 'list[PipelineDefinition]'
+     |      List all defined pipelines, optionally filtered by workspace.
+     |      
+     |      Args:
+     |          workspace_id: If provided, only return pipelines for this workspace.
+     |      
+     |      Returns:
+     |          A list of ``PipelineDefinition`` instances.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+    
+    class PipelineResult(builtins.object)
+     |  PipelineResult(pipeline_id: 'str', execution_id: 'str', success: 'bool', started_at: 'float', finished_at: 'float', stages_output: 'list[dict[str, Any]]' = <factory>, error: 'str' = '', duration_ms: 'float' = 0.0) -> None
+     |  
+     |  Result of a single pipeline execution.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, pipeline_id: 'str', execution_id: 'str', success: 'bool', started_at: 'float', finished_at: 'float', stages_output: 'list[dict[str, Any]]' = <factory>, error: 'str' = '', duration_ms: 'float' = 0.0) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_dict(self) -> 'dict[str, Any]'
+     |      Serialize to a JSON-friendly dict.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'duration_ms': 'float', 'error': 'str', 'execution_...
+     |  
+     |  __dataclass_fields__ = {'duration_ms': Field(name='duration_ms',type='...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('pipeline_id', 'execution_id', 'success', 'started_a...
+     |  
+     |  duration_ms = 0.0
+     |  
+     |  error = ''
+    
+    class PipelineStage(builtins.object)
+     |  PipelineStage(type: 'StageType', params: 'dict[str, Any]' = <factory>) -> None
+     |  
+     |  A single stage in a cognitive pipeline.
+     |  
+     |  Use the class-method constructors (``PipelineStage.search()``,
+     |  ``PipelineStage.filter()``, etc.) for a clean API rather than
+     |  instantiating this dataclass directly.
+     |  
+     |  Methods defined here:
+     |  
+     |  __eq__(self, other)
+     |      Return self==value.
+     |  
+     |  __init__(self, type: 'StageType', params: 'dict[str, Any]' = <factory>) -> None
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  to_dict(self) -> 'dict[str, Any]'
+     |      Serialize this stage to a plain dict.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Class methods defined here:
+     |  
+     |  classify(categories: 'list[str] | None' = None, output_key: 'str' = 'classification', **kwargs: 'Any') -> 'PipelineStage' from builtins.type
+     |      Create a Classify stage.
+     |      
+     |      Args:
+     |          categories: Allowed classification categories (empty = auto-detect).
+     |          output_key: Key to store classification result in stage output.
+     |          **kwargs: Additional classification parameters.
+     |  
+     |  extract(type: 'str' = 'entities', fields: 'list[str] | None' = None, **kwargs: 'Any') -> 'PipelineStage' from builtins.type
+     |      Create an Extract stage.
+     |      
+     |      Args:
+     |          type: What to extract — ``"entities"``, ``"keywords"``, ``"summary"``, etc.
+     |          fields: Source fields to extract from (default: content).
+     |          **kwargs: Additional extraction parameters.
+     |  
+     |  filter(min_confidence: 'float' = 0.0, max_age_hours: 'float | None' = None, include_types: 'list[str] | None' = None, exclude_types: 'list[str] | None' = None, **kwargs: 'Any') -> 'PipelineStage' from builtins.type
+     |      Create a Filter stage.
+     |      
+     |      Args:
+     |          min_confidence: Minimum confidence score (0.0–1.0).
+     |          max_age_hours: Maximum age in hours (None = no limit).
+     |          include_types: Only keep results whose ``type``/``memory_type`` is in this list.
+     |          exclude_types: Remove results whose ``type``/``memory_type`` is in this list.
+     |          **kwargs: Additional filter parameters.
+     |  
+     |  from_dict(d: 'dict[str, Any]') -> 'PipelineStage' from builtins.type
+     |      Deserialize from a dict produced by ``to_dict()``.
+     |  
+     |  rank(field: 'str' = 'score', reverse: 'bool' = True, top_k: 'int | None' = None, **kwargs: 'Any') -> 'PipelineStage' from builtins.type
+     |      Create a Rank stage.
+     |      
+     |      Args:
+     |          field: Field name to sort by.
+     |          reverse: Sort descending (highest first) when True.
+     |          top_k: Keep only the top K results (None = keep all).
+     |          **kwargs: Additional ranking parameters.
+     |  
+     |  search(query: 'str', top_k: 'int' = 10, workspace_id: 'str | None' = None, **kwargs: 'Any') -> 'PipelineStage' from builtins.type
+     |      Create a Search stage.
+     |      
+     |      Args:
+     |          query: Search query string.
+     |          top_k: Maximum number of results to return.
+     |          workspace_id: Optional workspace scope (defaults to pipeline's).
+     |          **kwargs: Additional search parameters (e.g. filters, rerank).
+     |  
+     |  store(target: 'str' = 'memory', title: 'str' = '', tags: 'list[str] | None' = None, **kwargs: 'Any') -> 'PipelineStage' from builtins.type
+     |      Create a Store stage.
+     |      
+     |      Args:
+     |          target: Storage target — ``"memory"``, ``"note"``, ``"kg_node"``.
+     |          title: Title for the stored item.
+     |          tags: Optional tags for the stored item.
+     |          **kwargs: Additional store parameters.
+     |  
+     |  transform(llm_prompt: 'str' = '', model: 'str' = '', temperature: 'float' = 0.0, output_key: 'str' = 'transformed', **kwargs: 'Any') -> 'PipelineStage' from builtins.type
+     |      Create a Transform stage.
+     |      
+     |      Args:
+     |          llm_prompt: Prompt template for LLM transformation.
+     |          model: Model identifier (uses default if empty).
+     |          temperature: LLM temperature.
+     |          output_key: Key to store transformation result in stage output.
+     |          **kwargs: Additional transform parameters.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  __annotations__ = {'params': 'dict[str, Any]', 'type': 'StageType'}
+     |  
+     |  __dataclass_fields__ = {'params': Field(name='params',type='dict[str, ...
+     |  
+     |  __dataclass_params__ = _DataclassParams(init=True,repr=True,eq=True,or...
+     |  
+     |  __hash__ = None
+     |  
+     |  __match_args__ = ('type', 'params')
+    
+    class StageType(builtins.str, enum.Enum)
+     |  StageType(value, names=None, *, module=None, qualname=None, type=None, start=1, boundary=None)
+     |  
+     |  Enumeration of supported pipeline stage types.
+     |  
+     |  Method resolution order:
+     |      StageType
+     |      builtins.str
+     |      enum.Enum
+     |      builtins.object
+     |  
+     |  Methods defined here:
+     |  
+     |  __format__(self, format_spec)
+     |      Default object formatter.
+     |  
+     |  __new__(cls, value)
+     |      Create and return a new object.  See help(type) for accurate signature.
+     |  
+     |  __repr__(self)
+     |      Return repr(self).
+     |  
+     |  __str__(self)
+     |      Return str(self).
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data and other attributes defined here:
+     |  
+     |  CLASSIFY = <StageType.CLASSIFY: 'classify'>
+     |  
+     |  EXTRACT = <StageType.EXTRACT: 'extract'>
+     |  
+     |  FILTER = <StageType.FILTER: 'filter'>
+     |  
+     |  RANK = <StageType.RANK: 'rank'>
+     |  
+     |  SEARCH = <StageType.SEARCH: 'search'>
+     |  
+     |  STORE = <StageType.STORE: 'store'>
+     |  
+     |  TRANSFORM = <StageType.TRANSFORM: 'transform'>
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from builtins.str:
+     |  
+     |  __add__(self, value, /)
+     |      Return self+value.
+     |  
+     |  __contains__(self, key, /)
+     |      Return key in self.
+     |  
+     |  __eq__(self, value, /)
+     |      Return self==value.
+     |  
+     |  __ge__(self, value, /)
+     |      Return self>=value.
+     |  
+     |  __getattribute__(self, name, /)
+     |      Return getattr(self, name).
+     |  
+     |  __getitem__(self, key, /)
+     |      Return self[key].
+     |  
+     |  __getnewargs__(...)
+     |  
+     |  __gt__(self, value, /)
+     |      Return self>value.
+     |  
+     |  __hash__(self, /)
+     |      Return hash(self).
+     |  
+     |  __iter__(self, /)
+     |      Implement iter(self).
+     |  
+     |  __le__(self, value, /)
+     |      Return self<=value.
+     |  
+     |  __len__(self, /)
+     |      Return len(self).
+     |  
+     |  __lt__(self, value, /)
+     |      Return self<value.
+     |  
+     |  __mod__(self, value, /)
+     |      Return self%value.
+     |  
+     |  __mul__(self, value, /)
+     |      Return self*value.
+     |  
+     |  __ne__(self, value, /)
+     |      Return self!=value.
+     |  
+     |  __rmod__(self, value, /)
+     |      Return value%self.
+     |  
+     |  __rmul__(self, value, /)
+     |      Return value*self.
+     |  
+     |  __sizeof__(self, /)
+     |      Return the size of the string in memory, in bytes.
+     |  
+     |  capitalize(self, /)
+     |      Return a capitalized version of the string.
+     |      
+     |      More specifically, make the first character have upper case and the rest lower
+     |      case.
+     |  
+     |  casefold(self, /)
+     |      Return a version of the string suitable for caseless comparisons.
+     |  
+     |  center(self, width, fillchar=' ', /)
+     |      Return a centered string of length width.
+     |      
+     |      Padding is done using the specified fill character (default is a space).
+     |  
+     |  count(...)
+     |      S.count(sub[, start[, end]]) -> int
+     |      
+     |      Return the number of non-overlapping occurrences of substring sub in
+     |      string S[start:end].  Optional arguments start and end are
+     |      interpreted as in slice notation.
+     |  
+     |  encode(self, /, encoding='utf-8', errors='strict')
+     |      Encode the string using the codec registered for encoding.
+     |      
+     |      encoding
+     |        The encoding in which to encode the string.
+     |      errors
+     |        The error handling scheme to use for encoding errors.
+     |        The default is 'strict' meaning that encoding errors raise a
+     |        UnicodeEncodeError.  Other possible values are 'ignore', 'replace' and
+     |        'xmlcharrefreplace' as well as any other name registered with
+     |        codecs.register_error that can handle UnicodeEncodeErrors.
+     |  
+     |  endswith(...)
+     |      S.endswith(suffix[, start[, end]]) -> bool
+     |      
+     |      Return True if S ends with the specified suffix, False otherwise.
+     |      With optional start, test S beginning at that position.
+     |      With optional end, stop comparing S at that position.
+     |      suffix can also be a tuple of strings to try.
+     |  
+     |  expandtabs(self, /, tabsize=8)
+     |      Return a copy where all tab characters are expanded using spaces.
+     |      
+     |      If tabsize is not given, a tab size of 8 characters is assumed.
+     |  
+     |  find(...)
+     |      S.find(sub[, start[, end]]) -> int
+     |      
+     |      Return the lowest index in S where substring sub is found,
+     |      such that sub is contained within S[start:end].  Optional
+     |      arguments start and end are interpreted as in slice notation.
+     |      
+     |      Return -1 on failure.
+     |  
+     |  format(...)
+     |      S.format(*args, **kwargs) -> str
+     |      
+     |      Return a formatted version of S, using substitutions from args and kwargs.
+     |      The substitutions are identified by braces ('{' and '}').
+     |  
+     |  format_map(...)
+     |      S.format_map(mapping) -> str
+     |      
+     |      Return a formatted version of S, using substitutions from mapping.
+     |      The substitutions are identified by braces ('{' and '}').
+     |  
+     |  index(...)
+     |      S.index(sub[, start[, end]]) -> int
+     |      
+     |      Return the lowest index in S where substring sub is found,
+     |      such that sub is contained within S[start:end].  Optional
+     |      arguments start and end are interpreted as in slice notation.
+     |      
+     |      Raises ValueError when the substring is not found.
+     |  
+     |  isalnum(self, /)
+     |      Return True if the string is an alpha-numeric string, False otherwise.
+     |      
+     |      A string is alpha-numeric if all characters in the string are alpha-numeric and
+     |      there is at least one character in the string.
+     |  
+     |  isalpha(self, /)
+     |      Return True if the string is an alphabetic string, False otherwise.
+     |      
+     |      A string is alphabetic if all characters in the string are alphabetic and there
+     |      is at least one character in the string.
+     |  
+     |  isascii(self, /)
+     |      Return True if all characters in the string are ASCII, False otherwise.
+     |      
+     |      ASCII characters have code points in the range U+0000-U+007F.
+     |      Empty string is ASCII too.
+     |  
+     |  isdecimal(self, /)
+     |      Return True if the string is a decimal string, False otherwise.
+     |      
+     |      A string is a decimal string if all characters in the string are decimal and
+     |      there is at least one character in the string.
+     |  
+     |  isdigit(self, /)
+     |      Return True if the string is a digit string, False otherwise.
+     |      
+     |      A string is a digit string if all characters in the string are digits and there
+     |      is at least one character in the string.
+     |  
+     |  isidentifier(self, /)
+     |      Return True if the string is a valid Python identifier, False otherwise.
+     |      
+     |      Call keyword.iskeyword(s) to test whether string s is a reserved identifier,
+     |      such as "def" or "class".
+     |  
+     |  islower(self, /)
+     |      Return True if the string is a lowercase string, False otherwise.
+     |      
+     |      A string is lowercase if all cased characters in the string are lowercase and
+     |      there is at least one cased character in the string.
+     |  
+     |  isnumeric(self, /)
+     |      Return True if the string is a numeric string, False otherwise.
+     |      
+     |      A string is numeric if all characters in the string are numeric and there is at
+     |      least one character in the string.
+     |  
+     |  isprintable(self, /)
+     |      Return True if the string is printable, False otherwise.
+     |      
+     |      A string is printable if all of its characters are considered printable in
+     |      repr() or if it is empty.
+     |  
+     |  isspace(self, /)
+     |      Return True if the string is a whitespace string, False otherwise.
+     |      
+     |      A string is whitespace if all characters in the string are whitespace and there
+     |      is at least one character in the string.
+     |  
+     |  istitle(self, /)
+     |      Return True if the string is a title-cased string, False otherwise.
+     |      
+     |      In a title-cased string, upper- and title-case characters may only
+     |      follow uncased characters and lowercase characters only cased ones.
+     |  
+     |  isupper(self, /)
+     |      Return True if the string is an uppercase string, False otherwise.
+     |      
+     |      A string is uppercase if all cased characters in the string are uppercase and
+     |      there is at least one cased character in the string.
+     |  
+     |  join(self, iterable, /)
+     |      Concatenate any number of strings.
+     |      
+     |      The string whose method is called is inserted in between each given string.
+     |      The result is returned as a new string.
+     |      
+     |      Example: '.'.join(['ab', 'pq', 'rs']) -> 'ab.pq.rs'
+     |  
+     |  ljust(self, width, fillchar=' ', /)
+     |      Return a left-justified string of length width.
+     |      
+     |      Padding is done using the specified fill character (default is a space).
+     |  
+     |  lower(self, /)
+     |      Return a copy of the string converted to lowercase.
+     |  
+     |  lstrip(self, chars=None, /)
+     |      Return a copy of the string with leading whitespace removed.
+     |      
+     |      If chars is given and not None, remove characters in chars instead.
+     |  
+     |  partition(self, sep, /)
+     |      Partition the string into three parts using the given separator.
+     |      
+     |      This will search for the separator in the string.  If the separator is found,
+     |      returns a 3-tuple containing the part before the separator, the separator
+     |      itself, and the part after it.
+     |      
+     |      If the separator is not found, returns a 3-tuple containing the original string
+     |      and two empty strings.
+     |  
+     |  removeprefix(self, prefix, /)
+     |      Return a str with the given prefix string removed if present.
+     |      
+     |      If the string starts with the prefix string, return string[len(prefix):].
+     |      Otherwise, return a copy of the original string.
+     |  
+     |  removesuffix(self, suffix, /)
+     |      Return a str with the given suffix string removed if present.
+     |      
+     |      If the string ends with the suffix string and that suffix is not empty,
+     |      return string[:-len(suffix)]. Otherwise, return a copy of the original
+     |      string.
+     |  
+     |  replace(self, old, new, count=-1, /)
+     |      Return a copy with all occurrences of substring old replaced by new.
+     |      
+     |        count
+     |          Maximum number of occurrences to replace.
+     |          -1 (the default value) means replace all occurrences.
+     |      
+     |      If the optional argument count is given, only the first count occurrences are
+     |      replaced.
+     |  
+     |  rfind(...)
+     |      S.rfind(sub[, start[, end]]) -> int
+     |      
+     |      Return the highest index in S where substring sub is found,
+     |      such that sub is contained within S[start:end].  Optional
+     |      arguments start and end are interpreted as in slice notation.
+     |      
+     |      Return -1 on failure.
+     |  
+     |  rindex(...)
+     |      S.rindex(sub[, start[, end]]) -> int
+     |      
+     |      Return the highest index in S where substring sub is found,
+     |      such that sub is contained within S[start:end].  Optional
+     |      arguments start and end are interpreted as in slice notation.
+     |      
+     |      Raises ValueError when the substring is not found.
+     |  
+     |  rjust(self, width, fillchar=' ', /)
+     |      Return a right-justified string of length width.
+     |      
+     |      Padding is done using the specified fill character (default is a space).
+     |  
+     |  rpartition(self, sep, /)
+     |      Partition the string into three parts using the given separator.
+     |      
+     |      This will search for the separator in the string, starting at the end. If
+     |      the separator is found, returns a 3-tuple containing the part before the
+     |      separator, the separator itself, and the part after it.
+     |      
+     |      If the separator is not found, returns a 3-tuple containing two empty strings
+     |      and the original string.
+     |  
+     |  rsplit(self, /, sep=None, maxsplit=-1)
+     |      Return a list of the substrings in the string, using sep as the separator string.
+     |      
+     |        sep
+     |          The separator used to split the string.
+     |      
+     |          When set to None (the default value), will split on any whitespace
+     |          character (including \\n \\r \\t \\f and spaces) and will discard
+     |          empty strings from the result.
+     |        maxsplit
+     |          Maximum number of splits (starting from the left).
+     |          -1 (the default value) means no limit.
+     |      
+     |      Splitting starts at the end of the string and works to the front.
+     |  
+     |  rstrip(self, chars=None, /)
+     |      Return a copy of the string with trailing whitespace removed.
+     |      
+     |      If chars is given and not None, remove characters in chars instead.
+     |  
+     |  split(self, /, sep=None, maxsplit=-1)
+     |      Return a list of the substrings in the string, using sep as the separator string.
+     |      
+     |        sep
+     |          The separator used to split the string.
+     |      
+     |          When set to None (the default value), will split on any whitespace
+     |          character (including \\n \\r \\t \\f and spaces) and will discard
+     |          empty strings from the result.
+     |        maxsplit
+     |          Maximum number of splits (starting from the left).
+     |          -1 (the default value) means no limit.
+     |      
+     |      Note, str.split() is mainly useful for data that has been intentionally
+     |      delimited.  With natural text that includes punctuation, consider using
+     |      the regular expression module.
+     |  
+     |  splitlines(self, /, keepends=False)
+     |      Return a list of the lines in the string, breaking at line boundaries.
+     |      
+     |      Line breaks are not included in the resulting list unless keepends is given and
+     |      true.
+     |  
+     |  startswith(...)
+     |      S.startswith(prefix[, start[, end]]) -> bool
+     |      
+     |      Return True if S starts with the specified prefix, False otherwise.
+     |      With optional start, test S beginning at that position.
+     |      With optional end, stop comparing S at that position.
+     |      prefix can also be a tuple of strings to try.
+     |  
+     |  strip(self, chars=None, /)
+     |      Return a copy of the string with leading and trailing whitespace removed.
+     |      
+     |      If chars is given and not None, remove characters in chars instead.
+     |  
+     |  swapcase(self, /)
+     |      Convert uppercase characters to lowercase and lowercase characters to uppercase.
+     |  
+     |  title(self, /)
+     |      Return a version of the string where each word is titlecased.
+     |      
+     |      More specifically, words start with uppercased characters and all remaining
+     |      cased characters have lower case.
+     |  
+     |  translate(self, table, /)
+     |      Replace each character in the string using the given translation table.
+     |      
+     |        table
+     |          Translation table, which must be a mapping of Unicode ordinals to
+     |          Unicode ordinals, strings, or None.
+     |      
+     |      The table must implement lookup/indexing via __getitem__, for instance a
+     |      dictionary or list.  If this operation raises LookupError, the character is
+     |      left untouched.  Characters mapped to None are deleted.
+     |  
+     |  upper(self, /)
+     |      Return a copy of the string converted to uppercase.
+     |  
+     |  zfill(self, width, /)
+     |      Pad a numeric string with zeros on the left, to fill a field of the given width.
+     |      
+     |      The string is never truncated.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Static methods inherited from builtins.str:
+     |  
+     |  maketrans(...)
+     |      Return a translation table usable for str.translate().
+     |      
+     |      If there is only one argument, it must be a dictionary mapping Unicode
+     |      ordinals (integers) or characters to Unicode ordinals, strings or None.
+     |      Character keys will be then converted to ordinals.
+     |      If there are two arguments, they must be strings of equal length, and
+     |      in the resulting dictionary, each character in x will be mapped to the
+     |      character at the same position in y. If there is a third argument, it
+     |      must be a string, whose characters will be mapped to None in the result.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Methods inherited from enum.Enum:
+     |  
+     |  __dir__(self)
+     |      Returns all members and all public methods
+     |  
+     |  __init__(self, *args, **kwds)
+     |      Initialize self.  See help(type(self)) for accurate signature.
+     |  
+     |  __reduce_ex__(self, proto)
+     |      Helper for pickle.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors inherited from enum.Enum:
+     |  
+     |  name
+     |      The name of the Enum member.
+     |  
+     |  value
+     |      The value of the Enum member.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Readonly properties inherited from enum.EnumType:
+     |  
+     |  __members__
+     |      Returns a mapping of member name->value.
+     |      
+     |      This mapping lists all enum members, including aliases. Note that this
+     |      is a read-only view of the internal mapping.
+
+DATA
+    __all__ = ['StageType', 'PipelineStage', 'PipelineDefinition', 'Pipeli...
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_pipeline.py
+
+
+</pre>
+</body></html>

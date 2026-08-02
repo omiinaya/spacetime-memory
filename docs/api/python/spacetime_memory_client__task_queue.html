@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html><head><title>spacetime_memory.client._task_queue API</title>
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+</style></head><body>
+<h1>spacetime_memory.client._task_queue</h1>
+<pre>Help on module spacetime_memory.client._task_queue in spacetime_memory.client:
+
+NAME
+    spacetime_memory.client._task_queue - Task Queue mixin — Honcho-parity durable task queue for agent tasks.
+
+DESCRIPTION
+    Stores tasks as structured memories with ``memory_type="task_queue"``.
+    All task state (type, payload, priority, status, worker, result, error) is
+    encoded as JSON in the memory's ``content`` field so that status changes can
+    be made via the existing ``update_memory`` reducer.
+    
+    This avoids needing new STDB reducers or a dedicated table.
+
+CLASSES
+    builtins.object
+        TaskQueueMixin
+    
+    class TaskQueueMixin(builtins.object)
+     |  Spacetime-Memory task-queue mixin.
+     |  
+     |  Provides a durable task queue backed by the existing memory store.
+     |  Tasks are ``memory_type="task_queue"`` entries whose ``content`` is a
+     |  JSON blob holding ``task_type``, ``payload``, ``priority``, ``status``,
+     |  ``worker_id``, ``result``, ``error``, and timestamps.
+     |  
+     |  Inherits from ``ClientBase`` for connection infrastructure.
+     |  
+     |  Methods defined here:
+     |  
+     |  claim_next_task(self, workspace_id: 'str', worker_id: 'str', task_types: 'list[str] | None' = None) -> 'dict[str, Any] | None'
+     |      Claim the next available task for a worker.
+     |      
+     |      Finds the highest-priority pending task whose delay has elapsed,
+     |      optionally filtered by *task_types*, and claims it atomically.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          worker_id: Unique identifier for the worker.
+     |          task_types: If provided, only claim tasks matching one of
+     |              these types.
+     |      
+     |      Returns:
+     |          A task dict with keys ``task_id``, ``task_type``, ``payload``,
+     |          ``priority``, ``worker_id``, ``status``, ``created_at``,
+     |          ``run_at``, ``claimed_at`` — or ``None`` if no task is available.
+     |  
+     |  complete_task(self, task_id: 'str', result: 'str') -> 'dict[str, Any]'
+     |      Mark a task as completed.
+     |      
+     |      Args:
+     |          task_id: The task ID returned by :meth:`enqueue_task` /
+     |              :meth:`claim_next_task`.
+     |          result: Opaque result string produced by the worker.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  enqueue_task(self, workspace_id: 'str', task_type: 'str', payload: 'str', priority: 'int' = 0, delay: 'int' = 0) -> 'dict[str, Any]'
+     |      Add a task to the queue.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          task_type: A label categorising the task (e.g. ``"embed"``,
+     |              ``"summarise"``).
+     |          payload: Opaque string payload for the worker.
+     |          priority: Priority (higher = processed sooner). Default ``0``.
+     |          delay: Delay in seconds before the task becomes claimable.
+     |              Default ``0`` (claimable immediately).
+     |      
+     |      Returns:
+     |          Reducer status dict with a ``task_id`` key.
+     |  
+     |  fail_task(self, task_id: 'str', error: 'str') -> 'dict[str, Any]'
+     |      Mark a task as failed.
+     |      
+     |      Args:
+     |          task_id: The task ID.
+     |          error: Error description / traceback.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  get_queue_stats(self, workspace_id: 'str') -> 'dict[str, Any]'
+     |      Get queue depth, processing time, and status breakdown.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |      
+     |      Returns:
+     |          Dict with keys: ``total``, ``pending``, ``claimed``,
+     |          ``completed``, ``failed``, ``avg_processing_time_ms``.
+     |  
+     |  list_tasks(self, workspace_id: 'str', status: 'str | None' = None, task_type: 'str | None' = None) -> 'list[dict[str, Any]]'
+     |      List tasks with optional filtering.
+     |      
+     |      Args:
+     |          workspace_id: Target workspace.
+     |          status: Only return tasks with this status (``"pending"``,
+     |              ``"claimed"``, ``"completed"``, ``"failed"``).
+     |          task_type: Only return tasks with this type label.
+     |      
+     |      Returns:
+     |          List of task dicts with keys: ``task_id``, ``task_type``,
+     |          ``payload``, ``priority``, ``status``, ``worker_id``,
+     |          ``result``, ``error``, ``created_at``, ``run_at``,
+     |          ``claimed_at``, ``completed_at``.
+     |  
+     |  requeue_task(self, task_id: 'str', delay: 'int' = 0) -> 'dict[str, Any]'
+     |      Put a task back in the queue (reset status to pending).
+     |      
+     |      Args:
+     |          task_id: The task ID.
+     |          delay: Delay in seconds before the task becomes claimable
+     |              again. Default ``0``.
+     |      
+     |      Returns:
+     |          Reducer status dict.
+     |  
+     |  ----------------------------------------------------------------------
+     |  Data descriptors defined here:
+     |  
+     |  __dict__
+     |      dictionary for instance variables (if defined)
+     |  
+     |  __weakref__
+     |      list of weak references to the object (if defined)
+
+DATA
+    TASK_CLAIMED = 'claimed'
+    TASK_COMPLETED = 'completed'
+    TASK_FAILED = 'failed'
+    TASK_PENDING = 'pending'
+    logger = <Logger spacetime_memory.client._base (WARNING)>
+
+FILE
+    $HOME/spacetime-memory/sdk/python/spacetime_memory/client/_task_queue.py
+
+
+</pre>
+</body></html>
