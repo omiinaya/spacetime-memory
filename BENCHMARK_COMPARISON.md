@@ -4,9 +4,11 @@
 
 | Benchmark | Questions | SpacetimeMemory | Mem0 | Zep | Graphiti | LangMem | Letta | Cognee | QMD | Mnemosyne | Honcho | Hindsight |
 |-----------|-----------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| **BEAM** | 82 | **92.68%** 🏆 | 85.7% (old) / 64.1% (1M) | — | — | — | — | — | — | — | — | — |
-| **LoCoMo** | 1,540 | 🟢 76.1% (181/1986) | **92.5%** (Apr '26) | **94.7%** | — | — | — | — | — | — | — | — |
-| **LongMemEval** | 500 | 🔲 Scheduled | **94.4%** (Apr '26) | 90.2% | — | — | — | — | — | — | — | — |
+| **BEAM** | 82 | **92.68%** 🏆 | 85.7% (old) / 64.1% (1M) | — | — | — | **85.5%** | — | — | — | 61.5% | — |
+| **LoCoMo** | 1,540 | 🟢 82-84% (200Q real-STDB, fixed) | **92.5%** (Apr '26) | **94.7%** | — | — | — | — | — | — | — | — |
+| **LongMemEval** | 500 | 🔄 Running (ling-3.0-flash-free, real-STDB) | **94.4%** (Apr '26) | 90.2% | — | — | — | — | **98.9%** | — | — |
+
+*2026-08-02 accuracy pipeline fixes (query_table uuid collision panic + entity-linking auth) raised LoCoMo real-STDB pace from ~69% to 82-84%. Full runs run nightly 3 AM via cron.*
 
 *Mem0's April 2026 algorithm update: LoCoMo +21pts (71.4%→92.5%), LongMemEval +27pts (67.8%→94.4%), BEAM 64.1% @1M tokens.*
 
