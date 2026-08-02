@@ -1,5 +1,5 @@
 use spacetimedb::*;
-use crate::{uuid_v7, now_micros};
+use crate::{uuid_v7_uniq, now_micros};
 use crate::auth::require_auth;
 use crate::workspace::{check_space_access, workspace};
 use crate::memory::{memory, memory_revision};
@@ -218,8 +218,16 @@ pub fn query_table(
 // ── Per-table query helpers ────────────────────────────────────────────
 
 fn insert_row(ctx: &ReducerContext, query_id: &str, table_name: &str, row_json: String, now: i64) {
+    // uuid_v7(ctx) alone is NOT collision-safe within a single reducer
+    // transaction: STDB's new_uuid_v7() can return the same value for
+    // successive calls in the same batch, which made query_table panic with
+    // "duplicate unique column" on query_result when a query returned
+    // multiple rows. Retry against the table until a fresh id is found.
+    let id = uuid_v7_uniq(ctx, |candidate: &String| {
+        ctx.db.query_result().id().find(candidate).is_none()
+    }, 32);
     ctx.db.query_result().insert(GenericQueryResult {
-        id: uuid_v7(ctx),
+        id,
         query_id: query_id.to_string(),
         table_name: table_name.to_string(),
         row_json,
