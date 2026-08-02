@@ -205,12 +205,19 @@ pub fn uuid_v7_uniq(
     is_unique: impl Fn(&String) -> bool,
     max_attempts: usize,
 ) -> String {
+    // CRITICAL (2026-08-02): ctx.new_uuid_v7() is determinisic per-reducer —
+    // every call within the SAME transaction returns the SAME value, so a
+    // naive v7-only retry loop regenerates the identical colliding id every
+    // attempt and still panics on the N-th insert into a unique column
+    // (live `query_table` → `insert_row` → `query_result` panic persisted
+    // even after adding this retry). Interleave v4 (which advances the RNG
+    // on every call) with v7 so each attempt yields a DIFFERENT candidate.
     let mut id = uuid_v7(ctx);
-    for _ in 0..max_attempts {
+    for attempt in 0..max_attempts {
         if is_unique(&id) {
             return id;
         }
-        id = uuid_v7(ctx);
+        id = if attempt % 2 == 0 { uuid_v4(ctx) } else { uuid_v7(ctx) };
     }
     id
 }
