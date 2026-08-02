@@ -58,4 +58,28 @@ test.describe('Review — Seeded', () => {
     await expect(page.getByText(/Interval:\s*3d/, { exact: false }).first()).toBeVisible({ timeout: 8000 });
     await expect(page.getByText(/EF:\s*2\.50/, { exact: false }).first()).toBeVisible({ timeout: 3000 });
   });
+
+  test('schedule button disabled until memory id entered', async ({ page }) => {
+    const schedule = page.getByRole('button', { name: /^schedule$/i });
+    await expect(schedule).toBeDisabled({ timeout: 8000 });
+    const input = page.getByPlaceholder('Enter memory ID to schedule');
+    await input.fill('mem-x');
+    await expect(schedule).toBeEnabled();
+    await schedule.click();
+    // Reducer mocked ok → success message
+    await expect(page.getByText('Memory scheduled for review', { exact: true })).toBeVisible({ timeout: 8000 });
+  });
+
+  test('full review flow: show answer then grade fires the reducer', async ({ page }) => {
+    // Show Answer / Grade reveals grade buttons
+    const showAnswer = page.getByRole('button', { name: /show answer|grade/i }).first();
+    await expect(showAnswer).toBeVisible({ timeout: 8000 });
+    await showAnswer.click();
+    // Grade buttons appear as labeled buttons (0..5); click the first one
+    const gradeBtn = page.locator('button').filter({ has: page.locator('span.text-lg') }).first();
+    await expect(gradeBtn).toBeVisible({ timeout: 8000 });
+    await gradeBtn.click();
+    // perform_review reducer (mocked ok) advances or completes
+    await expect(page.getByText(/Review Complete|Item \d of \d/i).first()).toBeVisible({ timeout: 8000 });
+  });
 });

@@ -46,4 +46,17 @@ test.describe('Note Graph — Seeded Data', () => {
     // the computed node/edge counts from the seeded data.
     await expect(page.getByText(/1 notes, 0 connections/)).toBeVisible({ timeout: 5000 });
   });
+
+  test('search input narrows the graph stats', async ({ page }) => {
+    // Stats line visible from seed
+    await expect(page.getByText(/1 notes, 0 connections/)).toBeVisible({ timeout: 5000 });
+    // Search input is always in the header
+    await expect(page.getByPlaceholder('Search notes...')).toBeVisible({ timeout: 5000 });
+    // Search with no match → empty state appears
+    await page.getByPlaceholder('Search notes...').fill('zzz-nomatch');
+    await expect(page.getByText('No notes match', { exact: true })).toBeVisible({ timeout: 5000 });
+    // Clearing restores the count
+    await page.getByPlaceholder('Search notes...').fill('');
+    await expect(page.getByText(/1 notes, 0 connections/)).toBeVisible({ timeout: 5000 });
+  });
 });
