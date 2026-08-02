@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockPage, expectAnyVisible, gotoPage } from './helpers';
+import { mockPage, expectAnyVisible, gotoPage, installMockAuth, installMockStdb, mockReducerCalls } from './helpers';
 
 /**
  * E2E tests for the Context Tree Editor page.
@@ -45,5 +45,60 @@ test.describe('Context Tree Editor Page', () => {
     // Reducer mocked ok → the form CLOSES (setShowForm(false) only runs on success)
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(page.getByText('New Context Entry', { exact: true })).toBeHidden({ timeout: 8000 });
+  });
+});
+
+test.describe('Context Tree — Seeded', () => {
+  test.beforeEach(async ({ page }) => {
+    // The page reads context_tree_result (json blob) then falls back to
+    // context_tree. Seed the fallback table so the entry list renders.
+    await page.route(/\/v1\/database\/.*\/sql/, async (route: any) => {
+      const body = route.request().postData() ?? '';
+      if (body.includes('context_tree_result')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([{ schema: { elements: [] }, rows: [] }]),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              schema: {
+                elements: [
+                  { name: { some: 'id' } }, { name: { some: 'workspace_id' } },
+                  { name: { some: 'path' } }, { name: { some: 'content' } },
+                  { name: { some: 'priority' } }, { name: { some: 'is_global' } },
+                  { name: { some: 'created_at' } }, { name: { some: 'updated_at' } },
+                ],
+              },
+              rows: [
+                ['ctx-1', '', '/api/v2', 'Context entry content', 1, false, '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z'],
+              ],
+            },
+          ]),
+        });
+      }
+    });
+    await installMockAuth(page);
+    await installMockStdb(page);
+    await mockReducerCalls(page);
+    await gotoPage(page, '/context-tree');
+  });
+
+  test('lists seeded context entries', async ({ page }) => {
+    await expect(page.getByText('/api/v2', { exact: true }).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Context entry content', { exact: false }).first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test('delete action on a seeded entry shows success', async ({ page }) => {
+    await expect(page.getByText('/api/v2', { exact: true }).first()).toBeVisible({ timeout: 8000 });
+    // Trash button per entry (accessible-named)
+    const deleteBtn = page.getByRole('button', { name: 'Delete entry' }).first();
+    await expect(deleteBtn).toBeVisible({ timeout: 8000 });
+    await deleteBtn.click();
+    await expect(page.getByText('Context entry deleted', { exact: true })).toBeVisible({ timeout: 8000 });
   });
 });

@@ -55,4 +55,30 @@ test.describe('Session Reasoning — Seeded', () => {
     await expect(page.getByText('Planning Session', { exact: false }).first()).toBeVisible({ timeout: 8000 });
     await expect(page.getByText('Debugging Session', { exact: false }).first()).toBeVisible({ timeout: 8000 });
   });
+
+  test('search narrows the session list', async ({ page }) => {
+    const search = page.getByPlaceholder('Search sessions...');
+    await expect(search).toBeVisible({ timeout: 8000 });
+    await search.fill('planning');
+    await expect(page.getByText('Planning Session', { exact: false })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Debugging Session', { exact: false }).first()).toHaveCount(0);
+    await search.fill('zzz-nope');
+    await expect(page.getByText('No sessions match your search.', { exact: false }).first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test('filters panel toggles open with date and participant controls', async ({ page }) => {
+    await page.getByRole('button', { name: /filters/i }).first().click();
+    // Date inputs + participant select + clear-filters appear
+    const dateInputs = page.locator('input[type="date"]');
+    await expect(dateInputs.first()).toBeVisible({ timeout: 8000 });
+    await expect(dateInputs.nth(1)).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole('combobox').first()).toBeVisible({ timeout: 8000 });
+    // Selecting a participant from the seeded peer list (assert the select's
+    // selected value equals p1 — the option text is inside a hidden <option>)
+    await page.getByRole('combobox').first().selectOption('p1');
+    await expect(page.getByRole('combobox').first()).toHaveValue('p1');
+    // Clear filters resets the select
+    await page.getByRole('button', { name: /clear filters/i }).click();
+    await expect(page.getByRole('combobox').first()).toHaveValue('');
+  });
 });
