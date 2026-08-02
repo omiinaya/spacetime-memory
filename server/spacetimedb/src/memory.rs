@@ -333,31 +333,35 @@ pub fn store_memory_batch(ctx: &ReducerContext, items_json: String) -> Result<()
         let caller = ctx.sender().to_hex();
         let now = now_micros(ctx);
         let caller_str = caller.to_string();
-        for item in items {
-            check_space_access(ctx, &item.workspace_id, &caller, "editor")?;
-            insert_memory(
-                ctx,
-                &caller_str,
-                &item.workspace_id,
-                item.peer_id,
-                item.observer_id,
-                item.memory_type,
-                item.content,
-                item.summary,
-                item.context,
-                item.entities_json,
-                item.confidence,
-                item.source_session_id,
-                item.source_message_id,
-                now,
-            )?;
-        }
-        // Zero-scheduler maintenance: run once per batch (not per item)
-        if let Some(first) = serde_json::from_str::<Vec<StoreMemoryItem>>(&items_json)
-            .ok()
-            .and_then(|v| v.first().map(|i| i.workspace_id.clone()))
-        {
-            maintenance_slice(ctx, &first, now);
+        // Chunk oversized batches: each item fans out into entity auto-extraction
+        // (kg_node/kg_edge inserts). Processing 200+ items in one WASM transaction
+        // exceeded STDB's per-transaction limit and panicked the module
+        // (202 items → 20,301 edges, DB crash 2026-08-02). Bounded loops keep
+        // every transaction crash-safe while remaining atomic per chunk.
+        for chunk in items.chunks(crate::MAX_BATCH_ITEMS) {
+            for item in chunk {
+                check_space_access(ctx, &item.workspace_id, &caller, "editor")?;
+                insert_memory(
+                    ctx,
+                    &caller_str,
+                    &item.workspace_id,
+                    item.peer_id.clone(),
+                    item.observer_id.clone(),
+                    item.memory_type.clone(),
+                    item.content.clone(),
+                    item.summary.clone(),
+                    item.context.clone(),
+                    item.entities_json.clone(),
+                    item.confidence,
+                    item.source_session_id.clone(),
+                    item.source_message_id.clone(),
+                    now,
+                )?;
+            }
+            // Zero-scheduler maintenance: run once per chunk (not per item)
+            if let Some(first) = chunk.first() {
+                maintenance_slice(ctx, &first.workspace_id, now);
+            }
         }
         Ok(())
     })
@@ -1302,6 +1306,25 @@ mod tests {
         assert_eq!(mem.trust_score, 0.0);
         assert_eq!(mem.access_count, 0);
         assert_eq!(mem.feedback_count, 0);
+    }
+
+    #[test]
+    fn test_batch_chunking_bounds() {
+        // store_memory_batch processes items in ≤ MAX_BATCH_ITEMS chunks so a
+        // single oversized ingest (benchmark haystack) can't create 20k+ edges
+        // in one WASM transaction and panic the module. Verify the chunk math.
+        let items: Vec<usize> = (0..1000).collect();
+        let chunks: Vec<&[usize]> = items.chunks(crate::MAX_BATCH_ITEMS).collect();
+        assert_eq!(chunks.len(), (1000 + crate::MAX_BATCH_ITEMS - 1) / crate::MAX_BATCH_ITEMS);
+        for c in &chunks {
+            assert!(c.len() <= crate::MAX_BATCH_ITEMS, "chunk exceeded bound");
+        }
+        assert_eq!(chunks[0].len(), crate::MAX_BATCH_ITEMS);
+        assert_eq!(chunks[0][0], 0);
+        assert_eq!(chunks[1][0], crate::MAX_BATCH_ITEMS);
+        // Edge case: exactly MAX_BATCH_ITEMS items → 1 chunk
+        let exact: Vec<usize> = (0..crate::MAX_BATCH_ITEMS).collect();
+        assert_eq!(exact.chunks(crate::MAX_BATCH_ITEMS).count(), 1);
     }
 }
 

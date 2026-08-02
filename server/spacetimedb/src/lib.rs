@@ -94,6 +94,17 @@ pub use batch_memory_ops::*;
 /// This caps all `.iter()` scans to prevent OOM/timeout on large tables.
 pub const MAX_RESULTS: usize = 1000;
 
+/// Max items processed per reducer call in `store_memory_batch`.
+///
+/// Each item triggers entity auto-extraction which fan-outs into kg_node /
+/// kg_edge inserts. A single oversized batch (e.g. 200+ messages from a
+/// benchmark haystack ingest) could create tens of thousands of edges in
+/// one WASM transaction, exceeding STDB's per-transaction limit and
+/// panicking the module (observed 202 items → 20,301 edges crashing the
+/// DB on 2026-08-02). The reducer loops in ≤ CHUNK batches to keep each
+/// transaction bounded and crash-safe.
+pub const MAX_BATCH_ITEMS: usize = 50;
+
 /// Generate a UUID v4 using the SpacetimeDB reducer timestamp and RNG.
 /// Safe for WASM — does not use `std::time::SystemTime`.
 /// Each call advances the RNG, so consecutive calls in the same reducer
