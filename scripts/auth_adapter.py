@@ -59,7 +59,10 @@ async def proxy(request: Request, path: str):
     out_headers = {k: v for k, v in resp.headers.items()
                    if k.lower() not in ("content-length", "transfer-encoding", "content-encoding")}
 
-    # Move reasoning_content -> content for OpenCode Zen models
+    # Move reasoning_content -> content for OpenCode Zen models.
+    # Some models (mimo) emit the answer in `reasoning` instead of
+    # `reasoning_content`; hoist whichever reasoning field is present so
+    # downstream benchmark clients always see a usable `content`.
     ct = resp.headers.get("content-type", "")
     if "application/json" in ct and target == "oc":
         try:
@@ -68,10 +71,11 @@ async def proxy(request: Request, path: str):
             for ch in data.get("choices", []):
                 msg = ch.get("message", {})
                 c = msg.get("content", "")
-                r = msg.get("reasoning_content", "")
+                r = msg.get("reasoning_content", "") or msg.get("reasoning", "")
                 if not c and r:
                     msg["content"] = r
                     msg.pop("reasoning_content", None)
+                    msg.pop("reasoning", None)
                     modified = True
             if modified:
                 nb = json.dumps(data).encode()
