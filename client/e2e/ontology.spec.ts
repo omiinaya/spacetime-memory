@@ -64,4 +64,26 @@ test.describe('Ontology — Seeded', () => {
   test('shows entity type description', async ({ page }) => {
     await expect(page.getByText('A human', { exact: false }).first()).toBeVisible({ timeout: 8000 });
   });
+
+  test('create entity type form validates and submits', async ({ page }) => {
+    await page.getByRole('button', { name: /create entity type/i }).first().click();
+    await expect(page.getByText('New Entity Type', { exact: false }).first()).toBeVisible({ timeout: 8000 });
+    // Submit empty → validation error
+    const submit = page.getByRole('button', { name: 'Create', exact: true }).last();
+    await submit.click();
+    await expect(page.getByText('Entity type name is required', { exact: true })).toBeVisible({ timeout: 8000 });
+    // Fill name → submit → reducer mocked ok → success banner
+    await page.getByPlaceholder('Person, Organization, Document, ...').fill('Animal');
+    await submit.click();
+    await expect(page.getByText('Entity type created', { exact: true })).toBeVisible({ timeout: 8000 });
+  });
+
+  test('tabs switch between entity, relation, and recipe sections', async ({ page }) => {
+    // Entity Types tab default; click Relation Types
+    await page.getByRole('tab', { name: /relation types/i }).click();
+    await expect(page.getByRole('button', { name: /create relation type/i })).toBeVisible({ timeout: 8000 });
+    // Search Recipes tab
+    await page.getByRole('tab', { name: /search recipes/i }).click();
+    await expect(page.getByRole('button', { name: /create search recipe/i })).toBeVisible({ timeout: 8000 });
+  });
 });
