@@ -773,7 +773,7 @@ export default function BlockGraph() {
             {filterMode !== 'none' && filterBlockId && (
               <Badge variant="secondary" className="text-[10px] gap-1">
                 {filterMode === 'outgoing' ? '→ Outgoing' : '← Incoming'}
-                <button onClick={() => { setFilterMode('none'); setFilterBlockId(null); }}>
+                <button aria-label="Clear filter" onClick={() => { setFilterMode('none'); setFilterBlockId(null); }}>
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
@@ -897,7 +897,7 @@ export default function BlockGraph() {
               {selectedBlock.block_type}
             </Badge>
             <span className="text-xs font-mono text-muted-foreground ml-auto">{shortId(selectedBlock.id)}</span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearSelection}>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearSelection} aria-label="Close panel">
               <X className="h-4 w-4" />
             </Button>
           </div>

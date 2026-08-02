@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { mockPage, expectAnyVisible, gotoPage } from './helpers';
+import { mockPage, expectAnyVisible, gotoPage, mockSqlCalls } from './helpers';
 
 /**
  * E2E tests for the Pattern Detection page.
  *
- * Structural tests run against the empty mock. An additional corner test
- * drives the detection form: clicking "Run Detection" without a workspace ID
- * surfaces the validation error.
+ * Structural tests run against the empty mock. Corner tests drive the
+ * detection form: missing workspace ID surfaces the validation error, and a
+ * valid workspace ID fires the reducer + SQL read and shows the success
+ * message for each of the three detection sections.
  */
 
 test.describe('Pattern Detection Page', () => {
@@ -36,5 +37,21 @@ test.describe('Pattern Detection Page', () => {
     // Leave workspace ID empty, click Run Detection
     await page.getByRole('button', { name: /run detection/i }).first().click();
     await expect(page.getByText('Workspace ID is required').first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test('all three detection sections run with a workspace id', async ({ page }) => {
+    // SQL mock returns empty result rows so each section reports 0 results.
+    await mockSqlCalls(page, []);
+    const wsInput = page.getByPlaceholder('workspace-id');
+    await wsInput.fill('ws-e2e');
+    // Temporal
+    await page.getByRole('button', { name: /run detection/i }).nth(0).click();
+    await expect(page.getByText('Temporal cluster detection complete', { exact: false })).toBeVisible({ timeout: 8000 });
+    // Co-occurrence
+    await page.getByRole('button', { name: /run detection/i }).nth(1).click();
+    await expect(page.getByText('Entity co-occurrence detection complete', { exact: false })).toBeVisible({ timeout: 8000 });
+    // Topic
+    await page.getByRole('button', { name: /run detection/i }).nth(2).click();
+    await expect(page.getByText('Topic cluster detection complete', { exact: false })).toBeVisible({ timeout: 8000 });
   });
 });
