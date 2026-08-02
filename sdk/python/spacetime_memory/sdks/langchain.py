@@ -467,14 +467,21 @@ class StmemStore(BaseStore):
         ws_name = self._ns_to_ws(namespace)
         ws_id = self._resolve_workspace(ws_name)
 
+        # Preserve the ORIGINAL value for exact round-trip on get().
+        # LangGraph BaseStore semantics: put(namespace, key, value) stores the
+        # dict verbatim and get() returns it verbatim. We persist the full
+        # value in entities_json (metadata) and derive a searchable content
+        # string from the content/text key (or JSON serialization) separately.
+        original_value = dict(value)
+
         # Extract content for embedding
         content = value.pop("content", value.pop("text", None))
         if content is None:
             content = json.dumps(value) if value else ""
         content_str = str(content)
 
-        # Remaining value fields become metadata
-        metadata_str = json.dumps(value) if value else "{}"
+        # Full original value goes to metadata for exact reconstruction
+        metadata_str = json.dumps(original_value) if original_value else "{}"
         memory_type = "searchable" if (index is True or isinstance(index, list)) else "memory"
 
         try:
@@ -506,10 +513,12 @@ class StmemStore(BaseStore):
             "memory", workspace_id=ws_id, filter_dict={"source_session_id": key}, columns=["id"]
         )
         if rows:
-            try:
-                self._client.delete_memory(key)
-            except RuntimeError:
-                pass
+            mem_id = rows[0].get("id") or rows[0].get("entity_id")
+            if mem_id:
+                try:
+                    self._client.delete_memory(mem_id)
+                except RuntimeError:
+                    pass
 
     def search(
         self,
@@ -819,14 +828,23 @@ class StmemStore(BaseStore):
 
 
 def _memory_to_dict(row: dict[str, Any]) -> dict[str, Any]:
-    """Convert a SpacetimeDB memory row to a value dict."""
+    """Convert a SpacetimeDB memory row to a value dict.
+
+    Reconstructs the ORIGINAL value stored by ``put`` (LangGraph BaseStore
+    semantics: value round-trips verbatim). ``entities_json`` holds the full
+    original dict; ``content``/``summary``/``memory_type`` are derived search
+    fields and are only surfaced when no original value was persisted
+    (legacy rows written before put() stored the full value).
+    """
+    meta = _json_parse(row.get("entities_json", "{}"))
+    if isinstance(meta, dict) and meta:
+        # Full original value persisted by put() → return it verbatim.
+        return meta
     value: dict[str, Any] = {
         "content": row.get("content", ""),
         "summary": row.get("summary", ""),
         "memory_type": row.get("memory_type", ""),
     }
-    # Merge metadata
-    meta = _json_parse(row.get("entities_json", "{}"))
     if meta and isinstance(meta, dict):
         value["metadata"] = meta
     return value

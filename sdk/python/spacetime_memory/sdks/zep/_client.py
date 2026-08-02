@@ -1193,10 +1193,17 @@ class UserClient:
             ],
         )
 
-        # Read back from the public user table
-        rows = self._client._sql_param('SELECT * FROM "user" WHERE user_id = ?', uid)
-        if rows:
-            return self._row_to_user(rows[0])
+        # Read back via the get_user reducer → public `user_get_result`
+        # table (the `user` table itself is private; direct SQL reads fail).
+        try:
+            self._client._call("get_user", [uid])
+            rows = self._client._sql_param(
+                'SELECT * FROM "user_get_result" WHERE user_id = ?', uid
+            )
+            if rows:
+                return self._row_to_user(rows[0])
+        except (RuntimeError, ValueError):
+            pass
         return {
             "user_id": uid,
             "email": email,
@@ -1219,7 +1226,9 @@ class UserClient:
         """
         self._client._call("get_user", [user_id])
 
-        rows = self._client._sql_param('SELECT * FROM "user" WHERE user_id = ?', user_id)
+        rows = self._client._sql_param(
+            'SELECT * FROM "user_get_result" WHERE user_id = ?', user_id
+        )
         if not rows:
             raise NotFoundError(f"User '{user_id}' not found")
         return self._row_to_user(rows[0])

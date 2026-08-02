@@ -263,32 +263,43 @@ class GraphitiSearch:
 
     def get_entity_edge_summary(
         self,
-        entity_uuid: str,
-        group_ids: list[str] | None = None,
+        entity_names: list[str],
+        group_ids: list[str],
     ) -> dict[str, Any]:
-        """Get all edges connected to an entity node.
+        """Get all edges connected to an entity node (Graphiti-parity).
 
         Args:
-            entity_uuid: The UUID of the entity node.
+            entity_names: Names of the entity nodes to summarize. Graphiti
+                resolves names → node UUIDs internally; we do the same via
+                search before fetching neighbours.
             group_ids: Workspace names/UUIDs to scope the query.
 
         Returns:
             Dict with ``edges`` (list of EntityEdge), ``nodes`` (list of
             connected EntityNode), ``summary`` (concatenated facts).
         """
-        gid = group_ids[0] if group_ids else "default"
+        # Accept both upstream list args and a single string convenience
+        names = [entity_names] if isinstance(entity_names, str) else list(entity_names or [])
+        groups = [group_ids] if isinstance(group_ids, str) else list(group_ids or [])
+        gid = groups[0] if groups else "default"
         ws_id = self._resolve_workspace(gid)
-        try:
-            edge_rows = self._client.get_neighbors(entity_uuid, workspace_id=ws_id)
-        except RuntimeError:
-            return {"edges": [], "nodes": [], "summary": ""}
+
+        edge_rows: list[dict[str, Any]] = []
+        node_ids: set[str] = set()
+        for name in names:
+            resolved = self._resolve_entity_uuid(name, ws_id)
+            if resolved is None:
+                continue
+            try:
+                rows = self._client.get_neighbors(resolved, workspace_id=ws_id)
+            except RuntimeError:
+                continue
+            edge_rows.extend(rows)
+            node_ids.add(resolved)
 
         edges: list[EntityEdge] = []
-        node_ids: set[str] = set()
-
         for row in edge_rows:
-            edge = EntityEdge.from_stmem(row)
-            edges.append(edge)
+            edges.append(EntityEdge.from_stmem(row))
             src = row.get("source_node_id", "")
             tgt = row.get("target_node_id", "")
             if src:
@@ -296,19 +307,37 @@ class GraphitiSearch:
             if tgt:
                 node_ids.add(tgt)
 
-        node_ids.discard(entity_uuid)
-        node_ids.discard("")
-
         nodes: list[EntityNode] = []
-        for nid in node_ids:
-            nrows = self._client._query("kg_node", filter_dict={"id": nid})
+        for nid in list(node_ids):
+            nrows = self._client.get_node(nid)
             if nrows:
                 nodes.append(EntityNode.from_stmem(nrows[0]))
 
-        facts = [e.fact for e in edges if e.fact]
-        summary = "; ".join(facts) if facts else ""
-
+        summary = " ".join(e.fact for e in edges if getattr(e, "fact", None))
         return {"edges": edges, "nodes": nodes, "summary": summary}
+
+    def _resolve_entity_uuid(self, name: str, ws_id: str) -> str | None:
+        """Resolve an entity NAME to its node UUID by querying kg_node."""
+        try:
+            rows = self._client._query("kg_node", workspace_id=ws_id, filter_dict={"label": name})
+        except (RuntimeError, TypeError):
+            rows = []
+        if not rows:
+            try:
+                rows = self._client._query("kg_node", workspace_id=ws_id)
+            except (RuntimeError, TypeError):
+                rows = []
+            rows = [r for r in rows
+                    if str(r.get("label", "")).lower() == name.lower()]
+        else:
+            # _query may or may not apply the filter server-side; keep exact
+            rows = [r for r in rows
+                    if str(r.get("label", "")).lower() == name.lower()] or rows
+        for n in rows:
+            nid = n.get("id", "") if isinstance(n, dict) else getattr(n, "id", "")
+            if nid:
+                return nid
+        return None
 
     # -------------------------------------------------------------------
     # Community detection

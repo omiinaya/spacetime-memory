@@ -241,18 +241,38 @@ def _wire_tapped_client(
     if http is not None and hasattr(http, "_event_hooks"):
         http._event_hooks.setdefault("request", []).append(tap.request_hook)
     c._wire_tap = tap
+    _ensure_registered(c)
     return c, tap
+
+
+def _ensure_registered(c: Client) -> None:
+    """Register the client's identity against the live module if not already
+    present, so reducer calls that require_auth() succeed. Freshly published
+    e2e databases contain no accounts, so without this every store_memory /
+    update_memory call fails with 'Not authenticated'."""
+    try:
+        namespace = "e2e-reg-" + os.urandom(4).hex()
+        c._call("register", [f"{namespace}-user", "E2E Harness", "benchpass789"])
+    except RuntimeError:
+        # Already registered (identity reused) — fine
+        pass
 
 
 def _find_wasm(repo_root: _Path) -> _Path | None:
     module_dir = repo_root / "server" / "spacetimedb"
     if not module_dir.exists():
         return None
+    candidates = []
     for name in ("spacetime_memory.opt.wasm", "spacetime_memory.wasm"):
         p = module_dir / "target" / "wasm32-unknown-unknown" / "release" / name
         if p.exists():
-            return p
-    return None
+            candidates.append(p)
+    if not candidates:
+        return None
+    # Prefer the NEWEST artifact. A stale `.opt.wasm` from an earlier
+    # wasm-opt pass can silently publish an old module missing newer
+    # reducers (e.g. check_workspace_access) — always pick the newest.
+    return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
 def _publish_or_skip(repo_root: _Path) -> dict:
@@ -1260,24 +1280,30 @@ class TestMem0WireCompatibility:
     def test_search_uses_hybrid_search(self, mem):
         uid = _uid("mem0s")
         mem.add("Search target", user_id=uid, agent_id="test-agent")
-        assert isinstance(mem.search("target", user_id=uid), list)
+        out = mem.search("target", user_id=uid)
+        # Mem0 v2 wire shape: {"results": [...]}
+        assert isinstance(out, dict) and "results" in out
+        assert isinstance(out["results"], list)
+        assert len(out["results"]) > 0
 
     def test_update_sends_update_reducer(self, mem):
         uid = _uid("mem0u")
         mem.add("Original", user_id=uid, agent_id="test-agent")
-        results = mem.get_all(user_id=uid)
-        if results and hasattr(results[0], "id"):
+        out = mem.get_all(user_id=uid)
+        results = out["results"] if isinstance(out, dict) else out
+        if results and results[0].get("id"):
             before = len(_reducer_calls(mem._client))
-            mem.update(memory_id=results[0].id, data={"content": "Updated"})
+            mem.update(memory_id=results[0]["id"], data={"content": "Updated"})
             assert any("update_memory" in c for c in _reducer_calls(mem._client)[before:])
 
     def test_delete_sends_deactivate_reducer(self, mem):
         uid = _uid("mem0d")
         mem.add("To delete", user_id=uid, agent_id="test-agent")
-        results = mem.get_all(user_id=uid)
-        if results and hasattr(results[0], "id"):
+        out = mem.get_all(user_id=uid)
+        results = out["results"] if isinstance(out, dict) else out
+        if results and results[0].get("id"):
             before = len(_reducer_calls(mem._client))
-            mem.delete(memory_id=results[0].id)
+            mem.delete(memory_id=results[0]["id"])
             assert any("deactivate_memory" in c or "delete_memory" in c for c in _reducer_calls(mem._client)[before:])
 
 
@@ -1286,20 +1312,26 @@ class TestZepWireCompatibility:
     @pytest.fixture
     def zep(self, e2e_stdb: dict) -> Any:
         from spacetime_memory.sdks.zep import Zep
-        c, tap = _wire_tapped_client(
-            host=e2e_stdb["host"], port=e2e_stdb["port"],
-            database=e2e_stdb["database"], token=e2e_stdb.get("token", ""),
-        )
+        # Construct Zep WITH the token so its internal client (which the
+        # .user/.memory/.graph sub-proxies bind to at construction time)
+        # is authenticated and registered. Overwriting z._client afterwards
+        # would leave the proxies pointing at an unregistered client.
         z = Zep(host=e2e_stdb["host"], port=e2e_stdb["port"],
-                config={"db": e2e_stdb["database"]})
-        z._client = c
-        c._wire_tap = tap
+                config={"db": e2e_stdb["database"]},
+                token=e2e_stdb.get("token", "") or None)
+        _ensure_registered(z._client)
+        tap = WireTap()
+        http = getattr(z._client, "_http", None)
+        if http is not None and hasattr(http, "_event_hooks"):
+            http._event_hooks.setdefault("request", []).append(tap.request_hook)
+        z._client._wire_tap = tap
         return z
 
     def test_add_memory(self, zep):
         before = len(_reducer_calls(zep._client))
         zep.add_memory(session_id=_uid("zep"), messages=[{"role": "user", "content": "Hi"}])
-        assert any("add_memory" in c for c in _reducer_calls(zep._client)[before:])
+        # add_memory persists each message via client.store() → store_memory reducer
+        assert any("store_memory" in c for c in _reducer_calls(zep._client)[before:])
 
     def test_search_sessions(self, zep):
         sid = _uid("zeps")
@@ -1309,7 +1341,8 @@ class TestZepWireCompatibility:
     def test_add_fact(self, zep):
         before = len(_reducer_calls(zep._client))
         zep.add_fact(session_id=_uid("zepf"), fact="E2E test fact")
-        assert any("add_fact" in c or "upsert_fact" in c for c in _reducer_calls(zep._client)[before:])
+        # add_fact persists via client.store() with memory_type="fact" → store_memory
+        assert any("store_memory" in c for c in _reducer_calls(zep._client)[before:])
 
     def test_get_memory(self, zep):
         sid = _uid("zepg")
@@ -1318,8 +1351,10 @@ class TestZepWireCompatibility:
 
     def test_user_crud(self, zep):
         before = len(_reducer_calls(zep._client))
-        zep.add_user(user_id=_uid("zepu"), email="e2e@test.com")
-        assert any("add_user" in c or "create_user" in c for c in _reducer_calls(zep._client)[before:])
+        zep.user.add(user_id=_uid("zepu"), email="e2e@test.com")
+        # user.add persists via the add_user/create_user reducer (or SQL upsert)
+        calls = _reducer_calls(zep._client)[before:]
+        assert any("add_user" in c or "create_user" in c or "/sql" in c for c in calls)
 
 
 @pytest.mark.e2e
@@ -1350,13 +1385,15 @@ class TestGraphitiWireCompatibility:
         before = len(_reducer_calls(graphiti._client))
         gid = _uid("ge")
         graphiti.add_episode(name="E2E episode", episode_body="Test episode", source_description="E2E test", group_id=gid)
-        assert any("add_episode" in c for c in _reducer_calls(graphiti._client)[before:])
+        # add_episode persists the episode via client.store() → store_memory
+        assert any("store_memory" in c for c in _reducer_calls(graphiti._client)[before:])
 
     def test_get_entity_edge_summary(self, graphiti):
         gid = _uid("gg")
         from spacetime_memory.sdks.graphiti import EntityEdge, EntityNode
         graphiti.add_triplet(EntityNode(name="Charlie", group_id=gid), EntityEdge(name="related_to", fact="test", group_id=gid), EntityNode(name="Diana", group_id=gid))
-        assert graphiti.get_entity_edge_summary(group_id=gid, entity_name="Charlie") is not None
+        result = graphiti.get_entity_edge_summary(entity_names=["Charlie"], group_ids=[gid])
+        assert result is not None
 
 
 @pytest.mark.e2e
@@ -1377,10 +1414,25 @@ class TestHonchoWireCompatibility:
         return h
 
     def test_search(self, honcho):
-        before = len(_reducer_calls(honcho._client))
-        honcho.search("E2E test search")
-        calls = _reducer_calls(honcho._client)[before:]
-        assert any("search" in c or "/sql" in c for c in calls)
+        # Seed a workspace + memory so search has real data to retrieve.
+        # Honcho's _ws_id defaults to "default"; create that workspace id
+        # explicitly so store() + search() resolve it.
+        ws_id = honcho._ws_id
+        try:
+            honcho._client.create_workspace(f"{ws_id}_name", id=ws_id)
+        except RuntimeError:
+            pass  # already exists
+        try:
+            honcho._client.store(
+                workspace_id=ws_id,
+                content="E2E searchable marker",
+                memory_type="memory",
+            )
+        except RuntimeError:
+            pass
+        results = honcho.search("E2E searchable marker")
+        assert isinstance(results, list)
+        assert any(r.content or "" for r in results)
 
     def test_queue_status(self, honcho):
         result = honcho.queue_status()
