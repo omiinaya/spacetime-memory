@@ -55,9 +55,8 @@ test.describe('Sidebar Navigation', () => {
       const link = page.getByRole('link', { name: new RegExp(`^${label}$`, 'i') });
       await expect(link).toBeVisible();
       await link.click();
-      await page.waitForTimeout(800);
-      // Verify the URL changed
-      expect(page.url()).toContain(href);
+      // Wait for the actual route change (deterministic, no fixed sleep)
+      await page.waitForURL(new RegExp(href.replace(/\//g, '\\/') + '$'), { timeout: 10_000 });
     });
   }
 
@@ -67,14 +66,12 @@ test.describe('Sidebar Navigation', () => {
     await expect(toggleBtn).toBeVisible();
     // Collapse
     await toggleBtn.click();
-    await page.waitForTimeout(300);
-    // Check sidebar is narrower (collapsed class)
+    // Wait for the collapse animation/class to settle
     const aside = page.locator('aside');
-    await expect(aside).toHaveAttribute('class', /w-16/);
+    await expect(aside).toHaveAttribute('class', /w-16/, { timeout: 5000 });
     // Expand again
     await toggleBtn.click();
-    await page.waitForTimeout(300);
-    await expect(aside).toHaveAttribute('class', /w-60/);
+    await expect(aside).toHaveAttribute('class', /w-60/, { timeout: 5000 });
   });
 
   test('shows user info in sidebar footer', async ({ page }) => {

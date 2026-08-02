@@ -21,6 +21,10 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   retries: 1,
+  // 48-core host: default workers (~24) all compile against the cold Vite
+  // dev server on first load, causing heading-render flakes. Cap at 6 for
+  // stability; runtime is still parallelized across spec files.
+  workers: 6,
   use: {
     // Dedicated port: 5173 is claimed by other projects' dev servers
     // (amalgam, mrx-cc). --strictPort makes Vite fail loudly instead of
