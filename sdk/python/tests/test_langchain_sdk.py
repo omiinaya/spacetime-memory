@@ -70,8 +70,23 @@ class TestHelpers:
             "entities_json": '{"source": "test"}',
         }
         d = _memory_to_dict(row)
+        # put() persists the FULL original value in entities_json → get()
+        # round-trips it verbatim (LangGraph BaseStore semantics).
+        assert d == {"source": "test"}
+
+    def test_memory_to_dict_legacy_row(self):
+        # Rows written before put() stored the full value (empty entities_json)
+        # fall back to the content/summary/memory_type envelope.
+        row = {
+            "content": "test content",
+            "summary": "test summary",
+            "memory_type": "memory",
+            "entities_json": "{}",
+        }
+        d = _memory_to_dict(row)
         assert d["content"] == "test content"
-        assert d["metadata"]["source"] == "test"
+        assert d["summary"] == "test summary"
+        assert d["memory_type"] == "memory"
 
     def test_apply_filter_empty(self):
         rows = [{"content": "test", "entities_json": "{}"}]

@@ -521,21 +521,25 @@ class TestGetEntityEdgeSummary:
     def test_basic(self):
         mc = MagicMock()
         mc.list_workspaces.return_value = [{"id": "w1", "name": "default"}]
+        # _resolve_entity_uuid("Alice") → returns node id "s1" via kg_node query
+        mc._query.return_value = [{"id": "s1", "label": "Alice", "created_at": 1700000000}]
+        mc.get_node.return_value = [{"id": "s1", "label": "Alice", "created_at": 1700000000}]
         mc.get_neighbors.return_value = [
             {"id": "e1", "relation": "r", "fact": "connects",
-             "source_node_id": "s1", "target_node_id": "t1"}
+             "source_node_id": "s1", "target_node_id": "t1",
+             "created_at": 1700000000}
         ]
-        mc._query.return_value = [{"id": "t1", "label": "Tgt"}]
         g = Graphiti(client=mc)
-        r = g.get_entity_edge_summary("s1", group_ids=["default"])
+        r = g.get_entity_edge_summary(["Alice"], group_ids=["default"])
         assert len(r["edges"]) == 1
         g.close()
 
     def test_nonexistent(self):
         mc = MagicMock()
-        mc.get_neighbors.side_effect = RuntimeError()
+        mc.list_workspaces.return_value = [{"id": "w1", "name": "default"}]
+        mc._query.return_value = []  # entity name resolves to nothing
         g = Graphiti(client=mc)
-        r = g.get_entity_edge_summary("bad")
+        r = g.get_entity_edge_summary(["missing"], group_ids=["default"])
         assert r["edges"] == [] and r["summary"] == ""
         g.close()
 

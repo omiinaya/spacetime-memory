@@ -705,8 +705,8 @@ class TestGraphitiWireFormatValidation:
         gid = _uid("gg")
         g._ws_cache[gid] = _MOCK_WS_ID
         tap.requests.clear()
-        result = g.get_entity_edge_summary(entity_uuid="mock-uuid")
-        assert isinstance(result, str) or result is not None
+        result = g.get_entity_edge_summary(entity_names=["mock"], group_ids=[gid])
+        assert result is not None
 
 
 class TestHindsightWireFormatValidation:
