@@ -22,7 +22,6 @@ Two benchmark-contamination bugs were fixed in ``client/_base.py``:
 from unittest.mock import MagicMock, patch
 
 import httpx
-import pytest
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 

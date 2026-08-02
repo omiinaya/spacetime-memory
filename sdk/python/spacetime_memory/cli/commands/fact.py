@@ -9,7 +9,6 @@ from typing import Any
 import click
 
 from ..root import (
-    _esc,
     _quiet_print,
     _sdk_client,
     cli,
