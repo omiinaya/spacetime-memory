@@ -248,3 +248,26 @@ Also ~3× faster than gemma (36-74s/question vs 117-195s).
 **Full 1,540-Q official re-run** scheduled (cron `mem0-official-full-zen`,
 gateway-immune, one-shot) with deepseek-v4-flash-free via our chain. Mem0's
 published: **91.56%** (gpt-5/gpt-5, same dataset).
+
+## 2026-08-03 (mid-day) — Per-project identity isolation (P0)
+
+The official Mem0 harness full run was silently corrupted by **shared-account
+auth clobbering**: a concurrent LongMemEval smoke logged in as the same
+`benchmark-runner` account, rotating its token, and the LoCoMo run's every
+reducer then failed "Not authenticated" (221 errors, dropped to 1.1s/chunk
+degradation at 69s/chunk). Root cause: workspace ownership is per-PEER, auth
+token is per-ACCOUNT — two runs sharing one account = mutual identity theft.
+
+**Fix (mem0 harness):** `StmemClient` derives a unique account per project
+(`bench-<slug>` from `--project-name`), so each run owns its own peer.
+Verified: per-project client registers, writes date-anchored content, searches.
+**Fix (Zep shim):** persist identity token to `$STDB_TOKEN_FILE` so the
+separate ingest/eval processes share the workspace-owner peer (public
+workspaces only grant VIEW, not EDITOR).
+
+**Official full re-run** (`stmem-full5-zen`) relaunched 11:53 with date-anchor
++ per-project identity: ingesting cleanly at ~1s/chunk, **0 auth errors**.
+Sequential chain scheduled after it: Zep LoCoMo → Mem0 LongMemEval → Mem0 BEAM
+(cron `official-harness-chain`). All LLM via our OpenCode Zen chain
+(`:4004 → :4002`, x-api-key: public) — no OpenRouter.
+
