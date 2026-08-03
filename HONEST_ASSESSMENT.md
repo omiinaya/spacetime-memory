@@ -271,3 +271,23 @@ Sequential chain scheduled after it: Zep LoCoMo → Mem0 LongMemEval → Mem0 BE
 (cron `official-harness-chain`). All LLM via our OpenCode Zen chain
 (`:4004 → :4002`, x-api-key: public) — no OpenRouter.
 
+## 2026-08-03 (noon) — Stuck cron ticker → daemonized delivery (P0 infra fix)
+
+The gateway's in-process cron ticker got stuck holding `~/.hermes/cron/.tick.lock`
+(PID 11412, wedged by a Discord 429 rate-limit storm). No cron job fired after
+11:53 (monitors/chain all past-due, `hermes cron tick` returns 0 doing nothing).
+Two delivery paths were at risk: (1) the chain ran as a `terminal(background=True)`
+process which `gateway_timeout: 1800` kills at 30 min; (2) even `no_agent` cron
+delivery was blocked by the stuck ticker. Detail + daemonize recipe: benchmarking
+skill "Stuck Cron Ticker → Daemonize" section.
+
+**Fix — daemonized both critical processes** (fork+setsid+double-fork, orphaned
+to init, PPID=1, immune to both the stuck ticker and gateway timeout):
+- `daemonize_chain.py` → runs `official_chain_run.sh` (waits for full5 → runs
+  Zep→LME→BEAM), PPID=1.
+- `daemonize_verdict_watcher.py` → polls `/tmp/mem0bench_full5.out` and POSTs the
+  LoCoMo verdict to the Discord thread via REST (bypassing cron delivery).
+- `official_chain_run.sh` now also POSTs its own chain summary via REST (token
+  from `~/.hermes/.env`, never printed). Both committed to `~/.hermes/scripts`
+  git (master), clean omiinaya identity.
+
