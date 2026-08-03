@@ -18,7 +18,7 @@ const TOKEN = stdbToken();
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 60_000,
+  timeout: 90_000,
   expect: { timeout: 10_000 },
   retries: 1,
   // 48-core host: default workers (~24) all compile against the cold Vite
@@ -36,7 +36,11 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: `VITE_SPACETIMEDB_DB=spacetime-memory-v2 VITE_SPACETIMEDB_HOST=localhost:3001 VITE_SPACETIMEDB_WS=ws://localhost:3001 VITE_SPACETIMEDB_TOKEN=${TOKEN} npm run dev -- --port 5191 --strictPort`,
+    // STDB target is env-overridable so E2E can run in total isolation
+    // (VITE_STDB_HOST_OVERRIDE=localhost:39999) during live benchmarks —
+    // page specs use __MOCK_STDB__ and never need a real connection; only the
+    // dev server's env pointed at live STDB would contend with a benchmark.
+    command: `VITE_SPACETIMEDB_DB=${process.env.VITE_STDB_DB_OVERRIDE ?? 'spacetime-memory-v2'} VITE_SPACETIMEDB_HOST=${process.env.VITE_STDB_HOST_OVERRIDE ?? 'localhost:3001'} VITE_SPACETIMEDB_WS=${process.env.VITE_STDB_WS_OVERRIDE ?? 'ws://localhost:3001'} VITE_SPACETIMEDB_TOKEN=${TOKEN} npm run dev -- --port 5191 --strictPort`,
     url: 'http://localhost:5191',
     reuseExistingServer: false,
     timeout: 30_000,

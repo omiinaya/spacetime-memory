@@ -80,7 +80,7 @@ export async function mockPage(page: Page, sqlRows: unknown[] = []) {
  * not depend on clicking through the sidebar (that's what made many specs
  * flaky: the click + 800ms wait exceeded the default 30s test timeout).
  */
-export async function gotoPage(page: Page, path: string, timeout = 45_000) {
+export async function gotoPage(page: Page, path: string, timeout = 60_000) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout });
   // Give React time to hydrate and the sidebar/auth gate to settle.
   await page.waitForLoadState('networkidle', { timeout }).catch(() => {});

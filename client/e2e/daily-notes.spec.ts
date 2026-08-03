@@ -83,12 +83,24 @@ test.describe('Daily Notes', () => {
 });
 
 test.describe('Daily Notes — Seeded Data', () => {
+  // The DailyNotes page filters notes by `note_date === todayDate()` (the real
+  // current date). The seeded note must use TODAY's date or the assertion never
+  // matches — a hardcoded date silently goes stale and the test fails the next
+  // calendar day (pre-existing flake, fixed 2026-08-03).
+  function todayNoteDate(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   test.beforeEach(async ({ page }) => {
     await mockAuth(page);
     await installMockStdb(page);
     await seedMockData(page, {
       note: [
-        { id: 'n1', title: 'Seeded Daily', content: 'daily content', note_date: '2026-08-02', embedding_json: '[]', backlink_count: 0, block_ref_count: 0, created_at: 1785600000000, updated_at: 1785600000000, is_active: true },
+        { id: 'n1', title: 'Seeded Daily', content: 'daily content', note_date: todayNoteDate(), embedding_json: '[]', backlink_count: 0, block_ref_count: 0, created_at: 1785600000000, updated_at: 1785600000000, is_active: true },
       ],
     });
     await gotoPage(page, '/daily');
