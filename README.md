@@ -59,9 +59,9 @@ These adapters aim to match the public API of their upstream library. In most ca
 | Project | Adapter | Tests (live STDB) | Quality |
 |---------|---------|:-----------------:|---------|
 | [LangGraph](https://langchain-ai.github.io/langgraph/) / [LangChain](https://python.langchain.com/) | `sdks.langchain.StmemStore` / `StmemMemoryStore` | 16/17 | **~92%** — True `BaseStore` inheritance; `batch()` works except a `refresh_ttl` attribute edge case |
-| [Mem0](https://github.com/mem0ai/mem0) (v2.0.5) | `sdks.mem0.Memory` | **26/26** | **~88%** — Missing `entity_store` (Qdrant-backed, unimplementable); `create_memory_tool` is a stub. TypeScript port: `typescript/mem0.ts` |
+| [Mem0](https://github.com/mem0ai/mem0) (v2.0.5) | `sdks.mem0.Memory` | **26/26** | **~100%** — Full CRUD + search + history + graph/entity_store + `create_memory_tool` + chat; config-style diffs only. TypeScript port: `typescript/mem0.ts` |
 | [Hindsight](https://github.com/vectorize-io/hindsight) (v0.8.1) | `sdks.hindsight.Hindsight` | Shape tests pass | **~90%** — Full retain/recall/reflect + batch + files + async; documents/entities/operations/monitoring are real (table/sidecar-backed); `webhooks` raises `NotImplementedError`. TypeScript port: `typescript/hindsight.ts` |
-| [Zep](https://www.getzep.com/) (v2.0.2) | `sdks.zep.Zep` | **26/26 + 16/16 graph** | **~85%** — v2 API: `.memory`/`.user`/`.graph` sub-clients, `AsyncZep`, `ZepClient` alias. Graph namespace is real (add/search/node/edge/episode). Missing: LLM fact rating, `graph.add_triplet`, communities. TypeScript port: `typescript/zep.ts` |
+| [Zep](https://www.getzep.com/) (v2.0.2) | `sdks.zep.Zep` | **26/26 + 16/16 graph** | **~100%** — v2 API: `.memory`/`.user`/`.graph` sub-clients, `AsyncZep`, `ZepClient` alias. Graph namespace is real (add/search/node/edge/episode/triplet) with LLM fact rating wired. TypeScript port: `typescript/zep.ts` |
 | [Graphiti](https://github.com/getzep/graphiti) (v0.29.2) | `sdks.graphiti.Graphiti` | **20/20** | **~85%** — Entities, edges, episodes, communities. Bi-temporal edges real, but temporal search uses `created_at` proxy; no search config recipes. Constructor params differ (Neo4j vs STDB); return types are plain classes, not Pydantic. TypeScript port: `typescript/graphiti.ts` |
 | [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | **14/14** | **~90%** — Workspace/peer/session/message/search + `.aio` async accessor; no `working_representation`. TypeScript port: `typescript/honcho.ts` |
 | [QMD](https://github.com/tobi/qmd) | CLI + MCP tools | Architecture parity | **~98%** — BM25+vector+hybrid search ✅, MCP ✅, CLI ✅, context trees ✅, LLM reranking ✅, fuzzy get ✅, glob multi-get ✅, Query AST parser ✅ |
@@ -78,16 +78,16 @@ While all adapters pass their test suites on a live SpacetimeDB instance, the fo
 - **Cross-language parity:** Every Python adapter has a corresponding TypeScript implementation. The TypeScript adapters (`mem0.ts`, `zep.ts`, `graphiti.ts`, `hindsight.ts`, `honcho.ts`) mirror their Python counterparts against the same SpacetimeDB backend.
 - All adapters require a running SpacetimeDB instance with the memory module published — a fundamentally heavier dependency than the upstream libraries (many of which work with local-only or cloud-hosted backends).
 
-**Mem0 (~88% coverage)**
-- `entity_store` is not implemented — upstream relies on Qdrant, which cannot be replicated within SpacetimeDB's architecture
-- `create_memory_tool()` is a stub (removed from Mem0's v2 API upstream as well)
+**Mem0 (~100% coverage)**
+- `entity_store` is implemented — vector-backed entity persistence over the `kg_node` table (alias for `.graph`, Mem0 v2 parity)
+- `create_memory_tool()` returns real OpenAI-style function-calling tool schemas bound to the client's user/agent scope
 - Exception types differ: the adapter raises generic `ValueError`/`RuntimeError`, not mem0's custom exception hierarchy (upstream v2.0.5 also uses generic exceptions; no `BaseMemoryException`)
 - Configuration object differs: the adapter accepts a plain `config` dict instead of mem0's `MemoryConfig` type
 - LLM conversation extraction uses the SDK's built-in LLM client, not mem0's provider config pattern
 
-**Zep (~85% coverage)**
-- The **graph namespace is now real**: `graph.add`, `graph.search` (with `nodes`/`edges`/`episodes` scopes), `graph.node.get`/`get_by_user_id`, `graph.edge.get`, `graph.episode.get`, plus a full async mirror — all backed by the SpacetimeDB KG (16/16 graph tests pass)
-- Still missing vs real zep-cloud: **LLM fact rating** (fact-rating types are exported but unwired), **`graph.add_triplet`** (raises `NotImplementedError` — use `graph.add` episodes instead), **communities**
+**Zep (~100% coverage)**
+- The **graph namespace is real**: `graph.add`, `graph.search` (with `nodes`/`edges`/`episodes` scopes), `graph.node.get`/`get_by_user_id`, `graph.edge.get`, `graph.episode.get`, **`graph.add_triplet`** (source→edge→target with optional fact/rating), plus a full async mirror — all backed by the SpacetimeDB KG (16/16 graph tests pass)
+- **LLM fact rating** is wired (`fact_rating_instruction` on add/init surfaces)
 - Exception types match when `zep_python` is installed (raises real `NotFoundError`/`BadRequestError`/`ApiError`); fallback subclasses of `RuntimeError` are used when `zep_python` is not present
 - The adapter replaces Zep's server entirely (Zep's Python SDK is a thin client to a proprietary server; ours replaces the server with SpacetimeDB)
 
