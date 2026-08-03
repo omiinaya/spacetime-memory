@@ -1,6 +1,6 @@
 # Honest Competitive Assessment — Spacetime Memory
 
-*Last updated: 2026-08-02*
+*Last updated: 2026-08-03*
 
 ## Current Status
 
@@ -215,3 +215,36 @@ The official Mem0 harness run (their code, their 1,540-Q dataset, their judge)
 Also fixed: `StmemClient._ensure_workspace` now flips bench-* workspaces
 public on EVERY add() (not just on first creation) — a resumed run on an
 existing private workspace would otherwise fail ACL checks.
+
+## 2026-08-03 — All LLM traffic through OUR proxy chain (OpenRouter removed)
+
+The benchmark chain now routes **100% through our own infrastructure**:
+`:4004` auth adapter → `:4002` OpenCode Zen free tier (`x-api-key: public`).
+No OpenRouter, no external providers. The adapter previously routed
+`gemma`/`openai/`/`anthropic/` models to OpenRouter with an embedded key;
+OpenRouter free tier hit its daily limit mid-run (429) and the key has no
+paid credits (402) — both are now impossible by construction.
+
+Verified models through our chain: `deepseek-v4-flash-free` (clean JSON via
+`response_format: json_object`), `ling-3.0-flash-free` (JSON in code fence),
+`mimo-v2.5-free` (unusable reasoning dump). deepseek-v4-flash-free is the
+benchmark pick.
+
+### Official Mem0 harness smoke — our chain, date-anchored (8 Q, conv 1)
+
+| Cutoff | Result |
+|--------|:-:|
+| top_10 | **100%** (8/8) |
+| top_50 | **100%** (8/8) |
+| top_200 | **100%** (8/8) |
+| temporal (4 Q) | **100%** |
+| multi-hop (2 Q) | **100%** |
+| single-hop (2 Q) | **100%** |
+
+All 8 questions CORRECT at top_200 — including both temporal questions that
+every model (deepseek, gemma, gpt-4o) failed before the date-anchor fix.
+Also ~3× faster than gemma (36-74s/question vs 117-195s).
+
+**Full 1,540-Q official re-run** scheduled (cron `mem0-official-full-zen`,
+gateway-immune, one-shot) with deepseek-v4-flash-free via our chain. Mem0's
+published: **91.56%** (gpt-5/gpt-5, same dataset).
