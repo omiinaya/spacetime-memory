@@ -291,3 +291,35 @@ to init, PPID=1, immune to both the stuck ticker and gateway timeout):
   from `~/.hermes/.env`, never printed). Both committed to `~/.hermes/scripts`
   git (master), clean omiinaya identity.
 
+## 2026-08-03 (14:10) — STDB restart outage contaminated 11 LoCoMo questions (P1)
+
+**What happened:** `spacetimedb.service` (systemd `Restart=always`) restarted at
+13:45:32 EDT, taking `spacetime-memory-v2` offline ~15 min while it restored
+from snapshot (tx 10,137,687) + replayed history (to 10,308,555, Loaded 100%).
+The Mem0 LoCoMo harness's search retries all failed during the window;
+`StmemClient.search()` returns `[]` after 5 attempts (NOT an exception), so the
+questions were answered + judged against EMPTY context → recorded as wrong.
+
+**Scope:** exactly 11 questions, all written 13:52-14:03 EDT (in-outage):
+conv0_q38/39/40, conv1_q48/49, conv2_q44/45/46, conv3_q31/32/33.
+No other 0-result files exist outside the window (verified).
+
+**Trigger (unconfirmed):** restart coincided with (a) the E2E suite's Vite
+webServer starting its STDB connection and (b) a self-hosted GitHub Actions CI
+worker firing from the `dev` push (b0e9f59). CI workflows do NOT restart STDB
+(checked ci.yml/release.yml) — the kill looks abrupt (last log line is a normal
+debug msg, no panic). Not OOM (256GB box, no oom-kill evidence). Standing risk
+to re-audit; systemd Restart=always made recovery automatic.
+
+**Fix (repair, not re-run):** `scripts/repair_locomo_contamination.py`
+identifies `total_results==0` per-question files, re-runs search+answer+judge
+via the harness's own `process_question` + `StmemClient` (same user_id
+`locomo_{conv}_{run_id}`, run_id=a2e9b6fd) against the now-healthy STDB,
+overwrites damaged files, reassembles `locomo_results_*.json`. Wired into the
+launcher (`mem0_full5_zen_run.sh`) so it runs BEFORE verdict extraction —
+verdict metrics are computed on clean data. No --delete-data, no restart,
+touches only the 11 damaged questions.
+
+**Impact:** without repair, those 11 wrong answers would cost ~0.71pp
+(11/1540) on the apples-to-apples comparison vs Mem0's 91.56%.
+
