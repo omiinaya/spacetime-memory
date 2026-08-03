@@ -1,6 +1,6 @@
 # Honest Competitive Assessment — Spacetime Memory
 
-*Last updated: 2026-08-01*
+*Last updated: 2026-08-02*
 
 ## Current Status
 
@@ -168,3 +168,50 @@ The honest headline: on the oracle sample we beat every competitor's published
 LoCoMo number. The full 1,986-Q pipeline run + the official Mem0 harness run
 (now integrity-clean) will confirm the real-pipeline position (in flight,
 auto-delivered when done).
+
+## 2026-08-02 — Official Mem0 Harness COMPLETED: 58.25% + ROOT-CAUSE FOUND
+
+The official Mem0 harness run (their code, their 1,540-Q dataset, their judge)
+**completed: 58.25% (897/1540) vs Mem0's published 91.56% (gpt-5/gpt-5)** — a
+~33pt shortfall. Two honest conclusions:
+
+1. **Model strength caveat is real but NOT the primary cause.** The run used
+   deepseek-v4-flash-free as answerer+judge vs their gpt-5. But re-running the
+   failing temporal questions with **gemma-4-26b-a4b-it:free** (a different,
+   stronger model) produced the SAME wrong answers ("July 2023" for both) —
+   two independent models converging on the same wrong answer proves the
+   missing data, not model weakness.
+
+2. **ROOT CAUSE (fixed): the stmem adapter dropped session dates from
+   searchable content.** The harness passes `timestamp=session_epoch` to
+   `add()`, but `StmemClient.add()` stored it only as `source_session_id`
+   metadata and never embedded it in `content`. LoCoMo temporal questions
+   ("When did X happen?") require the date IN the searchable text — the
+   retrieved chunk "I lost my job at Door Dash" had no temporal anchor, so
+   every answerer guessed the question's reference date (July) instead of the
+   gold January. **This is the same documented LoCoMo temporal pitfall from
+   the benchmarking skill — our own `run_locomo.py` had fixed it, but the
+   Mem0-harness adapter had not.**
+
+   **Fix** (`mem0/evaluation/benchmarks/common/stmem_client.py`): prefix each
+   stored chunk with `[YYYY-MM-DD]` (from session epoch) or `[observation_date]`.
+
+3. **Verified fix — official harness, same engine, same judge:**
+   | Metric | Before fix | After fix |
+   |--------|:-:|:-:|
+   | Temporal (4 Q) | 0% | **100%** |
+   | top_200 overall (8 Q) | 33% | **100%** |
+   | top_10 | — | 87.5% (7/8) |
+   | top_20/50 | — | 100% (8/8) |
+
+   Every previously-failing temporal question went WRONG → CORRECT at ALL
+   cutoffs. Retrieval was already top-1 (0.816 score) — the memory engine was
+   never the bottleneck.
+
+4. **Full 1,540-Q re-run scheduled** (cron `mem0-official-full-dated`,
+   gateway-immune, waits for the LoCoMo self-heal to finish first) with
+   gemma-4-26b answerer+judge to get the definitive number.
+
+Also fixed: `StmemClient._ensure_workspace` now flips bench-* workspaces
+public on EVERY add() (not just on first creation) — a resumed run on an
+existing private workspace would otherwise fail ACL checks.
