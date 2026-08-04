@@ -24,13 +24,12 @@ export default function KGExplorer({ host, port, db, workspaceId }: { host: stri
   async function loadNodes() {
     setLoadingN(true)
     try {
-      let sql = `SELECT id, label, node_type, summary FROM kg_node WHERE workspace_id='${workspaceId}'`
-      if (searchLabel) {
-        const esc = searchLabel.replace(/'/g, "''")
-        sql += ` AND label LIKE '%${esc}%'`
-      }
-      sql += ' LIMIT 100'
-      const data = await stdbSql<KGNode>({ host, port, database: db }, sql)
+      // STDB's SQL subset does NOT support LIKE — fetch a capped set and
+      // filter client-side with case-insensitive substring matching.
+      const sql = `SELECT id, label, node_type, summary FROM kg_node WHERE workspace_id='${workspaceId.replace(/'/g, "''")}' LIMIT 1000`
+      const all = await stdbSql<KGNode>({ host, port, database: db }, sql)
+      const q = searchLabel.trim().toLowerCase()
+      const data = q ? all.filter((n) => n.label.toLowerCase().includes(q)) : all
       setNodes(data)
     } catch {
       setNodes([])
