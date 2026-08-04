@@ -89,8 +89,9 @@ async def main() -> None:
 
     # Build dataset + the harness's expected item list (same as the live run).
     dataset = load_dataset(args.dataset)
+    conv_indices = list(range(10))  # full5 ran conversations 0..9
     categories = [1, 2, 3, 4, 5]
-    expected = expected_locomo_question_items(dataset, categories, max_questions=None)
+    expected = expected_locomo_question_items(dataset, conv_indices, categories, max_questions=None)
     q_by_id = {qid: (conv, qi, qa) for qid, conv, qi, qa in expected}
 
     mem0 = StmemClient(db=args.db, host=args.stmem_host, port=args.stmem_port,
