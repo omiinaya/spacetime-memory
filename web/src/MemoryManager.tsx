@@ -188,8 +188,8 @@ export default function MemoryManager({ stdbHost, stdbPort, stdbDb }: MemoryMana
 
   /* ---- Format date ---- */
   function fmtDate(ts: number): string {
-    if (!ts) return ''
-    return new Date(ts / 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    // STDB stores created_at as epoch MILLISECONDS — do not divide.
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
   /* ================================================================== */
