@@ -66,17 +66,29 @@ timeout 10800 env \
         --eval --config benchmark_config_stmem.yaml --prefix "$PREFIX" --num-runs 1 \
     >> "$LOGFILE" 2>&1
 echo "Zep eval done $(date)" >> "$LOGFILE"
-NEWEST=$(ls -t /home/hindsight/zep/benchmarks/locomo/experiments/experiment_*/experiment_summary.json 2>/dev/null | head -1)
+NEWEST=$(ls -t /home/hindsight/zep/benchmarks/locomo/experiments/run_*/results.json /home/hindsight/zep/benchmarks/locomo/experiments/experiment_*/experiment_summary.json 2>/dev/null | head -1)
 echo "ZEP_RESULT_FILE=$NEWEST" >> "$MASTER"
 if [ -n "$NEWEST" ]; then
     /home/hindsight/spacetime-memory/.venv/bin/python3 - "$NEWEST" >> "$MASTER" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
-am = d.get("aggregated_metrics", {})
+am = d.get("aggregated_metrics", {}) or {}
 acc = am.get("accuracy", {})
-print("ZEP OFFICIAL LOCOMO (Zep harness, our Zen chain adapter)")
-print(f"  accuracy.mean: {acc.get('mean', 0)*100:.2f}%  (median {acc.get('median', 0)*100:.2f}%)")
-print(f"  config: {d.get('config', {}).get('models', {}).get('response_model')}")
+# run_*/results.json uses metrics.accuracy (scalar), experiment_*/ uses
+# aggregated_metrics.accuracy.mean — accept both.
+if acc:
+    v = acc.get("mean")
+    print("ZEP OFFICIAL LOCOMO (Zep harness, our Zen chain adapter)")
+    print(f"  accuracy.mean: {v*100:.2f}%  (median {acc.get('median', 0)*100:.2f}%)")
+    m = d.get("config", {}).get("models", {})
+    print(f"  config: {m.get('response_model')}")
+else:
+    m = d.get("metrics", {})
+    v = m.get("accuracy")
+    print("ZEP OFFICIAL LOCOMO (Zep harness, our Zen chain adapter)")
+    print(f"  accuracy: {v*100 if v is not None else 0:.2f}%  ({m.get('correct_count',0)}/{m.get('total_count',0)})")
+    print(f"  completeness_insufficient: {m.get('completeness_insufficient_rate', 0)*100:.1f}%")
+    print(f"  config: deepseek-v4-flash-free")
 print("ZEP_PUBLISHED_LOCOMO=69.6 (gpt-4o-mini)")
 PY
 fi
