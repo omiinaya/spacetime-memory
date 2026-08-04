@@ -234,6 +234,10 @@ class ClientBase:
             or os.environ.get("EMBEDDER_URL")
             or "http://127.0.0.1:9090/v1"
         )
+        # Normalize: the embedder serves an OpenAI-compatible API under /v1.
+        # Accept both http://host:9090 and http://host:9090/v1 configs.
+        if not self.embedder_url.rstrip("/").endswith("/v1"):
+            self.embedder_url = self.embedder_url.rstrip("/") + "/v1"
         self.tantivy_url = tantivy_url or os.environ.get("TANTIVY_URL", "http://127.0.0.1:9091")
         self.verbose = verbose
         # Wire verbose flag into logging configuration

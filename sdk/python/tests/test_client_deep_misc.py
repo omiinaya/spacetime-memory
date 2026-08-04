@@ -317,7 +317,10 @@ class TestCreateNodeEmbed:
         c._embed = Mock(return_value=[0.1, 0.2])
         c._query = Mock(return_value=[{"id": "node1"}])
         result = c.create_node("ws", "TestNode", summary="A test")
-        assert result == {"status": "ok"}
+        # create_node intentionally returns the created node PLUS status
+        # (compounder workflows use node["id"]; deep CRUD uses status).
+        assert result["status"] == "ok"
+        assert result.get("id") == "node1"
         # _query should have been called for kg_node
         c._query.assert_called()
         # index_entity should have been called
