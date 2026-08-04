@@ -70,7 +70,7 @@ async def main() -> None:
     ap.add_argument("--judge-model", default="deepseek-v4-flash-free")
     ap.add_argument("--top-k", type=int, default=200)
     ap.add_argument("--max-workers", type=int, default=4)
-    ap.add_argument("--cutoff", type=int, nargs="+", default=[10, 20, 50, 200],
+    ap.add_argument("--cutoff", dest="cutoffs", type=int, nargs="+", default=[10, 20, 50, 200],
                     help="Must match the live run's --top-k-cutoffs (10,20,50,200). "
                          "Mismatched cutoffs produce top_7/top_30 labels that read as "
                          "score 0.0 during metrics reassembly → catastrophic deflation.")
