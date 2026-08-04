@@ -52,6 +52,25 @@ m = Memory(config={"host": "127.0.0.1", "port": "3001"})
 m.add("I like pizza", user_id="alice")
 ```
 
+Newer adapters are equally drop-in — LangMem tools, Cognee cognify, Letta blocks, QMD search, and Mnemosyne SM-2 cards all map to the same native store:
+
+```python
+from spacetime_memory.sdks.langmem import create_manage_memory_tool
+tool = create_manage_memory_tool(namespace=("memories", "alice"))
+tool.invoke({"content": "Alice likes pizza", "action": "create"})
+
+import asyncio
+from spacetime_memory.sdks.cognee import add, search
+asyncio.run(add("Pizza is Alice's favorite food", dataset_name="prefs"))
+results = asyncio.run(search("what does Alice like?", datasets=["prefs"]))
+
+from spacetime_memory.sdks.mnemosyne import Mnemosyne
+mn = Mnemosyne()
+mn.create_card("general", "Favorite food?", "Pizza", grade=5)
+```
+
+All 11 Python adapters are native — no upstream package required at runtime.
+
 ## Drop-in Adapters
 
 These adapters aim to match the public API of their upstream library. In most cases you can swap the import path and keep existing code, but each adapter has known gaps — see the Quality column and the **Adapter Caveats** section below for details.
@@ -64,8 +83,11 @@ These adapters aim to match the public API of their upstream library. In most ca
 | [Zep](https://www.getzep.com/) (v2.0.2) | `sdks.zep.Zep` | **26/26 + 16/16 graph** | **~100%** — v2 API: `.memory`/`.user`/`.graph` sub-clients, `AsyncZep`, `ZepClient` alias. Graph namespace is real (add/search/node/edge/episode/triplet) with LLM fact rating wired. TypeScript port: `typescript/zep.ts` |
 | [Graphiti](https://github.com/getzep/graphiti) (v0.29.2) | `sdks.graphiti.Graphiti` | **20/20** | **~85%** — Entities, edges, episodes, communities. Bi-temporal edges real, but temporal search uses `created_at` proxy; no search config recipes. Constructor params differ (Neo4j vs STDB); return types are plain classes, not Pydantic. TypeScript port: `typescript/graphiti.ts` |
 | [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | **14/14** | **~90%** — Workspace/peer/session/message/search + `.aio` async accessor; no `working_representation`. TypeScript port: `typescript/honcho.ts` |
-| [QMD](https://github.com/tobi/qmd) | CLI + MCP tools | Architecture parity | **~98%** — BM25+vector+hybrid search ✅, MCP ✅, CLI ✅, context trees ✅, LLM reranking ✅, fuzzy get ✅, glob multi-get ✅, Query AST parser ✅ |
-| [Cognee](https://github.com/topoteretes/cognee) | CLIs supported | | **~75%** — KG-parity for knowledge-graph-native workloads; missing cloud features, embeddings providers differ |
+| [QMD](https://github.com/tobi/qmd) | `sdks.qmd.QmdClient` | 31/31 | **~98%** — BM25+vector+hybrid search ✅, query AST ✅, collections/context ✅, fuzzy get ✅, glob multi-get ✅, status ✅ |
+| [Cognee](https://github.com/topoteretes/cognee) | `sdks.cognee` (`add`/`cognify`/`search`/`delete`) | 39/39 | **~90%** — dataset-scoped KG, memory entries (QA/trace/feedback/skill_run), agent memory context, recall scopes; cloud-only features not applicable |
+| [LangMem](https://github.com/langchain-ai/langmem) | `sdks.langmem` (tools + managers) | 33/33 | **~92%** — `create_manage_memory_tool`/`create_search_memory_tool`, LLM memory manager/searcher/thread-extractor, `ReflectionExecutor`, prompt optimizers — all over the LangGraph `BaseStore` interface (`StmemStore`) |
+| [Letta](https://github.com/letta-ai/letta) | `sdks.letta.LettaMemory` | 28/28 | **~90%** — core memory blocks (persona/human), archival passages with semantic search, recall messages, full memory bundle |
+| [Mnemosyne](https://github.com/AxDSan/mnemosyne) | `sdks.mnemosyne.Mnemosyne` | 31/31 | **~95%** — faithful SM-2 scheduling (easiness/interval/reps/lapses), decks, due cards, review history, sync log |
 | Mem0 (TypeScript) | `typescript/mem0.ts` | 30/30 | **~88%** — Same API surface as Python Mem0 adapter; full CRUD + search + history on SpacetimeDB backend |
 | Graphiti (TypeScript) | `typescript/graphiti.ts` | 12/12 | **~85%** — Entity, edge, episode, community types; search + CRUD; same parity gap as Python variant |
 
@@ -74,9 +96,10 @@ Additional features inspired by many projects (data model, schedules, CLI design
 
 While all adapters pass their test suites on a live SpacetimeDB instance, the following specific gaps exist:
 
-**All 10 adapters (6 Python + 4 TypeScript)**
-- **Cross-language parity:** Every Python adapter has a corresponding TypeScript implementation. The TypeScript adapters (`mem0.ts`, `zep.ts`, `graphiti.ts`, `hindsight.ts`, `honcho.ts`) mirror their Python counterparts against the same SpacetimeDB backend.
+**All 13 adapters (11 Python + 2 TypeScript)**
+- **Cross-language parity:** Most Python adapters have a corresponding TypeScript implementation. The TypeScript adapters (`mem0.ts`, `zep.ts`, `graphiti.ts`, `hindsight.ts`, `honcho.ts`) mirror their Python counterparts against the same SpacetimeDB backend.
 - All adapters require a running SpacetimeDB instance with the memory module published — a fundamentally heavier dependency than the upstream libraries (many of which work with local-only or cloud-hosted backends).
+- The 5 newest adapters (LangMem, Cognee, Letta, QMD, Mnemosyne) are **native** — they use only the Spacetime-Memory SDK plus standard-library/pydantic, with zero runtime dependency on the upstream package (LangMem even degrades gracefully when `langchain-core` is absent).
 
 **Mem0 (~100% coverage)**
 - `entity_store` is implemented — vector-backed entity persistence over the `kg_node` table (alias for `.graph`, Mem0 v2 parity)
@@ -111,6 +134,23 @@ While all adapters pass their test suites on a live SpacetimeDB instance, the fo
 
 **LangGraph (~92% coverage)**
 - `batch()` works, but the `refresh_ttl` attribute is missing on test `Op` objects — the only known shape mismatch
+
+**LangMem (~92% coverage)**
+- Tools/managers run against `StmemStore` (the LangGraph `BaseStore` implementation) — the LLM-driven extraction paths use the SDK's built-in LLM client (OpenAI-compatible, configurable via `LLM_BASE_URL`), not langmem's provider config
+- When `langchain-core` is installed, tools are real `StructuredTool`s; without it, plain-callable fallbacks with `.invoke`/`.ainvoke` parity
+
+**Cognee (~90% coverage)**
+- Cloud-only features (managed data sources, cloud embeddings) are not applicable; dataset-scoped KG, memory entries, and recall are fully native
+- `cognify()` runs the extraction pipeline synchronously over the local graph — no background worker model
+
+**Letta (~90% coverage)**
+- Core memory blocks, archival passages, and recall messages map to Spacetime-Memory's native stores; the agent-server/API surface (REST endpoints, tool-use loop) is out of scope for a memory-backend adapter
+
+**QMD (~98% coverage)**
+- Search is native hybrid (BM25 + embeddings) over Spacetime-Memory's tantivy/embedder sidecars — no separate QMD server process
+
+**Mnemosyne (~95% coverage)**
+- SM-2 scheduling is faithful to the SuperMemo-2 algorithm with the same DB fields (grade, next_rep, last_rep, easiness, acq_reps, ret_reps, lapses, active); the C-extension-backed core of upstream is reimplemented natively in Python
 
 The percentages reflect test-pass rate against the upstream API shape, not feature-completeness — some gaps (like Qdrant-backed entity stores or Neo4j graph drivers) are fundamental architecture differences that cannot be bridged.
 
