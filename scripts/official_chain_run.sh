@@ -99,6 +99,7 @@ cd /home/hindsight/mem0/evaluation
 timeout 28800 env \
     OTEL_ENABLED=false \
     LLM_BASE_URL=http://localhost:4004/v1 OPENAI_API_KEY=dummy-key \
+    STDB_EMBEDDER_URL=http://localhost:9093/v1 \
     PYTHONUNBUFFERED=1 \
     /home/hindsight/spacetime-memory/.venv/bin/python -m benchmarks.longmemeval.run \
         --project-name stmem-chain-lme \
@@ -135,6 +136,7 @@ echo "=== MEM0 OFFICIAL BEAM ($(date)) ===" >> "$LOGFILE"
 timeout 14400 env \
     OTEL_ENABLED=false \
     LLM_BASE_URL=http://localhost:4004/v1 OPENAI_API_KEY=dummy-key \
+    STDB_EMBEDDER_URL=http://localhost:9093/v1 \
     PYTHONUNBUFFERED=1 \
     /home/hindsight/spacetime-memory/.venv/bin/python -m benchmarks.beam.run \
         --project-name stmem-chain-beam \
