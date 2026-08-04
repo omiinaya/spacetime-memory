@@ -27,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 
 # The harness modules import as `benchmarks.*`; run from the mem0/evaluation root.
-HARNESS_ROOT = "$HOME/mem0/evaluation"
+HARNESS_ROOT = os.path.expanduser("~/mem0/evaluation")
 sys.path.insert(0, HARNESS_ROOT)
 
 from benchmarks.common.stmem_client import StmemClient  # noqa: E402
@@ -98,11 +98,30 @@ async def main() -> None:
     run_id = args.run_id
     sem = asyncio.Semaphore(args.max_workers)
 
+    def user_id_for(conv_idx: int) -> str:
+        """Prefer the authoritative user_id stored in the ingestion checkpoint.
+
+        Resume runs keep the *original* run's user_id per conversation (the
+        harness loads cp_data['user_id'] on resume). Different conversations
+        can have different run_ids (e.g. conv 4 ingested under a later resume
+        run), so hardcoding one run_id searches the WRONG user (empty context).
+        The checkpoint is the source of truth; fall back to args.run_id.
+        """
+        cp = Path(args.results_dir) / f"_ingestion_{conv_idx}.json"
+        try:
+            d = json.loads(cp.read_text())
+            uid = d.get("user_id") or d.get("metadata", {}).get("user_id")
+            if uid:
+                return uid
+        except (OSError, json.JSONDecodeError):
+            pass
+        return f"locomo_{conv_idx}_{run_id}"
+
     async def repair(qid):
         if qid not in q_by_id:
             return qid, False
         conv_idx, qi, qa = q_by_id[qid]
-        user_id = f"locomo_{conv_idx}_{run_id}"
+        user_id = user_id_for(conv_idx)
         path = Path(args.results_dir) / f"{qid}.json"
         async with sem:
             res = await process_question(
