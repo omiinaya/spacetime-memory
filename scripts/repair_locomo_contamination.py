@@ -69,6 +69,9 @@ async def main() -> None:
     ap.add_argument("--run-id", default="a2e9b6fd", help="run_id used by the live run (from user_id suffix)")
     ap.add_argument("--answerer-model", default="deepseek-v4-flash-free")
     ap.add_argument("--judge-model", default="deepseek-v4-flash-free")
+    ap.add_argument("--provider", default="openai",
+                    help="LLM provider passed to LLMClient (openai/anthropic/azure); "
+                         "base_url comes from LLM_BASE_URL env (local Zen chain :4004).")
     ap.add_argument("--top-k", type=int, default=200)
     ap.add_argument("--max-workers", type=int, default=4)
     ap.add_argument("--cutoff", dest="cutoffs", type=int, nargs="+", default=[10, 20, 50, 200],
@@ -97,8 +100,14 @@ async def main() -> None:
 
     mem0 = StmemClient(db=args.db, host=args.stmem_host, port=args.stmem_port,
                        project_name=args.project_name)
-    answerer = LLMClient(model=args.answerer_model, provider="custom")
-    judge_llm = LLMClient(model=args.judge_model, provider="custom")
+    # LLM_BASE_URL must be honored (defaults to the local Zen chain :4004). The
+    # harness run.py builds LLMClient with base_url=os.getenv("LLM_BASE_URL");
+    # omitting it here routes to platform.openai.com and 401s with the dummy key.
+    llm_base = os.getenv("LLM_BASE_URL")
+    answerer = LLMClient(model=args.answerer_model, provider=args.provider,
+                         base_url=llm_base, api_key=os.getenv("OPENAI_API_KEY", "dummy-key"))
+    judge_llm = LLMClient(model=args.judge_model, provider=args.provider,
+                          base_url=llm_base, api_key=os.getenv("OPENAI_API_KEY", "dummy-key"))
 
     run_id = args.run_id
     sem = asyncio.Semaphore(args.max_workers)
