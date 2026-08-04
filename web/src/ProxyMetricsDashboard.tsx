@@ -48,7 +48,8 @@ function fmtMicros(us: number): string {
 }
 
 function fmtTime(ms: number): string {
-  const d = new Date(ms / 1000)
+  // proxy_metrics_snapshot.created_at is epoch MILLISECONDS — do not divide.
+  const d = new Date(ms)
   return d.toLocaleString()
 }
 
