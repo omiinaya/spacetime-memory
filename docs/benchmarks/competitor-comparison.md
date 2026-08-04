@@ -58,7 +58,7 @@ recover most of the remaining gap, exactly as our own oracle pipeline
 | **Mem0 (platform)** | **91.56%** | 1,540 (cat 1-4) | gpt-5 / gpt-5 (Azure) | `mem0/evaluation/results/platform/locomo_results.json` (top_200) |
 | Mem0 (platform, top-50) | 82.66% | 1,540 | gpt-5 / gpt-5 | same repo, `locomo_top50_results.json` |
 | **Zep** | **69.6%** (mean of 10 runs) | 1,540 | gpt-4o-mini / gpt-4o-mini | `zep/benchmarks/locomo/experiments/.../experiment_summary.json` |
-| **Spacetime-Memory (in-flight)** | ~81% (tracking) | 1,540 (cat 1-4, official harness) | deepseek-v4-flash-free | official Mem0 harness, `--backend stmem` |
+| **Spacetime-Memory (in-flight)** | ~91% clean (tracking, excl. contamination) | 1,540 (cat 1-4, official harness) | deepseek-v4-flash-free | official Mem0 harness, `--backend stmem` (full5 run) |
 
 Notes:
 - Mem0's 91.56% uses gpt-5 for **both** answer generation and judging.
@@ -75,7 +75,9 @@ Notes:
 | Mem0 (OSS, gpt-5) | 91.0% | 500 | `mem0/evaluation/results/oss/longmemeval_gpt5.json` |
 | Mnemosyne | 98.9% (reference) | 500 | spacetime-memory summary JSON `reference_scores` |
 | Mem0 (OSS, top-50) | 90.4% | 500 | `mem0/evaluation/results/platform/longmemeval_top50_results.json` |
-| **Spacetime-Memory** | run queued after LoCoMo | 500 | official Mem0 harness, `--backend stmem` |
+| Honcho | 90.4% | 500 | reference (Mnemosyne summary) |
+| Hindsight | 91.4% | 500 | reference (Mnemosyne summary) |
+| **Spacetime-Memory** | queued in chain (stmem-chain-lme) | 500 | official Mem0 harness, `--backend stmem` |
 
 ## 3. BEAM (Belief-based Evaluation for Artificial Memory)
 
@@ -128,3 +130,34 @@ answerer+judge.
    harness run matches Mem0's 1,540 for the apples-to-apples comparison.
 3. **Judging**: same judge prompts in the official harness for both systems —
    that part is fully controlled.
+
+## 2026-08-04 full5 run + critical-path hardening
+
+The full5 official-harness run (`stmem-full5-zen`, 1,540 questions, all 10
+convs, deepseek-v4-flash-free answerer+judge through the local Zen chain
+`:4004 → :4002`) reached ~1,000/1,540 at last check with all 10 convs scoring
+in parallel (12 workers). conv0–3 complete, conv4 ~96%, convs 5–9 at 30–40%
+(the long-tail convs are slower: 100–230s/question).
+
+**194 contaminated questions** (total_results == 0) from the 2026-08-03 STDB
+restart window (13:45–14:01 EDT) await repair by
+`scripts/repair_locomo_contamination.py` once the benchmark exits. Four latent
+bugs in the post-benchmark path were found and fixed this session (all would
+have crashed or silently failed the chain's first verdict):
+
+1. **`args.cutoffs` AttributeError** — argparse defined `--cutoff` but the code
+   used `args.cutoffs`; repaired with `dest="cutoffs"`.
+2. **Missing `conv_indices` arg** — `expected_locomo_question_items()` requires
+   `(dataset, conv_indices, categories, max_questions)`; the script passed 3.
+3. **Wrong reference-date anchoring** — passed `None` for `ref_date_human` and
+   used `dataset[conv_idx]` instead of `entry["conversation"]`; now computes
+   `get_sorted_sessions(entry["conversation"])[-1][1]` exactly like run.py.
+4. **Discord verdict delivery 403** — urllib's default User-Agent is blocked by
+   Discord's Cloudflare WAF (error 1010); both `daemonize_verdict_watcher.py`
+   and `official_chain_run.sh` now set `User-Agent: DiscordBot (hermes-agent,
+   1.0)`. Verified live with HTTP 200 delivery to the thread.
+
+Downstream chain (verified): Zep LoCoMo → LongMemEval (500Q, `longmemeval_s.json`
+268MB dataset) → BEAM (100K, `beam_100K.json` cache). All three harnesses have
+`--backend stmem` wired; the chain runs sequentially, gated on the postprocess
+verdict being stable.
