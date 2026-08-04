@@ -41,6 +41,7 @@ from benchmarks.locomo.run import (  # noqa: E402
     compute_locomo_metrics,
     display_results,
     cutoff_label,
+    get_sorted_sessions,
 )
 
 
@@ -128,9 +129,16 @@ async def main() -> None:
         user_id = user_id_for(conv_idx)
         path = Path(args.results_dir) / f"{qid}.json"
         async with sem:
+            # Same reference-date anchoring the live run used: the conversation's
+            # chronologically last session datetime (get_sorted_sessions sorts by
+            # parsed date; run.py takes sorted_sessions[-1][1]).
+            entry = dataset[conv_idx] if conv_idx < len(dataset) else {}
+            conversation = entry.get("conversation", entry)
+            sorted_sessions = get_sorted_sessions(conversation)
+            ref_date_human = sorted_sessions[-1][1] if sorted_sessions else None
             res = await process_question(
                 qa, qi, conv_idx, user_id, mem0, answerer, judge_llm,
-                args.cutoffs, args.top_k, None, None, None, False, None,
+                args.cutoffs, args.top_k, ref_date_human, None, None, False, None,
             )
             if res.get("retrieval", {}).get("total_results", 0) == 0:
                 return qid, False
