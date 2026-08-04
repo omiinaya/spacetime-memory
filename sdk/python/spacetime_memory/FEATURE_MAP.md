@@ -552,6 +552,52 @@ Drop-in adapters matching external memory SDK APIs:
 - `create_peer()`, `get_session()`, `add_message()`
 - `get_conclusion()`, `search_sessions()`
 
+### 4.7 LangMem (`sdks/langmem.py`)
+- Drop-in replacement for `langmem` (LangChain's memory toolkit, built on LangGraph `BaseStore`)
+- `create_manage_memory_tool()` — create/update/delete memories via tool calls
+- `create_search_memory_tool()` — search memories via tool calls (content / content_and_artifact)
+- `create_memory_manager()` / `create_memory_store_manager()` — LLM-driven extraction of memories from conversations (with memory history)
+- `create_memory_searcher()` — LLM-driven memory recall
+- `create_thread_extractor()` — per-thread memory extraction
+- `ReflectionExecutor` — memory reflection on top of a store
+- `Prompt` / `create_prompt_optimizer()` / `create_multi_prompt_optimizer()` — prompt optimization with memory
+- `ExtractedMemory`, `MemoryPhase` models
+- Backed by `StmemStore` (LangGraph `BaseStore` interface) → Spacetime-Memory natively
+
+### 4.8 Cognee (`sdks/cognee.py`)
+- Drop-in replacement for `cognee` (cognify + search pipeline)
+- `cognify()` — ingest content → extract entities/concepts → build knowledge graph
+- `add()` — store content for later cognify
+- `search()` — semantic search over cognified knowledge
+- `delete()` — remove content by dataset/ID
+- `get_datasets()` / `get_dataset_data()` — dataset management
+- Dataset-scoped graph, pydantic-validated memory entries
+
+### 4.9 Letta (`sdks/letta.py`)
+- Drop-in replacement for Letta's agent memory model (core memory blocks + archival passages + recall messages)
+- `Block` (core memory), `Memory` (block collection), `Passage` (archival), `Message` (recall) models
+- `set_core_memory()` / `get_core_memory()` — labeled core memory blocks (persona, human)
+- `insert_archival_memory()` / `get_archival_memory()` — archival passages with semantic search
+- `insert_recall_memory()` / `get_messages()` — recall messages
+- `get_memory()` — full memory bundle
+
+### 4.10 QMD (`sdks/qmd.py`)
+- Drop-in replacement for QMD's local search engine surface
+- `query()` — lexical (BM25), vector, and HYDE sub-queries
+- `get()` / `multi_get()` — document retrieval
+- `status()` — index stats
+- `collection` management (create, list, rename, drop, get)
+- `context` management — attach/update context to a workspace
+- Native hybrid search (BM25 inverted index + embeddings)
+
+### 4.11 Mnemosyne (`sdks/mnemosyne.py`)
+- Drop-in replacement for Mnemosyne's SM-2 spaced-repetition memory
+- `process_new_card()` / `review_card()` — SM-2 scheduling (easiness, interval, reps, lapses)
+- `get_due()` — due cards; `get_card()` / `get_all_cards()`
+- `log_review()` / `sync_log()` — review history
+- Deck-scoped memory storage (`deck_<name>` workspaces)
+- Faithful SM-2 state machine (grade → easiness/interval progression, lapse reset)
+
 ---
 
 ## 5. CONNECTORS (`connectors/`)
@@ -643,7 +689,7 @@ All CLI commands support `--output json` for machine-readable output.
 | Compounder workflow files | 5 + helpers |
 | Compounder public methods | ~20 |
 | Top-level module files | ~25 |
-| SDK adapter packages | 6 (LangChain, Hindsight, Mem0, Zep, Graphiti, Honcho) |
+| SDK adapter packages | 11 (LangChain, Hindsight, Mem0, Zep, Graphiti, Honcho, LangMem, Cognee, Letta, QMD, Mnemosyne) |
 | Connector modules | 9 |
 | CLI command modules | ~35 |
 | Total Python files | ~140 |
