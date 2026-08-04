@@ -51,7 +51,7 @@ export async function stdbQuery<T = any>(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ table, workspace_id: workspaceId, filter, columns: columns ?? [] }),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(45000),
     },
   )
   if (!res.ok) {

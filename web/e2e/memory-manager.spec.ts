@@ -27,7 +27,7 @@ test.describe("Memory Manager", () => {
     await expect(page.locator("select").first()).toBeVisible({ timeout: 20000 });
     // The known data workspace should appear (public/registered access).
     await expect
-      .poll(async () => pageText(page), { timeout: 20000 })
+      .poll(async () => pageText(page), { timeout: 45000 })
       .toContain("locomo_dated_sessions");
   });
 
@@ -145,7 +145,7 @@ test.describe("Memory Manager", () => {
     await expect(wsSelect).toBeVisible({ timeout: 20000 });
     await wsSelect.selectOption({ label: DATA_WORKSPACE_NAME });
 
-    await page.getByRole("button", { name: "Knowledge Graph" }).click();
+    await page.getByRole("button", { name: "🔗 Knowledge Graph" }).click();
     await expectText(page, "Knowledge Graph Visualizer");
     // Canvas is present (headless may create a zero-size canvas — assert attach).
     const canvas = page.locator("canvas").first();
