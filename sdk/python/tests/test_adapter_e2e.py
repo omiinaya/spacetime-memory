@@ -1529,3 +1529,149 @@ class TestLangChainWireCompatibility:
         val = store.get(("lc-del",), key="del1")
         if val is not None:
             assert val.value is None or "gone" not in str(val.value)
+
+
+# ===========================================================================
+# 5 new parity adapters — wire-format validation via mock transport
+# ===========================================================================
+
+
+class TestQmdWireFormatValidation:
+    """Validate QMD adapter wire format via mock transport."""
+
+    _COL = "qmd-wire-col"
+
+    @pytest.fixture
+    def qmd(self) -> tuple[Any, WireTap]:
+        from spacetime_memory.sdks.qmd import QmdClient
+        c, tap = _make_mock_client()
+        q = QmdClient(host="localhost", port=3001, database="mock-adapter-e2e")
+        q._client = c
+        return q, tap
+
+    def test_query_uses_sql_or_search(self, qmd: tuple[Any, WireTap]) -> None:
+        q, tap = qmd
+        tap.requests.clear()
+        q.query(self._COL, "wire target")
+        urls = [r["url"] for r in tap.requests]
+        assert any("/sql" in u or "/call/search" in u for u in urls), f"URLs: {urls}"
+
+    def test_query_returns_list(self, qmd: tuple[Any, WireTap]) -> None:
+        q, _ = qmd
+        result = q.query(self._COL, "wire target")
+        assert isinstance(result, list)
+
+    def test_status_returns_dict(self, qmd: tuple[Any, WireTap]) -> None:
+        q, _ = qmd
+        assert isinstance(q.status(), dict)
+
+
+class TestMnemosyneWireFormatValidation:
+    """Validate Mnemosyne adapter wire format via mock transport."""
+
+    _DECK = "mnemo-wire-deck"
+
+    @pytest.fixture
+    def mnemo(self) -> tuple[Any, WireTap]:
+        from spacetime_memory.sdks.mnemosyne import Mnemosyne
+        c, tap = _make_mock_client()
+        m = Mnemosyne(host="localhost", port=3001, database="mock-adapter-e2e")
+        m._client = c
+        return m, tap
+
+    def test_create_card_stores_memory(self, mnemo: tuple[Any, WireTap]) -> None:
+        m, tap = mnemo
+        tap.requests.clear()
+        m.create_card(self._DECK, "Who is Ada?", "Ada Lovelace", 5)
+        _assert_reducer_called(tap, "store_memory")
+
+    def test_get_due_cards_uses_sql(self, mnemo: tuple[Any, WireTap]) -> None:
+        m, tap = mnemo
+        tap.requests.clear()
+        m.get_due_cards(self._DECK)
+        _assert_sql_called(tap)
+
+
+class TestLettaWireFormatValidation:
+    """Validate Letta adapter wire format via mock transport."""
+
+    _AGENT = "letta-wire-agent"
+
+    @pytest.fixture
+    def letta(self) -> tuple[Any, WireTap]:
+        from spacetime_memory.sdks.letta import LettaMemory
+        c, tap = _make_mock_client()
+        l = LettaMemory(host="localhost", port=3001, database="mock-adapter-e2e")
+        l._client = c
+        return l, tap
+
+    def test_update_block_stores(self, letta: tuple[Any, WireTap]) -> None:
+        l, tap = letta
+        tap.requests.clear()
+        l.update_block(self._AGENT, "persona", "I am a test agent.")
+        _assert_reducer_called(tap, "store_memory")
+
+    def test_get_memory_uses_sql(self, letta: tuple[Any, WireTap]) -> None:
+        l, tap = letta
+        tap.requests.clear()
+        l.get_memory(self._AGENT)
+        _assert_sql_called(tap)
+
+
+class TestCogneeWireFormatValidation:
+    """Validate Cognee adapter wire format via mock transport."""
+
+    _DS = "cognee-wire-ds"
+
+    @pytest.fixture
+    def cog(self) -> tuple[Any, WireTap]:
+        import spacetime_memory.sdks.cognee as cognee_mod
+        c, tap = _make_mock_client()
+        orig = cognee_mod._client
+        cognee_mod._client = lambda: c
+        try:
+            yield (cognee_mod, tap)
+        finally:
+            cognee_mod._client = orig
+
+    def test_add_stores_memory(self, cog: tuple[Any, WireTap]) -> None:
+        mod, tap = cog
+        tap.requests.clear()
+        import asyncio
+        asyncio.run(mod.add("wire content", dataset_name=self._DS))
+        _assert_reducer_called(tap, "store_memory")
+
+    def test_search_returns_list(self, cog: tuple[Any, WireTap]) -> None:
+        mod, _ = cog
+        import asyncio
+        result = asyncio.run(mod.search("wire query", datasets=[self._DS]))
+        assert isinstance(result, list)
+
+
+class TestLangMemWireFormatValidation:
+    """Validate LangMem adapter wire format via mock transport."""
+
+    def test_manage_memory_create_stores_via_store(self) -> None:
+        from spacetime_memory.sdks.langmem import create_manage_memory_tool
+        from spacetime_memory.sdks.langchain import StmemStore
+        c, tap = _make_mock_client()
+        s = StmemStore(config={
+            "host": "localhost", "port": "3001", "database": "mock-adapter-e2e",
+        })
+        s._client = c
+        tool = create_manage_memory_tool(namespace=("memories", "wire"), store=s)
+        tap.requests.clear()
+        result = tool.invoke({"content": "wire memory", "action": "create"})
+        assert result.startswith("created memory ")
+
+    def test_search_memory_tool_returns_string(self) -> None:
+        from spacetime_memory.sdks.langmem import create_search_memory_tool
+        from spacetime_memory.sdks.langchain import StmemStore
+        c, tap = _make_mock_client()
+        s = StmemStore(config={
+            "host": "localhost", "port": "3001", "database": "mock-adapter-e2e",
+        })
+        s._client = c
+        tool = create_search_memory_tool(namespace=("memories", "wire"), store=s)
+        result = tool.invoke({"query": "wire", "limit": 5})
+        assert isinstance(result, str)
