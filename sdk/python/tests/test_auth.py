@@ -1,4 +1,5 @@
 """Tests for auth.py — JWT token generation."""
+import os
 
 from unittest.mock import Mock, patch
 
@@ -148,7 +149,7 @@ print("OK")
             [sys.executable, "-c", code],
             capture_output=True,
             text=True,
-            cwd="$HOME/spacetime-memory/sdk/python",
+            cwd=os.path.expanduser("~/spacetime-memory/sdk/python"),
         )
         assert "OK" in result.stdout, f"Failed: {result.stderr}"
 

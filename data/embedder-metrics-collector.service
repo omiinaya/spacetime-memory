@@ -5,9 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=hindsight
-Group=hindsight
-ExecStart=/usr/local/lib/hermes-agent/venv/bin/python3 $HOME/spacetime-memory/scripts/embedder_metrics_collector.py serve
+# Replace USER and PYTHON_VENV with your local values (example unit — copy to
+# /etc/systemd/system/embedder-metrics-collector.service and adjust):
+User=__USER__
+Group=__USER__
+ExecStart=__PYTHON_VENV__/python3 $HOME/spacetime-memory/scripts/embedder_metrics_collector.py serve
 WorkingDirectory=$HOME/spacetime-memory
 Environment="HOME=$HOME"
 Environment="EMBEDDER_METRICS_URL=http://localhost:9090/metrics"

@@ -1,7 +1,8 @@
 """Split cli/commands/standalone.py into focused modules."""
+import os
 from pathlib import Path
 
-cmds_dir = Path("$HOME/spacetime-memory/sdk/python/spacetime_memory/cli/commands")
+cmds_dir = Path(os.path.expanduser("~/spacetime-memory/sdk/python/spacetime_memory/cli/commands"))
 standalone_path = cmds_dir / "standalone.py"
 
 content = standalone_path.read_text()

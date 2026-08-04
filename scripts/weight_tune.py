@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Weight tuning — with per-query timeout and progress."""
 from __future__ import annotations
+import os
 import json, os, sys, time, uuid as _uuid, signal
 
-for prefix in (".", "..", "$HOME/spacetime-memory"):
+for prefix in (".", "..", os.path.expanduser("~/spacetime-memory")):
     sdk_path = os.path.join(prefix, "sdk/python")
     if os.path.isdir(sdk_path): sys.path.insert(0, sdk_path); break
 

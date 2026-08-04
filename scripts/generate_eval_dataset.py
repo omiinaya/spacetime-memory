@@ -17,7 +17,7 @@ import uuid
 
 import httpx
 
-for prefix in (".", "..", "$HOME/spacetime-memory"):
+for prefix in (".", "..", os.path.expanduser("~/spacetime-memory")):
     sdk_path = os.path.join(prefix, "sdk/python")
     if os.path.isdir(sdk_path):
         sys.path.insert(0, sdk_path)

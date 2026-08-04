@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Retrieval quality benchmark — test hybrid search strategies."""
 from __future__ import annotations
+import os
 import json, os, sys, time, uuid as _uuid
 
-for prefix in (".", "..", "$HOME/spacetime-memory"):
+for prefix in (".", "..", os.path.expanduser("~/spacetime-memory")):
     sdk_path = os.path.join(prefix, "sdk/python")
     if os.path.isdir(sdk_path): sys.path.insert(0, sdk_path); break
 

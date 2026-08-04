@@ -33,6 +33,17 @@ scripts/.cron_identity_token
 scripts/.cron_jwt_token
 scripts/.replication_identity_token
 
+# Signing keys and npm auth files (contain secrets — NEVER commit)
+data/id_ecdsa
+data/id_ecdsa.pub
+data/id_ecdsa_pkcs8.pem
+data/id_ecdsa_pkcs8_backup.pem
+data/id_ecdsa_pkcs8_*.pem
+data/id_ecdsa_*.pub
+**/.npmrc-gh
+**/~/.config/spacetime/id_ecdsa
+**/~/.config/spacetime/id_ecdsa.pub
+
 # Backup artifacts
 spacetime-memory-backup-*.json
 

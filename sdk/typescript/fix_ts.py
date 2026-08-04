@@ -1,8 +1,9 @@
+import os
 import re
 
 # Read files
-client = open("$HOME/spacetime-memory/sdk/typescript/client.ts").read()
-mem0 = open("$HOME/spacetime-memory/sdk/typescript/mem0.ts").read()
+client = open(os.path.expanduser("~/spacetime-memory/sdk/typescript/client.ts")).read()
+mem0 = open(os.path.expanduser("~/spacetime-memory/sdk/typescript/mem0.ts")).read()
 
 # Strip the test marker I just appended
 mem0 = mem0.replace("// test marker", "")
@@ -190,6 +191,6 @@ mem0 = mem0.replace(old, new)
 print("mem0: entity_name cast")
 
 # Write files
-open("$HOME/spacetime-memory/sdk/typescript/client.ts", "w").write(client)
-open("$HOME/spacetime-memory/sdk/typescript/mem0.ts", "w").write(mem0)
+open(os.path.expanduser("~/spacetime-memory/sdk/typescript/client.ts"), "w").write(client)
+open(os.path.expanduser("~/spacetime-memory/sdk/typescript/mem0.ts"), "w").write(mem0)
 print("\nBOTH WRITTEN OK")

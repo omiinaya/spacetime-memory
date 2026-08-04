@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 # Make the mem0 evaluation package importable
-MEM0_EVAL = "$HOME/mem0/evaluation"
+MEM0_EVAL = os.path.expanduser("~/mem0/evaluation")
 if MEM0_EVAL not in sys.path:
     sys.path.insert(0, MEM0_EVAL)
 

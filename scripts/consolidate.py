@@ -20,7 +20,7 @@ from typing import Any
 os.environ.setdefault("no_proxy", "localhost,127.0.0.1,127.0.0.1,.local")
 
 # Allow running from project root or cron (hermes/scripts)
-for prefix in (".", "..", "$HOME/spacetime-memory"):
+for prefix in (".", "..", os.path.expanduser("~/spacetime-memory")):
     sdk_path = os.path.join(prefix, "sdk/python")
     if os.path.isdir(sdk_path):
         sys.path.insert(0, sdk_path)

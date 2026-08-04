@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "sdk", "python"))
 
-GRAPH_PATH = "$HOME/graphify/master/graph.json"
+GRAPH_PATH = os.path.expanduser("~/graphify/master/graph.json")
 DEFAULT_WORKSPACE = "default"
 
 # ---------------------------------------------------------------------------

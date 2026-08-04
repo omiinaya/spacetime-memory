@@ -8,6 +8,18 @@ regex = '''sk-[A-Za-z0-9]{32,}'''
 tags = ["api-key", "openai"]
 
 [[rules]]
+id = "openrouter-api-key"
+description = "OpenRouter API key"
+regex = '''sk-or-v1-[A-Za-z0-9]{24,}'''
+tags = ["api-key", "openrouter"]
+
+[[rules]]
+id = "github-pat"
+description = "GitHub personal access token"
+regex = '''\bgh[pousr]_[A-Za-z0-9]{36,}'''
+tags = ["api-key", "github"]
+
+[[rules]]
 id = "generic-api-key"
 description = "Generic secret"
 regex = '''(?i)(?:api[_-]?key|secret|token|password)\s*[:=]\s*['"][A-Za-z0-9_\-+=/]{20,}['"]'''
@@ -28,10 +40,12 @@ tags = ["private-key"]
 [allowlist]
 paths = [
     ".git/", "target/", "node_modules/", ".venv/", ".ruff_cache/",
-    ".pytest_cache/", ".hermes/", "data/", "__pycache__/",
+    ".pytest_cache/", ".hermes/", "__pycache__/",
 ]
 regexes = [
     "sk-your-openai-api-key",
     "your-api-key",
     "xoxb-1234567890-abc123",
+    "ghp_(REPLACED|XXX|_)|sk-or-v1-REPLACED",
+    "ghp_<REDACTED>|sk-or-v1-<REDACTED>",
 ]

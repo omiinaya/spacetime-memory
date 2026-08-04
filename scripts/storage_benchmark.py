@@ -41,7 +41,7 @@ def get_db_size() -> dict:
             candidates.append(base)
 
     # Also check the current directory for any .spacetime files
-    for root, dirs, files in os.walk("$HOME/spacetime-memory"):
+    for root, dirs, files in os.walk(os.path.expanduser("~/spacetime-memory")):
         for f in files:
             if f.endswith((".spacetime", ".stdb", ".calcite", ".db", ".sqlite")):
                 candidates.append(os.path.join(root, f))

@@ -2,7 +2,7 @@
 """Check which modules have trace_span on all their reducers."""
 import os, re, subprocess, sys
 
-src = '$HOME/spacetime-memory/server/spacetimedb/src'
+src = os.path.expanduser('~/spacetime-memory/server/spacetimedb/src')
 
 for f in sorted(os.listdir(src)):
     if not f.endswith('.rs'): continue
