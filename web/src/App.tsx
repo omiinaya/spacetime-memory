@@ -3,8 +3,10 @@ import ProxyMetricsDashboard from './ProxyMetricsDashboard'
 import EmbedderMetricsDashboard from './EmbedderMetricsDashboard'
 import MemoryManager from './MemoryManager'
 import BenchmarkDashboard from './BenchmarkDashboard'
+import KGExplorer from './KGExplorer'
+import KGVisualizer from './KGVisualizer'
 
-type Page = 'proxy' | 'embedder' | 'memories' | 'benchmark' | 'wizard'
+type Page = 'proxy' | 'embedder' | 'memories' | 'benchmark' | 'kg' | 'wizard'
 
 /* ------------------------------------------------------------------ */
 /*  Connection settings (shared across pages)                          */
@@ -13,14 +15,17 @@ type Page = 'proxy' | 'embedder' | 'memories' | 'benchmark' | 'wizard'
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PROXY_PORT = '5190'
 const DEFAULT_DB = 'spacetime-memory-v2'
+const DEFAULT_WORKSPACE = 'default'
 
 function App() {
   const [page, setPage] = useState<Page>('proxy')
+  const [workspaceId, setWorkspaceId] = useState(DEFAULT_WORKSPACE)
 
   const tabs: { id: Page; label: string }[] = [
     { id: 'proxy', label: 'Proxy Metrics' },
     { id: 'embedder', label: 'Embedder Metrics' },
     { id: 'memories', label: 'Memory Manager' },
+    { id: 'kg', label: '🕸 Knowledge Graph' },
     { id: 'benchmark', label: '🏆 Benchmarks' },
     { id: 'wizard', label: 'Connection Wizard' },
   ]
@@ -63,6 +68,20 @@ function App() {
             stdbPort={DEFAULT_PROXY_PORT}
             stdbDb={DEFAULT_DB}
           />
+        ) : page === 'kg' ? (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">Knowledge Graph</h2>
+              <input
+                value={workspaceId}
+                onChange={(e) => setWorkspaceId(e.target.value)}
+                placeholder="Workspace ID"
+                className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500 w-64"
+              />
+            </div>
+            <KGExplorer host={DEFAULT_HOST} port={DEFAULT_PROXY_PORT} db={DEFAULT_DB} workspaceId={workspaceId} />
+            <KGVisualizer host={DEFAULT_HOST} port={DEFAULT_PROXY_PORT} db={DEFAULT_DB} workspaceId={workspaceId} />
+          </div>
         ) : page === 'benchmark' ? (
           <BenchmarkDashboard />
         ) : (
