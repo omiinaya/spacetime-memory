@@ -48,12 +48,21 @@ sleep 30
 # ── 1. ZEP OFFICIAL LOCOMO ──────────────────────────────────────────────
 echo "=== ZEP OFFICIAL LOCOMO ($(date)) ===" >> "$LOGFILE"
 cd /home/hindsight/zep/benchmarks/locomo
-PREFIX="stmem-chain"
-rm -f /tmp/zep_harness_identity.token
+PREFIX="stmem-chain-$(date +%Y%m%d%H%M%S)"
+# IMPORTANT: do NOT delete the identity token — the Zep shim persists its
+# peer identity to /tmp/zep_harness_identity.token and reuses it across
+# ingest/eval processes. Deleting it forces a NEW anonymous peer, which has
+# no owner access to workspaces created by the previous run's peer → every
+# graph.add fails with "Access denied ... private workspace". Keeping the
+# token makes the same peer own all workspaces for the whole chain.
+# A timestamped prefix also guarantees a FRESH workspace per chain run —
+# stale private workspaces from earlier runs (owned by lost peers) never
+# collide with the current run.
 timeout 10800 env \
     OTEL_ENABLED=false \
     OPENAI_API_KEY=dummy-key OPENAI_BASE_URL=http://localhost:4004/v1 \
     ZEP_API_KEY=dummy STDB_DB=spacetime-memory-v2 \
+    EMBEDDER_URL=http://localhost:9093/v1 \
     /home/hindsight/spacetime-memory/.venv/bin/python -m benchmark \
         --ingest --config benchmark_config_stmem.yaml --prefix "$PREFIX" \
     >> "$LOGFILE" 2>&1
@@ -62,6 +71,7 @@ timeout 10800 env \
     OTEL_ENABLED=false \
     OPENAI_API_KEY=dummy-key OPENAI_BASE_URL=http://localhost:4004/v1 \
     ZEP_API_KEY=dummy STDB_DB=spacetime-memory-v2 \
+    EMBEDDER_URL=http://localhost:9093/v1 \
     /home/hindsight/spacetime-memory/.venv/bin/python -m benchmark \
         --eval --config benchmark_config_stmem.yaml --prefix "$PREFIX" --num-runs 1 \
     >> "$LOGFILE" 2>&1
