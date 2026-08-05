@@ -28,6 +28,10 @@ type HmacSha256 = Hmac<Sha256>;
 struct Config {
     /// SpacetimeDB base URL (e.g. "http://localhost:3001")
     stdb_url: String,
+    /// SpacetimeDB database name (e.g. "spacetime-memory-v2")
+    stdb_db: String,
+    /// Auth token for STDB SQL + reducer calls (server-issued JWT).
+    stdb_token: String,
     /// Poll interval in seconds
     poll_interval_secs: u64,
     /// Max retries per delivery
@@ -40,6 +44,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             stdb_url: std::env::var("STDB_URL").unwrap_or_else(|_| "http://localhost:3001".into()),
+            stdb_db: std::env::var("STDB_DB").unwrap_or_else(|_| "spacetime-memory-v2".into()),
+            stdb_token: std::env::var("STDB_TOKEN").unwrap_or_default(),
             poll_interval_secs: std::env::var("POLL_INTERVAL_SECS")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -84,6 +90,16 @@ struct SqlResponse<T> {
     rows: Vec<T>,
 }
 
+/// STDB SQL API returns `[{ "schema": {...}, "rows": [[...]] }]` — a top-level
+/// array of table results, each with a schema + rows. Deserialize the wrapper
+/// and extract rows from the first table.
+#[derive(Debug, serde::Deserialize)]
+struct StdbSqlTable<T> {
+    #[allow(dead_code)]
+    schema: serde_json::Value,
+    rows: Vec<T>,
+}
+
 #[derive(Debug, serde::Serialize)]
 #[allow(dead_code)]
 struct StatusUpdate {
@@ -109,22 +125,42 @@ async fn fetch_pending_deliveries(
     client: &reqwest::Client,
     config: &Config,
 ) -> Result<Vec<PendingDelivery>, String> {
+    let query = "SELECT id, webhook_id, workspace_id, event_type, payload, retry_count \
+                 FROM webhook_delivery WHERE status = 'pending'";
     let url = format!(
-        "{}/sql?q=SELECT%20id,webhook_id,workspace_id,event_type,payload,retry_count%20FROM%20webhook_delivery%20WHERE%20status%20%3D%20'pending'%20ORDER%20BY%20created_at%20ASC",
-        config.stdb_url
+        "{}/v1/database/{}/sql",
+        config.stdb_url, config.stdb_db
     );
 
-    let resp = client
-        .get(&url)
-        .timeout(Duration::from_secs(config.request_timeout_secs))
-        .send()
-        .await
-        .map_err(|e| format!("HTTP error: {}", e))?;
+    let mut req = client
+        .post(&url)
+        .body(query.to_string())
+        .timeout(Duration::from_secs(config.request_timeout_secs));
+    if !config.stdb_token.is_empty() {
+        req = req.header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {}", config.stdb_token),
+        );
+    }
+
+    let resp = req.send().await.map_err(|e| format!("HTTP error: {}", e))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("SQL fetch failed ({}): {}", status, text));
+    }
 
     let body = resp.text().await.map_err(|e| format!("Body error: {}", e))?;
 
-    // STDB SQL API returns either a JSON array of rows or a wrapper
-    // Try deserializing as wrapped response first
+    // STDB SQL returns `[{schema, rows:[...]}]` (a wrapped table result).
+    if let Ok(wrapped) = serde_json::from_str::<Vec<StdbSqlTable<PendingDelivery>>>(&body) {
+        if let Some(first) = wrapped.into_iter().next() {
+            return Ok(first.rows);
+        }
+        return Ok(Vec::new());
+    }
+
+    // Older/other clients may return a bare `{"rows": [...]}` wrapper.
     if let Ok(wrapped) = serde_json::from_str::<SqlResponse<PendingDelivery>>(&body) {
         return Ok(wrapped.rows);
     }
@@ -145,19 +181,42 @@ async fn fetch_webhook(
     webhook_id: &str,
 ) -> Result<Option<WebhookRow>, String> {
     let escaped_id = urlencoding(webhook_id);
+    let query = format!(
+        "SELECT id, url, secret, is_active FROM webhook WHERE id = '{}'",
+        escaped_id
+    );
     let url = format!(
-        "{}/sql?q=SELECT%20id,url,secret,is_active%20FROM%20webhook%20WHERE%20id%20%3D%20'{}'",
-        config.stdb_url, escaped_id
+        "{}/v1/database/{}/sql",
+        config.stdb_url, config.stdb_db
     );
 
-    let resp = client
-        .get(&url)
-        .timeout(Duration::from_secs(config.request_timeout_secs))
-        .send()
-        .await
-        .map_err(|e| format!("HTTP error: {}", e))?;
+    let mut req = client
+        .post(&url)
+        .body(query)
+        .timeout(Duration::from_secs(config.request_timeout_secs));
+    if !config.stdb_token.is_empty() {
+        req = req.header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {}", config.stdb_token),
+        );
+    }
+
+    let resp = req.send().await.map_err(|e| format!("HTTP error: {}", e))?;
+    let status = resp.status();
+    if !status.is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("SQL fetch failed ({}): {}", status, text));
+    }
 
     let body = resp.text().await.map_err(|e| format!("Body error: {}", e))?;
+
+    // STDB SQL returns `[{schema, rows:[...]}]` (a wrapped table result).
+    if let Ok(wrapped) = serde_json::from_str::<Vec<StdbSqlTable<WebhookRow>>>(&body) {
+        if let Some(first) = wrapped.into_iter().next() {
+            return Ok(first.rows.into_iter().next());
+        }
+        return Ok(None);
+    }
 
     // Try wrapped response
     if let Ok(wrapped) = serde_json::from_str::<SqlResponse<WebhookRow>>(&body) {
@@ -183,8 +242,8 @@ async fn update_delivery_status(
     retry_count: u32,
 ) -> Result<(), String> {
     let url = format!(
-        "{}/v1/database/db/reducers/update_webhook_delivery",
-        config.stdb_url
+        "{}/v1/database/{}/call/update_webhook_delivery",
+        config.stdb_url, config.stdb_db
     );
 
     let now = std::time::SystemTime::now()
@@ -192,24 +251,29 @@ async fn update_delivery_status(
         .unwrap_or_default()
         .as_micros() as i64;
 
-    let body = serde_json::json!({
-        "args": [
-            delivery_id,
-            status,
-            response_code,
-            response_body,
-            now,
-            retry_count,
-        ]
-    });
+    // STDB reducer calls take a BARE JSON array of positional args
+    // (the SDK sends json.dumps(args) with no wrapper).
+    let body = serde_json::json!([
+        delivery_id,
+        status,
+        response_code,
+        response_body,
+        now,
+        retry_count,
+    ]);
 
-    let resp = client
+    let mut req = client
         .post(&url)
         .json(&body)
-        .timeout(Duration::from_secs(config.request_timeout_secs))
-        .send()
-        .await
-        .map_err(|e| format!("Update error: {}", e))?;
+        .timeout(Duration::from_secs(config.request_timeout_secs));
+    if !config.stdb_token.is_empty() {
+        req = req.header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {}", config.stdb_token),
+        );
+    }
+
+    let resp = req.send().await.map_err(|e| format!("Update error: {}", e))?;
 
     if !resp.status().is_success() {
         let text = resp.text().await.unwrap_or_default();
