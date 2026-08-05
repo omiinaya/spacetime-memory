@@ -11,7 +11,6 @@ import click
 
 from .. import root as _root
 from ..root import (
-    _esc,
     _quiet_print,
     _sdk_client,
     cli,

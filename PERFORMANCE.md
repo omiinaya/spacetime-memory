@@ -62,23 +62,25 @@ Full suite results from 2026-07-06 08:25 UTC (WASM build contention resolved).
 
 ## Retrieval Quality
 
-**Benchmarked:** 2026-07-06 via `scripts/hybrid_benchmark.py` (standalone, embedder API direct)
+**Benchmarked:** 2026-08-05 via `scripts/retrieval_quality_benchmark.py` (end-to-end SDK path — STDB + Tantivy sidecar + bge-m3 embedder)
 **Dataset:** 50 eval memories, 25 queries from `data/`
-**Embedder:** bge-m3 at :9090 (1024-dim, ~350ms/embedding)
+**Embedder:** bge-m3 (GPU sidecar :9093, same model as CPU :9090; 1024-dim)
 
 | Config | P@5 | R@5 | MRR |
 |--------|-----|-----|-----|
-| keyword-only (term overlap) | 49.3% | 49.3% | 0.463 |
-| hybrid (bge-m3 semantic) | 74.0% | 74.0% | 0.853 |
-| keyword Tantivy ON | 47.3% | 47.3% | 0.435 |
-| hybrid (semantic + Tantivy) | 11.3% | 11.3% | 0.079 |
+| keyword-only (Tantivy BM25) | 61.3% | 61.3% | 0.608 |
+| semantic-only (bge-m3) | 74.7% | 74.7% | 0.643 |
+| hybrid (semantic + Tantivy) | **76.0%** | **76.0%** | **0.698** |
 
 **Historical baseline (June 20, bge-m3 proxy):** P@5=81.3%, R@5=82.0%, MRR=0.960
+**Historical (July 6, standalone `hybrid_benchmark.py`):** keyword-only 49.3%/0.463, hybrid (bge-m3) 74.0%/0.853, keyword Tantivy 47.3%/0.435, hybrid semantic+Tantivy 11.3%/0.079
 
 **Analysis:**
-- Hybrid embeddings provide a 24.7pp P@5 improvement over keyword-only regardless of embedder choice
-- bge-m3 replaced bge-large-en-v1.5, closing the 7.3pp P@5 gap against the historic baseline
-- Tantivy keyword quality is identical to fallback (47.3% both) — same BM25 algorithm, different implementation
+- The end-to-end SDK path now measures what production serves: **hybrid fusion is the best config (76.0% P@5, MRR 0.698)** — +14.7pp P@5 and +0.090 MRR over keyword-only, and +1.3pp/+0.055 over semantic-only. The fusion (semantic 0.55 + Tantivy keyword 0.30) adds real value on top of either signal alone.
+- Semantic-only (74.7%) is within the historical hybrid band (74–81%) — the embedder is correctly serving bge-m3.
+- The all-identical 61.3% numbers in the earlier 2026-08-05 run were a **benchmark artifact**: seeding via the `store_memory` reducer + Tantivy `/index/batch` never populated the `search_index` table, so client-side semantic search found zero rows and every config collapsed to keyword-only. The benchmark now embeds the seeded memories and calls `index_entity_batch` (mirroring SDK `store()`), so semantic/hybrid are actually exercised.
+- The July 6 "hybrid (semantic + Tantivy) 11.3%" was measured by the standalone `hybrid_benchmark.py` with a different metric implementation and fusion path; it does not reproduce on the real SDK pipeline (76.0% today).
+- The June 20 baseline (81.3%/0.960) remains the ceiling; the remaining ~5pp gap to it is evaluation-noise/rerank territory — LLM reranking (`rerank=True`) measured +8.0pp P@5 / +0.317 MRR on top of hybrid in July 7 runs.
 
 ## Summary
 

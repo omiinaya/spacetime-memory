@@ -9,16 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
 
 from spacetime_memory.sdks.langmem import (
-    ExtractedMemory,
-    MemoryPhase,
     Prompt,
     ReflectionExecutor,
     create_manage_memory_tool,
