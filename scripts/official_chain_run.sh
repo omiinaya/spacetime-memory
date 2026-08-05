@@ -62,7 +62,7 @@ timeout 10800 env \
     OTEL_ENABLED=false \
     OPENAI_API_KEY=dummy-key OPENAI_BASE_URL=http://localhost:4004/v1 \
     ZEP_API_KEY=dummy STDB_DB=spacetime-memory-v2 \
-    EMBEDDER_URL=http://localhost:9093/v1 \
+    EMBEDDER_URL=http://localhost:9093/v1 STDB_TIMEOUT=300 \
     /home/hindsight/spacetime-memory/.venv/bin/python -m benchmark \
         --ingest --config benchmark_config_stmem.yaml --prefix "$PREFIX" \
     >> "$LOGFILE" 2>&1
@@ -71,7 +71,7 @@ timeout 10800 env \
     OTEL_ENABLED=false \
     OPENAI_API_KEY=dummy-key OPENAI_BASE_URL=http://localhost:4004/v1 \
     ZEP_API_KEY=dummy STDB_DB=spacetime-memory-v2 \
-    EMBEDDER_URL=http://localhost:9093/v1 \
+    EMBEDDER_URL=http://localhost:9093/v1 STDB_TIMEOUT=300 \
     /home/hindsight/spacetime-memory/.venv/bin/python -m benchmark \
         --eval --config benchmark_config_stmem.yaml --prefix "$PREFIX" --num-runs 1 \
     >> "$LOGFILE" 2>&1
