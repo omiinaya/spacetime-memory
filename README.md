@@ -120,7 +120,7 @@ While all adapters pass their test suites on a live SpacetimeDB instance, the fo
 - `search()` accepts extra `**kwargs` for SpacetimeDB-specific filter options
 - Return types are plain Python classes rather than upstream's Pydantic models — this affects serialization, validation, and downstream type inference (`EntityNode` upstream is a Pydantic model with auto-validation; ours is a plain dataclass with the same fields)
 - Bi-temporal edges are real (`valid_at`/`invalid_at` fields plus edge temporal versioning via `edge_group_id`), and bi-temporal *search* now honors `invalid_at` (Graphiti `SearchFilters` parity): `valid_at_after`/`valid_at_before`/`invalid_at_after`/`invalid_at_before` are independent field comparisons, never-invalidated edges handled correctly, and combined as-of snapshots work (13 mock tests)
-- Upstream's configurable search recipes (cross-encoder/MMR combos) are not ported
+- Search recipes are ported: `search_()` accepts `SearchConfig`-shaped configs with `cross_encoder` (local ONNX rerank) and `mmr_strength` (Maximal Marginal Relevance), both real in the underlying client search
 
 **Hindsight (~95% coverage)**
 - `documents`, `entities`, `operations`, and `monitoring` are real — backed by the `document`/`doc_chunk`, `kg_node`, and `change_event` tables plus the sidecar health endpoints (embedder :9090, Tantivy :9091)
