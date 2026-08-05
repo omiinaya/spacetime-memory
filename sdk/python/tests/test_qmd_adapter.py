@@ -6,7 +6,6 @@ Unit tests use a fake Client (no live STDB needed). Integration tests
 
 from __future__ import annotations
 
-import os
 import uuid
 from typing import Any
 
@@ -16,7 +15,6 @@ from spacetime_memory.sdks.qmd import (
     Document,
     QmdClient,
     Query,
-    SearchResult,
     SubQuery,
     _collection_ws,
     _docid,

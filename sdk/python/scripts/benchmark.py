@@ -42,12 +42,14 @@ from spacetime_memory import Client  # noqa: E402  (sys.path bootstrap above)
 # ---------------------------------------------------------------------------
 
 
-def _running_stdb() -> bool:
+def _running_stdb(host: str | None = None, port: int | None = None) -> bool:
     """Check whether a SpacetimeDB standalone is listening on localhost:3001."""
+    host = host or os.environ.get("SPACETIMEDB_HOST", "127.0.0.1")
+    port = port or int(os.environ.get("SPACETIMEDB_PORT", "3001"))
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.settimeout(2)
-        s.connect(("127.0.0.1", 3001))
+        s.connect((host, port))
         return True
     except (ConnectionRefusedError, OSError):
         return False
@@ -82,9 +84,12 @@ def _publish_module(delete_data: str = "never") -> str:
     wasm_data = wasm_path.read_bytes()
     import httpx
 
+    host = os.environ.get("SPACETIMEDB_HOST", "127.0.0.1")
+    port = os.environ.get("SPACETIMEDB_PORT", "3001")
+
     # Establish anonymous identity
     anon = httpx.get(
-        "http://127.0.0.1:3001/v1/database/anon-probe", timeout=5.0,
+        f"http://{host}:{port}/v1/database/anon-probe", timeout=5.0,
     )
     token = anon.headers.get("spacetime-identity-token", "")
 
@@ -92,7 +97,7 @@ def _publish_module(delete_data: str = "never") -> str:
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    url = "http://127.0.0.1:3001/v1/database?host_type=Wasm"
+    url = f"http://{host}:{port}/v1/database?host_type=Wasm"
     if delete_data == "always":
         url += "&delete_data=true"
 

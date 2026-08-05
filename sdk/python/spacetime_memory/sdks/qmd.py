@@ -63,12 +63,10 @@ Usage::
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import re
-import uuid
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from ..client import Client
 from ..llm import LLMClient

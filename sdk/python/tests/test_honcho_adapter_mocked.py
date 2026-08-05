@@ -398,7 +398,6 @@ class TestPeerSessionsPersisted:
 
     def test_sessions_from_persisted_messages(self, honcho: Honcho, monkeypatch) -> None:
         """Sessions are derived from memory rows authored by this peer."""
-        from unittest.mock import MagicMock
 
         pid = _uid("peer")
         sid = _uid("sess")
@@ -427,7 +426,6 @@ class TestPeerSessionsPersisted:
 
     def test_sessions_falls_back_to_cache(self, honcho: Honcho, monkeypatch) -> None:
         """When the message query fails, the in-memory cache still works."""
-        from unittest.mock import MagicMock
 
         pid = _uid("peer")
         sid = _uid("sess")

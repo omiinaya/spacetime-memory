@@ -68,10 +68,21 @@ When the embedder is running (historical, June 9 reference):
 
 ## Retrieval Quality (Keyword-Only vs Hybrid Baseline)
 
+**Current reference (2026-08-05, end-to-end SDK path via `scripts/retrieval_quality_benchmark.py`):**
+
 With 50 eval memories across 25 queries (people, architecture, incidents, models, processes):
 
-**P@5=49.3%  R@5=49.3%  MRR=0.463** (keyword-only, July 6 on 50/25 eval set)
-**P@5=81.3%  R@5=81.3%  MRR=0.880** (hybrid, bge-m3, July 7 on 50/25 eval set)
+| Config | P@5 | R@5 | MRR |
+|--------|-----|-----|-----|
+| keyword-only (Tantivy BM25) | 61.3% | 61.3% | 0.608 |
+| semantic-only (bge-m3) | 74.7% | 74.7% | 0.643 |
+| hybrid (semantic + Tantivy) | **76.0%** | **76.0%** | **0.698** |
+
+Hybrid fusion is the best config: **+14.7pp P@5 / +0.090 MRR over keyword-only**. Semantic embeddings are the primary driver of retrieval accuracy (keyword-only matches exact word overlap; semantic matches meaning). An earlier 2026-08-05 run showing all configs at 61.3% was a benchmark artifact — the seeding path never populated `search_index`, so semantic search found zero rows; the benchmark now calls `index_entity_batch` with bge-m3 embeddings (mirroring SDK `store()`).
+
+**Historical (standalone `hybrid_benchmark.py`, July 6 on 50/25 eval set):**
+**P@5=49.3%  R@5=49.3%  MRR=0.463** (keyword-only)
+**P@5=81.3%  R@5=81.3%  MRR=0.880** (hybrid, bge-m3)
 
 Keyword-only retrieval is weak — it matches on exact word overlap. Semantic
 embeddings are critical for good retrieval. Hybrid provides **+32.0pp P@5** over keyword-only on the same dataset.

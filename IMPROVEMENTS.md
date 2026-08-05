@@ -8,11 +8,13 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
-*(None pending cleanup — 7 completed items from the July 2026 batch verified
-in-tree and removed 2026-08-05: NoteRecord TS interface fields, user-management
+*(None pending cleanup — 9 completed items verified in-tree and removed 2026-08-05:
+the 7-item July 2026 batch (NoteRecord TS interface fields, user-management
 SDK wrappers, OTel metrics reader, connector/entity-extraction/harmonic-beliefs
 SDK+CLI, `search_by_tags`, semantic-strategy client-side cosine, `batch_tag_memories`
-/`batch_untag_memories`.)*
+/`batch_untag_memories`), plus the STDB 2% fatal-error concurrency fix (commit
+46300149, 12,500 concurrent stores → 0 fatal) and the Frontend/Web UI (client/
+SPA, 34 vitest files / 97 tests passing, `dist/` built).)*
 
 ---
 
@@ -24,22 +26,17 @@ SDK+CLI, `search_by_tags`, semantic-strategy client-side cosine, `batch_tag_memo
 
 ## Deferred / Blocked
 
-### P1: TypeScript — Publish to npm (BLOCKED — needs GitHub secrets)
-npm publish workflow exists but NPM_TOKEN hasn't been set in GitHub secrets.
+### P1: TypeScript — Publish to npm (BLOCKED — scope/account ownership, not secrets)
+The original blocker is RESOLVED: NPM_TOKEN has been set in GitHub secrets (2026-07-16).
+Re-running the workflow (run 28841505323) now passes auth, build, and all 338 vitest tests,
+but `npm publish` fails with `404 Not Found - PUT https://registry.npmjs.org/@omiinaya/spacetime-memory`.
+The `@omiinaya` scope has 0 packages on the registry and the token's npm account does not
+own the scope. Fix options (owner decision): publish under the token account's own
+user-scope name, rename the package (e.g. unscoped `spacetime-memory` — name is available),
+or create/join an `@omiinaya` npm org with the token's account as a maintainer.
 Files: sdk/typescript/package.json, .github/workflows/npm-publish.yml
 Difficulty: Easy
 Est: 15min
-
-### STDB 2% fatal error under heavy concurrent load (BLOCKED — no live STDB for stress testing)
-Remaining root cause appears to be STDB-level WASM limitation.
-Deferred until live STDB infrastructure is available.
-Files: server/spacetimedb/src/lib.rs, tests/concurrent/
-Difficulty: Hard
-
-### Frontend / Web UI (BLOCKED — not started, 1-2 week effort)
-Zero web UI code exists. React/Vite SPA needed for dashboard, workspace management, KG explorer, note editor.
-No code to block on — just not started.
-Difficulty: Hard
 
 ### No managed cloud (BLOCKED — strategic decision, not code)
 Every competitor has a managed option. Self-hosting is correct for current use case.

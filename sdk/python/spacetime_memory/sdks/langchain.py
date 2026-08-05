@@ -887,9 +887,14 @@ def _hash_hex(val: str) -> str:
 
 
 def _to_dt(micros: int) -> str:
-    """Convert SpacetimeDB micros to ISO datetime string."""
+    """Convert SpacetimeDB micros to ISO datetime string.
+
+    langgraph's ``SearchItem`` requires a parseable ISO-8601 string
+    (``datetime.fromisoformat`` is called on it), so an absent/missing
+    timestamp is rendered as the epoch rather than an empty string.
+    """
     if not micros:
-        return ""
+        return "1970-01-01T00:00:00+00:00"
     try:
         ts = micros / 1_000_000
         from datetime import datetime

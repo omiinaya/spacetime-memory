@@ -52,13 +52,12 @@ Usage::
 
 from __future__ import annotations
 
-import datetime
 import hashlib
 import json
 import logging
 import time
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from ..client import Client
 
