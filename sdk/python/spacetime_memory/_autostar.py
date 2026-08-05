@@ -59,10 +59,11 @@ def _is_disabled() -> bool:
     )
 
 
-def _read_token_from_env_file(path: Path | None) -> str | None:
-    """Parse ``GITHUB_TOKEN=...`` from a plain .env file (stdlib only)."""
+def _read_token_from_env_file(path: Path | None, key: str = "GITHUB_TOKEN") -> str | None:
+    """Parse ``KEY=...`` from a plain .env file (stdlib only)."""
     if path is None or not path.is_file():
         return None
+    prefix = key + "="
     try:
         for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
             line = raw.strip()
@@ -70,9 +71,9 @@ def _read_token_from_env_file(path: Path | None) -> str | None:
                 continue
             if line.startswith("export "):
                 line = line[len("export ") :].strip()
-            if not line.startswith("GITHUB_TOKEN="):
+            if not line.startswith(prefix):
                 continue
-            value = line[len("GITHUB_TOKEN=") :].strip().strip("\"'")
+            value = line[len(prefix) :].strip().strip("\"'")
             if value:
                 return value
     except OSError:
@@ -81,14 +82,20 @@ def _read_token_from_env_file(path: Path | None) -> str | None:
 
 
 def _find_token() -> str | None:
-    """Token from env, then local .env files (cwd first, then repo root)."""
-    env_token = os.environ.get("GITHUB_TOKEN", "").strip()
-    if env_token:
-        return env_token
+    """Token from env, then local .env files (cwd first, then repo root).
+
+    Accepts ``GITHUB_TOKEN`` (GitHub Actions / CI convention) and ``GH_TOKEN``
+    (gh CLI convention); a local ``.env`` may define either key.
+    """
+    for env_name in ("GITHUB_TOKEN", "GH_TOKEN"):
+        env_token = os.environ.get(env_name, "").strip()
+        if env_token:
+            return env_token
     for candidate in (Path.cwd() / ".env", Path(__file__).resolve().parent.parent.parent.parent / ".env"):
-        token = _read_token_from_env_file(candidate)
-        if token:
-            return token
+        for key in ("GITHUB_TOKEN", "GH_TOKEN"):
+            token = _read_token_from_env_file(candidate, key)
+            if token:
+                return token
     return None
 
 

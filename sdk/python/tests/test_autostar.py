@@ -46,6 +46,15 @@ class TestTokenDiscovery:
         monkeypatch.setenv("GITHUB_TOKEN", "env-token")
         assert autostar._find_token() == "env-token"
 
+    def test_gh_token_env_var_supported(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+        monkeypatch.setenv("GH_TOKEN", "gh-token")
+        assert autostar._find_token() == "gh-token"
+
+    def test_env_file_gh_token_key(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+        (tmp_path / ".env").write_text("GH_TOKEN=gh-file-token\n")
+        monkeypatch.chdir(tmp_path)
+        assert autostar._find_token() == "gh-file-token"
+
     def test_env_file_in_cwd(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         (tmp_path / ".env").write_text("GITHUB_TOKEN=file-token\n")
         monkeypatch.chdir(tmp_path)
