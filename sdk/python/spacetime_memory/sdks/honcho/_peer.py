@@ -375,10 +375,55 @@ class Peer:
         size: int = 50,
         reverse: bool = False,
     ) -> SyncPage[SessionResponse, Session]:
-        """List sessions this peer participates in."""
+        """List sessions this peer participates in.
+
+        Backed by the persisted ``message`` table: messages store
+        ``source_session_id`` (the session) plus ``peer_id`` in metadata, so
+        sessions containing this peer are derivable across processes.
+        Falls back to the in-memory session cache for sessions created in
+        this process that haven't had messages persisted yet.
+        """
         filtered: list[Session] = []
+        seen: set[str] = set()
+        from ._session import Session  # lazy — avoids circular import with _peer
+        # 1. Derive sessions from persisted messages authored by this peer.
+        try:
+            rows = self._honcho._client._query(
+                "memory",
+                workspace_id=self._ws_id,
+                filter_dict={},
+                columns=["source_session_id", "metadata"],
+            )
+            for row in rows:
+                meta = row.get("metadata") or {}
+                if isinstance(meta, str):
+                    import json as _json
+
+                    try:
+                        meta = _json.loads(meta)
+                    except ValueError:
+                        meta = {}
+                if meta.get("peer_id") != self._id:
+                    continue
+                sid = row.get("source_session_id", "")
+                if not sid or sid in seen:
+                    continue
+                seen.add(sid)
+                filtered.append(
+                    Session(
+                        sid,
+                        self._honcho,
+                        metadata={"source": "persisted"},
+                    )
+                )
+        except RuntimeError:
+            pass  # fall through to cache
+        # 2. Merge any sessions known only in the in-memory cache.
         for session in self._honcho._session_cache.values():
+            if session.id in seen:
+                continue
             if self in session._peers:
+                seen.add(session.id)
                 filtered.append(session)
         if reverse:
             filtered = list(reversed(filtered))

@@ -391,3 +391,55 @@ class TestWithMocks:
         results = scope.query("filter test")
         assert isinstance(results, list)
 
+
+
+class TestPeerSessionsPersisted:
+    """Peer.sessions() derives persisted sessions from the message table."""
+
+    def test_sessions_from_persisted_messages(self, honcho: Honcho, monkeypatch) -> None:
+        """Sessions are derived from memory rows authored by this peer."""
+        from unittest.mock import MagicMock
+
+        pid = _uid("peer")
+        sid = _uid("sess")
+        p = honcho.peer(pid)
+
+        # Mock _query: memory rows return this peer's messages with session ids
+        def fake_query(table, workspace_id="", filter_dict=None, columns=None, **kw):
+            if table == "memory":
+                return [
+                    {
+                        "source_session_id": sid,
+                        "metadata": '{"peer_id": "%s"}' % pid,
+                    },
+                    {
+                        "source_session_id": "other-sess",
+                        "metadata": '{"peer_id": "different-peer"}',
+                    },
+                ]
+            return []
+
+        monkeypatch.setattr(honcho._client, "_query", fake_query)
+
+        sessions = p.sessions()
+        assert sessions.total == 1
+        assert sessions.items[0].id == sid
+
+    def test_sessions_falls_back_to_cache(self, honcho: Honcho, monkeypatch) -> None:
+        """When the message query fails, the in-memory cache still works."""
+        from unittest.mock import MagicMock
+
+        pid = _uid("peer")
+        sid = _uid("sess")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+
+        def fake_query(table, workspace_id="", filter_dict=None, columns=None, **kw):
+            raise RuntimeError("no access")
+
+        monkeypatch.setattr(honcho._client, "_query", fake_query)
+
+        sessions = p.sessions()
+        assert sessions.total == 1
+        assert sessions.items[0].id == sid
