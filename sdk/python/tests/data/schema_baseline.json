@@ -1,0 +1,1383 @@
+{
+  "Account": {
+    "created_at": "i64",
+    "display_name": "String",
+    "id": "String",
+    "is_active": "bool",
+    "password_hash": "String",
+    "password_salt": "String",
+    "role": "String",
+    "updated_at": "i64",
+    "username": "String"
+  },
+  "AdminListResult": {
+    "created_at": "i64",
+    "display_name": "String",
+    "id": "String",
+    "identity": "String",
+    "queried_at": "i64",
+    "username": "String"
+  },
+  "AgentStep": {
+    "content": "String",
+    "created_at": "i64",
+    "id": "String",
+    "parent_step_id": "String",
+    "session_id": "String",
+    "step_type": "String",
+    "summary": "String",
+    "workspace_id": "String"
+  },
+  "AnomalyResult": {
+    "anomaly_type": "String",
+    "created_at": "i64",
+    "description": "String",
+    "id": "String",
+    "memory_id": "String",
+    "metric_value": "f64",
+    "workspace_id": "String",
+    "z_score": "f64"
+  },
+  "ApiKey": {
+    "created_at": "i64",
+    "id": "String",
+    "is_active": "bool",
+    "key_hash": "String",
+    "last_used_at": "i64",
+    "name": "String",
+    "permissions": "String",
+    "scope": "String",
+    "workspace_id": "String"
+  },
+  "ApiKeyResult": {
+    "api_key_id": "String",
+    "caller_identity": "String",
+    "created_at": "i64",
+    "id": "String",
+    "is_active": "bool",
+    "last_used_at": "i64",
+    "name": "String",
+    "operation": "String",
+    "permissions": "String",
+    "request_id": "String",
+    "scope": "String",
+    "workspace_id": "String"
+  },
+  "ApiKeyVerificationResult": {
+    "api_key_id": "String",
+    "caller_identity": "String",
+    "created_at": "i64",
+    "id": "String",
+    "is_active": "bool",
+    "last_used_at": "i64",
+    "name": "String",
+    "permissions": "String",
+    "scope": "String",
+    "verified_at": "i64",
+    "workspace_id": "String"
+  },
+  "BackgroundJob": {
+    "completed_at": "i64",
+    "created_at": "i64",
+    "debounce_key": "String",
+    "debounce_micros": "i64",
+    "id": "String",
+    "job_type": "String",
+    "payload_json": "String",
+    "priority": "i32",
+    "started_at": "i64",
+    "status": "String",
+    "workspace_id": "String"
+  },
+  "BackgroundJobResult": {
+    "created_at": "i64",
+    "data": "String",
+    "job_id": "String",
+    "result_id": "String",
+    "workspace_id": "String"
+  },
+  "BacklinkResult": {
+    "created_at": "i64",
+    "display_text": "String",
+    "id": "String",
+    "source_note_id": "String",
+    "source_note_title": "String",
+    "target_note_id": "String",
+    "target_note_title": "String"
+  },
+  "BlockReference": {
+    "created_at": "i64",
+    "id": "String",
+    "ref_type": "String",
+    "source_block_id": "String",
+    "source_note_id": "String",
+    "target_block_id": "String",
+    "target_note_id": "String"
+  },
+  "BridgeResult": {
+    "bridge_score": "f64",
+    "community_count": "u32",
+    "community_ids_json": "String",
+    "created_at": "i64",
+    "id": "String",
+    "node_id": "String",
+    "node_label": "String",
+    "node_type": "String",
+    "workspace_id": "String"
+  },
+  "ChangeEvent": {
+    "created_at": "i64",
+    "data_json": "String",
+    "id": "String",
+    "operation": "String",
+    "record_id": "String",
+    "table_name": "String",
+    "workspace_id": "String"
+  },
+  "ChangeEventResult": {
+    "created_at": "i64",
+    "events_json": "String",
+    "id": "String",
+    "next_cursor": "i64",
+    "since_cursor": "i64"
+  },
+  "Citation": {
+    "created_at": "i64",
+    "description": "String",
+    "entity_id": "String",
+    "entity_type": "String",
+    "id": "String",
+    "source_memory_id": "String",
+    "workspace_id": "String"
+  },
+  "CitationResult": {
+    "created_at": "i64",
+    "description": "String",
+    "entity_id": "String",
+    "entity_type": "String",
+    "id": "String",
+    "source_memory_id": "String",
+    "workspace_id": "String"
+  },
+  "CognitiveOp": {
+    "config_json": "String",
+    "created_at": "i64",
+    "description": "String",
+    "id": "String",
+    "name": "String",
+    "op_type": "String",
+    "pipeline_stage_type": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "CognitiveOpResult": {
+    "created_at": "i64",
+    "data": "String",
+    "id": "String",
+    "workspace_id": "String"
+  },
+  "CommunityHierarchy": {
+    "child_cluster_id": "String",
+    "depth": "u32",
+    "id": "String",
+    "parent_cluster_id": "String",
+    "similarity": "f64",
+    "workspace_id": "String"
+  },
+  "ConnectorConfig": {
+    "config_json": "String",
+    "connector_type": "String",
+    "created_at": "i64",
+    "id": "String",
+    "is_active": "bool",
+    "name": "String",
+    "schedule_secs": "u64",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "ConsolidationLog": {
+    "consolidation_type": "String",
+    "created_at": "i64",
+    "id": "String",
+    "source_memory_ids": "String",
+    "target_memory_id": "String",
+    "workspace_id": "String"
+  },
+  "ContextDirectory": {
+    "created_at": "i64",
+    "description": "String",
+    "id": "String",
+    "name": "String",
+    "parent_id": "String",
+    "path": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "ContextPack": {
+    "created_at": "i64",
+    "id": "String",
+    "pack_json": "String",
+    "query_hash": "String",
+    "token_count": "u32",
+    "workspace_id": "String"
+  },
+  "ContextTree": {
+    "content": "String",
+    "created_at": "i64",
+    "created_by": "String",
+    "id": "String",
+    "is_global": "bool",
+    "path": "String",
+    "priority": "f64",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "ContextTreeResult": {
+    "created_at": "i64",
+    "id": "String",
+    "query_id": "String",
+    "results_json": "String",
+    "workspace_id": "String"
+  },
+  "DecryptedMemoryResult": {
+    "caller": "String",
+    "confidence": "f64",
+    "content": "String",
+    "created_at": "i64",
+    "id": "String",
+    "is_active": "bool",
+    "memory_id": "String",
+    "memory_type": "String",
+    "summary": "String",
+    "tier": "String"
+  },
+  "DeltaPack": {
+    "changed_memory_ids_json": "String",
+    "created_at": "i64",
+    "estimated_tokens": "u32",
+    "id": "String",
+    "new_memories_json": "String",
+    "previous_context_pack_id": "String",
+    "query_hash": "String",
+    "removed_memory_ids_json": "String",
+    "workspace_id": "String"
+  },
+  "Directive": {
+    "assigned_to": "String",
+    "category": "String",
+    "created_at": "i64",
+    "deadline": "i64",
+    "description": "String",
+    "id": "String",
+    "outcome": "String",
+    "parent_id": "String",
+    "priority": "u32",
+    "progress": "u32",
+    "status": "String",
+    "tags_json": "String",
+    "title": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "DirectiveListResult": {
+    "created_at": "i64",
+    "id": "String",
+    "json_data": "String",
+    "workspace_id": "String"
+  },
+  "DirectoryContentResult": {
+    "created_at": "i64",
+    "directory_id": "String",
+    "directory_path": "String",
+    "id": "String",
+    "memory_ids_json": "String",
+    "subdirectory_ids_json": "String",
+    "workspace_id": "String"
+  },
+  "DirectoryEntry": {
+    "created_at": "i64",
+    "entity_id": "String",
+    "entity_type": "String",
+    "id": "String",
+    "workspace_id": "String"
+  },
+  "DirectoryMemoryLink": {
+    "directory_id": "String",
+    "id": "String",
+    "memory_id": "String",
+    "workspace_id": "String"
+  },
+  "DirectoryResult": {
+    "depth": "i64",
+    "description": "String",
+    "entity_id": "String",
+    "entity_type": "String",
+    "id": "String",
+    "name": "String",
+    "parent_id": "String",
+    "path": "String",
+    "query_hash": "String",
+    "workspace_id": "String"
+  },
+  "DocChunk": {
+    "chunk_index": "u32",
+    "content": "String",
+    "created_at": "i64",
+    "document_id": "String",
+    "embedding_json": "String",
+    "id": "String"
+  },
+  "Document": {
+    "chunk_count": "u32",
+    "content": "String",
+    "content_type": "String",
+    "created_at": "i64",
+    "file_path": "String",
+    "id": "String",
+    "metadata_json": "String",
+    "source_url": "String",
+    "title": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "EdgeHistoryResult": {
+    "confidence": "String",
+    "created_at": "i64",
+    "edge_group_id": "String",
+    "edge_id": "String",
+    "id": "String",
+    "invalid_at": "i64",
+    "metadata_json": "String",
+    "relation": "String",
+    "source_node_id": "String",
+    "target_node_id": "String",
+    "valid_at": "i64",
+    "version": "u32",
+    "weight": "f64",
+    "workspace_id": "String"
+  },
+  "EmbedderAlert": {
+    "consecutive_failures": "u32",
+    "created_at": "i64",
+    "degraded": "bool",
+    "embedder_url": "String",
+    "error_rate_pct": "f64",
+    "id": "String",
+    "message": "String",
+    "reachable": "bool",
+    "recovery": "bool",
+    "severity": "u8",
+    "total_calls": "u32",
+    "total_errors": "u32"
+  },
+  "EmbedderMetricsSnapshot": {
+    "created_at": "i64",
+    "dimension": "u32",
+    "embedding_count": "u64",
+    "id": "String",
+    "model_name": "String",
+    "raw_metrics_text": "String",
+    "rss_bytes": "u64",
+    "uptime_seconds": "u64"
+  },
+  "EntityCooccurrenceResult": {
+    "count": "u64",
+    "created_at": "i64",
+    "entity_a": "String",
+    "entity_b": "String",
+    "id": "String",
+    "strength": "f64",
+    "workspace_id": "String"
+  },
+  "EntityExtractionResult": {
+    "edge_count": "u64",
+    "entities_json": "String",
+    "id": "String",
+    "kg_node_count": "u64",
+    "queried_at": "i64",
+    "workspace_id": "String"
+  },
+  "EntityLink": {
+    "aliases_json": "String",
+    "created_at": "i64",
+    "description": "String",
+    "entity_name": "String",
+    "entity_type": "String",
+    "first_seen": "i64",
+    "id": "String",
+    "last_seen": "i64",
+    "used_count": "u64",
+    "workspace_id": "String"
+  },
+  "EntitySearchIndex": {
+    "entity_id": "String",
+    "id": "String",
+    "search_index_id": "String"
+  },
+  "EntitySignature": {
+    "algorithm_version": "u32",
+    "created_at": "i64",
+    "entity_id": "String",
+    "entity_name": "String",
+    "id": "String",
+    "num_hashes": "u32",
+    "signatures_json": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "EntityTermIndex": {
+    "entity_id": "String",
+    "id": "String",
+    "term_index_id": "String",
+    "workspace_id": "String"
+  },
+  "Fact": {
+    "category": "String",
+    "confidence": "f64",
+    "content": "String",
+    "created_at": "i64",
+    "expires_at": "i64",
+    "fact_type": "String",
+    "id": "String",
+    "is_active": "bool",
+    "peer_id": "String",
+    "source": "String",
+    "tier": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "FactResult": {
+    "created_at": "i64",
+    "id": "String",
+    "json_data": "String",
+    "query_hash": "String",
+    "workspace_id": "String"
+  },
+  "FactTriple": {
+    "confidence": "f64",
+    "created_at": "i64",
+    "id": "String",
+    "justification": "String",
+    "object_id": "String",
+    "object_type": "String",
+    "predicate": "String",
+    "source": "String",
+    "subject_id": "String",
+    "updated_at": "i64",
+    "valid_from": "i64",
+    "valid_until": "i64",
+    "workspace_id": "String"
+  },
+  "FactTripleListResult": {
+    "created_at": "i64",
+    "id": "String",
+    "json_data": "String",
+    "workspace_id": "String"
+  },
+  "GenericQueryResult": {
+    "created_at": "i64",
+    "id": "String",
+    "query_id": "String",
+    "row_json": "String",
+    "table_name": "String"
+  },
+  "GodNode": {
+    "computed_at": "i64",
+    "edge_count": "u64",
+    "id": "String",
+    "node_id": "String",
+    "workspace_id": "String"
+  },
+  "GraphTraversalResult": {
+    "created_at": "i64",
+    "depth": "u32",
+    "id": "String",
+    "node_id": "String",
+    "node_label": "String",
+    "node_type": "String",
+    "path_json": "String",
+    "query_id": "String",
+    "workspace_id": "String"
+  },
+  "HarmonicBelief": {
+    "action": "String",
+    "cluster_id": "String",
+    "confidence": "f64",
+    "created_at": "i64",
+    "harmony_score": "f64",
+    "id": "String",
+    "iteration": "u32",
+    "object": "String",
+    "predicate": "String",
+    "rationale": "String",
+    "source_memory_ids_json": "String",
+    "subject": "String",
+    "workspace_id": "String"
+  },
+  "HierarchyCluster": {
+    "community_ids": "String",
+    "depth": "u32",
+    "id": "String",
+    "workspace_id": "String"
+  },
+  "HybridResult": {
+    "content": "String",
+    "context_json": "String",
+    "created_at": "i64",
+    "entity_id": "String",
+    "entity_type": "String",
+    "id": "String",
+    "query_hash": "String",
+    "score": "f64",
+    "strategy": "String",
+    "workspace_id": "String"
+  },
+  "Insight": {
+    "confidence": "f64",
+    "content": "String",
+    "created_at": "i64",
+    "id": "String",
+    "insight_type": "String",
+    "peer_id": "String",
+    "source_memory_ids_json": "String",
+    "workspace_id": "String"
+  },
+  "JwkSetResult": {
+    "created_at": "i64",
+    "id": "String",
+    "payload": "String"
+  },
+  "JwtSigningKey": {
+    "created_at": "i64",
+    "expires_at": "i64",
+    "id": "String",
+    "is_current": "bool",
+    "is_trusted": "bool",
+    "key_id": "String",
+    "key_version": "u32",
+    "name": "String",
+    "private_key_path": "String",
+    "public_key_pem": "String",
+    "retired_at": "i64"
+  },
+  "JwtSigningKeyResult": {
+    "created_at": "i64",
+    "expires_at": "i64",
+    "id": "String",
+    "is_current": "bool",
+    "is_trusted": "bool",
+    "key_id": "String",
+    "key_version": "u32",
+    "name": "String",
+    "retired_at": "i64"
+  },
+  "KeyRotationEvent": {
+    "created_at": "i64",
+    "detail": "String",
+    "event_type": "String",
+    "id": "String"
+  },
+  "KgCommunity": {
+    "created_at": "i64",
+    "id": "u64",
+    "name": "String",
+    "summary": "String",
+    "workspace_id": "String"
+  },
+  "KgEdge": {
+    "confidence": "String",
+    "created_at": "i64",
+    "edge_group_id": "String",
+    "id": "String",
+    "invalid_at": "i64",
+    "metadata_json": "String",
+    "relation": "String",
+    "source_memory_id": "String",
+    "source_node_id": "String",
+    "target_node_id": "String",
+    "valid_at": "i64",
+    "version": "u32",
+    "weight": "f64",
+    "workspace_id": "String"
+  },
+  "KgNode": {
+    "community_id": "u64",
+    "created_at": "i64",
+    "embedding_json": "String",
+    "id": "String",
+    "label": "String",
+    "metadata_json": "String",
+    "node_type": "String",
+    "source_document_id": "String",
+    "source_memory_id": "String",
+    "stale_since": "i64",
+    "summary": "String",
+    "workspace_id": "String"
+  },
+  "KgStatsResult": {
+    "avg_degree": "f64",
+    "community_count": "u64",
+    "created_at": "i64",
+    "edge_count": "u64",
+    "id": "String",
+    "node_count": "u64",
+    "orphan_nodes": "u64",
+    "unassigned_nodes": "u64",
+    "workspace_id": "String"
+  },
+  "MemfsEntry": {
+    "created_at": "i64",
+    "data": "String",
+    "entry_type": "String",
+    "id": "String",
+    "is_mounted": "bool",
+    "mime_type": "String",
+    "mount_source": "String",
+    "name": "String",
+    "parent_id": "String",
+    "path": "String",
+    "size": "u64",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "MemfsMount": {
+    "created_at": "i64",
+    "filter_query": "String",
+    "id": "String",
+    "mount_path": "String",
+    "source_config": "String",
+    "source_type": "String",
+    "workspace_id": "String"
+  },
+  "MemfsResult": {
+    "created_at": "i64",
+    "data": "String",
+    "id": "String"
+  },
+  "Memory": {
+    "access_count": "u64",
+    "confidence": "f64",
+    "consolidated_to": "String",
+    "content": "String",
+    "context": "String",
+    "created_at": "i64",
+    "entities_json": "String",
+    "expires_at": "i64",
+    "feedback_count": "u32",
+    "id": "String",
+    "is_active": "bool",
+    "memory_type": "String",
+    "observer_id": "String",
+    "parent_directory_id": "String",
+    "peer_id": "String",
+    "source_message_id": "String",
+    "source_session_id": "String",
+    "source_url": "String",
+    "strength": "f64",
+    "summary": "String",
+    "tier": "String",
+    "trust_score": "f64",
+    "updated_at": "i64",
+    "user_scope": "String",
+    "valid_from": "i64",
+    "valid_to": "i64",
+    "version": "u32",
+    "workspace_id": "String"
+  },
+  "MemoryFeedback": {
+    "created_at": "i64",
+    "id": "String",
+    "memory_id": "String",
+    "peer_id": "String",
+    "rating": "String",
+    "score": "f64"
+  },
+  "MemoryInsertResult": {
+    "caller": "String",
+    "content_prefix": "String",
+    "created_at": "i64",
+    "id": "String",
+    "memory_id": "String",
+    "workspace_id": "String"
+  },
+  "MemoryMeta": {
+    "category": "String",
+    "created_at": "i64",
+    "extra_json": "String",
+    "id": "String",
+    "immutable": "bool",
+    "memory_id": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "MemoryRecommendation": {
+    "action": "String",
+    "content": "String",
+    "created_at": "i64",
+    "feedback_count": "u32",
+    "id": "String",
+    "memory_id": "String",
+    "trust_score": "f64",
+    "urgency": "f64",
+    "workspace_id": "String"
+  },
+  "MemoryRevision": {
+    "changed_at": "i64",
+    "changed_by": "String",
+    "id": "String",
+    "memory_id": "String",
+    "new_confidence": "f64",
+    "new_content": "String",
+    "new_summary": "String",
+    "previous_confidence": "f64",
+    "previous_content": "String",
+    "previous_summary": "String",
+    "version": "u32",
+    "workspace_id": "String"
+  },
+  "MemoryTag": {
+    "memory_id": "String",
+    "tag_id": "String",
+    "workspace_id": "String"
+  },
+  "MemoryTagResult": {
+    "id": "String",
+    "memory_id": "String",
+    "tag_color": "String",
+    "tag_id": "String",
+    "tag_name": "String"
+  },
+  "MentalModel": {
+    "confidence": "f64",
+    "content": "String",
+    "created_at": "i64",
+    "id": "String",
+    "model_type": "String",
+    "source_memory_ids": "String",
+    "status": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "MergeSuggestion": {
+    "content_overlap_preview": "String",
+    "cosine_similarity": "f64",
+    "created_at": "i64",
+    "edit_distance": "f64",
+    "id": "String",
+    "source_id": "String",
+    "status": "String",
+    "target_id": "String",
+    "workspace_id": "String"
+  },
+  "Message": {
+    "content": "String",
+    "content_type": "String",
+    "created_at": "i64",
+    "id": "String",
+    "metadata": "String",
+    "sender_id": "String",
+    "session_id": "String"
+  },
+  "NodeEdgeIndex": {
+    "edge_id": "String",
+    "id": "String",
+    "node_id": "String",
+    "workspace_id": "String"
+  },
+  "Note": {
+    "backlink_count": "u32",
+    "block_ref_count": "u32",
+    "content": "String",
+    "created_at": "i64",
+    "embedding_json": "String",
+    "id": "String",
+    "is_active": "bool",
+    "note_date": "String",
+    "title": "String",
+    "updated_at": "i64",
+    "version": "Option<u32>",
+    "workspace_id": "String"
+  },
+  "NoteBacklink": {
+    "created_at": "i64",
+    "display_text": "String",
+    "id": "String",
+    "source_note_id": "String",
+    "target_note_id": "String",
+    "workspace_id": "String"
+  },
+  "NoteBlock": {
+    "block_order": "u32",
+    "block_type": "String",
+    "content": "String",
+    "created_at": "i64",
+    "heading_level": "u8",
+    "id": "String",
+    "indent_level": "u32",
+    "is_active": "bool",
+    "note_id": "String",
+    "properties_json": "String",
+    "source": "String",
+    "task_state": "String"
+  },
+  "NoteRevision": {
+    "changed_at": "i64",
+    "changed_by": "String",
+    "id": "String",
+    "new_content": "String",
+    "new_title": "String",
+    "note_id": "String",
+    "previous_content": "String",
+    "previous_title": "String",
+    "version": "u32",
+    "workspace_id": "String"
+  },
+  "Observation": {
+    "confidence": "f64",
+    "content": "String",
+    "created_at": "i64",
+    "evidence_json": "String",
+    "id": "String",
+    "last_verified_at": "i64",
+    "memory_count": "u32",
+    "observation_type": "String",
+    "status": "String",
+    "summary": "String",
+    "superseded_by": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "ObservationListResult": {
+    "created_at": "i64",
+    "id": "String",
+    "json_data": "String",
+    "workspace_id": "String"
+  },
+  "PagerankResult": {
+    "computed_at": "i64",
+    "id": "String",
+    "iteration": "u32",
+    "node_id": "String",
+    "node_label": "String",
+    "rank": "f64",
+    "workspace_id": "String"
+  },
+  "Peer": {
+    "created_at": "i64",
+    "id": "String",
+    "metadata": "String",
+    "name": "String",
+    "peer_type": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "PeerReputation": {
+    "helpful_count": "u64",
+    "id": "String",
+    "last_feedback_at": "i64",
+    "reputation_score": "f64",
+    "total_feedback": "u64",
+    "unhelpful_count": "u64"
+  },
+  "PeerReputationResult": {
+    "helpful_count": "u64",
+    "id": "String",
+    "last_feedback_at": "i64",
+    "peer_id": "String",
+    "reputation_score": "f64",
+    "total_feedback": "u64",
+    "unhelpful_count": "u64"
+  },
+  "PeerSummaryResult": {
+    "id": "String",
+    "insight_count": "u64",
+    "latest_activity": "i64",
+    "memory_count": "u64",
+    "peer_id": "String",
+    "session_count": "u64"
+  },
+  "Profile": {
+    "dynamic_context_json": "String",
+    "id": "String",
+    "peer_id": "String",
+    "preferences_json": "String",
+    "static_facts_json": "String",
+    "tags_json": "String",
+    "updated_at": "i64"
+  },
+  "ProfileContextResult": {
+    "created_at": "i64",
+    "dynamic_context_json": "String",
+    "id": "String",
+    "peer_id": "String",
+    "preferences_json": "String",
+    "query_text": "String",
+    "static_facts_json": "String",
+    "tags_json": "String"
+  },
+  "ProxyMetricsSnapshot": {
+    "created_at": "i64",
+    "duration_count": "u64",
+    "duration_sum_micros": "u64",
+    "errors_total": "u64",
+    "id": "String",
+    "latency_percentiles_json": "String",
+    "per_model_json": "String",
+    "raw_metrics_text": "String",
+    "requests_total": "u64",
+    "tokens_total": "u64"
+  },
+  "RateLimitEntry": {
+    "endpoint": "String",
+    "id": "String",
+    "identity": "String",
+    "timestamp": "i64"
+  },
+  "ReasoningTier": {
+    "created_at": "i64",
+    "description": "String",
+    "id": "String",
+    "is_default": "bool",
+    "max_context_memories": "u32",
+    "max_tokens": "u32",
+    "min_confidence": "f64",
+    "name": "String",
+    "priority": "u32",
+    "requires_graph_traversal": "bool",
+    "requires_reflection": "bool",
+    "temperature": "f64",
+    "top_p": "f64",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "ReasoningTierResult": {
+    "created_at": "i64",
+    "data": "String",
+    "result_id": "String"
+  },
+  "ReflectionInsight": {
+    "confidence": "f64",
+    "content": "String",
+    "created_at": "i64",
+    "cycle_number": "u32",
+    "id": "String",
+    "insight_type": "String",
+    "session_id": "String",
+    "source_memory_ids_json": "String",
+    "source_note_ids_json": "String",
+    "workspace_id": "String"
+  },
+  "ReflectionResult": {
+    "created_at": "i64",
+    "data": "String",
+    "result_id": "String"
+  },
+  "ReflectionSession": {
+    "completed_at": "i64",
+    "config_json": "String",
+    "cycle_count": "u32",
+    "id": "String",
+    "insights_count": "u32",
+    "peer_id": "String",
+    "started_at": "i64",
+    "status": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "ReplicationLog": {
+    "created_at": "i64",
+    "data_json": "String",
+    "id": "String",
+    "operation": "String",
+    "record_id": "String",
+    "synced": "bool",
+    "table_name": "String",
+    "workspace_id": "String"
+  },
+  "ReplicationPeer": {
+    "auth_token": "String",
+    "created_at": "i64",
+    "id": "String",
+    "is_active": "bool",
+    "last_sync_at": "i64",
+    "name": "String",
+    "remote_db": "String",
+    "remote_url": "String",
+    "workspace_id": "String"
+  },
+  "ReplicationResult": {
+    "created_at": "i64",
+    "id": "String",
+    "json_data": "String",
+    "query_type": "String",
+    "workspace_id": "String"
+  },
+  "ResonanceLog": {
+    "beliefs_generated": "u32",
+    "cluster_count": "u32",
+    "contradictions_resolved": "u32",
+    "created_at": "i64",
+    "duration_ms": "u64",
+    "harmony_score_avg": "f64",
+    "id": "String",
+    "workspace_id": "String"
+  },
+  "ReviewItem": {
+    "created_at": "i64",
+    "easiness_factor": "f64",
+    "grade_count": "u32",
+    "grade_sum": "u64",
+    "id": "String",
+    "interval_days": "u32",
+    "is_active": "bool",
+    "last_reviewed_at": "i64",
+    "memory_id": "String",
+    "next_review_at": "i64",
+    "repetitions": "u32",
+    "user_id": "String",
+    "workspace_id": "String"
+  },
+  "ReviewResult": {
+    "created_at": "i64",
+    "due_count": "u32",
+    "id": "String",
+    "items_json": "String",
+    "user_id": "String",
+    "workspace_id": "String"
+  },
+  "RippleImpact": {
+    "discovered_at": "i64",
+    "id": "String",
+    "node_id": "String",
+    "node_label": "String",
+    "resolved_at": "i64",
+    "source_id": "String",
+    "source_type": "String",
+    "status": "String",
+    "workspace_id": "String"
+  },
+  "RippleImpactResult": {
+    "id": "String",
+    "impacts_json": "String",
+    "pending_count": "u64",
+    "queried_at": "i64",
+    "total_count": "u64",
+    "workspace_id": "String"
+  },
+  "SearchIndex": {
+    "bm25_text": "String",
+    "content": "String",
+    "created_at": "i64",
+    "embedding_json": "String",
+    "entity_id": "String",
+    "entity_type": "String",
+    "id": "String",
+    "tokens": "u32",
+    "workspace_id": "String"
+  },
+  "Session": {
+    "created_at": "i64",
+    "id": "String",
+    "metadata": "String",
+    "name": "String",
+    "summary": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "SessionParticipant": {
+    "joined_at": "i64",
+    "peer_id": "String",
+    "role": "String",
+    "session_id": "String"
+  },
+  "SessionSearchResult": {
+    "created_at": "i64",
+    "id": "String",
+    "memory_count": "u32",
+    "query_hash": "String",
+    "score": "f64",
+    "session_name": "String",
+    "top_memory_content": "String",
+    "top_memory_id": "String",
+    "workspace_id": "String"
+  },
+  "SessionStepResult": {
+    "content": "String",
+    "created_at": "i64",
+    "id": "String",
+    "parent_step_id": "String",
+    "query_hash": "String",
+    "session_id": "String",
+    "step_type": "String",
+    "summary": "String",
+    "workspace_id": "String"
+  },
+  "ShortestPathResult": {
+    "created_at": "i64",
+    "id": "String",
+    "node_id": "String",
+    "node_label": "String",
+    "node_type": "String",
+    "query_id": "String",
+    "step_order": "u32",
+    "workspace_id": "String"
+  },
+  "SpaceMemberResult": {
+    "created_at": "i64",
+    "granted_by": "String",
+    "id": "String",
+    "peer_id": "String",
+    "permission": "String",
+    "queried_at": "i64",
+    "workspace_id": "String"
+  },
+  "SpacePermission": {
+    "created_at": "i64",
+    "granted_by": "String",
+    "id": "String",
+    "peer_id": "String",
+    "permission": "String",
+    "workspace_id": "String"
+  },
+  "StaleNodesResult": {
+    "id": "String",
+    "nodes_json": "String",
+    "queried_at": "i64",
+    "total_count": "u64",
+    "workspace_id": "String"
+  },
+  "Subscription": {
+    "callback_url": "String",
+    "created_at": "i64",
+    "created_by": "String",
+    "id": "String",
+    "is_active": "bool",
+    "name": "String",
+    "query": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "SubscriptionListResult": {
+    "callback_url": "String",
+    "created_at": "i64",
+    "created_by": "String",
+    "id": "String",
+    "is_active": "bool",
+    "name": "String",
+    "query": "String",
+    "updated_at": "i64",
+    "workspace_id": "String"
+  },
+  "Tag": {
+    "color": "String",
+    "created_at": "i64",
+    "id": "String",
+    "name": "String",
+    "workspace_id": "String"
+  },
+  "TantivyAlert": {
+    "consecutive_failures": "u32",
+    "created_at": "i64",
+    "degraded": "bool",
+    "error_rate_pct": "f64",
+    "id": "String",
+    "message": "String",
+    "reachable": "bool",
+    "recovery": "bool",
+    "severity": "u8",
+    "tantivy_url": "String",
+    "total_checks": "u32",
+    "total_failures": "u32"
+  },
+  "TemporalClusterResult": {
+    "count": "u64",
+    "created_at": "i64",
+    "end_time": "i64",
+    "id": "String",
+    "memory_ids": "String",
+    "start_time": "i64",
+    "summary_terms": "String",
+    "workspace_id": "String"
+  },
+  "TermIndex": {
+    "doc_length": "u32",
+    "entity_id": "String",
+    "entity_type": "String",
+    "id": "String",
+    "term": "String",
+    "term_frequency": "u32",
+    "workspace_id": "String"
+  },
+  "TopicClusterResult": {
+    "avg_confidence": "f64",
+    "count": "u64",
+    "created_at": "i64",
+    "id": "String",
+    "memory_ids": "String",
+    "top_terms": "String",
+    "topic": "String",
+    "workspace_id": "String"
+  },
+  "Tour": {
+    "created_at": "i64",
+    "description": "String",
+    "id": "String",
+    "title": "String",
+    "workspace_id": "String"
+  },
+  "TourStop": {
+    "created_at": "i64",
+    "description": "String",
+    "heading": "String",
+    "id": "String",
+    "node_id": "String",
+    "stop_order": "u32",
+    "tour_id": "String"
+  },
+  "TracingSpan": {
+    "caller": "String",
+    "created_at": "i64",
+    "duration_micros": "i64",
+    "error_message": "String",
+    "id": "String",
+    "kind": "String",
+    "operation": "String",
+    "success": "bool",
+    "workspace_id": "String"
+  },
+  "User": {
+    "created_at": "u64",
+    "email": "Option<String>",
+    "first_name": "Option<String>",
+    "last_name": "Option<String>",
+    "metadata_json": "String",
+    "updated_at": "u64",
+    "user_id": "String"
+  },
+  "UserGetResult": {
+    "created_at": "u64",
+    "first_name": "Option<String>",
+    "id": "String",
+    "last_name": "Option<String>",
+    "metadata_json": "String",
+    "updated_at": "u64",
+    "user_id": "String"
+  },
+  "UserMemoryResult": {
+    "confidence": "f64",
+    "content": "String",
+    "created_at": "i64",
+    "id": "String",
+    "is_active": "bool",
+    "memory_id": "String",
+    "memory_type": "String",
+    "summary": "String",
+    "tier": "String",
+    "user_scope": "String",
+    "workspace_id": "String"
+  },
+  "UserSessionResult": {
+    "created_at": "i64",
+    "query_id": "String",
+    "session_id": "String",
+    "session_name": "String",
+    "user_id": "String",
+    "workspace_id": "String"
+  },
+  "VeracityEvidence": {
+    "alpha": "f64",
+    "beta": "f64",
+    "confirmatory_count": "u64",
+    "contradictory_count": "u64",
+    "evidence_count": "u64",
+    "last_updated": "i64",
+    "memory_id": "String"
+  },
+  "VeracityEvidenceResult": {
+    "id": "String",
+    "result_json": "String",
+    "workspace_id": "String"
+  },
+  "Webhook": {
+    "created_at": "i64",
+    "created_by": "String",
+    "event_types": "String",
+    "id": "String",
+    "is_active": "bool",
+    "name": "String",
+    "secret": "String",
+    "updated_at": "i64",
+    "url": "String",
+    "workspace_id": "String"
+  },
+  "WebhookDelivery": {
+    "attempted_at": "i64",
+    "delivered_at": "i64",
+    "event_type": "String",
+    "id": "String",
+    "payload": "String",
+    "response_body": "String",
+    "response_code": "u16",
+    "retry_count": "u32",
+    "status": "String",
+    "webhook_id": "String",
+    "workspace_id": "String"
+  },
+  "WebhookListResult": {
+    "created_at": "i64",
+    "created_by": "String",
+    "event_types": "String",
+    "id": "String",
+    "is_active": "bool",
+    "name": "String",
+    "updated_at": "i64",
+    "url": "String",
+    "webhook_id": "String",
+    "workspace_id": "String"
+  },
+  "Workspace": {
+    "context": "String",
+    "created_at": "i64",
+    "description": "String",
+    "id": "String",
+    "is_public": "bool",
+    "name": "String",
+    "updated_at": "i64"
+  },
+  "WorkspaceConfig": {
+    "decay_model": "String",
+    "decay_rate": "f64",
+    "id": "String",
+    "last_decay_at": "i64",
+    "max_decay_days": "i64",
+    "weibull_scale": "f64",
+    "weibull_shape": "f64"
+  },
+  "WorkspaceContextResult": {
+    "context": "String",
+    "id": "String",
+    "queried_at": "i64",
+    "workspace_id": "String"
+  },
+  "WorkspaceEncryptionKey": {
+    "created_at": "i64",
+    "created_by": "String",
+    "enabled": "bool",
+    "key_hex": "String",
+    "workspace_id": "String"
+  },
+  "WorkspaceIndex": {
+    "entity_id": "String",
+    "entity_type": "String",
+    "id": "String",
+    "search_index_id": "String",
+    "workspace_id": "String"
+  },
+  "WorkspaceMemoryStatsResult": {
+    "id": "String",
+    "queried_at": "i64",
+    "stat_key": "String",
+    "stat_value": "String",
+    "workspace_id": "String"
+  }
+}

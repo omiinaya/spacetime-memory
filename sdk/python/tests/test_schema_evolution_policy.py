@@ -9,7 +9,7 @@ decision table so schema changes can't silently violate it:
     guard with `.unwrap_or` / `.unwrap_or_default()` — reading a None column
     with a bare `.unwrap()` aborts the reducer and crashes old rows.
   * Counters/scores/enum-strings/JSON blobs use plain types with documented
-   , reducer-level defaults (`u64`->0, `f64`->0.5, `String`->"L1"/"", `bool`->false).
+    reducer-level defaults (`u64`->0, `f64`->0.5, `String`->"L1"/"", `bool`->false).
   * Forbidden: `--delete-data=on-conflict`, `--delete-data=always`, `ALTER TABLE`
     in reducers, migration/backfill reducers. `scripts/publish.sh` must hardcode
     `--delete-data=never`.
@@ -21,6 +21,7 @@ break, the schema policy is being violated — fix the code, not the test.
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SRC_DIR = REPO_ROOT / "server" / "spacetimedb" / "src"
 PUBLISH_SH = REPO_ROOT / "scripts" / "publish.sh"
+BASELINE_JSON = REPO_ROOT / "sdk" / "python" / "tests" / "data" / "schema_baseline.json"
 
 # Policy decision table -> codebase contract.
 # (field, rust_type, reducer default) — every additive feature-block field on
@@ -44,6 +46,7 @@ MEMORY_FEATURE_BLOCK_DEFAULTS: dict[str, str] = {
     "trust_score": "0.5",
     "feedback_count": "0",
     "user_scope": "String::new()",
+    "source_url": "String::new()",
 }
 
 # Fields on the Memory table added after initial release (feature blocks) —
@@ -157,6 +160,7 @@ class TestReducerDefaults:
             "// ---- RetainDB: Consolidation ----",
             "// ---- Holographic: Trust Scoring & Feedback ----",
             "// ---- User-level isolation (Mem0 parity) ----",
+            "// ---- Source attribution ----",
         ):
             assert anchor in src, f"Missing feature-block comment header: {anchor}"
 
@@ -183,6 +187,25 @@ class TestReducerDefaults:
                 f"SDK reads additive field '{field}' without a default — "
                 f"use .get('{field}', <default>) per policy step 4"
             )
+
+    def test_ts_sdk_read_paths_are_coalesced_or_passthrough(self):
+        """TypeScript SDK: any Memory-row field access must use `??`; raw
+        passthrough (no destructuring) is also safe. Direct `.field` reads
+        without `??` would crash/undefined on old rows."""
+        ts_client = REPO_ROOT / "sdk" / "typescript" / "client.ts"
+        if not ts_client.exists():
+            pytest.skip("TS SDK client.ts not present")
+        src = ts_client.read_text(encoding="utf-8")
+        # Memory rows flow as Record<string, unknown> passthroughs in this SDK.
+        # Guard: any direct field access on a row-like value must use ??.
+        direct_reads = re.findall(
+            r"\b(?:memory|mem|row|result)\.(tier|accessCount|strength|trustScore|feedbackCount|userScope|parentDirectoryId)\b(?!\?)",
+            src,
+        )
+        assert not direct_reads, (
+            "TS SDK reads additive Memory fields without `??` fallback: "
+            f"{direct_reads}. Use row.field ?? <default> per policy step 4."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -256,4 +279,184 @@ class TestPolicyDocsPresent:
             assert (REPO_ROOT / rel).exists(), f"Missing policy doc: {rel}"
         assert (REPO_ROOT / "docs" / "SCHEMA_EVOLUTION_POLICY_RATIONALE.md").exists(), (
             "Missing docs/SCHEMA_EVOLUTION_POLICY_RATIONALE.md"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 4. Non-Additive Changes (Breaking) — the schema is append-only
+# ---------------------------------------------------------------------------
+
+
+class TestNonAdditiveAppendOnly:
+    """SCHEMA_EVOLUTION_POLICY.md "Non-Additive Changes (Breaking)" table.
+
+    The Rust struct is the source of truth and it only GROWS:
+
+      * Rename field   -> Forbidden (add new, deprecate old, never remove)
+      * Change type    -> Forbidden (add new field with the new type)
+      * Remove field   -> Forbidden (mark deprecated, leave in struct forever)
+      * Required->opt  -> Allowed ONLY as ``T`` -> ``Option<T>``
+      * Optional->req  -> Forbidden (impossible without migration)
+
+    The committed baseline (``tests/data/schema_baseline.json``) is the lower
+    bound: every baseline table/field/type must still exist in the current
+    source, except the single permitted ``T`` -> ``Option<T>`` upgrade.
+    New tables and new fields are allowed (append-only growth). Regenerate
+    the baseline with ``scripts/update_schema_baseline.py`` when schema
+    legitimately evolves; the script refuses to write a shrinking baseline.
+    """
+
+    @pytest.fixture(scope="class")
+    def schema(self):
+        import schema_policy_lib
+
+        return {
+            "baseline": schema_policy_lib.load_baseline(),
+            "current": schema_policy_lib.parse_table_structs(),
+        }
+
+    def test_baseline_file_committed(self):
+        """The baseline must exist — it is the append-only anchor."""
+        assert BASELINE_JSON.exists(), (
+            "Missing tests/data/schema_baseline.json — run "
+            "`python scripts/update_schema_baseline.py` to generate it"
+        )
+
+    def test_baseline_covers_memory_table(self, schema):
+        """Sanity: the canonical Memory table (policy's worked example) is in
+        the baseline with its full additive feature-block field set."""
+        memory = schema["baseline"].get("Memory", {})
+        assert memory, "Baseline must include the Memory table"
+        for field in MEMORY_ADDITIVE_FIELDS + ("id", "workspace_id"):
+            assert field in memory, (
+                f"Baseline Memory table is missing documented field '{field}' — "
+                "regenerate the baseline"
+            )
+
+    def test_no_table_removed(self, schema):
+        """A table that existed when the baseline was written must still exist."""
+        baseline, current = schema["baseline"], schema["current"]
+        removed = sorted(set(baseline) - set(current))
+        assert not removed, (
+            "Schema tables removed — policy forbids removing tables "
+            f"(append-only): {removed}"
+        )
+
+    def test_no_field_removed_or_renamed(self, schema):
+        """Every baseline field must still exist — a rename shows up as the
+        old name disappearing (plus a new name appearing, which is allowed
+        as a brand-new field)."""
+        baseline, current = schema["baseline"], schema["current"]
+        missing = []
+        for table, fields in sorted(baseline.items()):
+            cur_fields = current.get(table, {})
+            for field in sorted(fields):
+                if field not in cur_fields:
+                    missing.append(f"{table}.{field} ({fields[field]})")
+        assert not missing, (
+            "Schema fields removed/renamed — policy forbids it (add new, "
+            "deprecate old, never remove). Missing:\n  " + "\n  ".join(missing)
+        )
+
+    def test_no_field_type_changed(self, schema):
+        """Every baseline field must keep its type — the ONLY permitted
+        transition is ``T`` -> ``Option<T>`` (required->optional)."""
+        baseline, current = schema["baseline"], schema["current"]
+        changed = []
+        for table, fields in sorted(baseline.items()):
+            cur_fields = current.get(table, {})
+            for field, old_type in sorted(fields.items()):
+                new_type = cur_fields.get(field)
+                if new_type == old_type:
+                    continue
+                # Allowed: T -> Option<T> (policy's required->optional row)
+                if new_type == f"Option<{old_type}>":
+                    continue
+                changed.append(f"{table}.{field}: {old_type} -> {new_type}")
+        assert not changed, (
+            "Schema field types changed — policy forbids type changes (add a "
+            "new field with the new type, migrate in application logic). "
+            "Only T -> Option<T> is allowed. Changed:\n  "
+            + "\n  ".join(changed)
+        )
+
+    def test_optional_to_required_forbidden(self, schema):
+        """The reverse transition (``Option<T>`` -> ``T``) is explicitly
+        impossible without a migration — must never happen."""
+        baseline, current = schema["baseline"], schema["current"]
+        demoted = []
+        for table, fields in sorted(baseline.items()):
+            cur_fields = current.get(table, {})
+            for field, old_type in sorted(fields.items()):
+                if old_type.startswith("Option<") and cur_fields.get(field) == old_type[7:-1]:
+                    demoted.append(f"{table}.{field}: {old_type} -> {cur_fields[field]}")
+        assert not demoted, (
+            "Optional->required field demotion detected — impossible without a "
+            "migration, forbidden by policy:\n  " + "\n  ".join(demoted)
+        )
+
+    def test_append_only_allows_new_tables_and_fields(self, schema):
+        """The append-only contract must be a superset check: adding a new
+        table or a new field is always legal (that is how the schema grows)."""
+        import schema_policy_lib
+
+        baseline, current = schema["baseline"], schema["current"]
+        new_tables = sorted(set(current) - set(baseline))
+        new_fields = {
+            f"{t}.{f}"
+            for t, fs in current.items()
+            if t in baseline
+            for f in fs
+            if f not in baseline[t]
+        }
+        # No assertion on the actual additions (schema may not have grown since
+        # the baseline); this test documents that additions must NOT be flagged
+        # by find_violations.
+        violations = schema_policy_lib.find_violations(baseline, current)
+        assert not violations, (
+            "find_violations reported issues — the append-only contract is "
+            "broken:\n  " + "\n  ".join(violations)
+        )
+        # Additions are legal by construction; if the schema HAS grown, the
+        # additions must be pure additions (already covered above).
+        assert isinstance(new_tables, list) and isinstance(new_fields, set)
+
+
+class TestBaselineFreshness:
+    """The committed baseline should track the current schema so that newly
+    added tables/fields become protected. Pure additions never fail this test
+    — it only fails when the baseline is missing tables/fields that exist, or
+    when running the regen script would report drift."""
+
+    def test_baseline_has_no_orphan_tables(self):
+        """Every table in the baseline should exist in source (covered in
+        detail by TestNonAdditiveAppendOnly.test_no_table_removed)."""
+        import schema_policy_lib
+
+        baseline = schema_policy_lib.load_baseline()
+        current = schema_policy_lib.parse_table_structs()
+        orphans = sorted(set(baseline) - set(current))
+        assert not orphans, f"Baseline references tables no longer in source: {orphans}"
+
+    def test_regeneration_script_reports_clean(self):
+        """`scripts/update_schema_baseline.py --check` must pass: the committed
+        baseline must be byte-identical to what regeneration would write.
+        Run the script with --check as a subprocess so we test the actual tool."""
+        import subprocess
+
+        script = REPO_ROOT / "scripts" / "update_schema_baseline.py"
+        if not script.exists():
+            pytest.skip("scripts/update_schema_baseline.py not present")
+        proc = subprocess.run(
+            [sys.executable, str(script), "--check"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            "update_schema_baseline.py --check failed — the committed baseline "
+            "is stale (or the schema breaks the append-only contract). Regenerate "
+            f"with `python scripts/update_schema_baseline.py`.\nstdout:\n{proc.stdout}\n"
+            f"stderr:\n{proc.stderr}"
         )
