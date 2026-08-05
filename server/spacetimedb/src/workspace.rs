@@ -47,28 +47,68 @@ pub struct SpacePermission {
 pub fn create_workspace(ctx: &ReducerContext, name: String, description: String, id: String) -> Result<(), String> {
     let _account = require_auth(ctx)?;
     let now = now_micros(ctx);
-    let workspace_id = if id.is_empty() { uuid_v4_uniq(ctx, |id| ctx.db.workspace().id().find(id).is_none(), 3) } else { id };
+
+    // Idempotent retry-safe: if the caller supplies an id that already exists
+    // (e.g. a timed-out client retrying the same call), return Ok instead of
+    // panicking on the primary-key violation. Panicking aborts the whole WASM
+    // instance (panic=abort), failing every concurrent reducer call with
+    // "The instance encountered a fatal error".
+    let workspace_id = if id.is_empty() {
+        crate::insert_row_retry(
+            ctx.db.workspace(),
+            Workspace {
+                id: String::new(),
+                name: name.clone(),
+                description: description.clone(),
+                context: String::new(),
+                created_at: now,
+                updated_at: now,
+                is_public: false,
+            },
+            |row| {
+                row.id = uuid_v4_uniq(ctx, |cid| ctx.db.workspace().id().find(cid).is_none(), 5);
+            },
+            5,
+        )?
+        .id
+    } else {
+        match ctx.db.workspace().try_insert(Workspace {
+            id: id.clone(),
+            name,
+            description,
+            context: String::new(),
+            created_at: now,
+            updated_at: now,
+            is_public: false,
+        }) {
+            Ok(_) => {}
+            Err(spacetimedb::TryInsertError::UniqueConstraintViolation(_)) => {
+                // Idempotent retry-safe: id already exists (timed-out client
+                // retried). Succeed without re-creating or panicking.
+                return Ok(());
+            }
+            Err(e) => return Err(format!("create_workspace failed: {e}")),
+        }
+        id
+    };
     let caller = ctx.sender().to_hex().to_string();
 
-    ctx.db.workspace().insert(Workspace {
-        id: workspace_id.clone(),
-        name,
-        description,
-        context: String::new(),
-        created_at: now,
-        updated_at: now,
-        is_public: false,
-    });
-
     // Auto-grant owner access to the workspace creator
-    ctx.db.space_permission().insert(SpacePermission {
-        id: uuid_v4_uniq(ctx, |id| ctx.db.space_permission().id().find(id).is_none(), 3),
-        workspace_id: workspace_id.clone(),
-        peer_id: caller.to_string(),
-        permission: "owner".to_string(),
-        granted_by: caller.to_string(),
-        created_at: now,
-    });
+    crate::insert_row_retry(
+        ctx.db.space_permission(),
+        SpacePermission {
+            id: String::new(),
+            workspace_id: workspace_id.clone(),
+            peer_id: caller.to_string(),
+            permission: "owner".to_string(),
+            granted_by: caller.to_string(),
+            created_at: now,
+        },
+        |row| {
+            row.id = uuid_v4_uniq(ctx, |pid| ctx.db.space_permission().id().find(pid).is_none(), 5);
+        },
+        5,
+    )?;
 
     Ok(())
 }
@@ -608,15 +648,25 @@ pub fn grant_space_access(
         };
         ctx.db.space_permission().id().update(updated);
     } else {
-        // Insert new permission
-        ctx.db.space_permission().insert(SpacePermission {
-            id: uuid_v4_uniq(ctx, |id| ctx.db.space_permission().id().find(id).is_none(), 3),
-            workspace_id: workspace_id.clone(),
-            peer_id: peer_id.clone(),
-            permission: permission.clone(),
-            granted_by: caller.clone(),
-            created_at: now,
-        });
+        // Insert new permission — try_insert + retry so a unique-key collision
+        // (deterministic per-batch RNG can produce duplicate UUIDs under
+        // concurrency) retries with a fresh id instead of panicking and
+        // aborting the whole WASM instance.
+        crate::insert_row_retry(
+            ctx.db.space_permission(),
+            SpacePermission {
+                id: String::new(),
+                workspace_id: workspace_id.clone(),
+                peer_id: peer_id.clone(),
+                permission: permission.clone(),
+                granted_by: caller.clone(),
+                created_at: now,
+            },
+            |row| {
+                row.id = uuid_v4_uniq(ctx, |id| ctx.db.space_permission().id().find(id).is_none(), 5);
+            },
+            5,
+        )?;
     }
 
     Ok(())

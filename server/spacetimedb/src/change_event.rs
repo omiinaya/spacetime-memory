@@ -72,17 +72,28 @@ pub fn log_change(
     data_json: &str,
 ) {
     let now = now_micros(ctx);
-    let event_id = uuid_v4_uniq(ctx, |id| ctx.db.change_event().id().find(id).is_none(), 3);
-    let event = ChangeEvent {
-        id: event_id,
-        workspace_id: workspace_id.to_string(),
-        table_name: table_name.to_string(),
-        operation: operation.to_string(),
-        record_id: record_id.to_string(),
-        data_json: data_json.to_string(),
-        created_at: now,
-    };
-    ctx.db.change_event().insert(event);
+    // insert_row_retry: `ctx.rng()` is deterministic per batch, so two
+    // concurrent reducers in the same batch draw the same UUID, both pass
+    // the uuid_v4_uniq pre-check, and the second plain insert() would panic
+    // (unique-key violation) — with panic=abort that kills the ENTIRE WASM
+    // instance, failing every reducer in flight with "The instance
+    // encountered a fatal error". Retry regenerates the id instead.
+    let _ = crate::insert_row_retry(
+        ctx.db.change_event(),
+        ChangeEvent {
+            id: String::new(),
+            workspace_id: workspace_id.to_string(),
+            table_name: table_name.to_string(),
+            operation: operation.to_string(),
+            record_id: record_id.to_string(),
+            data_json: data_json.to_string(),
+            created_at: now,
+        },
+        |row| {
+            row.id = uuid_v4_uniq(ctx, |id| ctx.db.change_event().id().find(id).is_none(), 5);
+        },
+        5,
+    );
 }
 
 /// Serialise any STDB record to JSON string for the data_json field.
