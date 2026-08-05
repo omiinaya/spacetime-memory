@@ -44,8 +44,10 @@ When adding a field to a `#[table]` struct:
 | `String` | `""` | `String::new()` / semantic base (`"L1"`, `"EXTRACTED"`) |
 | `bool` | `false` | explicit `false` or `true` |
 | `u64`/`u32`/`i64`/`i32` | `0` | `0`, or semantic (`1` for versions) |
+| `u8`/`u16` | `0` | `0` (e.g. `severity`, `response_code`) |
 | `f64`/`f32` | `0.0` | `0.5` for scores, `0.0` for counters |
 | `Option<T>` | `NULL` | `None` — preferred when "not set" is meaningfully different |
+| `Option<String>` | `NULL` | `None` (e.g. `User.email`) |
 | `Vec<T>` / JSON string | `""` | `"[]"` or `serde_json::to_string(&vec![])` |
 
 **Key nuance:** `Option<T>` is the only way to distinguish "created before this field existed" from "explicitly set to the default". Use it when that distinction matters (e.g. `version: Option<u32>` — `None` = pre-versioning).
@@ -81,7 +83,7 @@ The schema is **append-only**. The Rust struct only grows.
 2. Add defaults in all insert reducers.
 3. Update/decide update reducers, with a comment.
 4. Update read paths (reducers, SDK mappers, query helpers).
-5. Build: `CARGO_BUILD_JOBS=2 cargo build --release --target wasm32-wasip1`.
+5. Build: `CARGO_BUILD_JOBS=2 cargo build --release --target wasm32-unknown-unknown`.
 6. Publish: `./scripts/publish.sh` (enforces `--delete-data=never`).
 7. Verify: `spacetimedb-cli logs -s local-3001 <db-id>`.
 
@@ -95,4 +97,4 @@ The schema is **append-only**. The Rust struct only grows.
 
 ---
 
-*Generated from [SCHEMA_EVOLUTION_POLICY.md](./SCHEMA_EVOLUTION_POLICY.md) (last updated 2026-07-06). If the policy changes, update this summary.*
+*Generated from [SCHEMA_EVOLUTION_POLICY.md](./SCHEMA_EVOLUTION_POLICY.md) (last updated 2026-08-05). If the policy changes, update this summary.*

@@ -2,7 +2,7 @@
 
 **Status:** Canonical policy for the `spacetime-memory` SpacetimeDB module  
 **Applies to:** All Rust reducer code in `server/spacetimedb/src/`  
-**Last updated:** 2026-07-06
+**Last updated:** 2026-08-05
 
 ---
 
@@ -44,9 +44,13 @@ When adding fields to SpacetimeDB tables, we rely on SpacetimeDB's built-in sche
 | `String` | `""` | `String::new()` or `String::from("L1")` |
 | `bool` | `false` | `false` or `true` (explicit) |
 | `u64` / `u32` / `i64` / `i32` | `0` | `0` or semantic default (`1` for version) |
+| `u8` / `u16` | `0` | `0` (e.g., `severity: u8` = `0`, `response_code: u16` = `0`) |
 | `f64` / `f32` | `0.0` | `0.5` for scores, `0.0` for counters |
 | `Option<T>` | `NULL` | `None` (preferred for "not set" semantics) |
+| `Option<String>` | `NULL` | `None` (e.g., `User.email` — `None` = no email on file) |
 | `Vec<T>` / JSON string | `""` | `String::from("[]")` or `serde_json::to_string(&vec![]).unwrap()` |
+
+> **Note:** `u8`/`u16` follow the same zero-default rule as the wider integer types — used for `severity` (`0`=recovery, `1`=warning, `2`=critical in `EmbedderAlert`/`TantivyAlert`), `heading_level` (`NoteBlock`), and `response_code` (`WebhookDelivery`; `0` = not yet delivered).
 
 > **Note:** `Option<T>` fields are the only way to distinguish "not set" from "explicitly set to default". Use `Option` when the semantic difference matters (e.g., `version: Option<u32>` — `None` means "created before versioning existed", `Some(0)` is invalid).
 
@@ -105,7 +109,7 @@ metadata_json: if metadata_json.is_empty() { String::from("{}") } else { metadat
 
 **In SDK mappers (Python/TS):**
 ```python
-# Python SDK - client.py
+# Python SDK - spacetime_memory/client/ (memory row consumers apply COALESCE)
 Memory(
     tier=row.get("tier", "L1"),
     access_count=row.get("access_count", 0),
@@ -115,7 +119,7 @@ Memory(
 ```
 
 ```typescript
-// TS SDK - client.ts
+// TS SDK - sdk/typescript/src/memories.ts
 tier: row.tier ?? "L1",
 accessCount: row.access_count ?? 0,
 strength: row.strength ?? 0.5,
@@ -154,7 +158,7 @@ strength: row.strength ?? 0.5,
 3. [ ] Update `update` reducers: preserve or reset? Document decision in comment.
 4. [ ] Update read paths (result table reducers, SDK mappers, query helpers) with defaults.
 5. [ ] Add comment block header if this is a new "feature group" (see `Memory.rs`).
-6. [ ] Build: `CARGO_BUILD_JOBS=2 cargo build --release --target wasm32-wasip1`
+6. [ ] Build: `CARGO_BUILD_JOBS=2 cargo build --release --target wasm32-unknown-unknown`
 7. [ ] Publish: `./scripts/publish.sh` (enforces `--delete-data=never`)
 8. [ ] Verify reducer list: `spacetimedb-cli logs -s local-3001 <db-id>`
 
@@ -222,6 +226,8 @@ sourceUrl: row.source_url ?? "",
 
 - `AGENTS.md` — Agent schema + development guide (see "Data Safety" section)
 - `scripts/publish.sh` — Enforces `--delete-data=never`
+- `docs/SCHEMA_EVOLUTION_POLICY_RATIONALE.md` — **Why this policy exists** (full evidence-based rationale)
+- `SCHEMA_EVOLUTION_POLICY_EXECUTIVE_SUMMARY.md` — One-page executive summary
 - `ROADMAP.md` — Phase 4.3 "Schema migrations" (this policy resolves that item)
 - `CONTRIBUTING.md` — Contribution workflow
 
