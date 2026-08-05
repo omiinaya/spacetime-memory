@@ -23,14 +23,10 @@ build/
 coverage
 *.profraw
 .coverage
-data/
 
 # Schema-baseline anchor for the append-only policy (SCHEMA_EVOLUTION_POLICY.md
 # "Non-Additive Changes (Breaking)"). MUST be committed — it is the lower-bound
-# contract that test_schema_evolution_policy.py enforces. Negate the `data/`
-# ignore above so this file can actually be tracked.
-!sdk/python/tests/data/
-!sdk/python/tests/data/schema_baseline.json
+# contract that test_schema_evolution_policy.py enforces.
 
 # Helper scripts for writing test files via terminal
 _write_e2e*

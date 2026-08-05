@@ -175,6 +175,14 @@ class CrossEncoderReranker:
                 f"cross-encoder/ms-marco-MiniLM-L-6-v2 (tokenizer.json)"
             )
 
+        if ort is None:
+            raise RuntimeError(
+                "Cross-encoder unavailable: onnxruntime failed to import "
+                "(check that the onnxruntime wheel matches the installed "
+                "CUDA runtime; a CPU-only build is required when CUDA is "
+                "absent). Install with: pip install onnxruntime"
+            )
+
         logger.info("Loading cross-encoder tokenizer: %s", self._tokenizer_path)
         self._tokenizer = Tokenizer.from_file(self._tokenizer_path)
 
@@ -317,10 +325,26 @@ def cross_encoder_rerank(
     content_key: str = "memory_content",
     top_k: int = 20,
 ) -> list[dict[str, Any]]:
-    """Convenience wrapper — rerank candidates with the cross-encoder singleton."""
+    """Convenience wrapper — rerank candidates with the cross-encoder singleton.
+
+    Degrades gracefully: if onnxruntime cannot be loaded (e.g. the install
+    wheel targets a CUDA runtime this host lacks) or the model files are
+    missing, the candidates are returned **unchanged** (their original order)
+    with a warning logged, rather than raising. Reranking is an optional
+    quality enhancement — search must never fail because of it.
+    """
     global _reranker
-    if _reranker is None or not hasattr(_reranker, "_loaded"):
-        # A previous partially-initialised singleton (e.g. a mock from a
-        # patched __init__) must not be reused — rebuild it.
-        _reranker = CrossEncoderReranker()
-    return _reranker.rerank(query, candidates, content_key=content_key, top_k=top_k)
+    try:
+        if _reranker is None or not hasattr(_reranker, "_loaded"):
+            # A previous partially-initialised singleton (e.g. a mock from a
+            # patched __init__) must not be reused — rebuild it.
+            _reranker = CrossEncoderReranker()
+        return _reranker.rerank(query, candidates, content_key=content_key, top_k=top_k)
+    except (RuntimeError, FileNotFoundError, ImportError, ValueError) as ce_err:
+        logger.warning(
+            "Cross-encoder rerank unavailable (%s): returning candidates "
+            "unchanged. Install onnxruntime matching the host CUDA runtime "
+            "and download the model files to enable semantic reranking.",
+            ce_err,
+        )
+        return candidates

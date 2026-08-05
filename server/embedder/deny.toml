@@ -6,7 +6,14 @@ unsound = "all"
 ignore = [
     # Known-safe advisories — these are vetted false positives or
     # transient issues that don't affect this project's use case.
-    #{ id = "RUSTSEC-0000-0000", reason = "example" },
+    # `paste` (proc-macro helper, via tokenizers) is archived/unmaintained
+    # but has no security impact — it expands `concat_idents!`-style macros
+    # at compile time and is used pervasively across the Rust ecosystem.
+    { id = "RUSTSEC-2024-0436", reason = "paste proc-macro is archived but not a security issue; no upgrade path (transitive via tokenizers)" },
+    # `number_prefix` (formatting helper, via tract-onnx) is unmaintained
+    # with no replacement; it only formats byte counts for display and is
+    # not reachable in this project's attack surface (local embedding sidecar).
+    { id = "RUSTSEC-2025-0119", reason = "number_prefix is unmaintained but display-only formatting; no upgrade path (transitive via tract-onnx)" },
 ]
 
 [licenses]

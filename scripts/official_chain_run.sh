@@ -6,6 +6,14 @@
 # No OpenRouter (cardinal rule #2). Gateway-immune via no_agent cron.
 set -e
 
+# ── Operator configuration (env-overridable; no hardcoded machine paths) ──
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT="$(cd "$_SCRIPT_DIR/.." && pwd)"
+STMEM_PY="${STMEM_PY:-$_REPO_ROOT/.venv/bin/python}"
+ZEP_BENCH_DIR="${ZEP_BENCH_DIR:-$HOME/zep/benchmarks/locomo}"
+MEM0_EVAL_DIR="${MEM0_EVAL_DIR:-$HOME/mem0/evaluation}"
+STMEM_DATA_DIR="${STMEM_DATA_DIR:-$_REPO_ROOT/data}"
+
 MASTER=/tmp/official_chain.out
 LOGFILE=/tmp/official_chain.log
 echo "Chain start $(date)" > "$LOGFILE"
@@ -47,7 +55,7 @@ sleep 30
 
 # ── 1. ZEP OFFICIAL LOCOMO ──────────────────────────────────────────────
 echo "=== ZEP OFFICIAL LOCOMO ($(date)) ===" >> "$LOGFILE"
-cd /home/hindsight/zep/benchmarks/locomo
+cd "$ZEP_BENCH_DIR"
 PREFIX="stmem-chain-$(date +%Y%m%d%H%M%S)"
 # IMPORTANT: do NOT delete the identity token — the Zep shim persists its
 # peer identity to /tmp/zep_harness_identity.token and reuses it across
@@ -63,7 +71,7 @@ timeout 10800 env \
     OPENAI_API_KEY=dummy-key OPENAI_BASE_URL=http://localhost:4004/v1 \
     ZEP_API_KEY=dummy STDB_DB=spacetime-memory-v2 \
     EMBEDDER_URL=http://localhost:9093/v1 STDB_TIMEOUT=300 \
-    /home/hindsight/spacetime-memory/.venv/bin/python -m benchmark \
+    "$STMEM_PY" -m benchmark \
         --ingest --config benchmark_config_stmem.yaml --prefix "$PREFIX" \
     >> "$LOGFILE" 2>&1
 echo "Zep ingest done $(date)" >> "$LOGFILE"
@@ -72,14 +80,14 @@ timeout 10800 env \
     OPENAI_API_KEY=dummy-key OPENAI_BASE_URL=http://localhost:4004/v1 \
     ZEP_API_KEY=dummy STDB_DB=spacetime-memory-v2 \
     EMBEDDER_URL=http://localhost:9093/v1 STDB_TIMEOUT=300 \
-    /home/hindsight/spacetime-memory/.venv/bin/python -m benchmark \
+    "$STMEM_PY" -m benchmark \
         --eval --config benchmark_config_stmem.yaml --prefix "$PREFIX" --num-runs 1 \
     >> "$LOGFILE" 2>&1
 echo "Zep eval done $(date)" >> "$LOGFILE"
-NEWEST=$(ls -t /home/hindsight/zep/benchmarks/locomo/experiments/run_*/results.json /home/hindsight/zep/benchmarks/locomo/experiments/experiment_*/experiment_summary.json 2>/dev/null | head -1)
+NEWEST=$(ls -t "$ZEP_BENCH_DIR"/experiments/run_*/results.json "$ZEP_BENCH_DIR"/experiments/experiment_*/experiment_summary.json 2>/dev/null | head -1)
 echo "ZEP_RESULT_FILE=$NEWEST" >> "$MASTER"
 if [ -n "$NEWEST" ]; then
-    /home/hindsight/spacetime-memory/.venv/bin/python3 - "$NEWEST" >> "$MASTER" <<'PY'
+    "$STMEM_PY" - "$NEWEST" >> "$MASTER" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 am = d.get("aggregated_metrics", {}) or {}
@@ -105,14 +113,14 @@ fi
 
 # ── 2. MEM0 OFFICIAL LONGMEMEVAL ────────────────────────────────────────
 echo "=== MEM0 OFFICIAL LONGMEMEVAL ($(date)) ===" >> "$LOGFILE"
-cd /home/hindsight/mem0/evaluation
+cd "$MEM0_EVAL_DIR"
 timeout 172800 env \
     OTEL_ENABLED=false \
     LLM_BASE_URL=http://localhost:4004/v1 OPENAI_API_KEY=dummy-key \
     STDB_EMBEDDER_URL=http://localhost:9093/v1 \
     STDB_SKIP_ENTITY_EXTRACT=1 \
     PYTHONUNBUFFERED=1 \
-    /home/hindsight/spacetime-memory/.venv/bin/python -m benchmarks.longmemeval.run \
+    "$STMEM_PY" -m benchmarks.longmemeval.run \
         --project-name stmem-chain-lme \
         --backend stmem \
         --stmem-db spacetime-memory-v2 \
@@ -121,14 +129,14 @@ timeout 172800 env \
         --judge-model deepseek-v4-flash-free \
         --top-k 200 --max-workers 4 \
         --output-dir /tmp/mem0bench/lme-chain \
-        --dataset-path /home/hindsight/spacetime-memory/data/longmemeval_s.json \
+        --dataset-path "$STMEM_DATA_DIR"/longmemeval_s.json \
         --all-questions \
     >> "$LOGFILE" 2>&1
 echo "LongMemEval done $(date)" >> "$LOGFILE"
 LME=$(ls -t /tmp/mem0bench/lme-chain/longmemeval_results_*.json 2>/dev/null | head -1)
 echo "LONGMEMEVAL_RESULT_FILE=$LME" >> "$MASTER"
 if [ -n "$LME" ]; then
-    /home/hindsight/spacetime-memory/.venv/bin/python3 - "$LME" >> "$MASTER" <<'PY'
+    "$STMEM_PY" - "$LME" >> "$MASTER" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 print("LONGMEMEVAL OFFICIAL (Mem0 harness, deepseek via our Zen chain)")
@@ -149,7 +157,7 @@ timeout 86400 env \
     LLM_BASE_URL=http://localhost:4004/v1 OPENAI_API_KEY=dummy-key \
     STDB_EMBEDDER_URL=http://localhost:9093/v1 \
     PYTHONUNBUFFERED=1 \
-    /home/hindsight/spacetime-memory/.venv/bin/python -m benchmarks.beam.run \
+    "$STMEM_PY" -m benchmarks.beam.run \
         --project-name stmem-chain-beam \
         --backend stmem \
         --stmem-db spacetime-memory-v2 \
@@ -157,14 +165,14 @@ timeout 86400 env \
         --answerer-model deepseek-v4-flash-free \
         --judge-model deepseek-v4-flash-free \
         --chat-sizes 100K \
-        --dataset-cache-dir /home/hindsight/mem0/evaluation/datasets/beam \
+        --dataset-cache-dir "$MEM0_EVAL_DIR/datasets/beam" \
         --output-dir /tmp/mem0bench/beam-chain \
     >> "$LOGFILE" 2>&1
 echo "BEAM done $(date)" >> "$LOGFILE"
 BEAM=$(ls -t /tmp/mem0bench/beam-chain/beam_results_*.json 2>/dev/null | head -1)
 echo "BEAM_RESULT_FILE=$BEAM" >> "$MASTER"
 if [ -n "$BEAM" ]; then
-    /home/hindsight/spacetime-memory/.venv/bin/python3 - "$BEAM" >> "$MASTER" <<'PY'
+    "$STMEM_PY" - "$BEAM" >> "$MASTER" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 print("BEAM OFFICIAL (Mem0 harness, deepseek judge via our Zen chain)")

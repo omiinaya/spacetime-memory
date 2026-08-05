@@ -139,11 +139,11 @@ All env vars can be overridden by passing constructor arguments to `Client()`:
 from spacetime_memory import Client
 
 client = Client(
-    host="10.0.0.5",
+    host="127.0.0.1",
     port=3001,
     database="my-db",
-    embedder_url="http://10.0.0.6:9090",
-    token="eyJ...",
+    embedder_url="http://127.0.0.1:9090",
+    token="<your-token>",
     verbose=True,
 )
 ```

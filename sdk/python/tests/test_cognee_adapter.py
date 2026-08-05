@@ -7,9 +7,7 @@ SpacetimeDB.
 
 from __future__ import annotations
 
-import asyncio
 import json
-import os
 import uuid
 from typing import Any
 
@@ -30,7 +28,6 @@ from spacetime_memory.sdks.cognee import (
     add,
     agent_memory,
     cognify,
-    config,
     datasets,
     delete,
     get_current_agent_memory_context,
@@ -93,7 +90,7 @@ class FakeClient:
                 out = [r for r in out if r.get("id") == filt["id"]]
             return out
         if table == "kg_node":
-            return [{"label": l} for l in self.nodes.get(ws, set())]
+            return [{"label": label} for label in self.nodes.get(ws, set())]
         return []
 
     def _call(self, reducer: str, args: list[Any]) -> Any:

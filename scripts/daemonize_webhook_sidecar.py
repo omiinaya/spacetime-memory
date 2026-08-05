@@ -7,7 +7,12 @@ Env: STDB_URL / STDB_DB / STDB_TOKEN are read by the sidecar itself.
 import os
 import sys
 
-BIN = "/home/hindsight/spacetime-memory/server/webhook-sidecar/target/release/webhook-sidecar"
+# Resolve the checkout root relative to this script so it works on any machine.
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+BIN = os.path.join(
+    _REPO_ROOT,
+    "server/webhook-sidecar/target/release/webhook-sidecar",
+)
 PIDFILE = "/tmp/webhook_sidecar.pid"
 LOGFILE = "/tmp/webhook_sidecar.log"
 

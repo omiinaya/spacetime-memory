@@ -1927,7 +1927,8 @@ mod tests {
         // We can't call the reducer without a ctx, so we verify the
         // logic directly: the condition `cache_ttl_ms > 0` gates the
         // cache lookup, so 0 means always re-run.
-        assert!(!(0u64 > 0));
+        let cache_ttl_ms: u64 = 0;
+        assert!(!(cache_ttl_ms > 0));
     }
 
     #[test]

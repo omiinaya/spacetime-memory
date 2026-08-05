@@ -75,8 +75,8 @@ from .letta import (
     Block,
     CORE_MEMORY_BLOCK_CHAR_LIMIT,
     LettaMemory,
-    Memory,
-    Message,
+    Memory,  # noqa: F811 — re-exported from letta adapter
+    Message,  # noqa: F811 — re-exported from letta adapter
     Passage,
 )
 from .qmd import Document, QmdClient, Query, SearchResult as QmdSearchResult, SubQuery
@@ -97,13 +97,13 @@ from .zep import (
     Fact,
     FactRatingExamples,
     FactRatingInstruction,
-    Memory,
+    Memory,  # noqa: F811 — re-exported from zep adapter
     MemoryMessage,
     MemorySearchResult,
     NotFoundError,
     RoleType,
     SearchScope,
-    SearchType,
+    SearchType,  # noqa: F811 — re-exported from zep adapter
     SessionFactRatingExamples,
     SessionFactRatingInstruction,
     SuccessResponse,

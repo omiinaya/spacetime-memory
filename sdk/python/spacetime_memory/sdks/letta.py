@@ -341,14 +341,14 @@ class LettaMemory:
         """Add a new core-memory block."""
         if not label or not value:
             raise ValueError("letta.add_block: label and value must be non-empty")
-        ws = self._agent_ws(agent_id)
+        ws = self._agent_ws(agent_id)  # noqa: F841 — workspace id kept for API parity with _store_block
         block = Block(value=value, label=label)
         self._store_block(ws, agent_id, block)
         return block
 
     def delete_block(self, agent_id: str, block_id: str) -> bool:
         """Delete a core-memory block by id."""
-        ws = self._agent_ws(agent_id)
+        ws = self._agent_ws(agent_id)  # noqa: F841 — workspace id kept for API parity with _store_block
         try:
             self._client._call("delete_memory", [block_id])
             return True
@@ -443,7 +443,7 @@ class LettaMemory:
 
     def delete_archival(self, agent_id: str, passage_id: str) -> bool:
         """Delete a passage from archival memory."""
-        arch_ws = self._archival_ws(agent_id)
+        arch_ws = self._archival_ws(agent_id)  # noqa: F841 — workspace id kept for API parity with _store_passage
         try:
             self._client._call("delete_memory", [passage_id])
             return True

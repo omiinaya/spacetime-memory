@@ -6,7 +6,12 @@ unsound = "all"
 ignore = [
     # Known-safe advisories — these are vetted false positives or
     # transient issues that don't affect this project's use case.
-    #{ id = "RUSTSEC-0000-0000", reason = "example" },
+    # lru 0.12.5 (via tantivy 0.24) has an IterMut soundness issue
+    # (Stacked Borrows). Fix requires tantivy >= 0.26 (lru >= 0.16.3);
+    # deferred because the sidecar is mid-migration to tantivy 0.26
+    # in active development. Not directly reachable — lru is an internal
+    # cache in tantivy and the sidecar never exercises IterMut on it.
+    { id = "RUSTSEC-2026-0002", reason = "lru IterMut soundness via tantivy 0.24; upgrade to tantivy 0.26 pending active migration, not reachable in sidecar usage" },
 ]
 
 [licenses]
@@ -61,6 +66,7 @@ skip = [
     { name = "windows_x86_64_gnullvm", reason = "platform dep pinned by windows-targets" },
     { name = "windows_x86_64_msvc", reason = "platform dep pinned by windows-targets" },
     { name = "wit-bindgen", reason = "0.51 via wasip3, 0.57 via wasip2" },
+    { name = "syn", reason = "2.0 via proc-macro2 ecosystem, 3.0 via tantivy 0.26 — incompatible major lines" },
 ]
 
 [sources]

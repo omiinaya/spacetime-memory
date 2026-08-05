@@ -1601,20 +1601,20 @@ class TestLettaWireFormatValidation:
     def letta(self) -> tuple[Any, WireTap]:
         from spacetime_memory.sdks.letta import LettaMemory
         c, tap = _make_mock_client()
-        l = LettaMemory(host="localhost", port=3001, database="mock-adapter-e2e")
-        l._client = c
-        return l, tap
+        letta_client = LettaMemory(host="localhost", port=3001, database="mock-adapter-e2e")
+        letta_client._client = c
+        return letta_client, tap
 
     def test_update_block_stores(self, letta: tuple[Any, WireTap]) -> None:
-        l, tap = letta
+        letta_client, tap = letta
         tap.requests.clear()
-        l.update_block(self._AGENT, "persona", "I am a test agent.")
+        letta_client.update_block(self._AGENT, "persona", "I am a test agent.")
         _assert_reducer_called(tap, "store_memory")
 
     def test_get_memory_uses_sql(self, letta: tuple[Any, WireTap]) -> None:
-        l, tap = letta
+        letta_client, tap = letta
         tap.requests.clear()
-        l.get_memory(self._AGENT)
+        letta_client.get_memory(self._AGENT)
         _assert_sql_called(tap)
 
 

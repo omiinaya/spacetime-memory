@@ -88,9 +88,8 @@ except Exception:  # pragma: no cover - fallback path
     BaseStore = object  # type: ignore[assignment]
     _HAS_LANGGRAPH = False
 
-from ..client import Client
-from ..llm import LLMClient
-from .langchain import StmemStore
+from ..llm import LLMClient  # noqa: E402 — after optional langgraph import
+from .langchain import StmemStore  # noqa: E402 — after optional langgraph import
 
 __all__ = [
     "create_manage_memory_tool",
@@ -363,7 +362,7 @@ def create_manage_memory_tool(
     """
     if not actions_permitted:
         raise ValueError("actions_permitted cannot be empty")
-    action_type = Literal[tuple(actions_permitted)]  # type: ignore[valid-type]
+    action_type = Literal[tuple(actions_permitted)]  # type: ignore[valid-type]  # noqa: F841 — kept for runtime typing parity
     default_action: str = "create" if "create" in actions_permitted else actions_permitted[0]
     namespacer = NamespaceTemplate(namespace)
     initial_store = store

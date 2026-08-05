@@ -6,7 +6,6 @@ Unit tests use a fake Client (no live STDB needed). Integration tests
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from typing import Any
@@ -21,7 +20,6 @@ from spacetime_memory.sdks.mnemosyne import (
     SM2_SECOND_INTERVAL_DAYS,
     process_forgotten_card,
     process_new_card,
-    process_remembered_card,
     _sm2_next_interval,
     _sm2_update_easiness,
 )
@@ -234,7 +232,7 @@ class TestReview:
     def test_review_good_grade_second_interval(self, memo: Mnemosyne) -> None:
         card = memo.create_card("q1", "a1")
         now = int(time.time())
-        r1 = memo.review_card(card["id"], grade=5, now=now)
+        r1 = memo.review_card(card["id"], grade=5, now=now)  # noqa: F841 — exercises grade-5 path, r2 asserts the persisted state
         r2 = memo.review_card(card["id"], grade=4, now=now + 86400)
         assert r2["acq_reps"] == 2
         assert r2["next_rep"] == now + 86400 + 6 * 86400
