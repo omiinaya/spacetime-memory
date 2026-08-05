@@ -729,6 +729,7 @@ class Memory:
                         "memory": r.get("content", ""),
                         "user_id": user_id or "",
                         "agent_id": agent_id or "",
+                        "source_url": r.get("source_url", ""),
                         "metadata": {},
                     }
                     for r in rows
