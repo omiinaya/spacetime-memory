@@ -11,7 +11,7 @@ use crate::{now_micros, uuid_v4_uniq, uuid_v7};
 // ---------------------------------------------------------------------------
 
 /// A registered webhook that fires POST requests on matching workspace events.
-#[table(accessor = webhook)]
+#[table(accessor = webhook, public)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Webhook {
     #[primary_key]
@@ -45,7 +45,7 @@ pub struct Webhook {
 /// Status lifecycle: `pending` → `delivered` | `failed`.
 /// An external worker (or future reducer) picks up `pending` deliveries,
 /// performs the HTTP call, and updates the status accordingly.
-#[table(accessor = webhook_delivery)]
+#[table(accessor = webhook_delivery, public)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WebhookDelivery {
     #[primary_key]
@@ -77,7 +77,7 @@ pub struct WebhookDelivery {
 // ---------------------------------------------------------------------------
 
 /// Snapshot result for `list_webhooks` queries.
-#[table(accessor = webhook_list_result)]
+#[table(accessor = webhook_list_result, public)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WebhookListResult {
     #[primary_key]

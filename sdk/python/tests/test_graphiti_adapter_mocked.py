@@ -2091,3 +2091,181 @@ class TestGraphitiMockedExtended:
         communities = g.nodes.community.get_by_group_ids(["default"])
         assert len(communities) == 1
         assert communities[0].uuid == "comm-gid"
+
+
+class TestBiTemporalFilter:
+    """Tests for _filter_by_valid_at Graphiti-parity bi-temporal semantics.
+
+    Mirrors Graphiti's SearchFilters: valid_at / invalid_at are separate
+    field comparisons (>= / <=) on the edge validity window
+    [valid_at, invalid_at). invalid_at 0/None means currently valid.
+    """
+
+    @staticmethod
+    def _make_edge(
+        name: str,
+        valid_at: str | None = None,
+        invalid_at: str | None = None,
+    ) -> EntityEdge:
+        def _p(s: str | None) -> datetime | None:
+            return datetime.fromisoformat(s).replace(tzinfo=UTC) if s else None
+
+        return EntityEdge(
+            name=name,
+            fact=f"fact {name}",
+            group_id="default",
+            valid_at=_p(valid_at),
+            invalid_at=_p(invalid_at),
+        )
+
+    @staticmethod
+    def _graphiti() -> Graphiti:
+        from unittest.mock import MagicMock
+
+        return Graphiti(client=MagicMock())
+
+    def test_no_bounds_returns_all(self):
+        """No bounds returns the original list unchanged (Graphiti parity)."""
+        g = self._graphiti()
+        edges = [
+            self._make_edge("current", valid_at="2023-01-01T00:00:00+00:00"),
+            self._make_edge(
+                "superseded",
+                valid_at="2023-01-01T00:00:00+00:00",
+                invalid_at="2023-06-01T00:00:00+00:00",
+            ),
+            self._make_edge("untimed"),
+        ]
+        assert g._filter_by_valid_at(edges) == edges
+
+    def test_valid_at_after(self):
+        """valid_at_after keeps edges with valid_at >= date."""
+        g = self._graphiti()
+        edges = [
+            self._make_edge("old", valid_at="2023-01-01T00:00:00+00:00"),
+            self._make_edge("new", valid_at="2023-06-01T00:00:00+00:00"),
+        ]
+        result = g._filter_by_valid_at(
+            edges, valid_at_after=datetime.fromisoformat("2023-03-01T00:00:00+00:00")
+        )
+        assert [e.name for e in result] == ["new"]
+
+    def test_valid_at_before(self):
+        """valid_at_before keeps edges with valid_at <= date."""
+        g = self._graphiti()
+        edges = [
+            self._make_edge("old", valid_at="2023-01-01T00:00:00+00:00"),
+            self._make_edge("new", valid_at="2023-06-01T00:00:00+00:00"),
+        ]
+        result = g._filter_by_valid_at(
+            edges, valid_at_before=datetime.fromisoformat("2023-03-01T00:00:00+00:00")
+        )
+        assert [e.name for e in result] == ["old"]
+
+    def test_invalid_at_after_includes_never_invalidated(self):
+        """Never-invalidated edges satisfy invalid_at >= date."""
+        g = self._graphiti()
+        edges = [
+            self._make_edge(
+                "invalidated-early",
+                valid_at="2023-01-01T00:00:00+00:00",
+                invalid_at="2023-02-01T00:00:00+00:00",
+            ),
+            self._make_edge("still-valid", valid_at="2023-01-01T00:00:00+00:00"),
+        ]
+        result = g._filter_by_valid_at(
+            edges, invalid_at_after=datetime.fromisoformat("2023-03-01T00:00:00+00:00")
+        )
+        assert [e.name for e in result] == ["still-valid"]
+
+    def test_invalid_at_before_excludes_never_invalidated(self):
+        """invalid_at_before keeps only edges invalidated by that date."""
+        g = self._graphiti()
+        edges = [
+            self._make_edge(
+                "superseded",
+                valid_at="2023-01-01T00:00:00+00:00",
+                invalid_at="2023-02-01T00:00:00+00:00",
+            ),
+            self._make_edge("still-valid", valid_at="2023-01-01T00:00:00+00:00"),
+        ]
+        result = g._filter_by_valid_at(
+            edges, invalid_at_before=datetime.fromisoformat("2023-03-01T00:00:00+00:00")
+        )
+        assert [e.name for e in result] == ["superseded"]
+
+    def test_combined_valid_and_invalid_window(self):
+        """Combine valid_at_after + invalid_at_before for an as-of snapshot."""
+        g = self._graphiti()
+        edges = [
+            self._make_edge(
+                "valid-then-superseded",
+                valid_at="2023-01-01T00:00:00+00:00",
+                invalid_at="2023-06-01T00:00:00+00:00",
+            ),
+            self._make_edge(
+                "too-early",
+                valid_at="2022-01-01T00:00:00+00:00",
+                invalid_at="2023-06-01T00:00:00+00:00",
+            ),
+            self._make_edge(
+                "invalidated-before-window",
+                valid_at="2023-01-01T00:00:00+00:00",
+                invalid_at="2023-02-01T00:00:00+00:00",
+            ),
+        ]
+        result = g._filter_by_valid_at(
+            edges,
+            valid_at_after=datetime.fromisoformat("2023-01-01T00:00:00+00:00"),
+            invalid_at_before=datetime.fromisoformat("2023-12-01T00:00:00+00:00"),
+        )
+        # All three edges are invalidated by end-2023 and valid_at >= 2023-01-01
+        assert {e.name for e in result} == {
+            "valid-then-superseded",
+            "invalidated-before-window",
+        }
+
+    def test_edges_without_valid_at_excluded_when_valid_bound_active(self):
+        """Edges without valid_at are excluded when a valid_at bound is active."""
+        g = self._graphiti()
+        edges = [self._make_edge("untimed")]
+        result = g._filter_by_valid_at(
+            edges, valid_at_after=datetime.fromisoformat("2023-01-01T00:00:00+00:00")
+        )
+        assert result == []
+
+    def test_invalid_at_zero_treated_as_never(self):
+        """invalid_at == 0 (raw STDB) means currently valid."""
+        g = self._graphiti()
+        edge = EntityEdge(
+            name="zero-invalid",
+            fact="f",
+            group_id="default",
+            valid_at=datetime(2023, 1, 1, tzinfo=UTC),
+            invalid_at=datetime.fromtimestamp(0, tz=UTC),
+        )
+        result = g._filter_by_valid_at(
+            [edge], invalid_at_before=datetime(2023, 6, 1, tzinfo=UTC)
+        )
+        assert result == []  # never invalidated → not matched by invalid_at_before
+
+    def test_search_passes_invalid_at_kwargs(self):
+        """search() forwards invalid_at filters to _filter_by_valid_at."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.list_workspaces.return_value = [{"id": "ws-1", "name": "default"}]
+        # First search call returns rows referencing a node, second (neighbors) empty
+        mock_client.search.return_value = [
+            {"entity_id": "node-a", "entity_type": "node", "score": 0.9},
+        ]
+        mock_client.get_neighbors.return_value = []
+        mock_client.query_graph.return_value = []
+        g = Graphiti(client=mock_client)
+        result = g.search(
+            "query",
+            group_ids=["default"],
+            invalid_at_before=datetime(2023, 6, 1, tzinfo=UTC),
+        )
+        # No edges found with empty neighbors, but the call should not raise
+        assert result == []

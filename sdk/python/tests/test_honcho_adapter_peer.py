@@ -89,6 +89,27 @@ class TestHonchoPeerAdvanced:
         rep = p.representation()
         assert rep is None or isinstance(rep, str)
 
+    def test_peer_working_representation(self, honcho: Honcho) -> None:
+        """Peer.working_representation() returns a session-scoped description."""
+        pid = _uid()
+        sid = _uid("session")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+        p.message("I love hiking in the mountains")
+        rep = p.working_representation(session=s)
+        assert rep is None or isinstance(rep, str)
+
+    def test_peer_working_representation_by_id(self, honcho: Honcho) -> None:
+        """Peer.working_representation() accepts a raw session id string."""
+        pid = _uid()
+        sid = _uid("session")
+        p = honcho.peer(pid)
+        s = honcho.session(sid)
+        s.add_peers([p])
+        rep = p.working_representation(session=sid)
+        assert rep is None or isinstance(rep, str)
+
     def test_peer_context(self, honcho: Honcho) -> None:
         """Peer.context() returns peer context."""
         pid = _uid()

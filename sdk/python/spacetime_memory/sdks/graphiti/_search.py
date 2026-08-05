@@ -117,11 +117,22 @@ class GraphitiSearch:
             except RuntimeError:
                 pass  # non-fatal — operation may fail under concurrent load or missing data
 
-        # Apply time-range filter on valid_at (if provided)
+        # Apply time-range filter on validity window (if provided)
         valid_at_after = kwargs.get("valid_at_after")
         valid_at_before = kwargs.get("valid_at_before")
-        if valid_at_after is not None or valid_at_before is not None:
-            edges = self._filter_by_valid_at(edges, valid_at_after, valid_at_before)
+        invalid_at_after = kwargs.get("invalid_at_after")
+        invalid_at_before = kwargs.get("invalid_at_before")
+        if any(
+            v is not None
+            for v in (valid_at_after, valid_at_before, invalid_at_after, invalid_at_before)
+        ):
+            edges = self._filter_by_valid_at(
+                edges,
+                valid_at_after=valid_at_after,
+                valid_at_before=valid_at_before,
+                invalid_at_after=invalid_at_after,
+                invalid_at_before=invalid_at_before,
+            )
 
         # Sort by score if available, then by name
         def _sort_key(e: EntityEdge) -> tuple[float, str]:
@@ -252,11 +263,22 @@ class GraphitiSearch:
             except RuntimeError:
                 pass  # non-fatal — operation may fail under concurrent load or missing data
 
-        # Apply time-range filter on edges (if provided)
+        # Apply time-range filter on validity window (if provided)
         valid_at_after = kwargs.get("valid_at_after")
         valid_at_before = kwargs.get("valid_at_before")
-        if valid_at_after is not None or valid_at_before is not None:
-            edges = self._filter_by_valid_at(edges, valid_at_after, valid_at_before)
+        invalid_at_after = kwargs.get("invalid_at_after")
+        invalid_at_before = kwargs.get("invalid_at_before")
+        if any(
+            v is not None
+            for v in (valid_at_after, valid_at_before, invalid_at_after, invalid_at_before)
+        ):
+            edges = self._filter_by_valid_at(
+                edges,
+                valid_at_after=valid_at_after,
+                valid_at_before=valid_at_before,
+                invalid_at_after=invalid_at_after,
+                invalid_at_before=invalid_at_before,
+            )
 
         return SearchResults(edges=edges, nodes=nodes)
 

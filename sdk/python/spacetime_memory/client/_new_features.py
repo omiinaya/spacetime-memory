@@ -8,6 +8,7 @@ import json
 from typing import Any
 
 from ._base import logger
+from ._utils import _esc
 
 
 class NewFeaturesMixin:
@@ -178,10 +179,11 @@ class NewFeaturesMixin:
             event_types, is_active, created_at, updated_at, created_by.
         """
         self._call("list_webhooks", [workspace_id])
-        rows = self._query(
-            "webhook_list_result",
-            workspace_id=workspace_id,
-            filter_dict={},
+        # webhook_list_result is a PUBLIC table, so read it via SQL directly
+        # (the query_table reducer's generic scan also works, but direct SQL
+        # avoids the reducer hop and is what other public result tables do).
+        rows = self._sql(
+            f"SELECT * FROM webhook_list_result WHERE workspace_id = '{_esc(workspace_id)}'"
         )
         if rows:
             rows.sort(key=lambda r: r.get("created_at", 0) or 0)

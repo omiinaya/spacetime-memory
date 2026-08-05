@@ -72,6 +72,7 @@ class ZepClient:
             port=port,
             database=config.get("db", config.get("database")) if config else None,
             embedder_url=config.get("embedder_url") if config else None,
+            timeout=float(config.get("timeout", 30.0) if config else 30.0),
             token=token or "",
         )
         # Cache: session_id -> workspace_id

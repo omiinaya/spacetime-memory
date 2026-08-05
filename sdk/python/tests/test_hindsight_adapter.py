@@ -485,13 +485,15 @@ class TestCoverageGaps:
         """hindsight.banks returns self (line 400)."""
         assert hindsight.banks is hindsight
 
-    def test_webhooks_shell(self, hindsight: Hindsight) -> None:
-        """hindsight.webhooks raises NotImplementedError (no fabricated success)."""
-        import pytest as _pytest
+    def test_webhooks_real_api(self, hindsight: Hindsight) -> None:
+        """hindsight.webhooks is a real API backed by webhook tables (not a shell)."""
         wh = hindsight.webhooks
-        assert isinstance(wh, _HindsightNotImplementedShell)
-        with _pytest.raises(NotImplementedError):
-            wh("arg1", key="val")
+        assert not isinstance(wh, _HindsightNotImplementedShell)
+        assert hasattr(wh, "create")
+        assert hasattr(wh, "list")
+        assert hasattr(wh, "update")
+        assert hasattr(wh, "delete")
+        assert hasattr(wh, "fire")
 
     def test_not_implemented_shell_call(self) -> None:
         """_HindsightNotImplementedShell raises on call and attribute access."""

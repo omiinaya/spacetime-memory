@@ -164,31 +164,89 @@ class GraphitiCore:
         edges: list[EntityEdge],
         valid_at_after: datetime | None = None,
         valid_at_before: datetime | None = None,
+        invalid_at_after: datetime | None = None,
+        invalid_at_before: datetime | None = None,
     ) -> list[EntityEdge]:
-        """Filter a list of edges by ``valid_at`` timestamp.
+        """Filter a list of edges by bi-temporal validity (Graphiti parity).
+
+        Mirrors Graphiti's ``SearchFilters`` date filters: ``valid_at`` and
+        ``invalid_at`` are separate, independently combinable field
+        comparisons (``ComparisonOperator >= / <=``) on the edge's validity
+        window ``[valid_at, invalid_at)``.
+
+        - ``valid_at_after``  → keep edges with ``valid_at >= date``
+        - ``valid_at_before`` → keep edges with ``valid_at <= date``
+        - ``invalid_at_after``  → keep edges with ``invalid_at >= date``
+        - ``invalid_at_before`` → keep edges with ``invalid_at <= date``
+
+        ``invalid_at`` of 0/None means *currently valid* (never invalidated).
+        For ``invalid_at`` comparisons it is treated as ``+inf`` for the
+        ``after`` bound and as an unmatched NULL for the ``before`` bound —
+        i.e. an edge invalidated ``<= date`` matches ``invalid_at_before``,
+        and a never-invalidated edge does not.
+
+        When **no bounds are supplied** the original edge list is returned
+        unchanged (matching Graphiti, which returns all versions and lets the
+        caller compose date filters).
 
         Args:
             edges: List of :class:`EntityEdge` objects to filter.
-            valid_at_after: If set, only return edges whose ``valid_at``
-                is greater than or equal to this datetime.
-            valid_at_before: If set, only return edges whose ``valid_at``
-                is less than or equal to this datetime.
+            valid_at_after: Only return edges whose ``valid_at >=`` this date.
+            valid_at_before: Only return edges whose ``valid_at <=`` this date.
+            invalid_at_after: Only return edges whose ``invalid_at >=`` this
+                date (never-invalidated edges always match).
+            invalid_at_before: Only return edges whose ``invalid_at <=`` this
+                date (never-invalidated edges never match).
 
         Returns:
-            Filtered list of edges.  Edges without a ``valid_at`` are
-            excluded when any filter is active.
+            Filtered list of edges.
         """
-        if valid_at_after is None and valid_at_before is None:
+        if (
+            valid_at_after is None
+            and valid_at_before is None
+            and invalid_at_after is None
+            and invalid_at_before is None
+        ):
             return edges
+
+        def _ts(dt: datetime | None) -> int | None:
+            if dt is None:
+                return None
+            return int(dt.timestamp() * 1_000_000)
+
+        def _edge_times(edge: EntityEdge) -> tuple[int | None, int | None, bool]:
+            """(valid_at_us, invalid_at_us_or_None, never_invalidated)"""
+            start = _ts(edge.valid_at)
+            invalid_raw = _ts(edge.invalid_at)
+            never = invalid_raw is None or invalid_raw == 0
+            return start, invalid_raw, never
+
+        after_us = _ts(valid_at_after)
+        before_us = _ts(valid_at_before)
+        invalid_after_us = _ts(invalid_at_after)
+        invalid_before_us = _ts(invalid_at_before)
 
         filtered: list[EntityEdge] = []
         for edge in edges:
-            if edge.valid_at is None:
-                continue  # no timestamp to compare against
-            if valid_at_after is not None and edge.valid_at < valid_at_after:
-                continue
-            if valid_at_before is not None and edge.valid_at > valid_at_before:
-                continue
+            start, invalid_raw, never = _edge_times(edge)
+
+            if after_us is not None:
+                if start is None or start < after_us:
+                    continue  # valid_at < date
+            if before_us is not None:
+                if start is None or start > before_us:
+                    continue  # valid_at > date
+
+            if invalid_after_us is not None:
+                # Never-invalidated edges are still valid, so they satisfy
+                # "invalid_at >= date". Otherwise require invalid_at >= date.
+                if not never and (invalid_raw is None or invalid_raw < invalid_after_us):
+                    continue
+            if invalid_before_us is not None:
+                # Only edges actually invalidated by this date match.
+                if never or invalid_raw is None or invalid_raw > invalid_before_us:
+                    continue
+
             filtered.append(edge)
 
         return filtered
