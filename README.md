@@ -557,7 +557,7 @@ The integration tests auto-publish the module via HTTP API. If no STDB is runnin
 | Rust (STDB module) | **896** ✅ | 0 failed, 0 compiler warnings |
 | TypeScript SDK | **348** ✅ | 15+ files in `tests/`, 0 failed |
 | Frontend (Vitest) | **124** ✅ | 45 test files covering all 47 pages |
-| Python SDK (unit) | **6,674 collected** ✅ | 8,144 test functions across 261 files |
+| Python SDK (unit) | **6,687 passed** ✅ | 6,687 passed + 21 skipped, 1,311 deselected (integration); 0 failed under leak-isolated env |
 
 ### Configuration Reference
 
