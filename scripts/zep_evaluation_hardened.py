@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 from time import time
 from typing import Any
 
@@ -238,20 +239,51 @@ class EvaluationRunner:
         grader_prompt = GRADER_PROMPT.format(
             question=question, gold_answer=gold_answer, response=response
         )
+        messages = [
+            {"role": "system", "content": GRADER_SYSTEM_PROMPT},
+            {"role": "user", "content": grader_prompt},
+        ]
 
-        grader_response = await self.openai.beta.chat.completions.parse(
-            model=self.config.models.grader_model,
-            messages=[
-                {"role": "system", "content": GRADER_SYSTEM_PROMPT},
-                {"role": "user", "content": grader_prompt},
-            ],
-            response_format=Grade,
+        text = await self._parse_or_plaintext(
+            model=self.config.models.grader_model, messages=messages,
             temperature=self.config.models.grader_temperature,
         )
+        if not text:
+            return False, "grade call failed (upstream)"
 
-        result = grader_response.choices[0].message.parsed
-        is_correct = result.is_correct.strip().lower() == "correct"
-        return is_correct, result.reasoning
+        # Structured path: "CORRECT"/"WRONG" with reasoning; plaintext path:
+        # the model echoes the same two fields — extract both defensively.
+        m = re.search(r"(CORRECT|WRONG)", text, re.IGNORECASE)
+        if m:
+            is_correct = m.group(1).strip().lower() == "correct"
+            reasoning = re.sub(r"(?is)^.*?(CORRECT|WRONG)\s*[:.\-]?\s*", "", text).strip()
+            return is_correct, reasoning[:500]
+        return False, text[:500]
+
+    async def _parse_or_plaintext(
+        self, *, model: str, messages: list[dict[str, str]], temperature: float,
+    ) -> str:
+        """Call the model, falling back to plaintext when structured output fails.
+
+        The free-tier upstream (OpenCode Zen / deepseek-v4-flash-free)
+        intermittently rejects ``response_format`` with 400 "This
+        response_format type is unavailable now". Structured output is a
+        convenience, not a requirement — every consumer here regex-parses the
+        reply, so fall back to a plain completion when the strict parse 400s.
+        """
+        try:
+            resp = await self.openai.beta.chat.completions.parse(
+                model=model, messages=messages, temperature=temperature,
+            )
+            return resp.choices[0].message.content or ""
+        except (APIError, APITimeoutError, InternalServerError):
+            try:
+                resp = await self.openai.chat.completions.create(
+                    model=model, messages=messages, temperature=temperature,
+                )
+                return resp.choices[0].message.content or ""
+            except (APIError, APITimeoutError, InternalServerError):
+                return ""
 
     def _count_tokens(self, text: str) -> int:
         """Count tokens in text."""
@@ -328,23 +360,31 @@ For your evaluation:
 Please evaluate the context completeness:
 """
 
-        result = await self.openai.beta.chat.completions.parse(
+        text = await self._parse_or_plaintext(
             model=self.config.models.grader_model,
             messages=[
                 {"role": "system", "content": instructions},
                 {"role": "user", "content": input_text},
             ],
-            response_format=CompletenessGrade,
             temperature=self.config.models.grader_temperature,
         )
 
-        completeness_grade = (
-            result.choices[0].message.parsed.completeness.strip().upper()
-        )
+        if not text:
+            return "INSUFFICIENT", "context eval call failed", [], []
+
+        # Structured output schema fields, interpreted from plaintext:
+        #   completeness: COMPLETE | PARTIAL | INSUFFICIENT
+        #   reasoning: free text
+        #   missing_elements / present_elements: lists
+        comp_m = re.search(r"(COMPLETE|PARTIAL|INSUFFICIENT)", text, re.IGNORECASE)
+        completeness_grade = comp_m.group(1).strip().upper() if comp_m else "INSUFFICIENT"
+        reasoning = re.sub(r"(?is)^.*?(COMPLETE|PARTIAL|INSUFFICIENT)\s*[:.\-]?\s*", "", text).strip()
+        missing_elements = re.findall(r"(?im)^\s*[-*]\s*MISSING(?::\s*|\s)+(.+)$", text)
+        present_elements = re.findall(r"(?im)^\s*[-*]\s*PRESENT(?::\s*|\s)+(.+)$", text)
 
         return (
             completeness_grade,
-            result.choices[0].message.parsed.reasoning,
-            result.choices[0].message.parsed.missing_elements,
-            result.choices[0].message.parsed.present_elements,
+            reasoning[:500],
+            missing_elements or [],
+            present_elements or [],
         )
