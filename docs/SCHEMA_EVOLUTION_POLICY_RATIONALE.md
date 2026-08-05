@@ -141,9 +141,9 @@ rational optimum.
 The policy did not come from theory; it codifies what `spacetime-memory` has
 been doing successfully across many releases. Three verified examples:
 
-### 5.1 The `Memory` struct grew 15+ fields across 6 feature groups — zero migrations
+### 5.1 The `Memory` struct grew 12 fields across 7 feature groups — zero migrations
 
-`server/spacetimedb/src/memory.rs` (lines 41–74) documents its own evolution
+`server/spacetimedb/src/memory.rs` (lines 41–79) documents its own evolution
 in commented feature blocks, each appended onto an existing production table
 with nothing but struct fields + reducer defaults:
 
@@ -155,7 +155,14 @@ with nothing but struct fields + reducer defaults:
 // ---- RetainDB: Consolidation ----          -> consolidated_to          (default "")
 // ---- Holographic: Trust Scoring & Feedback-> trust_score, feedback_count
 // ---- User-level isolation (Mem0 parity) -- -> user_scope               (default "")
+// ---- Source attribution ----                -> source_url               (default None; COALESCEd to "" on read)
 ```
+
+The `Memory` struct now holds **28 total fields** — 16 original plus 12 added
+across 7 feature blocks — and the `source_url` block (the policy's own
+worked example) was added after this document was first written, on the live
+table, without a migration. The example describes a real change that already
+happened.
 
 None of these required a migration, an `ALTER`, or a data wipe. Each was a
 struct edit + a default in `store_memory`/`store_memory_batch` + a guard in
@@ -163,7 +170,7 @@ read paths. **This is the empirical proof that the approach scales.**
 
 ### 5.2 `memory_meta.rs` explicitly avoids migrations on purpose
 
-The `MemoryMeta` design comment (verified, lines 11–15) states it stores
+The `MemoryMeta` design comment (verified, lines 14–16) states it stores
 extensible metadata **in a separate table specifically "so we don't need
 schema migrations** on the core memory table." The codebase is not merely
 tolerant of the policy — it is *architected* around avoiding migrations.
@@ -196,7 +203,7 @@ cheap relative to the benefits:
    we do for a true breaking change?" with **"we don't make breaking changes"**.
    Renames, type changes, and removals are all forbidden (see the policy's
    "Non-Additive Changes" table). When data genuinely must move shape — e.g. the
-   `ITER_AUDIT.md` note that adding `workspace_id` to `peer_reputation` /
+   `server/spacetimedb/src/ITER_AUDIT.md` note that adding `workspace_id` to `peer_reputation` /
    `entity_link` / `kg_node` "would fix remaining cross-workspace scans but
    requires schema migration" — the policy's answer is: **add a new
    field/table and migrate in application logic**, not a destructive rewrite.
@@ -228,8 +235,8 @@ sweeps) either unavailable, forbidden, or strictly riskier — and because the
 module's own history proves the free path works for many releases.** The rule
 "add a field, give it a default, guard the read paths, publish with
 `--delete-data=never`" costs almost nothing, risks nothing, and has carried a
-15+-field, 6-feature-group `Memory` table from v2-era through to multi-feature
-parity without a single migration.
+12-new-field, 7-feature-group `Memory` table (28 total fields) from v2-era
+through to multi-feature parity without a single migration.
 
 It is not a workaround. It is the optimal strategy for this platform.
 

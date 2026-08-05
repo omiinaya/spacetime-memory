@@ -249,7 +249,7 @@ spacetime-memory/
 | `make install-sdk` | `pip install -e sdk/python` | First setup, after pulling new deps |
 | `make setup` | install-sdk + build-module | Fresh clone setup |
 | `spacetime publish <name> -p server/spacetimedb/ --yes --delete-data=never` | Deploy module to STDB | After a successful build |
-> **⚠️ DATA SAFETY:** Always use `--delete-data=never`. The script `./scripts/publish.sh` enforces this automatically. Never use `--delete-data=on-conflict` — it silently wipes production data on schema changes. Never use `--delete-data=always` unless you've verified a backup exists and explicitly intend to reset.
+> **⚠️ DATA SAFETY:** Always use `--delete-data=never`. The script `./scripts/publish.sh` enforces this automatically. Never use `--delete-data=on-conflict` — it silently wipes production data on schema changes. Never use `--delete-data=always` unless you've verified a backup exists and explicitly intend to reset. Schema changes are governed by [SCHEMA_EVOLUTION_POLICY.md](SCHEMA_EVOLUTION_POLICY.md) — additive fields with reducer-level defaults, **no migrations** (see the policy's 5-step rule and its Related Documents).
 | `cd server/spacetimedb && cargo build --target wasm32-unknown-unknown --release` | Raw cargo build | Debugging Rust compilation |
 | `cd sdk/python && pip install -e ".[dev]"` | Install dev extras (pytest, ruff) | Before running tests/lint |
 

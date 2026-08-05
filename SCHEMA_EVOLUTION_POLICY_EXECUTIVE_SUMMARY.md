@@ -21,7 +21,7 @@
 | **Operational simplicity** | No migration scripts to write, test, version, or run. No downtime. No partial-migration failures. |
 | **Data safety** | `--delete-data=never` is enforced repo-wide. Anything resembling a destructive migration is forbidden by policy. |
 | **Backward compatibility** | Lagging clients keep working — new fields are optional at the SQL level. |
-| **Proven in the codebase** | The `Memory` table grew 15+ fields across 6 commented "feature blocks" (tiering, reinforcement, hierarchy, consolidation, trust scoring, user isolation) with zero migrations. |
+| **Proven in the codebase** | The `Memory` table grew to 28 fields across 7 commented "feature blocks" (tiering, reinforcement, hierarchy, consolidation, trust scoring, user isolation, source attribution) with zero migrations. |
 
 ---
 
@@ -50,7 +50,7 @@ When adding a field to a `#[table]` struct:
 | `Option<String>` | `NULL` | `None` (e.g. `User.email`) |
 | `Vec<T>` / JSON string | `""` | `"[]"` or `serde_json::to_string(&vec![])` |
 
-**Key nuance:** `Option<T>` is the only way to distinguish "created before this field existed" from "explicitly set to the default". Use it when that distinction matters (e.g. `version: Option<u32>` — `None` = pre-versioning).
+**Key nuance:** `Option<T>` is the only way to distinguish "created before this field existed" from "explicitly set to the default". Use it when that distinction matters (e.g. `version: Option<u32>` — `None` = pre-versioning). For the full decision procedure and worked examples, see [docs/OPTION_VS_DEFAULT.md](./docs/OPTION_VS_DEFAULT.md).
 
 ---
 
