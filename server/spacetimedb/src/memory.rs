@@ -75,10 +75,7 @@ pub struct Memory {
 
     // ---- Source attribution ----
     /// URL the memory was sourced from; "" = no source recorded.
-    /// `#[default(None::<String>)]` keeps the schema migration non-breaking for
-    /// existing databases (new column, existing rows get None).
-    #[default(None::<String>)]
-    pub source_url: Option<String>,
+    pub source_url: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +295,7 @@ fn insert_memory(
         trust_score: 0.5,
         feedback_count: 0,
         user_scope: String::new(),
-        source_url: Some(String::new()),
+        source_url: String::new(),
     };
 
     let mem_json = change_event::record_to_json(&mem);
@@ -820,7 +817,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
-            source_url: None,
+            source_url: String::new(),
 
         }
     }
@@ -902,7 +899,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
-            source_url: None,
+            source_url: String::new(),
 
         };
         assert_eq!(mem.id, "mem_001");
@@ -943,7 +940,7 @@ mod tests {
             trust_score: 0.2,
             feedback_count: 1,
             user_scope: "user:alice".to_string(),
-            source_url: None,
+            source_url: String::new(),
         };
         assert!(!mem.is_active);
         assert_eq!(mem.tier, "L2");
@@ -983,7 +980,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
-            source_url: None,
+            source_url: String::new(),
 
         };
         let json = serde_json::to_string(&mem).expect("serialize");
@@ -1139,7 +1136,7 @@ mod tests {
             trust_score: 0.0,
             feedback_count: 0,
             user_scope: String::new(),
-            source_url: None,
+            source_url: String::new(),
 
         };
         assert!(mem.content.is_empty());
@@ -1182,7 +1179,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
-            source_url: None,
+            source_url: String::new(),
 
         };
         assert_eq!(mem.content, content);
@@ -1221,7 +1218,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
-            source_url: None,
+            source_url: String::new(),
 
         };
         assert_eq!(mem.content, content);
@@ -1260,7 +1257,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
-            source_url: None,
+            source_url: String::new(),
 
         };
         assert_eq!(mem.content.len(), 10_000);
@@ -1298,7 +1295,7 @@ mod tests {
                 trust_score: 0.5,
                 feedback_count: 0,
                 user_scope: String::new(),
-                source_url: None,
+                source_url: String::new(),
 
             })
             .collect();
@@ -1340,7 +1337,7 @@ mod tests {
             trust_score: 0.0,
             feedback_count: 0,
             user_scope: String::new(),
-            source_url: None,
+            source_url: String::new(),
 
         };
         assert!(mem.summary.is_empty());

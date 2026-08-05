@@ -399,7 +399,7 @@ mod tests {
             trust_score: 0.9,
             feedback_count: 3,
             user_scope: "".to_string(),
-            source_url: Some(String::new()),
+            source_url: String::new(),
         }
     }
 
@@ -455,7 +455,7 @@ mod tests {
             trust_score: 0.8,
             feedback_count: 5,
             user_scope: "".to_string(),
-            source_url: Some(String::new()),
+            source_url: String::new(),
         };
         let entry = memory_to_entry(&mem);
         let json_str = serde_json::to_string(&entry).unwrap();

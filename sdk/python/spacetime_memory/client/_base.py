@@ -153,6 +153,7 @@ class MemoryRecord:
     trust_score: float
     feedback_count: int
     consolidated_to: str
+    source_url: str = ""
 
     @classmethod
     def from_dict(cls, d: dict) -> "MemoryRecord":
