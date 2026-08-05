@@ -8,13 +8,7 @@ and works the top pending item each tick.
 
 ## Recently Completed
 
-### P3: Add `create_insight` + `delete_insight` typed Python SDK methods (July 17, 2026)
-Added `InsightMixin` in `sdk/python/spacetime_memory/client/_insights.py` with
-`create_insight()` and `delete_insight()` typed methods and wired the mixin into
-the composite `Client` class. Verified the module imports cleanly.
-Files: sdk/python/spacetime_memory/client/_insights.py, sdk/python/spacetime_memory/client/__init__.py
-Difficulty: Easy
-Est: 10min
+*(None pending cleanup — last item verified and removed 2026-08-05.)*
 
 ---
 
