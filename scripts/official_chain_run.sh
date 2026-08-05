@@ -13,6 +13,9 @@ STMEM_PY="${STMEM_PY:-$_REPO_ROOT/.venv/bin/python}"
 ZEP_BENCH_DIR="${ZEP_BENCH_DIR:-$HOME/zep/benchmarks/locomo}"
 MEM0_EVAL_DIR="${MEM0_EVAL_DIR:-$HOME/mem0/evaluation}"
 STMEM_DATA_DIR="${STMEM_DATA_DIR:-$_REPO_ROOT/data}"
+STDB_HOST="${STDB_HOST:-127.0.0.1}"
+STDB_PORT="${STDB_PORT:-3001}"
+STDB_DB="${STDB_DB:-spacetime-memory-v2}"
 
 MASTER=/tmp/official_chain.out
 LOGFILE=/tmp/official_chain.log
@@ -69,7 +72,7 @@ PREFIX="stmem-chain-$(date +%Y%m%d%H%M%S)"
 timeout 10800 env \
     OTEL_ENABLED=false \
     OPENAI_API_KEY=dummy-key OPENAI_BASE_URL=http://localhost:4004/v1 \
-    ZEP_API_KEY=dummy STDB_DB=spacetime-memory-v2 \
+    ZEP_API_KEY=dummy STDB_DB="$STDB_DB" \
     EMBEDDER_URL=http://localhost:9093/v1 STDB_TIMEOUT=300 \
     "$STMEM_PY" -m benchmark \
         --ingest --config benchmark_config_stmem.yaml --prefix "$PREFIX" \
@@ -78,7 +81,7 @@ echo "Zep ingest done $(date)" >> "$LOGFILE"
 timeout 10800 env \
     OTEL_ENABLED=false \
     OPENAI_API_KEY=dummy-key OPENAI_BASE_URL=http://localhost:4004/v1 \
-    ZEP_API_KEY=dummy STDB_DB=spacetime-memory-v2 \
+    ZEP_API_KEY=dummy STDB_DB="$STDB_DB" \
     EMBEDDER_URL=http://localhost:9093/v1 STDB_TIMEOUT=300 \
     "$STMEM_PY" -m benchmark \
         --eval --config benchmark_config_stmem.yaml --prefix "$PREFIX" --num-runs 1 \
@@ -123,8 +126,8 @@ timeout 172800 env \
     "$STMEM_PY" -m benchmarks.longmemeval.run \
         --project-name stmem-chain-lme \
         --backend stmem \
-        --stmem-db spacetime-memory-v2 \
-        --stmem-host 192.168.1.10 --stmem-port 3001 \
+        --stmem-db "$STDB_DB" \
+        --stmem-host "$STDB_HOST" --stmem-port "$STDB_PORT" \
         --answerer-model deepseek-v4-flash-free \
         --judge-model deepseek-v4-flash-free \
         --top-k 200 --max-workers 4 \
@@ -160,8 +163,8 @@ timeout 86400 env \
     "$STMEM_PY" -m benchmarks.beam.run \
         --project-name stmem-chain-beam \
         --backend stmem \
-        --stmem-db spacetime-memory-v2 \
-        --stmem-host 192.168.1.10 --stmem-port 3001 \
+        --stmem-db "$STDB_DB" \
+        --stmem-host "$STDB_HOST" --stmem-port "$STDB_PORT" \
         --answerer-model deepseek-v4-flash-free \
         --judge-model deepseek-v4-flash-free \
         --chat-sizes 100K \
