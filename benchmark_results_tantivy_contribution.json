@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-08-05T17:06:16Z",
+  "timestamp": "2026-08-05T17:21:48Z",
   "host": "127.0.0.1",
   "port": 3001,
   "database": "c200976a4c964c82cde9",
-  "workspace_id": "6c10d48763444ea8b1c28abe6cd725ab",
+  "workspace_id": "3597fc7b0b164cbb8b2943d8b04e91c7",
   "iterations": 20,
   "dataset": {
     "memories": 50,
@@ -17,12 +17,12 @@
         "label": "keyword (Tantivy ON) SDK top-5",
         "n": 20,
         "fails": 0,
-        "p50": 51.1,
-        "p90": 67.0,
-        "p99": 105.8,
-        "mean": 55.6,
-        "min": 35.4,
-        "max": 106.5
+        "p50": 77.8,
+        "p90": 110.3,
+        "p99": 155.2,
+        "mean": 81.5,
+        "min": 41.0,
+        "max": 164.5
       }
     ],
     "keyword_tantivy_on_direct": [
@@ -30,12 +30,12 @@
         "label": "keyword (Tantivy ON) direct API top-5",
         "n": 20,
         "fails": 0,
-        "p50": 1.3,
-        "p90": 3.0,
-        "p99": 5.2,
-        "mean": 1.7,
-        "min": 0.9,
-        "max": 5.5
+        "p50": 2.2,
+        "p90": 4.7,
+        "p99": 11.6,
+        "mean": 3.0,
+        "min": 1.6,
+        "max": 13.1
       }
     ],
     "keyword_tantivy_off_sdk": [
@@ -43,12 +43,12 @@
         "label": "keyword (Tantivy OFF) SDK top-5",
         "n": 20,
         "fails": 0,
-        "p50": 77.1,
-        "p90": 5404.4,
-        "p99": 6811.5,
-        "mean": 1441.6,
-        "min": 50.8,
-        "max": 7042.3
+        "p50": 319.7,
+        "p90": 6430.1,
+        "p99": 6545.7,
+        "mean": 1768.0,
+        "min": 105.4,
+        "max": 6566.7
       }
     ],
     "keyword_tantivy_off_mock": [
@@ -56,12 +56,12 @@
         "label": "keyword (Tantivy OFF) mock top-5",
         "n": 20,
         "fails": 0,
-        "p50": 0.0,
-        "p90": 0.1,
-        "p99": 0.3,
+        "p50": 0.1,
+        "p90": 0.2,
+        "p99": 0.5,
         "mean": 0.1,
-        "min": 0.0,
-        "max": 0.3
+        "min": 0.1,
+        "max": 0.6
       }
     ]
   },
@@ -81,7 +81,7 @@
     "P@5_delta_pp": -1.3,
     "R@5_delta_pp": -1.3,
     "MRR_delta": -0.095,
-    "latency_speedup_sdk_x": 1.5,
+    "latency_speedup_sdk_x": 4.1,
     "latency_speedup_direct_x": 0.0
   },
   "notes": "Tantivy ON (SDK): c.search(semantic=False) routes through SDK -> Tantivy sidecar HTTP API. Tantivy ON (direct): direct POST to Tantivy BM25 sidecar at :9091. Tantivy OFF (SDK): c.search() with invalid Tantivy URL forces SDK fallback through _keyword_fallback (STDB _query + client-side BM25). NOTE: the _query bug (workspace_id filter returns 0 rows) causes this path to return 0 results for quality measurement, but latency correctly reflects the STDB query overhead (~5000ms when cold). Tantivy OFF (mock): in-memory keyword substring matching over 50 eval memories (same algorithm as SDK _keyword_fallback, sidestepping the _query bug). Seeding bypasses c.store() (unusably slow, ~10s/memory, and wedges the STDB wasm executor on client timeout) \u2014 uses the store_memory reducer directly + Tantivy /index/batch HTTP API. Graph/temporal/semantic phases skipped (keyword-only benchmark)."
