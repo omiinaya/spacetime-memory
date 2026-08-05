@@ -79,10 +79,10 @@ These adapters aim to match the public API of their upstream library. In most ca
 |---------|---------|:-----------------:|---------|
 | [LangGraph](https://langchain-ai.github.io/langgraph/) / [LangChain](https://python.langchain.com/) | `sdks.langchain.StmemStore` / `StmemMemoryStore` | 16/17 | **~92%** — True `BaseStore` inheritance; `batch()` works except a `refresh_ttl` attribute edge case |
 | [Mem0](https://github.com/mem0ai/mem0) (v2.0.5) | `sdks.mem0.Memory` | **26/26** | **~100%** — Full CRUD + search + history + graph/entity_store + `create_memory_tool` + chat; config-style diffs only. TypeScript port: `typescript/mem0.ts` |
-| [Hindsight](https://github.com/vectorize-io/hindsight) (v0.8.1) | `sdks.hindsight.Hindsight` | Shape tests pass | **~90%** — Full retain/recall/reflect + batch + files + async; documents/entities/operations/monitoring are real (table/sidecar-backed); `webhooks` raises `NotImplementedError`. TypeScript port: `typescript/hindsight.ts` |
+| [Hindsight](https://github.com/vectorize-io/hindsight) (v0.8.1) | `sdks.hindsight.Hindsight` | Shape tests pass | **~95%** — Full retain/recall/reflect + batch + files + async; documents/entities/operations/monitoring are real (table/sidecar-backed); **webhooks are real** (create/list/update/delete/fire over `webhook`+`webhook_delivery` tables with a Rust delivery sidecar — verified E2E). TypeScript port: `typescript/hindsight.ts` |
 | [Zep](https://www.getzep.com/) (v2.0.2) | `sdks.zep.Zep` | **26/26 + 16/16 graph** | **~100%** — v2 API: `.memory`/`.user`/`.graph` sub-clients, `AsyncZep`, `ZepClient` alias. Graph namespace is real (add/search/node/edge/episode/triplet) with LLM fact rating wired. TypeScript port: `typescript/zep.ts` |
-| [Graphiti](https://github.com/getzep/graphiti) (v0.29.2) | `sdks.graphiti.Graphiti` | **20/20** | **~85%** — Entities, edges, episodes, communities. Bi-temporal edges real, but temporal search uses `created_at` proxy; no search config recipes. Constructor params differ (Neo4j vs STDB); return types are plain classes, not Pydantic. TypeScript port: `typescript/graphiti.ts` |
-| [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | **14/14** | **~90%** — Workspace/peer/session/message/search + `.aio` async accessor; no `working_representation`. TypeScript port: `typescript/honcho.ts` |
+| [Graphiti](https://github.com/getzep/graphiti) (v0.29.2) | `sdks.graphiti.Graphiti` | **20/20** | **~92%** — Entities, edges, episodes, communities. **Bi-temporal search is real** (`invalid_at` filters honored — Graphiti `SearchFilters` parity, `valid_at`/`invalid_at` field comparisons + as-of snapshots; verified with mock tests). Constructor params differ (Neo4j vs STDB); return types are plain classes, not Pydantic. TypeScript port: `typescript/graphiti.ts` |
+| [Honcho](https://github.com/plastic-labs/honcho) | `sdks.honcho.Honcho` | **14/14** | **~95%** — Workspace/peer/session/message/search + `.aio` async accessor; **`working_representation` is real** (LLM-generated, session-scoped; integration-tested). TypeScript port: `typescript/honcho.ts` |
 | [QMD](https://github.com/tobi/qmd) | `sdks.qmd.QmdClient` | 31/31 | **~98%** — BM25+vector+hybrid search ✅, query AST ✅, collections/context ✅, fuzzy get ✅, glob multi-get ✅, status ✅ |
 | [Cognee](https://github.com/topoteretes/cognee) | `sdks.cognee` (`add`/`cognify`/`search`/`delete`) | 39/39 | **~90%** — dataset-scoped KG, memory entries (QA/trace/feedback/skill_run), agent memory context, recall scopes; cloud-only features not applicable |
 | [LangMem](https://github.com/langchain-ai/langmem) | `sdks.langmem` (tools + managers) | 33/33 | **~92%** — `create_manage_memory_tool`/`create_search_memory_tool`, LLM memory manager/searcher/thread-extractor, `ReflectionExecutor`, prompt optimizers — all over the LangGraph `BaseStore` interface (`StmemStore`) |
@@ -114,26 +114,26 @@ While all adapters pass their test suites on a live SpacetimeDB instance, the fo
 - Exception types match when `zep_python` is installed (raises real `NotFoundError`/`BadRequestError`/`ApiError`); fallback subclasses of `RuntimeError` are used when `zep_python` is not present
 - The adapter replaces Zep's server entirely (Zep's Python SDK is a thin client to a proprietary server; ours replaces the server with SpacetimeDB)
 
-**Graphiti (~85% coverage)**
+**Graphiti (~92% coverage)**
 - Constructor parameters differ significantly: our adapter takes SpacetimeDB connection params (`host`, `port`, `database`, `token`), while upstream expects Neo4j/`graph_driver` params — these are fundamentally different backends
 - `add_triplet()` accepts an extra `group_id` parameter (SpacetimeDB namespace isolation)
 - `search()` accepts extra `**kwargs` for SpacetimeDB-specific filter options
 - Return types are plain Python classes rather than upstream's Pydantic models — this affects serialization, validation, and downstream type inference (`EntityNode` upstream is a Pydantic model with auto-validation; ours is a plain dataclass with the same fields)
-- Bi-temporal edges are real (`valid_from`/`valid_to` fields plus edge temporal versioning via `edge_group_id`), but bi-temporal *search* is partial — temporal search uses `created_at` as a proxy for valid-time interval filtering
+- Bi-temporal edges are real (`valid_at`/`invalid_at` fields plus edge temporal versioning via `edge_group_id`), and bi-temporal *search* now honors `invalid_at` (Graphiti `SearchFilters` parity): `valid_at_after`/`valid_at_before`/`invalid_at_after`/`invalid_at_before` are independent field comparisons, never-invalidated edges handled correctly, and combined as-of snapshots work (13 mock tests)
 - Upstream's configurable search recipes (cross-encoder/MMR combos) are not ported
 
-**Hindsight (~90% coverage)**
+**Hindsight (~95% coverage)**
 - `documents`, `entities`, `operations`, and `monitoring` are real — backed by the `document`/`doc_chunk`, `kg_node`, and `change_event` tables plus the sidecar health endpoints (embedder :9090, Tantivy :9091)
-- `webhooks` raises `NotImplementedError` — no webhook delivery infrastructure exists
+- `webhooks` are **real and verified E2E** — `create`/`list`/`update`/`delete`/`fire` over the public `webhook` + `webhook_delivery` tables, with a Rust delivery sidecar (`server/webhook-sidecar`) polling pending deliveries, POSTing with HMAC-SHA256 signatures and exponential-backoff retries
 - The real `hindsight_client` is not on PyPI — this adapter *is* the only Python SDK for Hindsight
 
-**Honcho (~90% coverage)**
-- `working_representation` is not implemented
+**Honcho (~95% coverage)**
+- `working_representation` is implemented (LLM-generated representation scoped to a session's messages; accepts `Session` object or raw session id) and integration-tested
 - `Peer.sessions()` returns an empty page — no peer→session mapping exists in SpacetimeDB
 - The real `honcho` is not on PyPI (the PyPI `honcho` package is a Procfile manager)
 
 **LangGraph (~92% coverage)**
-- `batch()` works, but the `refresh_ttl` attribute is missing on test `Op` objects — the only known shape mismatch
+- `batch()` works across `GetOp`/`PutOp`/`SearchOp`/`ListNamespacesOp`, tolerating missing `refresh_ttl` via `getattr` default — no shape mismatch in practice
 
 **LangMem (~92% coverage)**
 - Tools/managers run against `StmemStore` (the LangGraph `BaseStore` implementation) — the LLM-driven extraction paths use the SDK's built-in LLM client (OpenAI-compatible, configurable via `LLM_BASE_URL`), not langmem's provider config
