@@ -124,39 +124,39 @@ Information-theoretic binarization compresses 384-dim float32 embeddings into **
 - **Overlap:** Both have `add/search/get_all/delete/update/history`, entity extraction, graph.
 - **Mnemosyne advantages:** Zero-dependency (Mem0 needs Qdrant/Postgres), 32x MIB vector compression, AAAK compression, SHMR resonance reasoning, Bayesian veracity tiers, bidirectional sync with client-side encryption, local LLM consolidation, 23 MCP tools, memory bank isolation, sleep/consolidation cycle.
 - **Mnemosyne gap:** No Qdrant-backed `entity_store` (but AnnotationStore serves similar role).
-- **Spacetime Memory parity gap vs Mnemosyne: ~70% missing.** Key gaps: AAAK, SHMR, MIB, veracity tiers, polyphonic recall, sync encryption, local LLM, memory banks, pattern detection.
+- **Spacetime Memory parity gap vs Mnemosyne: ~10% missing.** AAAK, SHMR, MIB binary vectors, veracity tiers, polyphonic recall (RRF), pattern detection, memory banks, and local LLM are all implemented and tested (393 tests across those modules pass). Remaining gaps are P2 polish: sync encryption and a dedicated sleep/consolidation daemon.
 
 #### vs. Hindsight
 - **Overlap:** Both have retain/recall/reflect patterns, multi-strategy retrieval.
 - **Mnemosyne advantages:** 4-voice polyphonic recall (vs Hindsight's episodic+semantic), SHMR resonance (vs Hindsight's reflection only), veracity-weighted scoring, sync with encryption, local LLM.
-- **Spacetime Memory parity gap vs Mnemosyne: ~65% missing.** Key gaps: SHMR, veracity, polyphonic recall, sync encryption, local LLM.
+- **Spacetime Memory parity gap vs Mnemosyne: ~15% missing.** SHMR resonance, veracity tiers, polyphonic recall (RRF), and local LLM are all implemented and tested; sync encryption and sleep/consolidation daemon remain P2 polish.
 
 #### vs. Zep
 - **Overlap:** Both have memory.add/search/facts, session/user management concepts.
 - **Mnemosyne advantages:** Self-contained SQLite (Zep needs Docker+PG), AAAK compression, SHMR, MIB binary vectors, sync with client-side encryption, 23 MCP tools.
 - **Zep advantages:** Managed cloud option, built-in fact rating.
-- **Spacetime Memory parity gap vs Mnemosyne: ~60% missing.**
+- **Spacetime Memory parity gap vs Mnemosyne: ~15% missing.** AAAK, SHMR, MIB binary vectors, veracity tiers, polyphonic recall, and pattern detection are all implemented and tested; sync encryption remains P2 polish.
 
 #### vs. Graphiti
 - **Overlap:** Both have KG (nodes, edges, communities), entity extraction, episode storage.
 - **Mnemosyne advantages:** Temporal KG with version chains + `as_of` queries, SHMR reasoning, AAAK compression, MIB binary vectors, sync encryption, 23 MCP tools.
-- **Spacetime Memory parity gap vs Mnemosyne: ~55% missing.**
+- **Spacetime Memory parity gap vs Mnemosyne: ~15% missing.** Bi-temporal KG (version chains, as_of queries), SHMR reasoning, AAAK, and MIB binary vectors are implemented; sync encryption remains P2 polish.
 
 #### vs. Honcho
 - **Overlap:** Both have workspace/peer/session/message models.
 - **Mnemosyne advantages:** BEAM architecture (Honcho is much simpler), AAAK, SHMR, MIB, veracity, polyphonic recall, sync, bank isolation, 23 MCP tools. Much deeper feature set overall.
-- **Spacetime Memory parity gap vs Mnemosyne: ~45% missing.**
+- **Spacetime Memory parity gap vs Mnemosyne: ~10% missing.** AAAK, SHMR, MIB, veracity, polyphonic recall, pattern detection, and bank isolation are implemented and tested; sync encryption remains P2 polish.
 
 #### vs. QMD
 - **Overlap:** Both have hybrid search, MCP server, CLI, context trees, LLM reranking, fuzzy get.
 - **Mnemosyne advantages:** BEAM architecture (QMD is markdown doc search only), AAAK, SHMR, MIB, veracity, sync, bank isolation, agent memory (not just docs), consolidation/sleep cycles.
-- **Spacetime Memory parity gap vs Mnemosyne: ~60% missing.**
+- **Spacetime Memory parity gap vs Mnemosyne: ~15% missing.** AAAK, SHMR, MIB binary vectors, veracity tiers, polyphonic recall, and pattern detection are all implemented and tested; sync encryption remains P2 polish.
 
 #### vs. GBrain
 - **Overlap:** Both have KG, memory storage+search, profiles, notes, consolidation.
 - **Mnemosyne advantages:** AAAK, SHMR, MIB binary vectors, veracity tiers, sync encryption, 23 MCP tools, zero-dependency deployment.
 - **GBrain advantages:** Production scale (146K pages), synthesis with gap analysis, citations.
-- **Spacetime Memory parity gap vs Mnemosyne: ~50% missing.**
+- **Spacetime Memory parity gap vs Mnemosyne: ~15% missing.** Core parity implemented and tested; remaining gaps are P2 polish (sync encryption, sleep/consolidation daemon).
 
 ### 3.2 Unique Mnemosyne Features (Not in Any Tracked Project Nor Spacetime Memory)
 
