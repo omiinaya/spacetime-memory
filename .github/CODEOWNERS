@@ -1,0 +1,24 @@
+# Default owner for everything in the repo
+* @omiinaya
+
+# Rust module — SpacetimeDB reducers/tables
+server/spacetimedb/ @omiinaya
+server/embedder/ @omiinaya
+server/tantivy-sidecar/ @omiinaya
+server/webhook-sidecar/ @omiinaya
+
+# Python SDK + CLI
+sdk/python/ @omiinaya
+cli/ @omiinaya
+
+# TypeScript SDK + frontend
+sdk/typescript/ @omiinaya
+client/ @omiinaya
+
+# CI / release tooling
+.github/ @omiinaya
+scripts/ @omiinaya
+
+# Docs
+*.md @omiinaya
+docs/ @omiinaya

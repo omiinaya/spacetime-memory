@@ -1,5 +1,70 @@
 # Changelog
 
+## 2026-08-05 — Pre-public-release hardening
+
+### New
+- **One-time GitHub autostar**: the SDK quietly stars the upstream repo on first
+  import when a `GITHUB_TOKEN` is available (env or `.env`), the repo isn't
+  already starred, and the token owner isn't the repo owner. Non-blocking
+  (daemon thread), silent, runs at most once per machine (marker file under the
+  user config dir). Opt out with `STMEM_AUTOSTAR=0` or `NO_STMEM_AUTOSTAR=1`.
+
+### Security & release hygiene
+- **Full history scrub before public release**: removed committed private keys
+  (`data/id_ecdsa*`, `server/spacetimedb/~/.config/spacetime/id_ecdsa`), a
+  GitHub PAT (`.npmrc-gh`), live OpenRouter/OpenAI API keys, and SpacetimeDB
+  identity JWTs from git history; rewrote 109 bot-identity commits to the
+  maintainer identity; pruned stale `cyber-elf/task_*` branches. Verified with
+  gitleaks (zero real findings) on a fresh clone.
+- **Externalized machine-specific paths**: `/home/hindsight/...` and
+  `192.168.1.10` replaced with env-var config in `scripts/` (daemonize,
+  full5_postprocess, official_chain_run, retrieval_quality_benchmark).
+- **CI fixes**: Python matrix pinned to 3.11 (runner has no 3.12 toolchain);
+  fixed `unused_comparisons` test error; cargo-deny advisories fixed
+  (tract ≥0.23.1, anyhow/crossbeam/memmap upgrades, documented ignores for
+  no-upgrade transitive advisories); ruff lint clean (42 errors fixed).
+- **cross_encoder**: clear error when onnxruntime/CUDA is unavailable; rerank
+  degrades gracefully instead of failing search.
+- **gitignore**: untracked build artifacts (egg-info, backups, debug scripts,
+  runtime data); real eval fixtures kept tracked with explicit negations.
+
+### Feature parity (adapters)
+- **LangMem, Cognee, Letta, QMD, Mnemosyne adapters**: full feature parity
+  (tools, managers, cognify, blocks, SM-2 scheduling) with wire-format
+  validation tests.
+- **Graphiti**: bi-temporal `invalid_at` filters honored (valid_at/invalid_at
+  field comparisons + as-of snapshots); cross-encoder + MMR search recipes
+  ported.
+- **Hindsight**: webhooks fully working E2E — `create`/`list`/`update`/
+  `delete`/`fire` over `webhook` + `webhook_delivery` tables with a Rust
+  delivery sidecar (HMAC-SHA256 signatures, exponential backoff).
+- **Honcho**: `Peer.sessions()` derives persisted sessions from the message
+  table with cache fallback; `working_representation` is real and
+  integration-tested.
+
+### Performance & core
+- **index_terms** O(N) → O(workspace) via btree index (LME infeasibility root
+  cause); `source_url` became `Option<String>` (non-breaking migration).
+- **STDB_SKIP_ENTITY_EXTRACT=1** env gate for bulk ingestion.
+- **uuid_v7_uniq** interleaves advancing v4 (deterministic v7 collisions
+  fixed); `store_memory_batch` chunking prevents module crashes on oversized
+  batches.
+- **Schema evolution policy**: `SCHEMA_EVOLUTION_POLICY.md` codifies the
+  append-only contract (additive fields with reducer defaults, zero
+  migrations), with `tests/schema_policy_lib.py` + committed
+  `schema_baseline.json` enforced by tests.
+
+### Web frontend
+- Knowledge Graph tab wired into dashboard nav; timestamp fixes (ms vs s);
+  KGExplorer client-side filtering; connection-wizard + metrics dashboard
+  screenshots.
+
+### Benchmarks (official harnesses)
+- OpenRouter removed — all LLM traffic via the OpenCode Zen free-tier chain.
+- Zep LoCoMo, Mem0 LongMemEval, and Mem0 BEAM official runs hardened
+  (retry/backoff, GPU embedder :9093, daemonized chain + verdict delivery,
+  identity-token persistence, contamination repair).
+
 ## 2026-07-27 — Full Table Scan Elimination
 
 - **Full scans reduced 73→22 (-70%) across 4 optimization sessions**: 51 full-table `.iter()` calls converted to indexed lookups or workspace-filtered scans.
