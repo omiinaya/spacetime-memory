@@ -315,9 +315,17 @@ fn query_memory(
                 "peer_id": m.peer_id, "observer_id": m.observer_id,
                 "source_session_id": m.source_session_id, "source_message_id": m.source_message_id,
                 "entities_json": m.entities_json, "confidence": m.confidence,
+                "context": m.context,
                 "tier": m.tier, "is_active": m.is_active,
                 "expires_at": m.expires_at,
                 "created_at": m.created_at, "updated_at": m.updated_at,
+                "access_count": m.access_count, "strength": m.strength, "version": m.version,
+                "valid_from": m.valid_from, "valid_to": m.valid_to,
+                "parent_directory_id": m.parent_directory_id,
+                "consolidated_to": m.consolidated_to,
+                "trust_score": m.trust_score, "feedback_count": m.feedback_count,
+                "user_scope": m.user_scope,
+                "source_url": m.source_url.clone().unwrap_or_default(),
             });
             if filter_matches(&row, filter) {
                 insert_row(ctx, &query_id, "memory", row_to_json(&row, columns), now);
@@ -331,9 +339,17 @@ fn query_memory(
                 "peer_id": m.peer_id, "observer_id": m.observer_id,
                 "source_session_id": m.source_session_id, "source_message_id": m.source_message_id,
                 "entities_json": m.entities_json, "confidence": m.confidence,
+                "context": m.context,
                 "tier": m.tier, "is_active": m.is_active,
                 "expires_at": m.expires_at,
                 "created_at": m.created_at, "updated_at": m.updated_at,
+                "access_count": m.access_count, "strength": m.strength, "version": m.version,
+                "valid_from": m.valid_from, "valid_to": m.valid_to,
+                "parent_directory_id": m.parent_directory_id,
+                "consolidated_to": m.consolidated_to,
+                "trust_score": m.trust_score, "feedback_count": m.feedback_count,
+                "user_scope": m.user_scope,
+                "source_url": m.source_url.clone().unwrap_or_default(),
             });
             if filter_matches(&row, filter) {
                 insert_row(ctx, &query_id, "memory", row_to_json(&row, columns), now);

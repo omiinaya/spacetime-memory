@@ -24,7 +24,7 @@ export interface MemoryRecord {
   trust_score: number;
   created_at: number;
   updated_at: number;
-  source_url: string;
+  source_url?: string;
 }
 
 export interface Workspace {

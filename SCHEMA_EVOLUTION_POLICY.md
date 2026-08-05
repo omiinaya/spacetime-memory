@@ -22,7 +22,7 @@ When adding fields to SpacetimeDB tables, we rely on SpacetimeDB's built-in sche
 | **Operational simplicity** | No migration scripts to write, test, version, or run. No downtime. No risk of partial migration. |
 | **Data safety** | `--delete-data=never` is enforced (see `AGENTS.md`). Migrations with `DELETE DATA` are forbidden. |
 | **Backward compatibility** | Old reducer code (if any clients lag) continues to work — new fields are optional at the SQL level. |
-| **Observed pattern** | The codebase already follows this: `Memory` struct grew 15+ fields across 6 commented "feature blocks" — all added with reducer-level defaults, zero migrations. |
+| **Observed pattern** | The codebase already follows this: `Memory` struct grew 12 fields across 7 commented "feature blocks" (28 total fields: tiering, reinforcement, hierarchy, consolidation, trust scoring, user isolation, source attribution) — all added with reducer-level defaults, zero migrations. |
 
 ---
 
@@ -109,20 +109,28 @@ metadata_json: if metadata_json.is_empty() { String::from("{}") } else { metadat
 
 **In SDK mappers (Python/TS):**
 ```python
-# Python SDK - spacetime_memory/client/ (memory row consumers apply COALESCE)
-Memory(
-    tier=row.get("tier", "L1"),
-    access_count=row.get("access_count", 0),
-    strength=row.get("strength", 0.5),
-    ...
-)
+# Python SDK - spacetime_memory/client/_base.py
+# COALESCE via dataclass field default; from_dict filters raw rows:
+@dataclass
+class MemoryRecord:
+    # ... additive fields mirror the STDB table (required — rows always include them)
+    source_url: str = ""  # absent row key -> COALESCE to ""
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "MemoryRecord":
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 ```
 
 ```typescript
-// TS SDK - sdk/typescript/src/memories.ts
-tier: row.tier ?? "L1",
-accessCount: row.access_count ?? 0,
-strength: row.strength ?? 0.5,
+// TS SDK - sdk/typescript/src/types.ts (typed MemoryRecord — mirrors the
+// STDB table; COALESCE happens in row consumers via `??` where rows are raw)
+export interface MemoryRecord {
+  // ...
+  tier: string;
+  strength: number;
+  access_count: number;
+  source_url: string;
+}
 ```
 
 ---
@@ -136,6 +144,12 @@ strength: row.strength ?? 0.5,
 | Field is an enum-like string with a clear "base" value | `String` with default `"L1"` / `"EXTRACTED"` |
 | Field is a JSON blob that can be empty | `String` with default `"{}"` or `"[]"` |
 | Adding a field to an existing table where old rows must be distinguishable | `Option<T>` (but prefer default + version field) |
+
+> **Full decision procedure, worked examples, and pitfalls:** see
+> [docs/OPTION_VS_DEFAULT.md](docs/OPTION_VS_DEFAULT.md) — *"When to Use `Option<T>` vs Default Value"*.
+> It expands this table into a decision checklist grounded in real fields
+> (`Note.version`, `User.email`, `Memory` feature blocks) and is enforced by
+> `sdk/python/tests/test_schema_evolution_policy.py`.
 
 ---
 
@@ -166,20 +180,26 @@ strength: row.strength ?? 0.5,
 
 ## Example: Adding a `source_url` Field to `Memory`
 
-**Step 1 — Struct:**
+**Step 1 — Struct:** (as actually committed — `Option<String>`, the ONLY type STDB
+accepts when adding a string column to an existing table)
 ```rust
-pub struct Memory {
-    // ... existing fields ...
-    pub source_url: String,  // NEW
-}
+// ---- Source attribution ----
+/// URL the memory was sourced from; `None` = no source recorded.
+/// `Option<String>` (not plain `String`) because STDB cannot add a required
+/// `String` column to an existing table — existing rows would need a manual
+/// migration. Old rows default to `None`.
+pub source_url: Option<String>,
 ```
+> **Why not plain `String`?** STDB refuses the publish with
+> `Changing the type of column source_url ... requires a manual migration`
+> (verified 2026-08-05). The Defaults-by-Rust-Type table's `""` default applies
+> to *reducer-level* defaults on new inserts; the *schema-level* column addition
+> still requires `Option<T>` (or `#[default(...)]` where supported). Do not
+> "simplify" `Option<String>` back to `String` — it makes the module unpublishable.
 
 **Step 2 — Insert reducer:**
 ```rust
-let mem = Memory {
-    // ... existing fields ...
-    source_url: String::new(),  // default: empty string
-};
+source_url: None,  // default: None = new row, no source yet
 ```
 
 **Step 3 — Update reducer (preserve existing):**
@@ -190,15 +210,23 @@ let mem = Memory {
 
 **Step 4 — Read path (Python SDK):**
 ```python
-Memory(
+# Python SDK - spacetime_memory/client/_base.py MemoryRecord.from_dict
+# COALESCE via dataclass field default:
+class MemoryRecord:
     # ...
-    source_url=row.get("source_url", ""),
-)
+    source_url: str = ""
 ```
 
 **Step 5 — Read path (TS SDK):**
 ```typescript
-sourceUrl: row.source_url ?? "",
+// sdk/typescript/src/types.ts — source_url is an optional string field
+source_url?: string;
+```
+
+**Step 5b — Read path (Rust query helpers):** the `query_memory` reducer must
+COALESCE the Option before emitting JSON, or rows serialize as `null`:
+```rust
+"source_url": m.source_url.clone().unwrap_or_default(),  // None -> ""
 ```
 
 **Step 6 — Publish:**
@@ -225,10 +253,11 @@ sourceUrl: row.source_url ?? "",
 ## Related Documents
 
 - `AGENTS.md` — Agent schema + development guide (see "Data Safety" section)
+- `docs/OPTION_VS_DEFAULT.md` — **When to Use `Option<T>` vs Default Value** (full decision procedure + worked examples + pitfalls)
 - `scripts/publish.sh` — Enforces `--delete-data=never`
 - `docs/SCHEMA_EVOLUTION_POLICY_RATIONALE.md` — **Why this policy exists** (full evidence-based rationale)
 - `SCHEMA_EVOLUTION_POLICY_EXECUTIVE_SUMMARY.md` — One-page executive summary
-- `ROADMAP.md` — Phase 4.3 "Schema migrations" (this policy resolves that item)
+- `ROADMAP.md` — The old roadmap tracked a "Phase 4.3 — Schema migrations" question (*"when adding fields, do we use COALESCE/default, or do we migrate?"*). **This policy resolves that item** — the answer is COALESCE/default. The current `ROADMAP.md` is an honest-governance assessment covering the question as resolved.
 - `CONTRIBUTING.md` — Contribution workflow
 
 ---

@@ -143,12 +143,14 @@ memory that never got feedback has `trust_score: 0.5` (neutral), an un-tiered
 memory is `tier: "L1"`. Old rows reading `0`/`"L1"` behave *identically* to new
 rows that were never updated, which is exactly what the product wants.
 
-> **`source_url` is the exception:** it is `Option<String>` with
-> `#[default(None::<String>)]` (see `memory.rs`) so the schema migration stays
-> non-breaking for existing databases — the new column arrives as `NULL` on old
-> rows, which `None` models. Read paths COALESCE `None` to `""` when serializing
-> (e.g. `m.source_url.clone().unwrap_or_default()` in `query.rs`), so SDK
-> consumers still see a plain string.
+> **`source_url` is the exception:** it is `Option<String>` (see `memory.rs`).
+> STDB cannot add a required `String` column to an existing table — the publish
+> fails with `Changing the type of column source_url ... requires a manual
+> migration` (verified 2026-08-05, see `SCHEMA_EVOLUTION_POLICY.md`). The new
+> column arrives as `NULL` on old rows, which `None` models. Read paths COALESCE
+> `None` to `""` when serializing (e.g. `m.source_url.clone().unwrap_or_default()`
+> in `query.rs`), so SDK consumers still see a plain string. Do not "simplify"
+> `Option<String>` back to `String` — it makes the module unpublishable.
 
 ### 4. `Option` as a reducer parameter — `update_note_block` (`note.rs`)
 
