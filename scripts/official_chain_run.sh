@@ -106,7 +106,7 @@ fi
 # ── 2. MEM0 OFFICIAL LONGMEMEVAL ────────────────────────────────────────
 echo "=== MEM0 OFFICIAL LONGMEMEVAL ($(date)) ===" >> "$LOGFILE"
 cd /home/hindsight/mem0/evaluation
-timeout 28800 env \
+timeout 172800 env \
     OTEL_ENABLED=false \
     LLM_BASE_URL=http://localhost:4004/v1 OPENAI_API_KEY=dummy-key \
     STDB_EMBEDDER_URL=http://localhost:9093/v1 \
@@ -118,7 +118,7 @@ timeout 28800 env \
         --stmem-host 192.168.1.10 --stmem-port 3001 \
         --answerer-model deepseek-v4-flash-free \
         --judge-model deepseek-v4-flash-free \
-        --top-k 200 --max-workers 4 \
+        --top-k 200 --max-workers 10 \
         --output-dir /tmp/mem0bench/lme-chain \
         --dataset-path /home/hindsight/spacetime-memory/data/longmemeval_s.json \
         --all-questions \
@@ -143,7 +143,7 @@ fi
 
 # ── 3. MEM0 OFFICIAL BEAM ───────────────────────────────────────────────
 echo "=== MEM0 OFFICIAL BEAM ($(date)) ===" >> "$LOGFILE"
-timeout 14400 env \
+timeout 86400 env \
     OTEL_ENABLED=false \
     LLM_BASE_URL=http://localhost:4004/v1 OPENAI_API_KEY=dummy-key \
     STDB_EMBEDDER_URL=http://localhost:9093/v1 \
