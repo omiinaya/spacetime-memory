@@ -38,7 +38,9 @@ class TestHelpers:
         assert len(h) == 64
 
     def test_to_dt_zero(self):
-        assert _to_dt(0) == ""
+        # langgraph's SearchItem calls datetime.fromisoformat(created_at),
+        # so an absent timestamp must be a parseable epoch, not "".
+        assert _to_dt(0) == "1970-01-01T00:00:00+00:00"
 
     def test_to_dt_normal(self):
         result = _to_dt(1719000000000000)
