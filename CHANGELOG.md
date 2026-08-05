@@ -65,6 +65,34 @@
   (retry/backoff, GPU embedder :9093, daemonized chain + verdict delivery,
   identity-token persistence, contamination repair).
 
+### Schema governance (new in 08-05)
+- **`SCHEMA_EVOLUTION_POLICY.md`**: exhaustive reference of every SpacetimeDB
+  default per Rust type (28 fields / 7 blocks), wiring column defaults into
+  CI via a full-module default-audit test that fails on drift.
+- **Append-only contract enforced**: Non-Additive (Breaking) schema changes are
+  prohibited once shipped; `source_url` corrected to `Option<String>` so STDB
+  accepts the added column on live databases.
+- **Webhook delivery hardened**: 5 bugs in the delivery worker fixed — the
+  sidecar can now actually deliver (`create`/`list`/`update`/`delete`/`fire`
+  over `webhook` + `webhook_delivery`, HMAC-SHA256, exponential backoff).
+
+### SDK adapter bug fixes (from full-suite green run)
+- **LangChain `StmemStore`**: `_to_dt(0)` now returns a parseable ISO epoch
+  (`1970-01-01T00:00:00+00:00`) instead of `""` — langgraph's
+  `SearchItem` calls `datetime.fromisoformat(created_at)` and crashed on empty
+  strings.
+- **Temporal search**: memory PK is `id` (not `entity_id`) — the temporal
+  strategy now reads `id` and maps it to the result's `entity_id`; recency
+  score is capped at 0.35 so a fresh memory never outranks a genuine semantic
+  match after fusion.
+- **Tracer**: `is_enabled` now honors an explicitly injected `_tracer`
+  (dependency injection / tests) regardless of `OTEL_ENABLED`.
+- **Test isolation hardening**: the autostar fixture now clears `GH_TOKEN`
+  (the `gh` CLI exports it, which leaked a real PAT into the suite); the
+  Graphiti fixture mocks `client.store()` so `add_episode` no longer makes a
+  real embedder network call. Full unit suite (≈6,800 tests) green, including
+  under a leaked-token environment.
+
 ## 2026-07-27 — Full Table Scan Elimination
 
 - **Full scans reduced 73→22 (-70%) across 4 optimization sessions**: 51 full-table `.iter()` calls converted to indexed lookups or workspace-filtered scans.
