@@ -225,13 +225,14 @@ For detailed development instructions, see [AGENTS.md](AGENTS.md) (Development G
 1. **Ensure tests pass** — `make test-unit` at minimum. Run `make test` or `make ci` if you have a live SpacetimeDB.
 2. **Lint your code** — `ruff check .` for Python, `cargo fmt --check && cargo clippy` for Rust.
 3. **Update documentation** — update `AGENTS.md` (agent schema/development guide), `docs/`, or `README.md` as appropriate.
-4. **Add a CHANGELOG entry** (if applicable) — see `CHANGELOG.md` for format.
-5. **Open the PR** against `main` with a clear title and description:
+4. **Schema-touching PRs are reviewed against [SCHEMA_EVOLUTION_POLICY.md](SCHEMA_EVOLUTION_POLICY.md)** — struct field + defaults + read-path guards, no migration code (see the policy's 5-step rule and Related Documents).
+5. **Add a CHANGELOG entry** (if applicable) — see `CHANGELOG.md` for format.
+6. **Open the PR** against `main` with a clear title and description:
    - What does this change do?
    - Why is it needed?
    - How was it tested?
    - Are there any breaking changes?
-6. **Address CI feedback** — the project runs 5 CI workflows (Rust, Rust Integration, Python SDK, TypeScript SDK, Python Integration). Ensure all pass before requesting review.
+7. **Address CI feedback** — the project runs 5 CI workflows (Rust, Rust Integration, Python SDK, TypeScript SDK, Python Integration). Ensure all pass before requesting review.
 
 ## Coding Standards
 
@@ -254,6 +255,7 @@ Configuration is in `sdk/python/pyproject.toml`.
 - **All reads through `query_table` reducer** for private tables
 - Use `ctx.timestamp` and `ctx.rng()` (not `SystemTime::now()` or `OsRng`)
 - Return `Result<(), String>` from all reducers
+- **Schema changes follow [SCHEMA_EVOLUTION_POLICY.md](SCHEMA_EVOLUTION_POLICY.md)** — additive fields with reducer-level defaults, no migration/backfill reducers, never `--delete-data=on-conflict`/`always`. Binding for all `server/spacetimedb/` contributors.
 
 ### Commit Messages
 

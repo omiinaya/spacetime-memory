@@ -147,6 +147,7 @@
 | **Unwrap/expect in production** | 🟢 100% | 0 unwrap/expect in production code |
 | **TODO/FIXME markers** | 🟢 95% | 2 Rust, 3 Python — all low severity |
 | **WASM build** | 🟢 100% | 0 errors, clean release build |
+| **Schema evolution** | 🟢 100% | Governed by [SCHEMA_EVOLUTION_POLICY.md](SCHEMA_EVOLUTION_POLICY.md) — additive fields with reducer defaults, zero migrations (resolves the old roadmap's "Phase 4.3 — Schema migrations" question) |
 
 ## 5. HONEST PARITY ASSESSMENT BY TARGET
 
