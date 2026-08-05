@@ -1,0 +1,16 @@
+{
+  "_doc": "Validated allowlist of KNOWN, CORRECTED, TRANSIENT breaking (non-additive) schema transitions in git history. Enforced by scripts/audit_schema_history.py: every entry must (1) match a transition that actually occurs in `git log` of server/spacetimedb/src, and (2) show the field/table reverted (restored) to the recorded type in the CURRENT schema. A stale entry or one that hides an un-restored breaking state fails the audit. This file exists to document corrections that already happened \u2014 it is NOT an escape hatch for new breaking changes (those have no force flag in the history audit). See SCHEMA_EVOLUTION_POLICY.md 'Non-Additive Changes (Breaking)'.",
+  "exceptions": [
+    {
+      "id": "memory-source-url-option-string-flip-2026-08",
+      "kind": "type_changed",
+      "table": "Memory",
+      "field": "source_url",
+      "from": "Option<String>",
+      "to": "String",
+      "restored_type": "Option<String>",
+      "commits": "07f1f7b4 (flipped to String) -> bf2e6a6e (restored Option<String>)",
+      "why": "Transient pre-release source flip: 07f1f7b4 set Memory.source_url to plain String to conform to the Defaults-by-Rust-Type table; bf2e6a6e reverted it to Option<String> because STDB rejects adding a required String column to an existing table ('requires a manual migration'). The breaking state (optional -> required) was never published; the committed baseline and current source both have source_url: Option<String>."
+    }
+  ]
+}

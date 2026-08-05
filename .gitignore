@@ -24,9 +24,12 @@ coverage
 *.profraw
 .coverage
 
-# Schema-baseline anchor for the append-only policy (SCHEMA_EVOLUTION_POLICY.md
-# "Non-Additive Changes (Breaking)"). MUST be committed — it is the lower-bound
-# contract that test_schema_evolution_policy.py enforces.
+# Schema-governance anchors for the append-only policy (SCHEMA_EVOLUTION_POLICY.md
+# "Non-Additive Changes (Breaking)"): the committed schema baseline
+# (sdk/python/tests/data/schema_baseline.json) and the transient-exception
+# allowlist (schema_history_transient_exceptions.json) MUST be tracked — they are
+# the contract that test_schema_evolution_policy.py enforces. Neither is matched
+# by any ignore pattern above (verified: `git check-ignore` returns nothing).
 
 # Helper scripts for writing test files via terminal
 _write_e2e*

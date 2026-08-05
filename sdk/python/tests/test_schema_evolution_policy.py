@@ -528,3 +528,78 @@ class TestBaselineFreshness:
             f"with `python scripts/update_schema_baseline.py`.\nstdout:\n{proc.stdout}\n"
             f"stderr:\n{proc.stderr}"
         )
+
+
+class TestSchemaHistoryAppendOnly:
+    """Git-history enforcement of the 'Non-Additive Changes (Breaking)' table.
+
+    The committed baseline (TestNonAdditiveAppendOnly) guards the schema AT A
+    POINT IN TIME. This test closes the pre-baseline / --force-breaking hole:
+    `scripts/audit_schema_history.py` walks `git log` of server/spacetimedb/src
+    and compares every consecutive commit pair with the same append-only
+    contract (rename/type-change/remove forbidden; only T -> Option<T> allowed).
+
+    Known, corrected, TRANSIENT flips are documented in
+    tests/data/schema_history_transient_exceptions.json — each entry is
+    validated on every run (must match a real historical transition AND be
+    restored in current source), so the allowlist cannot hide a live violation.
+
+    Shallow CI clones legitimately have < 2 src commits — the audit exits 0
+    with a note (no signal); the source-level baseline tests still enforce the
+    current schema.
+    """
+
+    def test_history_is_append_only(self):
+        import subprocess
+
+        script = REPO_ROOT / "scripts" / "audit_schema_history.py"
+        if not script.exists():
+            pytest.skip("scripts/audit_schema_history.py not present")
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode == 0, (
+            "A breaking (non-additive) schema change exists in git history, or a "
+            "transient exception is stale/invalid — policy forbids renames, type "
+            "changes and removals (add new, deprecate old, never remove). See "
+            "SCHEMA_EVOLUTION_POLICY.md 'Non-Additive Changes (Breaking)'.\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+
+    def test_exceptions_file_committed(self):
+        """The transient-exception allowlist must exist and parse as JSON."""
+        import json
+
+        exc_path = REPO_ROOT / "sdk" / "python" / "tests" / "data" / "schema_history_transient_exceptions.json"
+        assert exc_path.exists(), (
+            "Missing tests/data/schema_history_transient_exceptions.json — the "
+            "history audit needs it to document corrected transient flips"
+        )
+        data = json.loads(exc_path.read_text(encoding="utf-8"))
+        assert isinstance(data, dict) and isinstance(data.get("exceptions"), list)
+
+    def test_history_audit_self_test_passes(self):
+        """The audit's own negative tests must pass — guards against a detector
+        that silently accepts everything (which would make the history test
+        meaningless)."""
+        import subprocess
+
+        script = REPO_ROOT / "scripts" / "test_audit_schema_history.py"
+        if not script.exists():
+            pytest.skip("scripts/test_audit_schema_history.py not present")
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        assert proc.returncode == 0, (
+            "audit_schema_history detector self-test failed — the detector no "
+            "longer distinguishes append-only from breaking history.\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )

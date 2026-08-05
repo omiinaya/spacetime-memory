@@ -250,6 +250,28 @@ COALESCE the Option before emitting JSON, or rows serialize as `null`:
 
 > **Bottom line:** Schema is **append-only**. The Rust struct is the source of truth; it only grows.
 
+**Enforcement is two-layered:**
+
+1. **Point-in-time** — the committed baseline `sdk/python/tests/data/schema_baseline.json`
+   anchors the schema at the time it was generated; `TestNonAdditiveAppendOnly`
+   asserts current source ⊇ baseline (only `T` → `Option<T>` allowed). Regenerated
+   with `scripts/update_schema_baseline.py`, which **refuses** to write a baseline
+   that shrinks or re-types existing entries.
+2. **Git-history** — `scripts/audit_schema_history.py` walks `git log` of
+   `server/spacetimedb/src` and compares every consecutive commit pair with the
+   same append-only contract. This closes the hole where a breaking change was
+   committed *before* the baseline snapshot existed, or was papered over with
+   `update_schema_baseline.py --force-breaking`. There is **no** force flag for
+   history audits.
+
+**Transient corrections:** a breaking flip that was *reverted* in a later commit
+(never published; final state restored) is recorded in
+`sdk/python/tests/data/schema_history_transient_exceptions.json`. Every entry is
+validated on every run: it must match a real transition found in history **and**
+the field/table must be restored to the recorded type in the current schema —
+otherwise the audit fails. The allowlist therefore only documents corrections
+that already happened; it cannot hide a live violation.
+
 ---
 
 ## Related Documents
@@ -257,6 +279,7 @@ COALESCE the Option before emitting JSON, or rows serialize as `null`:
 - `AGENTS.md` — Agent schema + development guide (see "Data Safety" section)
 - `docs/OPTION_VS_DEFAULT.md` — **When to Use `Option<T>` vs Default Value** (full decision procedure + worked examples + pitfalls)
 - `scripts/audit_rust_type_defaults.py` — **Full-module enforcement of the Defaults-by-Rust-Type table** (scans every `#[table]` insert site; wired into CI via `TestAllTablesDefaultsByRustType`; own negative self-test in `scripts/test_audit_rust_type_defaults.py`)
+- `scripts/audit_schema_history.py` — **Git-history enforcement of the Non-Additive (Breaking) table** (walks `git log` of `server/spacetimedb/src`, consecutive-pair append-only check; wired into CI via `TestSchemaHistoryAppendOnly`; own self-test in `scripts/test_audit_schema_history.py`; corrected-transient allowlist in `sdk/python/tests/data/schema_history_transient_exceptions.json`)
 - `scripts/publish.sh` — Enforces `--delete-data=never`
 - `docs/SCHEMA_EVOLUTION_POLICY_RATIONALE.md` — **Why this policy exists** (full evidence-based rationale)
 - `SCHEMA_EVOLUTION_POLICY_EXECUTIVE_SUMMARY.md` — One-page executive summary
