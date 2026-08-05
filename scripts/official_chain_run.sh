@@ -110,6 +110,7 @@ timeout 172800 env \
     OTEL_ENABLED=false \
     LLM_BASE_URL=http://localhost:4004/v1 OPENAI_API_KEY=dummy-key \
     STDB_EMBEDDER_URL=http://localhost:9093/v1 \
+    STDB_SKIP_ENTITY_EXTRACT=1 \
     PYTHONUNBUFFERED=1 \
     /home/hindsight/spacetime-memory/.venv/bin/python -m benchmarks.longmemeval.run \
         --project-name stmem-chain-lme \
@@ -118,7 +119,7 @@ timeout 172800 env \
         --stmem-host 192.168.1.10 --stmem-port 3001 \
         --answerer-model deepseek-v4-flash-free \
         --judge-model deepseek-v4-flash-free \
-        --top-k 200 --max-workers 10 \
+        --top-k 200 --max-workers 4 \
         --output-dir /tmp/mem0bench/lme-chain \
         --dataset-path /home/hindsight/spacetime-memory/data/longmemeval_s.json \
         --all-questions \
