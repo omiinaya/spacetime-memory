@@ -56,31 +56,34 @@ def mock_client():
                                     with patch.object(g._client, "query_graph") as mock_query_graph:
                                         with patch.object(g._client, "delete_memory") as mock_delete_mem:
                                             with patch.object(g._client, "_sql") as mock_sql:
-                                                # Defaults
-                                                mock_call.return_value = "ok"
-                                                mock_query.return_value = []
-                                                mock_search.return_value = []
-                                                mock_list_ws.return_value = []
-                                                mock_create_ws.return_value = {"id": "ws-uuid"}
-                                                mock_create_node.return_value = {"id": "node-uuid"}
-                                                mock_create_edge.return_value = {"id": "edge-uuid"}
-                                                mock_get_neighbors.return_value = []
-                                                mock_query_graph.return_value = []
-                                                mock_delete_mem.return_value = {"status": "ok"}
-                                                mock_sql.return_value = []
+                                                with patch.object(g._client, "store") as mock_store:
+                                                    # Defaults
+                                                    mock_call.return_value = "ok"
+                                                    mock_query.return_value = []
+                                                    mock_search.return_value = []
+                                                    mock_list_ws.return_value = []
+                                                    mock_create_ws.return_value = {"id": "ws-uuid"}
+                                                    mock_create_node.return_value = {"id": "node-uuid"}
+                                                    mock_create_edge.return_value = {"id": "edge-uuid"}
+                                                    mock_get_neighbors.return_value = []
+                                                    mock_query_graph.return_value = []
+                                                    mock_delete_mem.return_value = {"status": "ok"}
+                                                    mock_sql.return_value = []
+                                                    mock_store.return_value = {"id": "episode-uuid", "status": "ok"}
 
-                                                g._mock_call = mock_call
-                                                g._mock_query = mock_query
-                                                g._mock_search = mock_search
-                                                g._mock_list_ws = mock_list_ws
-                                                g._mock_create_ws = mock_create_ws
-                                                g._mock_create_node = mock_create_node
-                                                g._mock_create_edge = mock_create_edge
-                                                g._mock_get_neighbors = mock_get_neighbors
-                                                g._mock_query_graph = mock_query_graph
-                                                g._mock_delete_mem = mock_delete_mem
-                                                g._mock_sql = mock_sql
-                                                yield g
+                                                    g._mock_call = mock_call
+                                                    g._mock_query = mock_query
+                                                    g._mock_search = mock_search
+                                                    g._mock_list_ws = mock_list_ws
+                                                    g._mock_create_ws = mock_create_ws
+                                                    g._mock_create_node = mock_create_node
+                                                    g._mock_create_edge = mock_create_edge
+                                                    g._mock_get_neighbors = mock_get_neighbors
+                                                    g._mock_query_graph = mock_query_graph
+                                                    g._mock_delete_mem = mock_delete_mem
+                                                    g._mock_sql = mock_sql
+                                                    g._mock_store = mock_store
+                                                    yield g
 
 
 # ── Test: Constructor & properties ────────────────────────────────────────
@@ -254,8 +257,8 @@ class TestAddEpisode:
         assert result.episode is not None
         assert result.episode.name == "test-ep"
         assert result.episode.content == "Hello world"
-        # Expected 4 calls: store memory, then 2 query for extract results
-        assert mock_client._mock_call.call_count >= 1
+        # The episode must be persisted via client.store()
+        assert mock_client._mock_store.call_count >= 1
 
     def test_add_episode_with_extracted_entities(self, mock_client):
         """When LLM extraction succeeds, entities and edges should be created."""

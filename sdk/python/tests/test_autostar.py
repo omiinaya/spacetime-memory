@@ -18,12 +18,19 @@ REPO = "omiinaya/spacetime-memory"
 
 
 @pytest.fixture(autouse=True)
-def _isolate_marker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Point the marker file at a temp dir and clear env gates for each test."""
+def _isolate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Point marker + cwd at a temp dir and clear EVERY token source.
+
+    ``gh`` CLI exports ``GH_TOKEN`` into the environment (and CI may set
+    ``GITHUB_TOKEN``), so "no token anywhere" tests must clear both env
+    vars explicitly rather than assume a clean environment.  Otherwise the
+    suite's background child process inherits a real token and the
+    no-token assertions fail.
+    """
     monkeypatch.setattr(autostar, "_config_dir", lambda: tmp_path)
-    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-    monkeypatch.delenv("STMEM_AUTOSTAR", raising=False)
-    monkeypatch.delenv("NO_STMEM_AUTOSTAR", raising=False)
+    for name in ("GITHUB_TOKEN", "GH_TOKEN", "STMEM_AUTOSTAR", "NO_STMEM_AUTOSTAR"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.chdir(tmp_path)
 
 
 class _FakeResponse:
