@@ -208,6 +208,74 @@ class TestReducerDefaults:
         )
 
 
+class TestAllTablesDefaultsByRustType:
+    """Full-module enforcement of the policy's 'SpacetimeDB Defaults by Rust
+    Type' table (SCHEMA_EVOLUTION_POLICY.md lines 40-57), applied to EVERY
+    ``#[table]`` struct's insert sites — not just the Memory feature blocks
+    covered by TestReducerDefaults.
+
+    The audit (``scripts/audit_rust_type_defaults.py``) walks each table's
+    ``ctx.db.<accessor>().insert(<Struct> { ... })`` literals and checks that
+    every *present* field whose type is covered by the policy table
+    (String, bool, u8/u16/u32/u64/i32/i64, f32/f64, Option<T>, Vec<T>)
+    is initialized with a policy-conformant default:
+
+      * String            -> "" / String::from("...") / String::new()
+      * bool              -> false | true (explicit)
+      * integers          -> integer literal (0, 1, 0_u64, ...)
+      * f64/f32           -> numeric literal (0.0 counters, 0.5 scores)
+      * Option<T>         -> None (preferred) or Some(<T>)
+      * Vec<T>            -> vec![] / Vec::new()
+
+    Runtime expressions (``now``, ``id.clone()``, ``x as f64``) are never
+    flagged — Rust's type system already guarantees those are type-correct.
+    Fields omitted from an insert literal are also never flagged: STDB's
+    auto column default on publish fills them (that IS the policy mechanism).
+    """
+
+    def test_all_tables_insert_literals_conform(self):
+        import subprocess
+
+        script = REPO_ROOT / "scripts" / "audit_rust_type_defaults.py"
+        if not script.exists():
+            pytest.skip("scripts/audit_rust_type_defaults.py not present")
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            "A table insert initializes a policy-covered field with a "
+            "non-conformant default (see 'SpacetimeDB Defaults by Rust Type' "
+            "table in SCHEMA_EVOLUTION_POLICY.md). Fix the reducer, not the "
+            f"audit.\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+
+    def test_audit_detector_self_test_passes(self):
+        """The audit's own negative tests must pass — guards against a detector
+        that silently accepts everything (which would make the above test
+        meaningless)."""
+        import subprocess
+
+        script = REPO_ROOT / "scripts" / "test_audit_rust_type_defaults.py"
+        if not script.exists():
+            pytest.skip("scripts/test_audit_rust_type_defaults.py not present")
+        proc = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert proc.returncode == 0, (
+            "audit_rust_type_defaults detector self-test failed — the detector "
+            "no longer distinguishes conformant from non-conformant defaults.\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # 3. Forbidden patterns
 # ---------------------------------------------------------------------------
