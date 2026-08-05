@@ -25,7 +25,7 @@ jobs:
         name: Save image (release only)
         run: docker save spacetime-memory | gzip > spacetime-memory.tar.gz
       - if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docker-image
           path: spacetime-memory.tar.gz
