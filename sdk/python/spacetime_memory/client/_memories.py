@@ -12,6 +12,11 @@ from ._base import _tracing_span, logger
 from ._utils import _esc
 
 
+def _skip_entity_extract() -> bool:
+    """True when bulk/benchmark callers disable per-store entity extraction."""
+    return os.environ.get("STDB_SKIP_ENTITY_EXTRACT", "").strip() == "1"
+
+
 def _normalize_images(
     images: str | list[str] | None = None,
     images_json: str = "",
@@ -185,7 +190,12 @@ class MemoryMixin:
                     memory_type,
                     content,
                     summary,
-                    entities_json,
+                    # When bulk/benchmark ingestion disables entity extraction,
+                    # pass a valid-JSON sentinel the reducer treats as "entities
+                    # already provided" (it skips its regex extraction for
+                    # anything non-empty and != "[]"). Saves the regex + O(n²)
+                    # KG co-occurrence edge pass on every bulk store (~20s/chunk).
+                    "[{}]" if _skip_entity_extract() else entities_json,
                     confidence,
                     source_session_id,
                     source_message_id,
@@ -273,8 +283,14 @@ class MemoryMixin:
                     ],
                 )
 
-                # Entity extraction: LLM first, fall back to regex
-                self._extract_and_store_entities(workspace_id, memory_id, content)
+                # Entity extraction: LLM first, fall back to regex.
+                # Skipped when STDB_SKIP_ENTITY_EXTRACT=1 — bulk benchmark
+                # ingestion (LongMemEval/BEAM) stores raw retrieval chunks and
+                # does NOT need per-chunk LLM entity extraction; that call costs
+                # ~20s per store (an LLM round-trip per chunk) and made the LME
+                # 500-question haystack ingest infeasible (100h+ → hours).
+                if not _skip_entity_extract():
+                    self._extract_and_store_entities(workspace_id, memory_id, content)
 
 
         if tier and tier in ("L0", "L1", "L2"):

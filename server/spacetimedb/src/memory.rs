@@ -72,6 +72,13 @@ pub struct Memory {
     /// "" = shared (visible to all users in workspace),
     /// or a specific user identity hash for user-scoped isolation
     pub user_scope: String,
+
+    // ---- Source attribution ----
+    /// URL the memory was sourced from; "" = no source recorded.
+    /// `#[default(None::<String>)]` keeps the schema migration non-breaking for
+    /// existing databases (new column, existing rows get None).
+    #[default(None::<String>)]
+    pub source_url: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -291,10 +298,26 @@ fn insert_memory(
         trust_score: 0.5,
         feedback_count: 0,
         user_scope: String::new(),
+        source_url: Some(String::new()),
     };
 
     let mem_json = change_event::record_to_json(&mem);
-    ctx.db.memory().insert(mem);
+    // Use try_insert + collision-retry: STDB's `insert()` panics on unique-key
+    // violation, and with panic=abort a single collision aborts the ENTIRE
+    // WASM instance — every concurrent store in flight fails with
+    // "The instance encountered a fatal error". `ctx.rng()` is deterministic
+    // per batch, so concurrent reducers can draw the same UUID and both pass
+    // the uuid_v4_uniq pre-check; try_insert + regenerate converts that into
+    // a bounded retry instead of an instance-killing panic.
+    let mem = crate::insert_row_retry(
+        ctx.db.memory(),
+        mem,
+        |row| {
+            row.id = uuid_v4_uniq(ctx, |mid| ctx.db.memory().id().find(mid).is_none(), 5);
+        },
+        5,
+    )?;
+    let id = mem.id.clone();
 
     // Initialize Bayesian veracity tracking with Beta(1,1) uniform prior
     crate::veracity::insert_initial_evidence(ctx, &id, now);
@@ -311,15 +334,25 @@ fn insert_memory(
     {
         ctx.db.memory_insert_result().id().delete(&old.id);
     }
-    let result_id = uuid_v4_uniq(ctx, |rid| ctx.db.memory_insert_result().id().find(rid).is_none(), 3);
-    ctx.db.memory_insert_result().insert(MemoryInsertResult {
-        id: result_id,
-        caller: caller.to_string(),
-        workspace_id: workspace_id.to_string(),
-        memory_id: id.clone(),
-        content_prefix: content.chars().take(100).collect::<String>(),
-        created_at: now,
-    });
+    crate::insert_row_retry(
+        ctx.db.memory_insert_result(),
+        MemoryInsertResult {
+            id: String::new(),
+            caller: caller.to_string(),
+            workspace_id: workspace_id.to_string(),
+            memory_id: id.clone(),
+            content_prefix: content.chars().take(100).collect::<String>(),
+            created_at: now,
+        },
+        |row| {
+            row.id = uuid_v4_uniq(
+                ctx,
+                |rid| ctx.db.memory_insert_result().id().find(rid).is_none(),
+                5,
+            );
+        },
+        5,
+    )?;
 
     Ok(id)
 }
@@ -444,6 +477,8 @@ pub fn update_memory(
         mem.confidence = confidence;
         mem.version += 1; // Increment version on each update
         mem.updated_at = now_micros(ctx);
+        // source_url is immutable after creation — preserved, never overwritten
+        // on update (SCHEMA_EVOLUTION_POLICY.md step 3).
 
         // Update expires_at if caller specified a change.
         // -1 = preserve existing value;  0 = never expires;  >0 = set specific timestamp.
@@ -785,6 +820,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
+            source_url: None,
 
         }
     }
@@ -866,6 +902,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
+            source_url: None,
 
         };
         assert_eq!(mem.id, "mem_001");
@@ -906,6 +943,7 @@ mod tests {
             trust_score: 0.2,
             feedback_count: 1,
             user_scope: "user:alice".to_string(),
+            source_url: None,
         };
         assert!(!mem.is_active);
         assert_eq!(mem.tier, "L2");
@@ -945,6 +983,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
+            source_url: None,
 
         };
         let json = serde_json::to_string(&mem).expect("serialize");
@@ -1100,6 +1139,7 @@ mod tests {
             trust_score: 0.0,
             feedback_count: 0,
             user_scope: String::new(),
+            source_url: None,
 
         };
         assert!(mem.content.is_empty());
@@ -1142,6 +1182,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
+            source_url: None,
 
         };
         assert_eq!(mem.content, content);
@@ -1180,6 +1221,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
+            source_url: None,
 
         };
         assert_eq!(mem.content, content);
@@ -1218,6 +1260,7 @@ mod tests {
             trust_score: 0.5,
             feedback_count: 0,
             user_scope: String::new(),
+            source_url: None,
 
         };
         assert_eq!(mem.content.len(), 10_000);
@@ -1255,6 +1298,7 @@ mod tests {
                 trust_score: 0.5,
                 feedback_count: 0,
                 user_scope: String::new(),
+                source_url: None,
 
             })
             .collect();
@@ -1296,6 +1340,7 @@ mod tests {
             trust_score: 0.0,
             feedback_count: 0,
             user_scope: String::new(),
+            source_url: None,
 
         };
         assert!(mem.summary.is_empty());

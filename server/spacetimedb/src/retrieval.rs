@@ -307,11 +307,20 @@ pub fn index_terms(
 ) -> Result<(), String> {
     let _account = require_auth(ctx)?;
 
-    // Remove any existing term index entries for this entity
+    // Remove any existing term index entries for this entity.
+    // The PK is `ti:{workspace}:{entity_id}:{term}`, and there is a btree
+    // index on workspace_id — use it (plus an entity_id filter) instead of a
+    // full-table scan. The old `.iter().take(MAX_RESULTS).filter(...)` was
+    // O(entire table) per store: with 100K+ benchmark chunks × ~20 terms each
+    // the term_index table grows to millions of rows and every store paid a
+    // multi-second full scan (measured 8s/chunk), making bulk ingestion
+    // infeasible.
     let old: Vec<String> = ctx
         .db
         .term_index()
-        .iter().take(crate::MAX_RESULTS)
+        .workspace_id()
+        .filter(&workspace_id)
+        .take(crate::MAX_RESULTS)
         .filter(|ti| ti.entity_type == entity_type && ti.entity_id == entity_id)
         .map(|ti| ti.id.clone())
         .collect();
