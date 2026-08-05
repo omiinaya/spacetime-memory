@@ -180,6 +180,50 @@ pub fn uuid_v4_uniq(
     id
 }
 
+/// Insert a row with retry-on-collision, using `try_insert` instead of the
+/// panicking `insert`.
+///
+/// STDB's `Table::insert()` is implemented as `try_insert(...).unwrap_or_else(panic)`
+/// and WASM modules compile with `panic=abort`, so a unique-key violation
+/// (errno 12) aborts the ENTIRE module instance — every concurrent reducer
+/// call in flight fails with "The instance encountered a fatal error".
+/// Under concurrent load, `uuid_v4_uniq`'s check-then-insert is TOCTOU-racy
+/// because `ctx.rng()` is deterministic per batch: two reducers in the same
+/// batch draw the same UUID, both pass the pre-check, and the second insert
+/// panics.
+///
+/// This helper regenerates the row's id on a unique-key collision and retries,
+/// so a collision becomes a bounded retry instead of an instance-aborting panic.
+/// Returns the inserted row (with any regenerated id) on success.
+pub fn insert_row_retry<T: spacetimedb::Table>(
+    handle: &T,
+    row: T::Row,
+    regenerate_id: impl FnMut(&mut T::Row),
+    max_attempts: usize,
+) -> Result<T::Row, String>
+where
+    T::Row: Clone,
+{
+    let mut row = row;
+    let mut regenerate_id = regenerate_id;
+    for attempt in 0..max_attempts {
+        match handle.try_insert(row.clone()) {
+            Ok(inserted) => return Ok(inserted),
+            Err(spacetimedb::TryInsertError::UniqueConstraintViolation(_)) => {
+                if attempt + 1 >= max_attempts {
+                    return Err(format!(
+                        "insert into `{}` failed after {max_attempts} attempts (unique-key collisions)",
+                        T::TABLE_NAME
+                    ));
+                }
+                regenerate_id(&mut row);
+            }
+            Err(e) => return Err(format!("insert into `{}` failed: {e}", T::TABLE_NAME)),
+        }
+    }
+    unreachable!()
+}
+
 /// Generate a sortable UUID v7 using the STDB built-in generator.
 ///
 /// Uses `ctx.new_uuid_v7()` which returns a `spacetimedb::Uuid` in standard
