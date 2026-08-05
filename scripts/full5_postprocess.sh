@@ -50,7 +50,14 @@ else
 fi
 
 # Extract the official metrics from the newest results file (repaired or not).
-NEW=$(ls -t /tmp/mem0bench/full5/locomo_results_*.json 2>/dev/null | head -1)
+# Prefer the REPAIRED reassembled file: repair_locomo_contamination.py writes
+# locomo_results_*.json into the per-run subdir (predicted_stmem-full5-zen/),
+# and that file carries the repair_note + re-scored questions. The parent-dir
+# file is the raw harness output with contamination still scored 0. Pick the
+# NEWEST across BOTH locations (the repaired one is always newer).
+NEW=$(ls -t /tmp/mem0bench/full5/locomo_results_*.json \
+           /tmp/mem0bench/full5/predicted_stmem-full5-zen/locomo_results_*.json \
+        2>/dev/null | head -1)
 log "newest results file: ${NEW:-NONE}"
 
 if [ -z "$NEW" ]; then
