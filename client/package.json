@@ -12,7 +12,7 @@
     "test:e2e": "npx playwright test"
   },
   "dependencies": {
-    "@rolldown/binding-linux-x64-gnu": "^1.1.0",
+    "@rolldown/binding-linux-x64-gnu": "^1.2.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "d3-drag": "^3.0.0",
