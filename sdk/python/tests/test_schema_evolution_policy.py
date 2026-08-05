@@ -136,6 +136,50 @@ class TestOptionReadPathsGuarded:
 # ---------------------------------------------------------------------------
 
 
+class TestMemoryReadPathCoalesce:
+    """SCHEMA_EVOLUTION_POLICY.md section 1 step 5b: read paths must COALESCE
+    the Memory additive fields — especially `source_url: Option<String>` —
+    before emitting JSON. A bare `m.source_url` would serialize as `null` for
+    old rows; the query_memory reducer must use `.unwrap_or_default()`.
+    """
+
+    def test_query_memory_coalesces_source_url(self):
+        src = _read_rust("query.rs")
+        # Every emission of source_url in a query row must COALESCE the Option.
+        raw_emits = re.findall(r'"source_url":\s*m\.source_url\b(?!\s*\.)', src)
+        assert not raw_emits, (
+            "query_memory emits source_url without COALESCE — old rows "
+            f"serialize as null: {raw_emits}"
+        )
+        coalesced = re.findall(
+            r'"source_url":\s*m\.source_url\.clone\(\)\.unwrap_or_default\(\)', src
+        )
+        assert len(coalesced) >= 2, (
+            "query_memory must COALESCE source_url via "
+            "m.source_url.clone().unwrap_or_default() in both the global and "
+            f"workspace-scoped branches (policy step 5b). Found: {coalesced}"
+        )
+
+    def test_query_memory_emits_all_additive_fields(self):
+        """The read path must surface every additive feature-block field —
+        dropping one would hide the column from clients (policy step 4)."""
+        src = _read_rust("query.rs")
+        for field in MEMORY_ADDITIVE_FIELDS:
+            assert f'"{field}"' in src, (
+                f"query_memory row does not emit additive field '{field}' — "
+                "read paths must include every feature-block column"
+            )
+
+    def test_no_bare_unwrap_on_memory_option_in_query_reads(self):
+        """Reading an Option column with bare `.unwrap()` aborts on None rows."""
+        src = _read_rust("query.rs")
+        bare = re.findall(r"m\.source_url\.unwrap\(\)", src)
+        assert not bare, (
+            "query.rs reads source_url with bare .unwrap() — aborts on old "
+            f"rows where the column is None: {bare}"
+        )
+
+
 class TestReducerDefaults:
     """Insert reducers must supply the policy-documented defaults."""
 
