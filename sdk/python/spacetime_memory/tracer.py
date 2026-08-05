@@ -142,6 +142,11 @@ class Tracer:
 
     @property
     def is_enabled(self) -> bool:
+        # An explicitly injected tracer (dependency injection / tests)
+        # overrides the environment gate — if the caller handed us a
+        # tracer, honor it regardless of OTEL_ENABLED.
+        if self._tracer is not None:
+            return True
         return self._enabled and _check_otel_available()
 
     def setup(self) -> None:

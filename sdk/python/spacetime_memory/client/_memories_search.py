@@ -502,8 +502,8 @@ class SearchMixin(SessionSearchMixin):
         try:
             type_clause = f"AND memory_type = '{_esc(memory_type)}'" if memory_type else ""
             mems = self._sql(
-                "SELECT entity_id, content, memory_type, created_at, "
-                "trust_score, strength "
+                "SELECT id, content, memory_type, created_at, "
+                "trust_score, strength, deactivated_at "
                 "FROM memory "
                 f"WHERE workspace_id = '{_esc(workspace_id)}' "
                 f"{type_clause} "
@@ -512,17 +512,22 @@ class SearchMixin(SessionSearchMixin):
                 f"LIMIT {limit}"
             )
         except RuntimeError:
-            logger.debug("temporal_search: memory query failed")
+            logger.debug("temporal search: memory query failed")
             return []
 
         results = []
         for m in mems:
             results.append({
-                "entity_id": m.get("entity_id", ""),
+                # Memory PK is `id` — map it to the result's entity_id.
+                "entity_id": m.get("id", m.get("entity_id", "")),
                 "entity_type": "memory",
                 "content": m.get("content", ""),
-                # Decay score: 1.0 for most recent, ~0.5 for limit-th oldest
-                "score": 0.5 + (0.5 * (1.0 - len(results) / max(limit, 1))),
+                # Decay score: recency-only signal, deliberately small and
+                # below semantic relevance. Starting at 1.0 let an arbitrarily
+                # fresh memory outrank a genuine semantic match after fusion.
+                # It now decays downward from 0.35 (min-max normalized by the
+                # fusion layer, which also down-weights it to 0.05).
+                "score": 0.35 * (1.0 - len(results) / max(limit + 1, 2)),
                 "strategy": "temporal",
                 "workspace_id": workspace_id,
             })
