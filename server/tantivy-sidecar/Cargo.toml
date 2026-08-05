@@ -10,7 +10,7 @@ tokio = { version = "1", features = ["full"] }
 axum = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tantivy = { version = "0.24", features = ["stopwords", "mmap"] }
+tantivy = { version = "0.26", features = ["stopwords", "mmap"] }
 dashmap = "6"
 uuid = { version = "1", features = ["v4"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
