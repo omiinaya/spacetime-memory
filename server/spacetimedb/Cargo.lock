@@ -1721,7 +1721,7 @@ dependencies = [
  "p256",
  "pbkdf2",
  "pretty_assertions",
- "rand 0.8.7",
+ "rand 0.9.5",
  "regex",
  "reqwest",
  "rstest",
