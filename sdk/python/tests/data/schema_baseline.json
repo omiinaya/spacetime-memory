@@ -672,7 +672,7 @@
     "peer_id": "String",
     "source_message_id": "String",
     "source_session_id": "String",
-    "source_url": "String",
+    "source_url": "Option<String>",
     "strength": "f64",
     "summary": "String",
     "tier": "String",

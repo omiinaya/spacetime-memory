@@ -72,7 +72,7 @@ pub fn consolidate_memories(
         trust_score: 0.5,
         feedback_count: 0,
         user_scope: String::new(),
-        source_url: String::new(),
+        source_url: None,
     };
     ctx.db.memory().insert(mem);
 

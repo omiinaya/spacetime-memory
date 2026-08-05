@@ -46,7 +46,7 @@ MEMORY_FEATURE_BLOCK_DEFAULTS: dict[str, str] = {
     "trust_score": "0.5",
     "feedback_count": "0",
     "user_scope": "String::new()",
-    "source_url": "String::new()",
+    "source_url": "None",
 }
 
 # Fields on the Memory table added after initial release (feature blocks) —
