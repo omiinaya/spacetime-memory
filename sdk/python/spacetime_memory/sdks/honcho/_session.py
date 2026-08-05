@@ -25,7 +25,26 @@ from ._models import (
 
 logger = logging.getLogger(__name__)
 
-from ._peer import Peer  # noqa: E402
+if TYPE_CHECKING:
+    from ._peer import Peer
+
+
+def _peer_cls() -> type:
+    """Lazily resolve the Peer class at runtime.
+
+    Importing ``._peer`` at module top-level creates a circular import:
+    ``_peer.py`` imports ``.``_session`` (module-level), so when
+    ``_session.py`` does ``from ._peer import Peer`` it hits ``_peer`` while it
+    is still partially initialized (the ``Peer`` class is not yet defined).
+    This is order-dependent and intermittently raises "cannot import name
+    'Peer' from partially initialized module" under the benchmark chain. Since
+    this module has ``from __future__ import annotations``, ``Peer`` is only
+    needed at runtime (``isinstance`` checks), so resolve it lazily here.
+    """
+    from ._peer import Peer
+
+    return Peer
+
 
 if TYPE_CHECKING:
     from ._honcho import Honcho
@@ -85,7 +104,7 @@ class Session:
         if not isinstance(peers, list):
             peers = [peers]
         for p in peers:
-            if isinstance(p, Peer) and p not in self._peers:
+            if isinstance(p, _peer_cls()) and p not in self._peers:
                 self._peers.append(p)
             elif isinstance(p, str):
                 # Create a lightweight peer reference
@@ -303,7 +322,7 @@ class Session:
             peers = [peers]
         new_peers: list[Peer] = []
         for p in peers:
-            if isinstance(p, Peer):
+            if isinstance(p, _peer_cls()):
                 new_peers.append(p)
             elif isinstance(p, str):
                 new_peers.append(self._honcho.peer(p))
@@ -315,7 +334,7 @@ class Session:
             peers = [peers]
         remove_ids: set[str] = set()
         for p in peers:
-            if isinstance(p, Peer):
+            if isinstance(p, _peer_cls()):
                 remove_ids.add(p.id)
             elif isinstance(p, str):
                 remove_ids.add(p)
@@ -323,12 +342,12 @@ class Session:
 
     def get_peer_configuration(self, peer: Peer | str) -> SessionPeerConfig:
         """Get configuration for a peer in this session."""
-        peer_id = peer.id if isinstance(peer, Peer) else peer
+        peer_id = peer.id if isinstance(peer, _peer_cls()) else peer
         return self._peer_configs.get(peer_id, SessionPeerConfig())
 
     def set_peer_configuration(self, peer: Peer | str, config: SessionPeerConfig) -> None:
         """Set configuration for a peer in this session."""
-        peer_id = peer.id if isinstance(peer, Peer) else peer
+        peer_id = peer.id if isinstance(peer, _peer_cls()) else peer
         self._peer_configs[peer_id] = config
 
     # -- Message access -------------------------------------------------------
@@ -409,7 +428,7 @@ class Session:
         else:
             filename = str(file) if file else "unknown"
 
-        peer_id = peer.id if isinstance(peer, Peer) else str(peer)
+        peer_id = peer.id if isinstance(peer, _peer_cls()) else str(peer)
         content = f"[File: {filename}]"
 
         msg_params = MessageCreateParams(
