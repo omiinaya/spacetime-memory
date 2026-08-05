@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-07-07T18:21:02Z",
-  "host": "localhost",
+  "timestamp": "2026-08-05T11:18:46Z",
+  "host": "127.0.0.1",
   "port": 3001,
-  "database": "c2009b3b9ff7eabfd140",
-  "workspace_id": "aff87a37260948ca8890fb1cd651f56a",
+  "database": "c200976a4c964c82cde9",
+  "workspace_id": "008f836b77614dbc9a17fa9cae26714b",
   "iterations": 20,
   "dataset": {
     "memories": 50,
@@ -17,12 +17,12 @@
         "label": "keyword (Tantivy ON) SDK top-5",
         "n": 20,
         "fails": 0,
-        "p50": 1.1,
-        "p90": 1.3,
-        "p99": 4.4,
-        "mean": 1.2,
-        "min": 0.7,
-        "max": 5.2
+        "p50": 19.5,
+        "p90": 73.1,
+        "p99": 102.9,
+        "mean": 30.9,
+        "min": 11.4,
+        "max": 108.6
       }
     ],
     "keyword_tantivy_on_direct": [
@@ -30,12 +30,12 @@
         "label": "keyword (Tantivy ON) direct API top-5",
         "n": 20,
         "fails": 0,
-        "p50": 69.0,
-        "p90": 119.8,
-        "p99": 194.3,
-        "mean": 81.0,
-        "min": 49.6,
-        "max": 209.4
+        "p50": 4.5,
+        "p90": 8.6,
+        "p99": 281.5,
+        "mean": 22.0,
+        "min": 1.7,
+        "max": 345.2
       }
     ],
     "keyword_tantivy_off_sdk": [
@@ -43,12 +43,12 @@
         "label": "keyword (Tantivy OFF) SDK top-5",
         "n": 20,
         "fails": 0,
-        "p50": 80.9,
-        "p90": 6193.6,
-        "p99": 6350.2,
-        "mean": 1527.5,
-        "min": 78.1,
-        "max": 6354.8
+        "p50": 469.5,
+        "p90": 6205.5,
+        "p99": 6480.9,
+        "mean": 1852.3,
+        "min": 163.1,
+        "max": 6481.1
       }
     ],
     "keyword_tantivy_off_mock": [
@@ -56,20 +56,20 @@
         "label": "keyword (Tantivy OFF) mock top-5",
         "n": 20,
         "fails": 0,
-        "p50": 0.0,
+        "p50": 0.1,
         "p90": 0.1,
-        "p99": 0.1,
+        "p99": 0.6,
         "mean": 0.1,
-        "min": 0.0,
-        "max": 0.1
+        "min": 0.1,
+        "max": 0.8
       }
     ]
   },
   "quality": {
     "keyword_tantivy_on": {
-      "P@5": 0.6333,
-      "R@5": 0.6333,
-      "MRR": 0.6447
+      "P@5": 0.6133,
+      "R@5": 0.6133,
+      "MRR": 0.608
     },
     "keyword_tantivy_off": {
       "P@5": 0.6267,
@@ -78,11 +78,11 @@
     }
   },
   "tantivy_contribution": {
-    "P@5_delta_pp": 0.7,
-    "R@5_delta_pp": 0.7,
-    "MRR_delta": -0.059,
-    "latency_speedup_sdk_x": 73.5,
+    "P@5_delta_pp": -1.3,
+    "R@5_delta_pp": -1.3,
+    "MRR_delta": -0.095,
+    "latency_speedup_sdk_x": 24.1,
     "latency_speedup_direct_x": 0.0
   },
-  "notes": "Tantivy ON (SDK): c.search(semantic=False) routes through SDK -> Tantivy sidecar HTTP API. Tantivy ON (direct): direct POST to Tantivy BM25 sidecar at :9091. Tantivy OFF (SDK): c.search() with invalid Tantivy URL forces SDK fallback through _keyword_fallback (STDB _query + client-side BM25). NOTE: the _query bug (workspace_id filter returns 0 rows) causes this path to return 0 results for quality measurement, but latency correctly reflects the STDB query overhead (~5000ms when cold). Tantivy OFF (mock): in-memory keyword substring matching over 50 eval memories (same algorithm as SDK _keyword_fallback, sidestepping the _query bug). Seeding bypasses buggy c.store() \u2014 uses store_memory reducer directly + Tantivy HTTP API. Graph/temporal/semantic phases skipped (keyword-only benchmark)."
+  "notes": "Tantivy ON (SDK): c.search(semantic=False) routes through SDK -> Tantivy sidecar HTTP API. Tantivy ON (direct): direct POST to Tantivy BM25 sidecar at :9091. Tantivy OFF (SDK): c.search() with invalid Tantivy URL forces SDK fallback through _keyword_fallback (STDB _query + client-side BM25). NOTE: the _query bug (workspace_id filter returns 0 rows) causes this path to return 0 results for quality measurement, but latency correctly reflects the STDB query overhead (~5000ms when cold). Tantivy OFF (mock): in-memory keyword substring matching over 50 eval memories (same algorithm as SDK _keyword_fallback, sidestepping the _query bug). Seeding bypasses c.store() (unusably slow, ~10s/memory, and wedges the STDB wasm executor on client timeout) \u2014 uses the store_memory reducer directly + Tantivy /index/batch HTTP API. Graph/temporal/semantic phases skipped (keyword-only benchmark)."
 }
