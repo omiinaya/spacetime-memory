@@ -52,7 +52,11 @@ def measure(label, fn, n=N):
         try:
             fn()
             lats.append((time.perf_counter() - t0) * 1000)
-        except (KeyError, IndexError):
+        except Exception:
+            # Broad catch: httpx.ReadTimeout / ConnectError / JSONDecodeError
+            # from a slow or overloaded sidecar must count as a FAILURE, not
+            # crash the whole benchmark (observed: ReadTimeout under box load
+            # ~36 killed the run in the quality phase).
             fails += 1
     if not lats:
         return {"label": label, "n": 0, "fails": fails, "p50": 0, "p90": 0, "p99": 0, "mean": 0, "min": 0, "max": 0}
@@ -161,14 +165,40 @@ if not ws_id:
     sys.exit(1)
 print(f"Workspace: {ws_id}")
 
-# Seed eval memories via c.store() -> auto-indexes into Tantivy
-print("Seeding 50 eval memories via c.store()...")
+# Seed eval memories via store_memory reducer directly + Tantivy HTTP API.
+# This bypasses c.store(), which is unusably slow here (~10s/memory: STDB store
+# + memory id query-back + embed + tantivy index per call) and can wedge the
+# STDB wasm executor for the database if a single store exceeds the client
+# timeout (observed 2026-07-05: wasm-<db> thread stuck in futex_do_wait, all
+# reducers for that DB hang until load clears). The raw reducer is ~30ms.
+print("Seeding 50 eval memories via store_memory reducer + Tantivy /index/batch...")
 t0 = time.time()
 for m in eval_memories:
-    c.store(ws_id, content=m["content"], memory_type=m.get("type", "experience"))
+    c._call(
+        "store_memory",
+        [ws_id, "", "", m.get("type", "experience"), m["content"], "", "[]", 1.0, "", "", "[]"],
+    )
 seed_time = time.time() - t0
-print(f"  Done in {seed_time:.1f}s")
-time.sleep(3)  # Let Tantivy commit
+# Index directly into Tantivy (entity_id = eval memory id; same shape as the
+# SDK's _tantivy_index which uses the STDB memory id — compute_metrics matches
+# by content, so the id value itself is not material).
+tantivy_items = [
+    {
+        "workspace_id": ws_id,
+        "entity_id": m["id"],
+        "content": m["content"],
+        "entity_type": "memory",
+    }
+    for m in eval_memories
+]
+try:
+    resp = httpx.post(f"{TANTIVY_URL}/index/batch", json={"items": tantivy_items}, timeout=60)
+    resp.raise_for_status()
+    print(f"  Tantivy /index/batch: {resp.json().get('count', 0)} indexed")
+except Exception as e:
+    print(f"  WARNING: Tantivy /index/batch failed: {e}")
+print(f"  Done in {seed_time:.1f}s (store_memory reducer)")
+time.sleep(3)  # Let Tantivy commit + reader reload (ReloadPolicy::OnCommitWithDelay)
 
 # Verify Tantivy has data
 try:
@@ -177,7 +207,7 @@ try:
     print(f"  Tantivy verification: {len(tr)} results for 'CTO' (expected >= 1)")
     for r in tr[:2]:
         print(f"    score={r['score']:.2f} id={r['entity_id']} content=\"{r['content'][:50]}...\"")
-except (OSError, json.JSONDecodeError):
+except Exception as e:
     print(f"  WARNING: Tantivy verification failed: {e}")
 print()
 
@@ -239,8 +269,13 @@ def run_latency_direct(label, fn, n=N):
     latency_with_direct.append(r)
     print(f"  [{len(latency_with_direct):2d}] {label:40s}  p50={r['p50']:>6.1f}ms  p90={r['p90']:>6.1f}ms  mean={r['mean']:>6.1f}ms  (n={r['n']})")
 
-run_latency_direct("keyword (Tantivy ON) direct API top-5", lambda: httpx.post(
-    f"{TANTIVY_URL}/search", json={"workspace_id": ws_id, "query": "test", "limit": 5}, timeout=10
+# Persistent client: a fresh httpx.Client per call costs ~40ms in construction
+# under load, which would dominate and masquerade as sidecar latency. Use one
+# keep-alive client so this phase measures the ACTUAL sidecar search round trip.
+_direct_client = httpx.Client()
+
+run_latency_direct("keyword (Tantivy ON) direct API top-5", lambda: _direct_client.post(
+    f"{TANTIVY_URL}/search", json={"workspace_id": ws_id, "query": "test", "limit": 5}, timeout=30
 ).json())
 
 # ============================================================
@@ -281,9 +316,9 @@ t0 = time.time()
 for q in eval_queries:
     try:
         resp = httpx.post(f"{TANTIVY_URL}/search",
-            json={"workspace_id": ws_id, "query": q["query"], "limit": 20}, timeout=10)
+            json={"workspace_id": ws_id, "query": q["query"], "limit": 20}, timeout=30)
         results_with[q["query"]] = resp.json() if resp.status_code < 400 else []
-    except (OSError, json.JSONDecodeError):
+    except Exception as e:
         print(f"  FAIL: {q['query'][:40]} — {e}")
         results_with[q["query"]] = []
 query_time_with = time.time() - t0
@@ -305,7 +340,7 @@ t0 = time.time()
 for q in eval_queries:
     try:
         results_without[q["query"]] = keyword_fallback_mock(q["query"], all_memory_contents, limit=20)
-    except (OSError, json.JSONDecodeError):
+    except Exception as e:
         print(f"  FAIL: {q['query'][:40]} — {e}")
         results_without[q["query"]] = []
 query_time_without = time.time() - t0
@@ -381,7 +416,7 @@ report = {
         "but latency correctly reflects the STDB query overhead (~5000ms when cold). "
         "Tantivy OFF (mock): in-memory keyword substring matching over 50 eval memories "
         "(same algorithm as SDK _keyword_fallback, sidestepping the _query bug). "
-        "Seeding uses c.store() which auto-indexes into Tantivy. "
+        "Seeding bypasses c.store() (unusably slow, ~10s/memory, and wedges the STDB wasm executor on client timeout) — uses the store_memory reducer directly + Tantivy /index/batch HTTP API. "
         "Graph/temporal/semantic phases skipped (keyword-only benchmark)."
     ),
 }
