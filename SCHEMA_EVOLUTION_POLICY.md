@@ -149,7 +149,9 @@ export interface MemoryRecord {
 > [docs/OPTION_VS_DEFAULT.md](docs/OPTION_VS_DEFAULT.md) — *"When to Use `Option<T>` vs Default Value"*.
 > It expands this table into a decision checklist grounded in real fields
 > (`Note.version`, `User.email`, `Memory` feature blocks) and is enforced by
-> `sdk/python/tests/test_schema_evolution_policy.py`.
+> `sdk/python/tests/test_schema_evolution_policy.py` (per-table cases) plus
+> `scripts/audit_rust_type_defaults.py` (full-module scan of **all** table
+> insert sites against this Defaults-by-Rust-Type table).
 
 ---
 
@@ -254,6 +256,7 @@ COALESCE the Option before emitting JSON, or rows serialize as `null`:
 
 - `AGENTS.md` — Agent schema + development guide (see "Data Safety" section)
 - `docs/OPTION_VS_DEFAULT.md` — **When to Use `Option<T>` vs Default Value** (full decision procedure + worked examples + pitfalls)
+- `scripts/audit_rust_type_defaults.py` — **Full-module enforcement of the Defaults-by-Rust-Type table** (scans every `#[table]` insert site; wired into CI via `TestAllTablesDefaultsByRustType`; own negative self-test in `scripts/test_audit_rust_type_defaults.py`)
 - `scripts/publish.sh` — Enforces `--delete-data=never`
 - `docs/SCHEMA_EVOLUTION_POLICY_RATIONALE.md` — **Why this policy exists** (full evidence-based rationale)
 - `SCHEMA_EVOLUTION_POLICY_EXECUTIVE_SUMMARY.md` — One-page executive summary

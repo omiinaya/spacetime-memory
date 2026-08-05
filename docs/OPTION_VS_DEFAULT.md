@@ -240,11 +240,17 @@ The decision table is codified in `sdk/python/tests/test_schema_evolution_policy
   `feedback_count`, `trust_score`, `tier`, `user_scope`) are plain types with the
   documented defaults.
 - SDK read paths COALESCE every additive `Memory` field they touch.
+- **Every** `#[table]` struct's insert sites conform to the "SpacetimeDB
+  Defaults by Rust Type" table — audited across all 140 tables by
+  `scripts/audit_rust_type_defaults.py` (wired into the test suite as
+  `TestAllTablesDefaultsByRustType`). Any field of a policy-covered type
+  (`String`, `bool`, integer, `f64/f32`, `Option<T>`, `Vec<T>`)
+  initialized with a non-conformant default fails CI.
 - No migration/backfill reducers, no `ALTER TABLE`, no destructive
   `--delete-data` flags, and `scripts/publish.sh` hardcodes `--delete-data=never`.
 
-If a test in that file fails, the schema policy is being violated — **fix the
-code, not the test.**
+If a test in that file (or `scripts/audit_rust_type_defaults.py`'s own self-test)
+fails, the schema policy is being violated — **fix the code, not the test.**
 
 ---
 
