@@ -54,16 +54,16 @@ Key findings:
 
 ## Tantivy Contribution (August 5, 2026 — 4th edition re-run)
 
-Re-ran `scripts/tantivy_contribution_benchmark.py` on a fresh workspace seeded with 50 eval memories, 25 query-judgment pairs. Measures latency + quality difference with vs without the Tantivy BM25 sidecar (:9091). 20 iterations per phase, 0 failures across all phases.
+Re-ran `scripts/tantivy_contribution_benchmark.py` on a fresh workspace seeded with 50 eval memories, 25 query-judgment pairs. Measures latency + quality difference with vs without the Tantivy BM25 sidecar (:9091). 20 iterations per phase, 0 failures across all phases. This is a fresh re-run of the 4th edition (17:06Z) — quality byte-identical to the earlier same-day runs, latency re-measured at moderate host load.
 
 **Latency comparison (keyword search, 20 iterations):**
 
 | Config | p50 (ms) | p90 (ms) | Mean (ms) | Min (ms) | Max (ms) | Speedup |
 |--------|---------:|---------:|----------:|---------:|---------:|--------:|
-| keyword (Tantivy ON, SDK c.search) | 19.5 | 73.1 | 30.9 | 11.4 | 108.6 | — |
-| keyword (Tantivy OFF, SDK fallback) | 469.5 | 6205.5 | 1852.3 | 163.1 | 6481.1 | **24.1× p50 / 85× p90** |
+| keyword (Tantivy ON, SDK c.search) | 51.1 | 67.0 | 55.6 | 35.4 | 106.5 | — |
+| keyword (Tantivy OFF, SDK fallback) | 77.1 | 5404.4 | 1441.6 | 50.8 | 7042.3 | **1.5× p50 / ~81× p90** |
 
-The raw Tantivy sidecar search is ~4.5ms p50 on this run (direct HTTP API with a persistent keep-alive client; 1.2ms in the earlier same-day run under lighter load — both sub-10ms, environment-sensitive). The SDK `c.search(semantic=False)` path adds two STDB HTTP round trips (`check_workspace_access` + `_enrich_entities_json`) which dominate on this loaded host (load average ~40–73, concurrent builds/CI) — hence 19.5ms p50 / 73.1ms p90 end-to-end. Tantivy OFF falls back to the SDK's `_keyword_fallback` (cross-process STDB `_query` + client-side BM25): a slow path under load, min 163ms / p50 469ms / p90 6.2s (STDB worker), mean 1852ms. Tantivy eliminates that tail: deterministic 19.5ms p50 / 73.1ms p90 vs a 6.2-second p90 on the fallback — a **~85× p90 tail-latency improvement** (24.1× at p50).
+The raw Tantivy sidecar search is 1.3ms p50 / 3.0ms p90 on this run (direct HTTP API with a persistent keep-alive client; 4.5ms p50 in the heavy-load same-day run, 1.2ms in the lightest-load run — all sub-10ms, environment-sensitive). The SDK `c.search(semantic=False)` path adds two STDB HTTP round trips (`check_workspace_access` + `_enrich_entities_json`) which dominate the end-to-end latency (51.1ms p50 / 67.0ms p90 here at moderate host load). Tantivy OFF falls back to the SDK's `_keyword_fallback` (cross-process STDB `_query` + client-side BM25): fast-ish at p50 when the STDB worker is warm (77.1ms) but with a multi-second tail (p90 5.4s, max 7.0s, mean 1441.6ms — the STDB worker stalls under concurrent load). Tantivy eliminates that tail: deterministic 51.1ms p50 / 67.0ms p90 vs a 5.4-second p90 on the fallback — a **~81× p90 tail-latency improvement**. The p50 speedup varies with load (24.1× in the heavy-load run when the fallback's STDB query was cold; 1.5× here when warm); the p90 tail elimination is the stable win across every run.
 
 **Quality comparison (P@5 / R@5 / MRR):**
 
