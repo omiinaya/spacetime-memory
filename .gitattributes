@@ -1,0 +1,58 @@
+# Standard git attributes for the repository.
+# See https://git-scm.com/docs/gitattributes
+
+# Normalize line endings to LF on commit; keep LF in the working tree on all platforms
+* text=auto eol=lf
+
+# Python
+*.py text diff=python eol=lf
+*.pyi text diff=python eol=lf
+
+# Rust
+*.rs text diff=rust eol=lf
+*.toml text eol=lf
+
+# TypeScript / JavaScript
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+
+# Shell
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Markdown / docs
+*.md text diff=markdown eol=lf
+
+# Web assets
+*.css text eol=lf
+*.scss text eol=lf
+*.html text eol=lf
+
+# Binary files — never diff/merge as text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.wasm binary
+*.onnx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.pyc binary
+
+# Lockfiles — treat as text so they can be reviewed, but mark generated
+package-lock.json text eol=lf
+Cargo.lock text eol=lf
+
+# License file should always use LF
+LICENSE text eol=lf
+
+# Denote generated/derived files so tools can skip them
+*.min.js -diff
+*.min.css -diff

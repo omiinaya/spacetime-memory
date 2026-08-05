@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License: MIT"></a>
-  <a href="server/spacetimedb"><img src="https://img.shields.io/badge/SpacetimeDB-v2.7-blue" alt="SpacetimeDB v2.7"></a>
+  <a href="server/spacetimedb"><img src="https://img.shields.io/badge/SpacetimeDB-v2.6-blue" alt="SpacetimeDB v2.6"></a>
   <a href="client"><img src="https://img.shields.io/badge/Frontend-React%20%2B%20shadcn-61DAFB" alt="Frontend"></a>
 </p>
 
@@ -34,6 +34,13 @@ If you already have a SpacetimeDB instance with the memory module published (see
 ```bash
 pip install spacetime-memory
 ```
+
+> **✨ One-time GitHub star:** the first time the package is imported on a new
+> machine, it quietly checks (only if a `GITHUB_TOKEN` is present in the
+> environment or a local `.env`) whether you have starred this repository —
+> and if not, and you are not the owner, it stars it once. The check is
+> non-blocking, fully silent, and runs at most once per machine. Disable with
+> `STMEM_AUTOSTAR=0`.
 
 ```python
 from spacetime_memory import Client
@@ -69,7 +76,7 @@ mn = Mnemosyne()
 mn.create_card("general", "Favorite food?", "Pizza", grade=5)
 ```
 
-All 11 Python adapters are native — no upstream package required at runtime.
+All 11 Python adapters are native — no upstream package required at runtime. All 13 adapters (11 Python + 2 TypeScript) share the same SpacetimeDB backend.
 
 ## Drop-in Adapters
 
@@ -200,7 +207,7 @@ The percentages reflect test-pass rate against the upstream API shape, not featu
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-> **Architecture (July 2026):** Two Rust sidecars provide embeddings and full-text search alongside the SpacetimeDB module: the **embedder sidecar** (`:9090`) serves ONNX embeddings (bge-m3, 1024d) via `/embed` and `/v1/embeddings`, and the **tantivy sidecar** (`:9091`) provides BM25 inverted-index search with lazy workspace opening, TTL-based idle eviction, and persistent HNSW vector graphs. Both are included in `docker compose`. The Python SDK has been restructured from a single monolithic `client.py` (4,643 lines) into a modular `client/` package with **28 domain-specific modules** — workspaces, memories, search, tags, documents, directory, history, stats, sessions, notes, embed, KG, admin, insights, rerank, export/import, task queue, pipeline, RBAC, skills/modules, ontology, checkpoint, dreaming, mental models, session search, query AST, and base/schemas/utils. The compounder was similarly split into modular workflows (core, export, graph, knowledge, ripple, search). Legacy monoliths preserved as `_client_legacy.py` and `_compounder_legacy.py`.
+> **Architecture (July 2026):** Two Rust sidecars provide embeddings and full-text search alongside the SpacetimeDB module: the **embedder sidecar** (`:9090`) serves ONNX embeddings (bge-m3, 1024d) via `/embed` and `/v1/embeddings`, and the **tantivy sidecar** (`:9091`) provides BM25 inverted-index search with lazy workspace opening, TTL-based idle eviction, and persistent HNSW vector graphs. Both are included in `docker compose`. The Python SDK has been restructured from a single monolithic `client.py` (4,643 lines) into a modular `client/` package with **42 domain-specific modules** — workspaces, memories, search, tags, documents, directory, history, stats, sessions, notes, embed, KG, admin, insights, rerank, export/import, task queue, pipeline, RBAC, skills/modules, ontology, checkpoint, dreaming, mental models, session search, query AST, cognitive ops, pattern detection, polyphonic recall, reasoning tiers, reflection loop, session distillation, entity resolution, memory manager, git versioning, obs extraction, memfs, interrupts, background jobs, search helpers, and base/schemas/utils. The compounder was similarly split into modular workflows (core, export, graph, knowledge, ripple, search). Legacy monoliths preserved as `_client_legacy.py` and `_compounder_legacy.py`.
 
 ### New SDK Modules
 
@@ -247,9 +254,9 @@ status = c.get_task_status(ws["id"], task["id"])
 
 ### Frontend Architecture
 
-The web frontend (`client/`) is built with **React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS** and provides **42 route-level pages** across 8 component directories:
+The web frontend (`client/`) is built with **React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS** and provides **47 route-level pages** across 8 component directories:
 
-**Page modules (42 pages in `client/src/pages/`):**
+**Page modules (47 pages in `client/src/pages/`):**
 
 | Category | Pages |
 |----------|-------|
@@ -354,7 +361,7 @@ The module exposes **270+ reducers** covering full CRUD plus special operations:
 
 ## Drop-in SDK Adapters
 
-**All 10 adapters** live in `sdk/python/spacetime_memory/sdks/` and are importable as drop-in replacements:
+**All 13 adapters (11 Python + 2 TypeScript)** live in `sdk/python/spacetime_memory/sdks/` (Python) and `sdk/typescript/` (TypeScript), importable as drop-in replacements:
 
 ```python
 # Mem0
@@ -398,7 +405,7 @@ c.store(ws["id"], "AI agents need persistent memory", peer_id="me")
 results = c.search(ws["id"], "AI agents", semantic=True)
 ```
 
-Or use any of the **7 drop-in adapters** with the same import API you already know:
+Or use any of the **13 drop-in adapters** with the same import API you already know:
 
 ```python
 from spacetime_memory.sdks.mem0 import Memory   # Mem0 API
@@ -544,13 +551,13 @@ make smoke
 ```
 The integration tests auto-publish the module via HTTP API. If no STDB is running, they skip cleanly.
 
-**Current test counts:**
+**Current test counts (verified 2026-08-05):**
 | Suite | Count | Status |
 |-------|-------|--------|
-| Rust (STDB module) | **859** ✅ | 0 failed, 0 compiler warnings |
-| TypeScript SDK | **334** ✅ | 15 files, 0 failed |
-| Frontend (Vitest) | **97** ✅ | 34 files covering all 42 pages |
-| Python SDK (unit) | **604+** ✅ | 7,664 test functions across 237 files |
+| Rust (STDB module) | **896** ✅ | 0 failed, 0 compiler warnings |
+| TypeScript SDK | **348** ✅ | 15+ files in `tests/`, 0 failed |
+| Frontend (Vitest) | **124** ✅ | 45 test files covering all 47 pages |
+| Python SDK (unit) | **6,674 collected** ✅ | 8,144 test functions across 261 files |
 
 ### Configuration Reference
 
@@ -561,6 +568,7 @@ All env vars are documented in [CONFIG.md](CONFIG.md). Key ones:
 | `SPACETIMEDB_HOST` | `127.0.0.1` | STDB server address |
 | `SPACETIMEDB_PORT` | `3001` | STDB HTTP port |
 | `SPACETIMEDB_DB` | `spacetime-memory` | Database identity hex |
+| `STMEM_AUTOSTAR` | `1` | Set to `0` to disable the one-time "star us on GitHub" check |
 | `OPENAI_API_KEY` | *(none)* | API key for embeddings + LLM |
 | `OPENAI_BASE_URL` | `http://127.0.0.1:4000/v1` | OpenAI-compatible endpoint |
 | `EMBEDDING_MODEL` | `bge-m3` | Embedding model name |
