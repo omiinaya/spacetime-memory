@@ -267,9 +267,16 @@ COALESCE the Option before emitting JSON, or rows serialize as `null`:
 
 ## Decision Log
 
+Chronological record of policy-affecting decisions. Newest entries go at the
+bottom. When you make a schema/evolution decision covered by this policy,
+log it here with its date, the decision, and the rationale.
+
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-07-06 | Adopt COALESCE/default policy | Matches existing codebase patterns; SpacetimeDB auto-adds columns; zero-migration operational model. |
+| 2026-08-05 | New `String` columns on **existing** tables must be `Option<String>`, not plain `String` | Verified live (commit `bf2e6a6`): STDB refuses to publish a required `String` column onto an existing table — `Changing the type of column source_url ... requires a manual migration`. The Defaults-by-Rust-Type table's `""` default applies only to **reducer-level** defaults on new inserts; the **schema-level** column addition still requires `Option<T>` (or `#[default(...)]` where supported). Applied to `Memory.source_url`. Do not "simplify" `Option<String>` back to `String` — it makes the module unpublishable. |
+| 2026-08-05 | Codify an explicit `Option<T>` vs default-value decision procedure in `docs/OPTION_VS_DEFAULT.md` | The prose policy stated "Use `Option<T>` when unset matters" but gave no checklist. Worked examples (`note.version`, `User.email`, `Memory` feature blocks) plus a front-loaded TL;DR give contributors a repeatable procedure; enforced per-table by `sdk/python/tests/test_schema_evolution_policy.py::TestOptionVsDefaultDecision` and `TestOptionReadPathsGuarded`. |
+| 2026-08-05 | Make the policy machine-enforced (append-only contract + defaults audit) wired into CI | Policy compliance previously relied on manual review. Now: `sdk/python/tests/schema_policy_lib.py` + committed `schema_baseline.json` assert `current schema ⊇ baseline` (only permitted transition `T` → `Option<T>`; no table/field removal, no type change — `TestNonAdditiveAppendOnly`), and `scripts/audit_rust_type_defaults.py` scans every `#[table]` insert site against the Defaults-by-Rust-Type table (`TestAllTablesDefaultsByRustType`). Baseline regenerated via `scripts/update_schema_baseline.py`, which refuses to write a shrinking baseline. |
 
 ---
 
