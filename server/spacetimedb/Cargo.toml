@@ -24,7 +24,7 @@ hex = "0.4"
 regex = "1"
 hmac = "0.12"
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
-p256 = { version = "0.13", features = ["pem", "sha2", "arithmetic"] }
+p256 = { version = "0.14", features = ["pem", "sha2", "arithmetic"] }
 base64 = "0.22"
 aes-gcm = "0.10"
 # getrandom comes in via p256 → crypto-bigint → rand_core. The wasi backend
