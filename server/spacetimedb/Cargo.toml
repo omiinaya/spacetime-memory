@@ -43,4 +43,4 @@ serde_json = "1"           # benchmark JSON parsing/writing
 # Test utilities — these compile on host target (not wasm32)
 rstest = "0.18"            # parameterized tests
 pretty_assertions = "1"    # readable diff output
-reqwest = { version = "0.12", features = ["blocking"] }  # integration tests (HTTP)
+reqwest = { version = "0.13", features = ["blocking"] }  # integration tests (HTTP)
