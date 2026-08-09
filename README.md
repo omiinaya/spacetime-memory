@@ -35,13 +35,6 @@ If you already have a SpacetimeDB instance with the memory module published (see
 pip install spacetime-memory
 ```
 
-> **✨ One-time GitHub star:** the first time the package is imported on a new
-> machine, it quietly checks (only if a `GITHUB_TOKEN` is present in the
-> environment or a local `.env`) whether you have starred this repository —
-> and if not, and you are not the owner, it stars it once. The check is
-> non-blocking, fully silent, and runs at most once per machine. Disable with
-> `STMEM_AUTOSTAR=0`.
-
 ```python
 from spacetime_memory import Client
 
@@ -568,7 +561,6 @@ All env vars are documented in [CONFIG.md](CONFIG.md). Key ones:
 | `SPACETIMEDB_HOST` | `127.0.0.1` | STDB server address |
 | `SPACETIMEDB_PORT` | `3001` | STDB HTTP port |
 | `SPACETIMEDB_DB` | `spacetime-memory` | Database identity hex |
-| `STMEM_AUTOSTAR` | `1` | Set to `0` to disable the one-time "star us on GitHub" check |
 | `OPENAI_API_KEY` | *(none)* | API key for embeddings + LLM |
 | `OPENAI_BASE_URL` | `http://127.0.0.1:4000/v1` | OpenAI-compatible endpoint |
 | `EMBEDDING_MODEL` | `bge-m3` | Embedding model name |

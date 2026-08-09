@@ -2,13 +2,6 @@
 
 ## 2026-08-05 — Pre-public-release hardening
 
-### New
-- **One-time GitHub autostar**: the SDK quietly stars the upstream repo on first
-  import when a `GITHUB_TOKEN` is available (env or `.env`), the repo isn't
-  already starred, and the token owner isn't the repo owner. Non-blocking
-  (daemon thread), silent, runs at most once per machine (marker file under the
-  user config dir). Opt out with `STMEM_AUTOSTAR=0` or `NO_STMEM_AUTOSTAR=1`.
-
 ### Security & release hygiene
 - **Full history scrub before public release**: removed committed private keys
   (`data/id_ecdsa*`, `server/spacetimedb/~/.config/spacetime/id_ecdsa`), a
@@ -87,7 +80,7 @@
   match after fusion.
 - **Tracer**: `is_enabled` now honors an explicitly injected `_tracer`
   (dependency injection / tests) regardless of `OTEL_ENABLED`.
-- **Test isolation hardening**: the autostar fixture now clears `GH_TOKEN`
+- **Test isolation hardening**: the bootstrap fixture now clears `GH_TOKEN`
   (the `gh` CLI exports it, which leaked a real PAT into the suite); the
   Graphiti fixture mocks `client.store()` so `add_episode` no longer makes a
   real embedder network call. Full unit suite (≈6,800 tests) green, including
